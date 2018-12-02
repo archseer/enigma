@@ -2,10 +2,11 @@
 // use std::fs;
 use std::str;
 use nom::*;
+use nom::dbg;
 
 fn main() {
     let bytes = include_bytes!("../hello.beam");
-    let res = scan_beam(bytes);//.unwrap();
+    let res = scan_beam(bytes).unwrap();
     println!("{:?}", res);
     //println!("{:?}", bytes);
 }
@@ -29,8 +30,7 @@ pub struct Chunk<'a> {
     pub data: &'a [u8],
 }
 
-named!(
-    scan_beam<&[u8], Vec<Chunk>>,
+named!( scan_beam<&[u8], Vec<Chunk>>,
     do_parse!(
         tag!("FOR1") >>
         _size: le_u32 >>
@@ -42,12 +42,12 @@ named!(
 
 named!(
     chunks<&[u8], Vec<Chunk>>,
-    many1!(chunk)
+    many0!(chunk)
 );
 
 named!(
     chunk<&[u8], Chunk>,
-    do_parse!(
+     do_parse!(
         name: map_res!(take!(4), std::str::from_utf8) >>
         size: be_u32 >>
         bytes: take!(size) >>
