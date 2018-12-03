@@ -34,21 +34,17 @@ fn main() {
         // bit length of each instruction.
         let mut pc = 0;
         loop {
-            //let opcode = to_opcode(code[pc]);
-            let (_, (opcode, args)) = scan_instruction(code).unwrap();
-            pc = pc + 1;
-            println!("op: {:?}, args: {:?}", opcode, args);
+            let (_, instruction) = scan_instruction(code).unwrap();
 
-            // apply compact_term, arity times (keep an arity table)
             let (_, res) = scan_instructions(code).unwrap();
-            println!("res: {:?}", res);
+            println!("res: {:#?}", res);
 
-            match opcode {
+            match instruction.op {
                 Opcode::Line => {
                     // one operand, Integer
                     break;
                 }
-                _ => println!("Unimplemented opcode {:?}", opcode),
+                opcode => println!("Unimplemented opcode {:?}", opcode),
             }
         }
     }
@@ -171,13 +167,13 @@ named!(
 
 #[derive(Debug)]
 pub enum Term {
-    Literal(),
-    Integer(),
-    Atom(),
-    X(),
-    Y(),
-    Label(),
-    Character(),
+    Literal(u8),
+    Integer(u8),
+    Atom(u8),
+    X(u8),
+    Y(u8),
+    Label(u8),
+    Character(u8),
     // Extended,
     Float(),
     List(),
@@ -186,41 +182,59 @@ pub enum Term {
     ExtendedLiteral(),
 }
 
-fn compact_term(i: &[u8]) -> IResult<&[u8], u8> {
+fn compact_term(i: &[u8]) -> IResult<&[u8], Term> {
     let (rest, b) = be_u8(i)?;
     let tag = b & 0b111;
 
     if tag < 0b111 {
         // it's not extended
-        if 0 == (b & 0b1000) {
+        let val = if 0 == (b & 0b1000) {
             // Bit 3 is 0 marks that 4 following bits contain the value
-            return Ok((rest, b >> 4));
-        }
-        // if bit 3 was 1,
-        // Bit 4 is 0, marks that the following 3 bits (most significant) and
-        // the following byte (least significant) will contain the 11-bit value
-        //
-        // Bit 4 is 1 means that bits 5-6-7 contain amount of bytes+2 to store
-        // the value
+            b >> 4
+        } else {
+            // if bit 3 was 1,
+            // Bit 4 is 0, marks that the following 3 bits (most significant) and
+            // the following byte (least significant) will contain the 11-bit value
+            //
+            // Bit 4 is 1 means that bits 5-6-7 contain amount of bytes+2 to store
+            // the value
+            44
+        };
 
-        return Ok((rest, 1));
+        return match tag {
+            0 => Ok((rest, Term::Literal(val))),
+            1 => Ok((rest, Term::Integer(val))),
+            2 => Ok((rest, Term::Atom(val))),
+            3 => Ok((rest, Term::X(val))),
+            4 => Ok((rest, Term::Y(val))),
+            5 => Ok((rest, Term::Label(val))),
+            6 => Ok((rest, Term::Character(val))),
+            _ => panic!("can't happen"),
+        };
     }
 
     // extended_term()
-    Ok((rest, b))
+    Ok((rest, Term::Integer(b)))
+}
+
+#[derive(Debug)]
+pub struct Instruction {
+    pub op: Opcode,
+    pub args: Vec<Term>,
 }
 
 named!(
-    scan_instructions<&[u8], Vec<(Opcode, Vec<u8>)>>,
+    scan_instructions<&[u8], Vec<Instruction>>,
     many0!(complete!(scan_instruction))
 );
 
+// apply compact_term, arity times (keep an arity table)
 named!(
-    scan_instruction<&[u8], (Opcode, Vec<u8>)>,
+    scan_instruction<&[u8], Instruction>,
     do_parse!(
         op: be_u8 >>
-        term: count!(compact_term, opcode_arity(op)) >>
-        ((to_opcode(op), term))
+        args: count!(compact_term, opcode_arity(op)) >>
+        (Instruction { op: to_opcode(op), args })
     )
 );
 
