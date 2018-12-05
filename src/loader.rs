@@ -2,8 +2,7 @@ use crate::opcodes::*;
 use nom::*;
 
 pub fn load_file(bytes: &[u8]) -> Result<CodeChunk, nom::Err<&[u8]>> {
-    let bytes = include_bytes!("../hello.beam");
-    let ([], res) = scan_beam(bytes).unwrap();
+    let (_, res) = scan_beam(bytes).unwrap();
 
     let names: Vec<_> = res.iter().map(|chunk| chunk.name).collect();
     println!("{:?}", names);
@@ -27,6 +26,14 @@ pub fn load_file(bytes: &[u8]) -> Result<CodeChunk, nom::Err<&[u8]>> {
     let chunk = res.iter().find(|chunk| chunk.name == "ExpT").unwrap();
     let data = loct_chunk(chunk.data)?;
     println!("{:?}", data);
+
+    // parse all the chunks
+    // load all the atoms, lambda funcs and literals into the VM and store the vm vals
+    // parse the instructions, swapping for global vals
+    // - skip line
+    // - store labels as offsets
+    // - patch jump instructions to labels (store patches if label wasn't seen yet)
+    // - make imports work via pointers..
 
     return Ok(code.1);
 }

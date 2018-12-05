@@ -1,5 +1,8 @@
+mod atom;
 mod loader;
 mod opcodes;
+mod value;
+use crate::atom::AtomTable;
 use crate::opcodes::*;
 
 fn main() {
@@ -31,12 +34,20 @@ fn main() {
 // --------------------
 
 #[derive(Debug)]
-pub struct Context {
-    // atom table
-// export table
-// module table
-// register table??
+pub struct Machine {
+    atom_table: AtomTable,
+    // export table
+    // module table
+    // register table??
 
-// registers
-// program pointer/reference?
+    // registers
+    // program pointer/reference?
+}
+
+impl Machine {
+    pub fn new() -> Machine {
+        Machine {
+            atom_table: AtomTable::new(),
+        }
+    }
 }
