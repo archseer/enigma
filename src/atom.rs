@@ -64,8 +64,8 @@ impl AtomTable {
     }
 
     fn register_atom(&self, s: &str) -> usize {
-        let index_r = self.index_r.lock().unwrap();
-        let index = index_r.len();
+        let mut index_r = self.index_r.lock().unwrap();
+        let mut index = index_r.len();
         self.index.lock().unwrap().insert(s.to_string(), index);
         index_r.push(Atom::new(s));
         index
@@ -74,7 +74,7 @@ impl AtomTable {
     // Allocate new atom in the atom table or find existing.
     // TODO: Pack the atom index as an immediate2 Term
     pub fn from_str(&self, val: &str) -> Value {
-        let mut atoms = self.index.lock().unwrap();
+        let atoms = self.index.lock().unwrap();
 
         if atoms.contains_key(val) {
             return Value::Atom(atoms[val]);
@@ -84,21 +84,24 @@ impl AtomTable {
         Value::Atom(index)
     }
 
-    pub fn to_str(&self, a: Value) -> Hopefully<String> {
-        assert!(a.is_atom());
-        if let Some(p) = self.lookup(a) {
-            Ok(unsafe { (*p).name.clone() })
+    pub fn to_str(&self, a: &Value) -> Result<String, String> {
+        if let Value::Atom(index) = a {
+            if let Some(p) = self.lookup(a) {
+                return Ok(unsafe { (*p).name.clone() });
+            }
+            return Err(format!("Atom does not exist: {}", index));
         }
-        Err(Error::AtomNotExist(format!("index {}", a.atom_index())));
+        panic!("Value is not an atom!")
     }
 
-    pub fn lookup(&self, a: Value) -> Option<*const Atom> {
-        assert!(a.is_atom());
-        let index_r = self.index_r.lock().unwrap();
-        let index = a.atom_index();
-        if index >= index_r.len() {
-            return None();
+    pub fn lookup(&self, a: &Value) -> Option<*const Atom> {
+        if let Value::Atom(index) = a {
+            let index_r = self.index_r.lock().unwrap();
+            if *index >= index_r.len() {
+                return None;
+            }
+            return Some(&index_r[*index] as *const Atom);
         }
-        Some(&index_r[index] as *const Atom)
+        panic!("Value is not an atom!")
     }
 }
