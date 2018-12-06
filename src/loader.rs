@@ -3,36 +3,46 @@ use crate::vm::Machine;
 use nom::*;
 use num_bigint::{BigInt, Sign};
 
+#[derive(Debug)]
 pub struct Loader<'a> {
     pub vm: &'a Machine,
+    atoms: Vec<&'a str>,
+    imports: Vec<ErlFun>,
+    exports: Vec<ErlFun>,
 }
 
 impl<'a> Loader<'a> {
-    pub fn load_file(&self, bytes: &'a [u8]) -> Result<CodeChunk, nom::Err<&[u8]>> {
+    pub fn new(vm: &Machine) -> Loader {
+        Loader {
+            vm,
+            atoms: Vec::new(),
+            imports: Vec::new(),
+            exports: Vec::new(),
+        }
+    }
+
+    pub fn load_file(&mut self, bytes: &'a [u8]) -> Result<String, nom::Err<&[u8]>> {
         let (_, res) = scan_beam(bytes).unwrap();
 
-        let names: Vec<_> = res.iter().map(|chunk| chunk.name).collect();
-        println!("{:?}", names);
+        // let names: Vec<_> = res.iter().map(|chunk| chunk.name).collect();
+        // println!("{:?}", names);
 
-        let chunk = res.iter().find(|chunk| chunk.name == "Code").unwrap();
-        let code = code_chunk(chunk.data)?;
-        println!("{:?}", code);
+        for chunk in res {
+            match chunk.name.as_ref() {
+                "AtU8" => self.load_atoms(chunk),
+                "LocT" => self.load_local_fun_table(chunk),
+                "ImpT" => self.load_imports_table(chunk),
+                "ExpT" => self.load_exports_table(chunk),
+                name => println!("Unhandled chunk: {}", name),
+                // // LitT
 
-        let chunk = res.iter().find(|chunk| chunk.name == "AtU8").unwrap();
-        let data = atom_chunk(chunk.data)?;
-        println!("{:?}", data);
+                // let chunk = res.iter().find(|chunk| chunk.name == "Code").unwrap();
+                // let code = code_chunk(chunk.data)?;
+                // println!("{:?}", code.1);
+            }
+        }
 
-        let chunk = res.iter().find(|chunk| chunk.name == "LocT").unwrap();
-        let data = loct_chunk(chunk.data)?;
-        println!("{:?}", data);
-
-        let chunk = res.iter().find(|chunk| chunk.name == "ImpT").unwrap();
-        let data = loct_chunk(chunk.data)?;
-        println!("{:?}", data);
-
-        let chunk = res.iter().find(|chunk| chunk.name == "ExpT").unwrap();
-        let data = loct_chunk(chunk.data)?;
-        println!("{:?}", data);
+        println!("{:?}", self);
 
         // parse all the chunks
         // load all the atoms, lambda funcs and literals into the VM and store the vm vals
@@ -41,9 +51,31 @@ impl<'a> Loader<'a> {
         // - store labels as offsets
         // - patch jump instructions to labels (store patches if label wasn't seen yet)
         // - make imports work via pointers..
-        println!("{:?}", code.1);
 
-        return Ok(code.1);
+        return Ok(String::from("OK"));
+    }
+
+    fn load_atoms(&mut self, chunk: Chunk<'a>) {
+        let (_, data) = atom_chunk(chunk.data).unwrap();
+        println!("{:?}", data);
+        self.atoms = data.atoms;
+    }
+
+    fn load_local_fun_table(&mut self, chunk: Chunk<'a>) {
+        let (_, data) = loct_chunk(chunk.data).unwrap();
+        println!("LocT {:?}", data);
+    }
+
+    fn load_imports_table(&mut self, chunk: Chunk<'a>) {
+        let (_, data) = loct_chunk(chunk.data).unwrap();
+        println!("ImpT {:?}", data);
+        self.imports = data.entries;
+    }
+
+    fn load_exports_table(&mut self, chunk: Chunk<'a>) {
+        let (_, data) = loct_chunk(chunk.data).unwrap();
+        println!("ExpT {:?}", data);
+        self.exports = data.entries;
     }
 }
 
@@ -124,6 +156,7 @@ named!(
     atom_chunk<&[u8], AtomChunk>,
     do_parse!(
         count: be_u32 >>
+        // TODO figure out if we can prealloc the size
         atoms: count!(map_res!(length_bytes!(be_u8), std::str::from_utf8), count as usize) >>
         (AtomChunk { count, atoms })
     )
