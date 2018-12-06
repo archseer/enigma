@@ -1,7 +1,7 @@
 //use std::ptr;
 use crate::value::Value;
 use std::collections::BTreeMap;
-use std::sync::Mutex;
+use std::sync::RwLock;
 use std::u16;
 
 #[derive(Debug)]
@@ -48,25 +48,25 @@ impl Atom {
 #[derive(Debug)]
 pub struct AtomTable {
     /// Direct mapping string to atom index
-    index: Mutex<BTreeMap<String, usize>>,
+    index: RwLock<BTreeMap<String, usize>>,
 
     /// Reverse mapping atom index to string (sorted by index)
-    index_r: Mutex<Vec<Atom>>,
+    index_r: RwLock<Vec<Atom>>,
 }
 
 /// Stores atom lookup tables.
 impl AtomTable {
     pub fn new() -> AtomTable {
         AtomTable {
-            index: Mutex::new(BTreeMap::new()),
-            index_r: Mutex::new(Vec::new()),
+            index: RwLock::new(BTreeMap::new()),
+            index_r: RwLock::new(Vec::new()),
         }
     }
 
     fn register_atom(&self, s: &str) -> usize {
-        let mut index_r = self.index_r.lock().unwrap();
+        let mut index_r = self.index_r.write().unwrap();
         let mut index = index_r.len();
-        self.index.lock().unwrap().insert(s.to_string(), index);
+        self.index.write().unwrap().insert(s.to_string(), index);
         index_r.push(Atom::new(s));
         index
     }
@@ -74,11 +74,13 @@ impl AtomTable {
     // Allocate new atom in the atom table or find existing.
     // TODO: Pack the atom index as an immediate2 Term
     pub fn from_str(&self, val: &str) -> Value {
-        let atoms = self.index.lock().unwrap();
+        {
+            let atoms = self.index.read().unwrap();
 
-        if atoms.contains_key(val) {
-            return Value::Atom(atoms[val]);
-        }
+            if atoms.contains_key(val) {
+                return Value::Atom(atoms[val]);
+            }
+        } // drop read lock
 
         let index = self.register_atom(val);
         Value::Atom(index)
@@ -96,7 +98,7 @@ impl AtomTable {
 
     pub fn lookup(&self, a: &Value) -> Option<*const Atom> {
         if let Value::Atom(index) = a {
-            let index_r = self.index_r.lock().unwrap();
+            let index_r = self.index_r.read().unwrap();
             if *index >= index_r.len() {
                 return None;
             }
