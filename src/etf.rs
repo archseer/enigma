@@ -3,6 +3,7 @@ use nom::*;
 
 /// External Term Format parser
 
+#[allow(dead_code)]
 #[derive(Debug)]
 enum Tag {
     ETF = 131,
@@ -44,20 +45,25 @@ pub fn decode(rest: &[u8]) -> IResult<&[u8], Value> {
 pub fn decode_value(rest: &[u8]) -> IResult<&[u8], Value> {
     // next be_u8 specifies the type tag
     let (rest, tag) = be_u8(rest)?;
-    println!("decode_value {:?}", tag);
     let tag: Tag = unsafe { ::std::mem::transmute(tag) };
-    println!("here!");
 
     match tag {
         Tag::List => decode_list(rest),
         Tag::Atom => decode_atom(rest),
         Tag::Nil => Ok((rest, Value::None())),
+        Tag::SmallTuple => {
+            let (rest, size) = be_u8(rest)?;
+            decode_tuple(rest, size as usize)
+        }
+        Tag::LargeTuple => {
+            let (rest, size) = be_u32(rest)?;
+            decode_tuple(rest, size as usize)
+        }
         _ => panic!("Tag is {:?}", tag),
     }
 }
 
 pub fn decode_atom(rest: &[u8]) -> IResult<&[u8], Value> {
-    println!("decode_atom");
     let (rest, size) = be_u16(rest)?;
     let (rest, string) = take_str!(rest, size)?;
 
@@ -66,8 +72,9 @@ pub fn decode_atom(rest: &[u8]) -> IResult<&[u8], Value> {
     Ok((rest, Value::Atom(1)))
 }
 
+pub fn decode_tuple(rest: &[u8], size: usize) -> IResult<&[u8], Value> {}
+
 pub fn decode_list(rest: &[u8]) -> IResult<&[u8], Value> {
-    println!("decode_list");
     let (rest, len) = be_u32(rest)?;
 
     // TODO: use alloc
@@ -76,7 +83,7 @@ pub fn decode_list(rest: &[u8]) -> IResult<&[u8], Value> {
         tail: Box::new(Value::None()),
     };
 
-    let (tail, rest) = (0..len).fold((&mut start, rest), |(cons, buf), i| {
+    let (tail, rest) = (0..len).fold((&mut start, rest), |(cons, buf), _i| {
         // TODO: probably doing something wrong here
         if let &mut Value::Cons {
             ref mut head,

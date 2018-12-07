@@ -14,6 +14,7 @@ pub struct Loader<'a> {
     imports: Vec<ErlFun>,
     exports: Vec<ErlFun>,
     literals: Vec<Value>,
+    code: &'a [u8],
 }
 
 impl<'a> Loader<'a> {
@@ -24,6 +25,7 @@ impl<'a> Loader<'a> {
             imports: Vec::new(),
             exports: Vec::new(),
             literals: Vec::new(),
+            code: &[],
         }
     }
 
@@ -32,6 +34,7 @@ impl<'a> Loader<'a> {
 
         // let names: Vec<_> = res.iter().map(|chunk| chunk.name).collect();
         // println!("{:?}", names);
+        // ["AtU8", "Code", "StrT", "ImpT", "ExpT", "LitT", "LocT", "Attr", "CInf", "Dbgi", "Line"]
 
         for chunk in res {
             match chunk.name.as_ref() {
@@ -39,11 +42,11 @@ impl<'a> Loader<'a> {
                 "LocT" => self.load_local_fun_table(chunk),
                 "ImpT" => self.load_imports_table(chunk),
                 "ExpT" => self.load_exports_table(chunk),
+                //"StrT" => self.load_strings_table(chunk),
                 "LitT" => self.load_literals_table(chunk),
+                "Attr" => self.load_attributes(chunk),
+                "Code" => self.load_code(chunk),
                 name => println!("Unhandled chunk: {}", name),
-                // let chunk = res.iter().find(|chunk| chunk.name == "Code").unwrap();
-                // let code = code_chunk(chunk.data)?;
-                // println!("{:?}", code.1);
             }
         }
 
@@ -63,11 +66,28 @@ impl<'a> Loader<'a> {
         return Ok(String::from("OK"));
     }
 
+    fn load_code(&mut self, chunk: Chunk<'a>) {
+        let (_, data) = code_chunk(chunk.data).unwrap();
+        println!("{:?}", data);
+        self.code = data.code;
+    }
+
     fn load_atoms(&mut self, chunk: Chunk<'a>) {
         let (_, data) = atom_chunk(chunk.data).unwrap();
         println!("{:?}", data);
         self.atoms = data.atoms;
     }
+
+    fn load_attributes(&mut self, chunk: Chunk<'a>) {
+        // Contains two parts: a proplist of module attributes, encoded as External Term Format,
+        // and a compiler info (options and version) encoded similarly.
+        let (rest, val) = etf::decode(chunk.data).unwrap();
+        println!("attrs val: {:?}; rest: {:?}", val, rest);
+    }
+
+    // fn load_strings_table(&mut self, chunk: Chunk<'a>) {
+    //     // println!("StrT {:?}", data);
+    // }
 
     fn load_local_fun_table(&mut self, chunk: Chunk<'a>) {
         let (_, data) = loct_chunk(chunk.data).unwrap();
@@ -108,8 +128,6 @@ impl<'a> Loader<'a> {
         let (_, literals) = decode_literals(buf).unwrap();
         self.literals = literals;
         println!("{:?}", self.literals);
-
-        println!("LitT {:?}", data);
     }
 
     // TODO: return a Module

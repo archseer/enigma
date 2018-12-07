@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 pub enum Value {
     None(), // also known as nil
