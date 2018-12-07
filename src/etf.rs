@@ -64,15 +64,25 @@ pub fn decode_value(rest: &[u8]) -> IResult<&[u8], Value> {
 }
 
 pub fn decode_atom(rest: &[u8]) -> IResult<&[u8], Value> {
-    let (rest, size) = be_u16(rest)?;
-    let (rest, string) = take_str!(rest, size)?;
+    let (rest, len) = be_u16(rest)?;
+    let (rest, string) = take_str!(rest, len)?;
 
     println!("{:?}", string);
     // TODO: create atom &string
     Ok((rest, Value::Atom(1)))
 }
 
-pub fn decode_tuple(rest: &[u8], size: usize) -> IResult<&[u8], Value> {}
+pub fn decode_tuple(rest: &[u8], len: usize) -> IResult<&[u8], Value> {
+    let mut els: Vec<Value> = Vec::with_capacity(len);
+
+    let rest = (0..len).fold(rest, |rest, _i| {
+        let (rest, el) = decode_value(rest).unwrap();
+        els.push(el);
+        rest
+    });
+
+    Ok((rest, Value::Tuple(els)))
+}
 
 pub fn decode_list(rest: &[u8]) -> IResult<&[u8], Value> {
     let (rest, len) = be_u32(rest)?;

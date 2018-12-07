@@ -15,7 +15,7 @@ pub enum Value {
         tail: Box<Value>,
     }, // two values
     /// Boxed values
-    Tuple(),
+    Tuple(Vec<Value>), // TODO: allocate on custom heap
     Float(f64),
     /// Strings use an Arc so they can be sent to other processes without
     /// requiring a full copy of the data.
