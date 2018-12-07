@@ -1,3 +1,4 @@
+use crate::atom::ATOMS;
 use crate::etf;
 use crate::opcodes::*;
 use crate::value::Value;
@@ -136,9 +137,9 @@ impl<'a> Loader<'a> {
     }
 
     fn register_atoms(&self) {
-        self.vm.atom_table.reserve(self.atoms.len());
+        ATOMS.reserve(self.atoms.len());
         for a in &self.atoms {
-            self.vm.atom_table.register_atom(a);
+            ATOMS.register_atom(a);
         }
         // keep a mapping of these to patch the instrs
 

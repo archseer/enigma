@@ -5,6 +5,9 @@ mod opcodes;
 mod value;
 mod vm;
 
+#[macro_use]
+extern crate once_cell;
+
 use crate::loader::Loader;
 use crate::opcodes::*;
 

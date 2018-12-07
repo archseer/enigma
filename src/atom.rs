@@ -1,6 +1,7 @@
 //use std::ptr;
 use crate::value::Value;
-use std::collections::BTreeMap;
+use once_cell::sync::Lazy;
+use std::collections::BTreeMap; // TODO: maybe HashMap
 use std::sync::RwLock;
 use std::u16;
 
@@ -109,3 +110,21 @@ impl AtomTable {
         panic!("Value is not an atom!")
     }
 }
+
+pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
+    let mut atoms = AtomTable::new();
+    // m.insert(0, "foo");
+    // m.insert(1, "bar");
+    // m.insert(2, "baz");
+    atoms
+};
+
+pub fn from_str(val: &str) -> Value {
+    ATOMS.from_str(val)
+}
+
+pub fn to_str(a: &Value) -> Result<String, String> {
+    ATOMS.to_str(a)
+}
+
+// println!("ATOMS: {:?}", ATOMS.index.read().unwrap());

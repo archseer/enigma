@@ -1,19 +1,21 @@
+use crate::atom;
 use crate::value::Value;
 use nom::*;
+use num::traits::ToPrimitive;
+use num_bigint::{BigInt, Sign};
 
 /// External Term Format parser
 
 #[allow(dead_code)]
 #[derive(Debug)]
 enum Tag {
-    ETF = 131,
     NewFloat = 70,
     BitBinary = 77,
     AtomCacheRef_ = 82,
     SmallInteger = 97,
     Integer = 98,
     Float = 99,
-    Atom = 100, // deprecated latin-1 ?
+    Atom = 100, // deprecated latin-1 ? check orig source
     Reference = 101,
     Port = 102,
     Pid = 103,
@@ -48,6 +50,26 @@ pub fn decode_value(rest: &[u8]) -> IResult<&[u8], Value> {
     let tag: Tag = unsafe { ::std::mem::transmute(tag) };
 
     match tag {
+        // TODO:
+        // NewFloat
+        // BitBinary
+        // AtomCacheRef_
+        // SmallInteger
+        // Integer
+        // Float
+        // Reference
+        // Port
+        // Pid
+        // String
+        // Binary
+        // NewFun
+        // Export
+        // NewReference
+        // SmallAtom
+        // Map
+        // Fun
+        // AtomU8
+        // SmallAtomU8
         Tag::List => decode_list(rest),
         Tag::Atom => decode_atom(rest),
         Tag::Nil => Ok((rest, Value::None())),
@@ -59,6 +81,15 @@ pub fn decode_value(rest: &[u8]) -> IResult<&[u8], Value> {
             let (rest, size) = be_u32(rest)?;
             decode_tuple(rest, size as usize)
         }
+        Tag::SmallBig => {
+            let (rest, size) = be_u8(rest)?;
+            decode_bignum(rest, size as usize)
+        }
+        Tag::LargeBig => {
+            let (rest, size) = be_u32(rest)?;
+            decode_bignum(rest, size as usize)
+        }
+
         _ => panic!("Tag is {:?}", tag),
     }
 }
@@ -67,9 +98,8 @@ pub fn decode_atom(rest: &[u8]) -> IResult<&[u8], Value> {
     let (rest, len) = be_u16(rest)?;
     let (rest, string) = take_str!(rest, len)?;
 
-    println!("{:?}", string);
     // TODO: create atom &string
-    Ok((rest, Value::Atom(1)))
+    Ok((rest, atom::from_str(string)))
 }
 
 pub fn decode_tuple(rest: &[u8], len: usize) -> IResult<&[u8], Value> {
@@ -117,4 +147,30 @@ pub fn decode_list(rest: &[u8]) -> IResult<&[u8], Value> {
     std::mem::replace(&mut *tail, val);
 
     return Ok((rest, start));
+}
+
+#[cfg(target_pointer_width = "32")]
+pub const WORD_BITS: usize = 32;
+
+#[cfg(target_pointer_width = "64")]
+pub const WORD_BITS: usize = 64;
+
+pub fn decode_bignum(rest: &[u8], size: usize) -> IResult<&[u8], Value> {
+    let (rest, sign) = be_u8(rest)?;
+
+    let sign = if sign == 0 { Sign::Plus } else { Sign::Minus };
+
+    let (rest, digits) = take!(rest, size)?;
+    let big = BigInt::from_bytes_le(sign, &digits);
+
+    // Assert that the number fits into small
+    if big.bits() < WORD_BITS - 4 {
+        let b_signed = big.to_isize().unwrap();
+        return Ok((rest, Value::Integer(b_signed as i64)));
+    }
+
+    // Determine storage size in words
+    //unsafe { Ok(tb.create_bignum(big)?) }
+    Ok((rest, Value::Integer(123)))
+    //Ok((rest, Value::BigNum(b_signed));
 }
