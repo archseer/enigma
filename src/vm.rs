@@ -2,7 +2,7 @@ use crate::atom::AtomTable;
 
 #[derive(Debug)]
 pub struct Machine {
-    atom_table: AtomTable,
+    pub atom_table: AtomTable,
     // export table
     // module table
     // register table??

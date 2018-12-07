@@ -7,3 +7,4 @@ edition = "2018"
 [dependencies]
 nom = "4.1.1"
 num-bigint = "0.2.1"
+compress = "0.1.2"

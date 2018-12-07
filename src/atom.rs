@@ -63,7 +63,9 @@ impl AtomTable {
         }
     }
 
-    fn register_atom(&self, s: &str) -> usize {
+    pub fn reserve(&self, len: usize) {}
+
+    pub fn register_atom(&self, s: &str) -> usize {
         let mut index_r = self.index_r.write().unwrap();
         let mut index = index_r.len();
         self.index.write().unwrap().insert(s.to_string(), index);

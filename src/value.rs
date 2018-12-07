@@ -9,7 +9,10 @@ pub enum Value {
     Port(),
     Ref(),
     // continuation pointer?
-    Cons(Box<Value>, Box<Value>), // two values
+    Cons {
+        head: Box<Value>,
+        tail: Box<Value>,
+    }, // two values
     /// Boxed values
     Tuple(),
     Float(f64),

@@ -1,7 +1,11 @@
+use crate::etf;
 use crate::opcodes::*;
+use crate::value::Value;
 use crate::vm::Machine;
+use compress::zlib;
 use nom::*;
 use num_bigint::{BigInt, Sign};
+use std::io::{Cursor, Read};
 
 #[derive(Debug)]
 pub struct Loader<'a> {
@@ -9,6 +13,7 @@ pub struct Loader<'a> {
     atoms: Vec<&'a str>,
     imports: Vec<ErlFun>,
     exports: Vec<ErlFun>,
+    literals: Vec<Value>,
 }
 
 impl<'a> Loader<'a> {
@@ -18,6 +23,7 @@ impl<'a> Loader<'a> {
             atoms: Vec::new(),
             imports: Vec::new(),
             exports: Vec::new(),
+            literals: Vec::new(),
         }
     }
 
@@ -33,9 +39,8 @@ impl<'a> Loader<'a> {
                 "LocT" => self.load_local_fun_table(chunk),
                 "ImpT" => self.load_imports_table(chunk),
                 "ExpT" => self.load_exports_table(chunk),
+                "LitT" => self.load_literals_table(chunk),
                 name => println!("Unhandled chunk: {}", name),
-                // // LitT
-
                 // let chunk = res.iter().find(|chunk| chunk.name == "Code").unwrap();
                 // let code = code_chunk(chunk.data)?;
                 // println!("{:?}", code.1);
@@ -44,9 +49,12 @@ impl<'a> Loader<'a> {
 
         println!("{:?}", self);
 
+        self.prepare();
         // parse all the chunks
         // load all the atoms, lambda funcs and literals into the VM and store the vm vals
+
         // parse the instructions, swapping for global vals
+        // - swap load atoms with global atoms
         // - skip line
         // - store labels as offsets
         // - patch jump instructions to labels (store patches if label wasn't seen yet)
@@ -77,7 +85,64 @@ impl<'a> Loader<'a> {
         println!("ExpT {:?}", data);
         self.exports = data.entries;
     }
+
+    fn load_literals_table(&mut self, chunk: Chunk<'a>) {
+        let (rest, size) = be_u32(chunk.data).unwrap();
+        let mut data = Vec::with_capacity(size as usize);
+
+        // Decompress deflated literal table
+        let iocursor = Cursor::new(rest);
+        zlib::Decoder::new(iocursor).read_to_end(&mut data).unwrap();
+        let buf = &data[..];
+
+        println!("{:?}", data);
+
+        assert_eq!(data.len(), size as usize, "LitT inflate failed");
+
+        // self.literals.reserve(count as usize);
+
+        // Decode literals into literal heap
+        // pass in an allocator that allocates to a permanent non GC heap
+        // TODO: probably GC'd when module is deallocated?
+        // &self.literal_allocator
+        let (_, literals) = decode_literals(buf).unwrap();
+        self.literals = literals;
+        println!("{:?}", self.literals);
+
+        println!("LitT {:?}", data);
+    }
+
+    // TODO: return a Module
+    fn prepare(&mut self) {
+        self.register_atoms();
+    }
+
+    fn register_atoms(&self) {
+        self.vm.atom_table.reserve(self.atoms.len());
+        for a in &self.atoms {
+            self.vm.atom_table.register_atom(a);
+        }
+        // keep a mapping of these to patch the instrs
+
+        // Create a new version number for this module and fill self.mod_id
+        // self.set_mod_id(code_server)
+    }
 }
+
+named!(
+    decode_literals<&[u8], Vec<Value>>,
+    do_parse!(
+        _count: be_u32 >>
+        literals: many0!(complete!(
+            do_parse!(
+                _size: be_u32 >>
+                literal: call!(etf::decode) >>
+                (literal)
+            )
+        )) >>
+        (literals)
+    )
+);
 
 #[derive(Debug, PartialEq)]
 pub struct Chunk<'a> {
@@ -189,6 +254,15 @@ named!(
     )
 );
 
+named!(
+    litt_chunk<&[u8], FunTableChunk>,
+    do_parse!(
+        count: be_u32 >>
+        entries: count!(fun_entry, count as usize) >>
+        (FunTableChunk { count, entries })
+    )
+);
+
 // "StrT", "ImpT", "ExpT", "LocT", "Attr", "CInf", "Dbgi", "Line"
 
 // It can be Literal=0, Integer=1, Atom=2, XRegister=3, YRegister=4, Label=5, Character=6, Extended=7.
@@ -292,8 +366,7 @@ fn parse_extended_term(b: u8, rest: &[u8]) -> IResult<&[u8], Term> {
 fn parse_list(rest: &[u8]) -> IResult<&[u8], Term> {
     // The stream now contains a smallint size, then size/2 pairs of values
     let (mut rest, n) = be_u8(rest)?;
-    let mut els: Vec<Term> = Vec::new();
-    els.reserve(n as usize);
+    let mut els = Vec::with_capacity(n as usize);
 
     for _i in 0..n {
         let (new_rest, term) = compact_term(rest)?;

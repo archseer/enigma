@@ -1,4 +1,5 @@
 mod atom;
+mod etf;
 mod loader;
 mod opcodes;
 mod value;
