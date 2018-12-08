@@ -15,6 +15,7 @@ pub struct Loader<'a> {
     imports: Vec<ErlFun>,
     exports: Vec<ErlFun>,
     literals: Vec<Value>,
+    lambdas: Vec<Lambda>,
     code: &'a [u8],
 }
 
@@ -26,6 +27,7 @@ impl<'a> Loader<'a> {
             imports: Vec::new(),
             exports: Vec::new(),
             literals: Vec::new(),
+            lambdas: Vec::new(),
             code: &[],
         }
     }
@@ -45,6 +47,7 @@ impl<'a> Loader<'a> {
                 "ExpT" => self.load_exports_table(chunk),
                 //"StrT" => self.load_strings_table(chunk),
                 "LitT" => self.load_literals_table(chunk),
+                "FunT" => self.load_funs_table(chunk),
                 "Attr" => self.load_attributes(chunk),
                 "Code" => self.load_code(chunk),
                 name => println!("Unhandled chunk: {}", name),
@@ -129,6 +132,12 @@ impl<'a> Loader<'a> {
         let (_, literals) = decode_literals(buf).unwrap();
         self.literals = literals;
         println!("{:?}", self.literals);
+    }
+
+    fn load_funs_table(&mut self, chunk: Chunk<'a>) {
+        let (_, data) = funt_chunk(chunk.data).unwrap();
+        println!("FunT {:?}", data);
+        self.lambdas = data.entries;
     }
 
     // TODO: return a Module
@@ -282,7 +291,39 @@ named!(
     )
 );
 
-// "StrT", "ImpT", "ExpT", "LocT", "Attr", "CInf", "Dbgi", "Line"
+#[derive(Debug)]
+pub struct Lambda {
+    name: u32,
+    arity: u32,
+    offset: u32,
+    index: u32,
+    nfree: u32, // frozen values for closures
+    ouniq: u32, // ?
+}
+
+#[derive(Debug)]
+pub struct LambdaChunk {
+    pub count: u32,
+    pub entries: Vec<Lambda>,
+}
+
+named!(
+    funt_chunk<&[u8], LambdaChunk>,
+    do_parse!(
+        count: be_u32 >>
+        entries: count!(do_parse!(
+            name: be_u32 >>
+            arity: be_u32 >>
+            offset: be_u32 >>
+            index: be_u32 >>
+            nfree: be_u32 >>
+            ouniq: be_u32 >>
+            (Lambda { name, arity, offset, index, nfree, ouniq })
+            )
+        , count as usize) >>
+        (LambdaChunk { count, entries })
+    )
+);
 
 // It can be Literal=0, Integer=1, Atom=2, XRegister=3, YRegister=4, Label=5, Character=6, Extended=7.
 // If the base tag was Extended=7, then bits 4-5-6-7 PLUS 7 will become the extended tag.
