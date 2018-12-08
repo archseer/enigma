@@ -20,6 +20,7 @@ pub struct Loader<'a> {
     funs: HashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
     labels: HashMap<usize, usize>,        // label -> offset
     code: &'a [u8],
+    instructions: Vec<Instruction>,
 }
 
 impl<'a> Loader<'a> {
@@ -34,6 +35,7 @@ impl<'a> Loader<'a> {
             labels: HashMap::new(),
             funs: HashMap::new(),
             code: &[],
+            instructions: Vec::new(),
         }
     }
 
@@ -154,28 +156,28 @@ impl<'a> Loader<'a> {
         // scan over the Code chunk bits, but we'll need to know bit length of each instruction.
         let (_, code) = scan_instructions(self.code).unwrap();
         println!("instructions: {:?}", code);
-        let mut pc = 0;
-        loop {
-            let ref instruction = code[pc];
+        for instruction in code {
             match &instruction.op {
-                Opcode::Line => {} // skip for now
+                Opcode::Line => continue, // skip for now
                 Opcode::Label => {
                     // TODO: skip in final output?
                     // one operand, Integer
                     if let Term::Literal(i) = instruction.args[0] {
                         // Store weak ptr to function and code offset to this label
                         // let floc = self.code.len(); // current byte length
-                        self.labels.insert(i as usize, pc);
+                        self.labels.insert(i as usize, self.instructions.len());
                     } else {
                         // op_badarg_panic(op, &args, 0);
                         panic!("Bad argument to {:?}", instruction.op)
                     }
+                    continue;
                 }
                 Opcode::FuncInfo => {
                     // record function data M:F/A
                     // don't skip so we can apply tracing during runtime
                     if let [_module, Term::Atom(f), Term::Literal(a)] = &instruction.args[..] {
-                        self.funs.insert((*f as usize, *a as usize), pc);
+                        self.funs
+                            .insert((*f as usize, *a as usize), self.instructions.len());
                     } else {
                         panic!("Bad argument to {:?}", instruction.op)
                     }
@@ -186,13 +188,12 @@ impl<'a> Loader<'a> {
                 }
                 opcode => println!("Unimplemented opcode {:?}", opcode),
             }
-            pc = pc + 1;
 
-            if pc >= code.len() {
-                panic!("Bytecode is broken, did not terminate with IntCodeEnd")
-            }
+            self.instructions.push(instruction);
         }
-        println!("{:?}", self.labels)
+        println!("{:?}", self.labels);
+        println!("{:?}", self.funs);
+        println!("{:?}", self.instructions);
     }
 }
 
