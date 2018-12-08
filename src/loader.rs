@@ -17,8 +17,8 @@ pub struct Loader<'a> {
     exports: Vec<ErlFun>,
     literals: Vec<Value>,
     lambdas: Vec<Lambda>,
-    funs: HashMap<(Atom, usize), usize>, // (fun name as atom, arity) -> offset
-    labels: HashMap<usize, usize>,       // label -> offset
+    funs: HashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
+    labels: HashMap<usize, usize>,        // label -> offset
     code: &'a [u8],
 }
 
@@ -32,6 +32,7 @@ impl<'a> Loader<'a> {
             literals: Vec::new(),
             lambdas: Vec::new(),
             labels: HashMap::new(),
+            funs: HashMap::new(),
             code: &[],
         }
     }
@@ -169,18 +170,26 @@ impl<'a> Loader<'a> {
                         // op_badarg_panic(op, &args, 0);
                         panic!("Bad argument to {:?}", instruction.op)
                     }
-                    // skip
                 }
                 Opcode::FuncInfo => {
-                    // TODO: skip in final output?
                     // record function data M:F/A
+                    // don't skip so we can apply tracing during runtime
+                    if let [_module, Term::Atom(f), Term::Literal(a)] = &instruction.args[..] {
+                        self.funs.insert((*f as usize, *a as usize), pc);
+                    } else {
+                        panic!("Bad argument to {:?}", instruction.op)
+                    }
+                }
+                Opcode::IntCodeEnd => {
+                    println!("Finished processing instructions");
+                    break;
                 }
                 opcode => println!("Unimplemented opcode {:?}", opcode),
             }
             pc = pc + 1;
 
             if pc >= code.len() {
-                break;
+                panic!("Bytecode is broken, did not terminate with IntCodeEnd")
             }
         }
         println!("{:?}", self.labels)
