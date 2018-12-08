@@ -42,7 +42,7 @@ impl<'a> Loader<'a> {
         for chunk in res {
             match chunk.name.as_ref() {
                 "AtU8" => self.load_atoms(chunk),
-                "LocT" => self.load_local_fun_table(chunk),
+                "LocT" => self.load_local_fun_table(chunk), // can probably be ignored
                 "ImpT" => self.load_imports_table(chunk),
                 "ExpT" => self.load_exports_table(chunk),
                 //"StrT" => self.load_strings_table(chunk),
@@ -77,9 +77,8 @@ impl<'a> Loader<'a> {
     }
 
     fn load_atoms(&mut self, chunk: Chunk<'a>) {
-        let (_, data) = atom_chunk(chunk.data).unwrap();
-        println!("{:?}", data);
-        self.atoms = data.atoms;
+        let (_, atoms) = atom_chunk(chunk.data).unwrap();
+        self.atoms = atoms;
     }
 
     fn load_attributes(&mut self, chunk: Chunk<'a>) {
@@ -100,14 +99,12 @@ impl<'a> Loader<'a> {
 
     fn load_imports_table(&mut self, chunk: Chunk<'a>) {
         let (_, data) = loct_chunk(chunk.data).unwrap();
-        println!("ImpT {:?}", data);
-        self.imports = data.entries;
+        self.imports = data;
     }
 
     fn load_exports_table(&mut self, chunk: Chunk<'a>) {
         let (_, data) = loct_chunk(chunk.data).unwrap();
-        println!("ExpT {:?}", data);
-        self.exports = data.entries;
+        self.exports = data;
     }
 
     fn load_literals_table(&mut self, chunk: Chunk<'a>) {
@@ -136,8 +133,7 @@ impl<'a> Loader<'a> {
 
     fn load_funs_table(&mut self, chunk: Chunk<'a>) {
         let (_, data) = funt_chunk(chunk.data).unwrap();
-        println!("FunT {:?}", data);
-        self.lambdas = data.entries;
+        self.lambdas = data;
     }
 
     // TODO: return a Module
@@ -239,19 +235,13 @@ named!(
     )
 );
 
-#[derive(Debug)]
-pub struct AtomChunk<'a> {
-    pub count: u32,
-    pub atoms: Vec<&'a str>,
-}
-
 named!(
-    atom_chunk<&[u8], AtomChunk>,
+    atom_chunk<&[u8], Vec<&str>>,
     do_parse!(
         count: be_u32 >>
         // TODO figure out if we can prealloc the size
         atoms: count!(map_res!(length_bytes!(be_u8), std::str::from_utf8), count as usize) >>
-        (AtomChunk { count, atoms })
+        (atoms)
     )
 );
 
@@ -267,27 +257,21 @@ named!(
     )
 );
 
-#[derive(Debug)]
-pub struct FunTableChunk {
-    pub count: u32,
-    pub entries: Vec<ErlFun>,
-}
-
 named!(
-    loct_chunk<&[u8], FunTableChunk>,
+    loct_chunk<&[u8], Vec<ErlFun>>,
     do_parse!(
         count: be_u32 >>
         entries: count!(fun_entry, count as usize) >>
-        (FunTableChunk { count, entries })
+        (entries)
     )
 );
 
 named!(
-    litt_chunk<&[u8], FunTableChunk>,
+    litt_chunk<&[u8], Vec<ErlFun>>,
     do_parse!(
         count: be_u32 >>
         entries: count!(fun_entry, count as usize) >>
-        (FunTableChunk { count, entries })
+        (entries)
     )
 );
 
@@ -301,14 +285,8 @@ pub struct Lambda {
     ouniq: u32, // ?
 }
 
-#[derive(Debug)]
-pub struct LambdaChunk {
-    pub count: u32,
-    pub entries: Vec<Lambda>,
-}
-
 named!(
-    funt_chunk<&[u8], LambdaChunk>,
+    funt_chunk<&[u8], Vec<Lambda>>,
     do_parse!(
         count: be_u32 >>
         entries: count!(do_parse!(
@@ -321,7 +299,7 @@ named!(
             (Lambda { name, arity, offset, index, nfree, ouniq })
             )
         , count as usize) >>
-        (LambdaChunk { count, entries })
+        (entries)
     )
 );
 
