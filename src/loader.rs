@@ -6,6 +6,7 @@ use crate::vm::Machine;
 use compress::zlib;
 use nom::*;
 use num_bigint::{BigInt, Sign};
+use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
 #[derive(Debug)]
@@ -16,6 +17,8 @@ pub struct Loader<'a> {
     exports: Vec<ErlFun>,
     literals: Vec<Value>,
     lambdas: Vec<Lambda>,
+    funs: HashMap<(Atom, usize), usize>, // (fun name as atom, arity) -> offset
+    labels: HashMap<usize, usize>,       // label -> offset
     code: &'a [u8],
 }
 
@@ -28,6 +31,7 @@ impl<'a> Loader<'a> {
             exports: Vec::new(),
             literals: Vec::new(),
             lambdas: Vec::new(),
+            labels: HashMap::new(),
             code: &[],
         }
     }
@@ -35,10 +39,7 @@ impl<'a> Loader<'a> {
     pub fn load_file(&mut self, bytes: &'a [u8]) -> Result<String, nom::Err<&[u8]>> {
         let (_, res) = scan_beam(bytes).unwrap();
 
-        // let names: Vec<_> = res.iter().map(|chunk| chunk.name).collect();
-        // println!("{:?}", names);
-        // ["AtU8", "Code", "StrT", "ImpT", "ExpT", "LitT", "LocT", "Attr", "CInf", "Dbgi", "Line"]
-
+        // parse all the chunks
         for chunk in res {
             match chunk.name.as_ref() {
                 "AtU8" => self.load_atoms(chunk),
@@ -56,8 +57,6 @@ impl<'a> Loader<'a> {
 
         println!("{:?}", self);
 
-        self.prepare();
-        // parse all the chunks
         // load all the atoms, lambda funcs and literals into the VM and store the vm vals
 
         // parse the instructions, swapping for global vals
@@ -66,13 +65,13 @@ impl<'a> Loader<'a> {
         // - store labels as offsets
         // - patch jump instructions to labels (store patches if label wasn't seen yet)
         // - make imports work via pointers..
+        self.prepare();
 
         return Ok(String::from("OK"));
     }
 
     fn load_code(&mut self, chunk: Chunk<'a>) {
         let (_, data) = code_chunk(chunk.data).unwrap();
-        println!("{:?}", data);
         self.code = data.code;
     }
 
@@ -94,7 +93,6 @@ impl<'a> Loader<'a> {
 
     fn load_local_fun_table(&mut self, chunk: Chunk<'a>) {
         let (_, data) = loct_chunk(chunk.data).unwrap();
-        println!("LocT {:?}", data);
     }
 
     fn load_imports_table(&mut self, chunk: Chunk<'a>) {
@@ -116,7 +114,7 @@ impl<'a> Loader<'a> {
         zlib::Decoder::new(iocursor).read_to_end(&mut data).unwrap();
         let buf = &data[..];
 
-        println!("{:?}", data);
+        println!("raw literals: {:?}", data);
 
         assert_eq!(data.len(), size as usize, "LitT inflate failed");
 
@@ -128,7 +126,6 @@ impl<'a> Loader<'a> {
         // &self.literal_allocator
         let (_, literals) = decode_literals(buf).unwrap();
         self.literals = literals;
-        println!("{:?}", self.literals);
     }
 
     fn load_funs_table(&mut self, chunk: Chunk<'a>) {
@@ -150,6 +147,43 @@ impl<'a> Loader<'a> {
 
         // Create a new version number for this module and fill self.mod_id
         // self.set_mod_id(code_server)
+    }
+
+    fn postprocess_raw_code(&mut self) {
+        // scan over the Code chunk bits, but we'll need to know bit length of each instruction.
+        let (_, code) = scan_instructions(self.code).unwrap();
+        println!("instructions: {:?}", code);
+        let mut pc = 0;
+        loop {
+            let ref instruction = code[pc];
+            match &instruction.op {
+                Opcode::Line => {} // skip for now
+                Opcode::Label => {
+                    // TODO: skip in final output?
+                    // one operand, Integer
+                    if let Term::Literal(i) = instruction.args[0] {
+                        // Store weak ptr to function and code offset to this label
+                        // let floc = self.code.len(); // current byte length
+                        self.labels.insert(i as usize, pc);
+                    } else {
+                        // op_badarg_panic(op, &args, 0);
+                        panic!("Bad argument to {:?}", instruction.op)
+                    }
+                    // skip
+                }
+                Opcode::FuncInfo => {
+                    // TODO: skip in final output?
+                    // record function data M:F/A
+                }
+                opcode => println!("Unimplemented opcode {:?}", opcode),
+            }
+            pc = pc + 1;
+
+            if pc >= code.len() {
+                break;
+            }
+        }
+        println!("{:?}", self.labels)
     }
 }
 
@@ -229,7 +263,7 @@ named!(
         opcode_max: be_u32 >>
         labels: be_u32 >>
         functions: be_u32 >>
-        //take!(sub_size) >>
+        //take!(sub_size) >> offset from the header
         code: rest >>
         (CodeChunk { sub_size, version, opcode_max, labels, functions, code })
     )

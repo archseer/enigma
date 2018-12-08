@@ -126,5 +126,3 @@ pub fn from_str(val: &str) -> Value {
 pub fn to_str(a: &Value) -> Result<String, String> {
     ATOMS.to_str(a)
 }
-
-// println!("ATOMS: {:?}", ATOMS.index.read().unwrap());
