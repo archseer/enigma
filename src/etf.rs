@@ -146,7 +146,7 @@ pub fn decode_list(rest: &[u8]) -> IResult<&[u8], Value> {
     let (rest, val) = decode_value(rest).unwrap();
     std::mem::replace(&mut *tail, val);
 
-    return Ok((rest, start));
+    Ok((rest, start))
 }
 
 #[cfg(target_pointer_width = "32")]

@@ -1,5 +1,6 @@
 use crate::atom::ATOMS;
 use crate::etf;
+use crate::module::{ErlFun, Lambda, Module};
 use crate::opcodes::*;
 use crate::value::Value;
 use crate::vm::Machine;
@@ -17,8 +18,9 @@ pub struct Loader<'a> {
     exports: Vec<ErlFun>,
     literals: Vec<Value>,
     lambdas: Vec<Lambda>,
+    atom_map: HashMap<usize, usize>, // TODO: remove this; local id -> global id
     funs: HashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
-    labels: HashMap<usize, usize>,        // label -> offset
+    labels: HashMap<usize, usize>,   // label -> offset
     code: &'a [u8],
     instructions: Vec<Instruction>,
 }
@@ -32,6 +34,7 @@ impl<'a> Loader<'a> {
             exports: Vec::new(),
             literals: Vec::new(),
             lambdas: Vec::new(),
+            atom_map: HashMap::new(),
             labels: HashMap::new(),
             funs: HashMap::new(),
             code: &[],
@@ -39,7 +42,7 @@ impl<'a> Loader<'a> {
         }
     }
 
-    pub fn load_file(&mut self, bytes: &'a [u8]) -> Result<String, nom::Err<&[u8]>> {
+    pub fn load_file(mut self, bytes: &'a [u8]) -> Result<Module, nom::Err<&[u8]>> {
         let (_, res) = scan_beam(bytes).unwrap();
 
         // parse all the chunks
@@ -60,17 +63,22 @@ impl<'a> Loader<'a> {
 
         println!("{:?}", self);
 
-        // load all the atoms, lambda funcs and literals into the VM and store the vm vals
-
         // parse the instructions, swapping for global vals
         // - swap load atoms with global atoms
-        // - skip line
-        // - store labels as offsets
         // - patch jump instructions to labels (store patches if label wasn't seen yet)
         // - make imports work via pointers..
         self.prepare();
 
-        return Ok(String::from("OK"));
+        Ok(Module {
+            atoms: self.atom_map,
+            imports: self.imports,
+            exports: self.exports,
+            literals: self.literals,
+            lambdas: self.lambdas,
+            funs: self.funs,
+            labels: self.labels,
+            instructions: self.instructions,
+        })
     }
 
     fn load_code(&mut self, chunk: Chunk<'a>) {
@@ -139,14 +147,21 @@ impl<'a> Loader<'a> {
     // TODO: return a Module
     fn prepare(&mut self) {
         self.register_atoms();
+        //self.stage2_fill_lambdas();
+
+        self.postprocess_raw_code();
+        ////unsafe { disasm::disasm(self.code.as_slice(), None) }
+        //self.postprocess_fix_labels()?;
+        //self.postprocess_setup_imports()?;
     }
 
-    fn register_atoms(&self) {
+    fn register_atoms(&mut self) {
         ATOMS.reserve(self.atoms.len());
-        for a in &self.atoms {
-            ATOMS.register_atom(a);
+        for (index, a) in self.atoms.iter().enumerate() {
+            let g_index = ATOMS.register_atom(a);
+            // keep a mapping of these to patch the instrs
+            self.atom_map.insert(index, g_index);
         }
-        // keep a mapping of these to patch the instrs
 
         // Create a new version number for this module and fill self.mod_id
         // self.set_mod_id(code_server)
@@ -160,7 +175,6 @@ impl<'a> Loader<'a> {
             match &instruction.op {
                 Opcode::Line => continue, // skip for now
                 Opcode::Label => {
-                    // TODO: skip in final output?
                     // one operand, Integer
                     if let Term::Literal(i) = instruction.args[0] {
                         // Store weak ptr to function and code offset to this label
@@ -191,9 +205,7 @@ impl<'a> Loader<'a> {
 
             self.instructions.push(instruction);
         }
-        println!("{:?}", self.labels);
         println!("{:?}", self.funs);
-        println!("{:?}", self.instructions);
     }
 }
 
@@ -289,8 +301,6 @@ named!(
     )
 );
 
-type ErlFun = (u32, u32, u32);
-
 named!(
     fun_entry<&[u8], ErlFun>,
     do_parse!(
@@ -318,16 +328,6 @@ named!(
         (entries)
     )
 );
-
-#[derive(Debug)]
-pub struct Lambda {
-    name: u32,
-    arity: u32,
-    offset: u32,
-    index: u32,
-    nfree: u32, // frozen values for closures
-    ouniq: u32, // ?
-}
 
 named!(
     funt_chunk<&[u8], Vec<Lambda>>,
