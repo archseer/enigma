@@ -61,8 +61,6 @@ impl<'a> Loader<'a> {
             }
         }
 
-        println!("{:?}", self);
-
         // parse the instructions, swapping for global vals
         // - swap load atoms with global atoms
         // - patch jump instructions to labels (store patches if label wasn't seen yet)
@@ -170,7 +168,6 @@ impl<'a> Loader<'a> {
     fn postprocess_raw_code(&mut self) {
         // scan over the Code chunk bits, but we'll need to know bit length of each instruction.
         let (_, code) = scan_instructions(self.code).unwrap();
-        println!("instructions: {:?}", code);
         for instruction in code {
             match &instruction.op {
                 Opcode::Line => continue, // skip for now
@@ -200,12 +197,11 @@ impl<'a> Loader<'a> {
                     println!("Finished processing instructions");
                     break;
                 }
-                opcode => println!("Unimplemented opcode {:?}", opcode),
+                _ => {}
             }
 
             self.instructions.push(instruction);
         }
-        println!("{:?}", self.funs);
     }
 }
 
