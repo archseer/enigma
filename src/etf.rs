@@ -73,7 +73,7 @@ pub fn decode_value(rest: &[u8]) -> IResult<&[u8], Value> {
         // SmallAtomU8
         Tag::List => decode_list(rest),
         Tag::Atom => decode_atom(rest),
-        Tag::Nil => Ok((rest, Value::None())),
+        Tag::Nil => Ok((rest, Value::Nil())),
         Tag::SmallTuple => {
             let (rest, size) = be_u8(rest)?;
             decode_tuple(rest, size as usize)
@@ -120,8 +120,8 @@ pub fn decode_list(rest: &[u8]) -> IResult<&[u8], Value> {
 
     // TODO: use alloc
     let mut start = Value::Cons {
-        head: Rc::new(Value::None()),
-        tail: Rc::new(Value::None()),
+        head: Rc::new(Value::Nil()),
+        tail: Rc::new(Value::Nil()),
     };
 
     let (tail, rest) = (0..len).fold((&mut start, rest), |(cons, buf), _i| {
@@ -133,8 +133,8 @@ pub fn decode_list(rest: &[u8]) -> IResult<&[u8], Value> {
         {
             let (rest, val) = decode_value(buf).unwrap();
             let new_cons = Value::Cons {
-                head: Rc::new(Value::None()),
-                tail: Rc::new(Value::None()),
+                head: Rc::new(Value::Nil()),
+                tail: Rc::new(Value::Nil()),
             };
             std::mem::replace(&mut *head, Rc::new(val));
             std::mem::replace(&mut *tail, Rc::new(new_cons));

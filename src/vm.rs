@@ -1,5 +1,4 @@
 use crate::atom;
-use crate::loader::Term;
 use crate::module::Module;
 use crate::opcodes::Opcode;
 use crate::value::Value;
@@ -26,8 +25,8 @@ impl Machine {
         unsafe {
             let mut vm = Machine {
                 modules: HashMap::new(),
-                x: std::mem::uninitialized(), //[Value::None(); 32],
-                y: std::mem::uninitialized(), //[Value::None(); 32],
+                x: std::mem::uninitialized(), //[Value::Nil(); 32],
+                y: std::mem::uninitialized(), //[Value::Nil(); 32],
                 ip: 0,
                 cp: -1,
                 live: 0,
@@ -35,12 +34,12 @@ impl Machine {
             for (_i, el) in vm.x.iter_mut().enumerate() {
                 // Overwrite `element` without running the destructor of the old value.
                 // Since Value does not implement Copy, it is moved.
-                std::ptr::write(el, Value::None());
+                std::ptr::write(el, Value::Nil());
             }
             for (_i, el) in vm.y.iter_mut().enumerate() {
                 // Overwrite `element` without running the destructor of the old value.
                 // Since Value does not implement Copy, it is moved.
-                std::ptr::write(el, Value::None());
+                std::ptr::write(el, Value::Nil());
             }
             vm
         }
@@ -69,11 +68,11 @@ impl Machine {
                     // arg1 can be either a value or a register
                     let val = self.load_arg(&module, &ins.args[0]).unwrap();
                     match &ins.args[1] {
-                        Term::X(reg) => {
+                        Value::X(reg) => {
                             self.x[*reg as usize] = val;
                             println!("reg: {}", *reg as usize);
                         }
-                        Term::Y(reg) => {
+                        Value::Y(reg) => {
                             self.y[*reg as usize] = val;
                             println!("reg: {}", *reg as usize);
                         }
@@ -94,7 +93,7 @@ impl Machine {
                     //literal arity, label jmp
                     // store arity as live
                     println!("call! {:?}", ins.args);
-                    if let [Term::Literal(a), Term::Label(i)] = &ins.args[..] {
+                    if let [Value::Literal(a), Value::Label(i)] = &ins.args[..] {
                         self.cp = self.ip as isize;
                         self.ip = *i as usize - 2;
                     } else {
@@ -103,7 +102,7 @@ impl Machine {
                 }
                 Opcode::GcBif2 => {
                     // fail label, live, bif, arg1, arg2, dest
-                    if let Term::Literal(i) = &ins.args[2] {
+                    if let Value::Literal(i) = &ins.args[2] {
                         // GCBifImpl2 func = (GCBifImpl2) mod->imports[bif].bif;
                         println!("gcbif2");
                         let val: Vec<_> = module
@@ -134,18 +133,16 @@ impl Machine {
         }
     }
 
-    /// This is ugly, but: convert a loader::Term into a Value.
     /// In the future, the removal is two part: replace atoms etc
     /// load time structures with Values while loading.
     /// Second, probably move some of the terms into vals (regs etc)
-    fn load_arg(&self, module: &Module, arg: &Term) -> Result<Value, &str> {
+    fn load_arg(&self, module: &Module, arg: &Value) -> Result<Value, &str> {
         match arg {
-            Term::Integer(i) => Ok(Value::Integer(*i)),
-            Term::Atom(i) => Ok(Value::Atom(*module.atoms.get(&(*i as usize)).unwrap())),
-            Term::ExtendedLiteral(i) => Ok(module.literals.get(*i as usize).unwrap().clone()),
-            Term::X(i) => Ok(self.x[*i as usize].clone()),
-            Term::Y(i) => Ok(self.y[*i as usize].clone()),
-            _ => panic!("unexpected term type {:?}", arg),
+            Value::Atom(i) => Ok(Value::Atom(*module.atoms.get(&(*i as usize)).unwrap())),
+            Value::ExtendedLiteral(i) => Ok(module.literals.get(*i as usize).unwrap().clone()),
+            Value::X(i) => Ok(self.x[*i as usize].clone()),
+            Value::Y(i) => Ok(self.y[*i as usize].clone()),
+            value => Ok(value.clone()),
         }
     }
 }

@@ -2,7 +2,7 @@ use std::rc::Rc;
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
-    None(), // also known as nil
+    Nil(), // also known as nil
     Integer(u64),
     Character(i64),
     Atom(usize),
@@ -27,8 +27,17 @@ pub enum Value {
     /// every unique interned string there is only one object allocated.
     //InternedBinary(ArcWithoutWeak<ImmutableString>),
     // BigInt(Rc<BigInt>),
-    Closure(),
+    // Closure(),
     // Import(), Export(),
+    /// Special values (invalid in runtime)
+    Literal(u64),
+    X(u64),
+    Y(u64),
+    Label(u64),
+    List(Box<Vec<Value>>),
+    FloatReg(u64),
+    AllocList(u64),
+    ExtendedLiteral(u64), // TODO; replace at load time
 }
 
 // TODO: maybe box binaries further:
@@ -51,7 +60,7 @@ impl Value {
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Value::None() => write!(f, "nil"),
+            Value::Nil() => write!(f, "nil"),
             _ => write!(f, "(val)"),
         }
     }

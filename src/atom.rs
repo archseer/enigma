@@ -74,8 +74,7 @@ impl AtomTable {
         index
     }
 
-    // Allocate new atom in the atom table or find existing.
-    // TODO: Pack the atom index as an immediate2 Term
+    /// Allocate new atom in the atom table or find existing.
     pub fn from_str(&self, val: &str) -> Value {
         {
             let atoms = self.index.read().unwrap();

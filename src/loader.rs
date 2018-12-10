@@ -174,7 +174,7 @@ impl<'a> Loader<'a> {
                 Opcode::Line => continue, // skip for now
                 Opcode::Label => {
                     // one operand, Integer
-                    if let Term::Literal(i) = instruction.args[0] {
+                    if let Value::Literal(i) = instruction.args[0] {
                         // Store weak ptr to function and code offset to this label
                         // let floc = self.code.len(); // current byte length
                         self.labels.insert(i as usize, self.instructions.len());
@@ -187,7 +187,7 @@ impl<'a> Loader<'a> {
                 Opcode::FuncInfo => {
                     // record function data M:F/A
                     // don't skip so we can apply tracing during runtime
-                    if let [_module, Term::Atom(f), Term::Literal(a)] = &instruction.args[..] {
+                    if let [_module, Value::Atom(f), Value::Literal(a)] = &instruction.args[..] {
                         self.funs
                             .insert((*f as usize, *a as usize), self.instructions.len());
                     } else {
@@ -348,23 +348,6 @@ named!(
 // If the base tag was Extended=7, then bits 4-5-6-7 PLUS 7 will become the extended tag.
 // It can have values Float=8, List=9, FloatReg=10, AllocList=11, Literal=12.
 
-#[derive(Debug)]
-pub enum Term {
-    Literal(u64),
-    Integer(u64),
-    Atom(u64),
-    X(u64),
-    Y(u64),
-    Label(u64),
-    Character(u64),
-    // Extended,
-    Float(),
-    List(Vec<Term>),
-    FloatReg(u64),
-    AllocList(u64),
-    ExtendedLiteral(u64),
-}
-
 fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], u64> {
     // it's not extended
     if 0 == (b & 0b1000) {
@@ -410,7 +393,7 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], u64> {
     } // if larger than 11 bits
 }
 
-fn compact_term(i: &[u8]) -> IResult<&[u8], Term> {
+fn compact_term(i: &[u8]) -> IResult<&[u8], Value> {
     let (rest, b) = be_u8(i)?;
     let tag = b & 0b111;
 
@@ -418,13 +401,13 @@ fn compact_term(i: &[u8]) -> IResult<&[u8], Term> {
         let (rest, val) = read_int(b, rest).unwrap();
 
         return match tag {
-            0 => Ok((rest, Term::Literal(val as u64))),
-            1 => Ok((rest, Term::Integer(val as u64))),
-            2 => Ok((rest, Term::Atom(val))),
-            3 => Ok((rest, Term::X(val))),
-            4 => Ok((rest, Term::Y(val))),
-            5 => Ok((rest, Term::Label(val))),
-            6 => Ok((rest, Term::Character(val))),
+            0 => Ok((rest, Value::Literal(val as u64))),
+            1 => Ok((rest, Value::Integer(val as u64))),
+            2 => Ok((rest, Value::Atom(val as usize))),
+            3 => Ok((rest, Value::X(val))),
+            4 => Ok((rest, Value::Y(val))),
+            5 => Ok((rest, Value::Label(val))),
+            6 => Ok((rest, Value::Character(val as i64))),
             _ => panic!("can't happen"),
         };
     }
@@ -432,7 +415,7 @@ fn compact_term(i: &[u8]) -> IResult<&[u8], Term> {
     parse_extended_term(b, rest)
 }
 
-fn parse_extended_term(b: u8, rest: &[u8]) -> IResult<&[u8], Term> {
+fn parse_extended_term(b: u8, rest: &[u8]) -> IResult<&[u8], Value> {
     match b {
         0b0001_0111 => parse_list(rest),
         0b0010_0111 => parse_float_reg(rest),
@@ -442,7 +425,7 @@ fn parse_extended_term(b: u8, rest: &[u8]) -> IResult<&[u8], Term> {
     }
 }
 
-fn parse_list(rest: &[u8]) -> IResult<&[u8], Term> {
+fn parse_list(rest: &[u8]) -> IResult<&[u8], Value> {
     // The stream now contains a smallint size, then size/2 pairs of values
     let (mut rest, n) = be_u8(rest)?;
     let mut els = Vec::with_capacity(n as usize);
@@ -453,21 +436,21 @@ fn parse_list(rest: &[u8]) -> IResult<&[u8], Term> {
         rest = new_rest;
     }
 
-    Ok((rest, Term::List(els)))
+    Ok((rest, Value::List(Box::new(els))))
 }
 
-fn parse_float_reg(rest: &[u8]) -> IResult<&[u8], Term> {
-    Ok((rest, Term::FloatReg(22 as u64)))
+fn parse_float_reg(rest: &[u8]) -> IResult<&[u8], Value> {
+    Ok((rest, Value::FloatReg(22 as u64)))
 }
 
-fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], Term> {
-    Ok((rest, Term::AllocList(22 as u64)))
+fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], Value> {
+    Ok((rest, Value::AllocList(22 as u64)))
 }
 
-fn parse_extended_literal(rest: &[u8]) -> IResult<&[u8], Term> {
+fn parse_extended_literal(rest: &[u8]) -> IResult<&[u8], Value> {
     let (rest, b) = be_u8(rest)?;
     let (rest, val) = read_int(b, rest).unwrap();
-    Ok((rest, Term::ExtendedLiteral(val)))
+    Ok((rest, Value::ExtendedLiteral(val)))
 }
 
 // ---------------------------------------------------
@@ -475,7 +458,7 @@ fn parse_extended_literal(rest: &[u8]) -> IResult<&[u8], Term> {
 #[derive(Debug)]
 pub struct Instruction {
     pub op: Opcode,
-    pub args: Vec<Term>,
+    pub args: Vec<Value>,
 }
 
 named!(
