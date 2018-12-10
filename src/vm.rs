@@ -1,3 +1,4 @@
+use crate::loader::Term;
 use crate::module::Module;
 use crate::opcodes::Opcode;
 use crate::value::Value;
@@ -12,7 +13,9 @@ pub struct Machine {
     // registers
     x: [Value; 32],
     // program pointer/reference?
-    pc: usize,
+    ip: usize,
+    // continuation pointer
+    cp: isize, // TODO: ?!
 }
 
 impl Machine {
@@ -21,7 +24,8 @@ impl Machine {
             let mut vm = Machine {
                 modules: HashMap::new(),
                 x: std::mem::uninitialized(), //[Value::None(); 32],
-                pc: 0,
+                ip: 0,
+                cp: -1,
             };
             for (_i, el) in vm.x.iter_mut().enumerate() {
                 // Overwrite `element` without running the destructor of the old value.
@@ -41,21 +45,32 @@ impl Machine {
     pub fn run(&mut self, module: Module, fun: usize) {
         let local = module.atoms.get(&fun).unwrap();
         println!("two: {:?}, fun:{:?}, local: {:?}", module.funs, fun, local);
-        self.pc = module.funs.get(&(1, 0)).unwrap().clone();
+        self.ip = module.funs.get(&(2, 0)).unwrap().clone();
         // TODO: modify imports to get *local working
 
         loop {
-            let ref ins = module.instructions[self.pc];
+            let ref ins = module.instructions[self.ip];
             match &ins.op {
                 Opcode::FuncInfo => println!("Running a function..."),
                 Opcode::Move => {
                     println!("move: {:?}", ins.args);
-                    // arg0 can be either a value or a register
+                    // arg1 can be either a value or a register
+                    match &ins.args[1] {
+                        Term::X(reg) => {}
+                        reg => panic!("Unhandled register type! {:?}", reg),
+                    }
                 }
-                Opcode::Return => {}
+                Opcode::Return => {
+                    if self.cp == -1 {
+                        println!("Process exited with normal");
+                        break;
+                    }
+                    self.ip = self.cp as usize;
+                    self.cp = -1;
+                }
                 opcode => println!("Unimplemented opcode {:?}", opcode),
             }
-            self.pc = self.pc + 1
+            self.ip = self.ip + 1
         }
     }
 }

@@ -68,7 +68,7 @@ impl AtomTable {
 
     pub fn register_atom(&self, s: &str) -> usize {
         let mut index_r = self.index_r.write().unwrap();
-        let mut index = index_r.len();
+        let index = index_r.len();
         self.index.write().unwrap().insert(s.to_string(), index);
         index_r.push(Atom::new(s));
         index
@@ -112,7 +112,7 @@ impl AtomTable {
 }
 
 pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
-    let mut atoms = AtomTable::new();
+    let atoms = AtomTable::new();
     // m.insert(0, "foo");
     // m.insert(1, "bar");
     // m.insert(2, "baz");

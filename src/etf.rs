@@ -3,6 +3,7 @@ use crate::value::Value;
 use nom::*;
 use num::traits::ToPrimitive;
 use num_bigint::{BigInt, Sign};
+use std::rc::Rc;
 
 /// External Term Format parser
 
@@ -111,7 +112,7 @@ pub fn decode_tuple(rest: &[u8], len: usize) -> IResult<&[u8], Value> {
         rest
     });
 
-    Ok((rest, Value::Tuple(els)))
+    Ok((rest, Value::Tuple(Rc::new(els))))
 }
 
 pub fn decode_list(rest: &[u8]) -> IResult<&[u8], Value> {
@@ -119,8 +120,8 @@ pub fn decode_list(rest: &[u8]) -> IResult<&[u8], Value> {
 
     // TODO: use alloc
     let mut start = Value::Cons {
-        head: Box::new(Value::None()),
-        tail: Box::new(Value::None()),
+        head: Rc::new(Value::None()),
+        tail: Rc::new(Value::None()),
     };
 
     let (tail, rest) = (0..len).fold((&mut start, rest), |(cons, buf), _i| {
@@ -132,12 +133,12 @@ pub fn decode_list(rest: &[u8]) -> IResult<&[u8], Value> {
         {
             let (rest, val) = decode_value(buf).unwrap();
             let new_cons = Value::Cons {
-                head: Box::new(Value::None()),
-                tail: Box::new(Value::None()),
+                head: Rc::new(Value::None()),
+                tail: Rc::new(Value::None()),
             };
-            std::mem::replace(&mut *head, Box::new(val));
-            std::mem::replace(&mut *tail, Box::new(new_cons));
-            return (tail, rest);
+            std::mem::replace(&mut *head, Rc::new(val));
+            std::mem::replace(&mut *tail, Rc::new(new_cons));
+            return (Rc::get_mut(tail).unwrap(), rest);
         }
         panic!("Wrong value!")
     });

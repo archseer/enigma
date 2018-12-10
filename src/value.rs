@@ -1,8 +1,10 @@
+use std::rc::Rc;
 #[allow(dead_code)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     None(), // also known as nil
     Integer(i64),
+    Character(i64),
     Atom(usize),
     Catch(),
     // external vals? except Pid can also be internal
@@ -11,11 +13,11 @@ pub enum Value {
     Ref(),
     // continuation pointer?
     Cons {
-        head: Box<Value>,
-        tail: Box<Value>,
-    }, // two values
+        head: Rc<Value>,
+        tail: Rc<Value>,
+    }, // two values TODO: Rc<[Value; 2]>
     /// Boxed values
-    Tuple(Vec<Value>), // TODO: allocate on custom heap
+    Tuple(Rc<Vec<Value>>), // TODO: allocate on custom heap
     Float(f64),
     /// Strings use an Arc so they can be sent to other processes without
     /// requiring a full copy of the data.
@@ -24,7 +26,7 @@ pub enum Value {
     /// An interned string is a string allocated on the permanent space. For
     /// every unique interned string there is only one object allocated.
     //InternedBinary(ArcWithoutWeak<ImmutableString>),
-    // BigInt(Box<BigInt>),
+    // BigInt(Rc<BigInt>),
     Closure(),
     // Import(), Export(),
 }
@@ -45,3 +47,12 @@ impl Value {
         }
     }
 }
+
+// /// A pointer to a value managed by the GC.
+// #[derive(Clone, Copy)]
+// pub struct ValuePointer {
+//     pub raw: TaggedPointer<Value>,
+// }
+
+// unsafe impl Send for ValuePointer {}
+// unsafe impl Sync for ValuePointer {}
