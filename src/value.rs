@@ -3,7 +3,7 @@ use std::rc::Rc;
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     None(), // also known as nil
-    Integer(i64),
+    Integer(u64),
     Character(i64),
     Atom(usize),
     Catch(),
@@ -44,6 +44,15 @@ impl Value {
         match *self {
             Value::Atom(_) => true,
             _ => false,
+        }
+    }
+}
+
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Value::None() => write!(f, "nil"),
+            _ => write!(f, "(val)"),
         }
     }
 }

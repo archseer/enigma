@@ -167,7 +167,7 @@ pub fn decode_bignum(rest: &[u8], size: usize) -> IResult<&[u8], Value> {
     // Assert that the number fits into small
     if big.bits() < WORD_BITS - 4 {
         let b_signed = big.to_isize().unwrap();
-        return Ok((rest, Value::Integer(b_signed as i64)));
+        return Ok((rest, Value::Integer(b_signed as u64)));
     }
 
     // Determine storage size in words
