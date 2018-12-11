@@ -43,23 +43,28 @@ impl<'a> Loader<'a> {
     }
 
     pub fn load_file(mut self, bytes: &'a [u8]) -> Result<Module, nom::Err<&[u8]>> {
-        let (_, res) = scan_beam(bytes).unwrap();
+        let (_, data) = scan_beam(bytes).unwrap();
+        let mut chunks = HashMap::new();
+        for (name, chunk) in data {
+            println!("name: {}", name);
+            chunks.insert(name, chunk);
+        }
 
         // parse all the chunks
-        for chunk in res {
-            match chunk.name.as_ref() {
-                "AtU8" => self.load_atoms(chunk),
-                "LocT" => self.load_local_fun_table(chunk), // can probably be ignored
-                "ImpT" => self.load_imports_table(chunk),
-                "ExpT" => self.load_exports_table(chunk),
-                //"StrT" => self.load_strings_table(chunk),
-                "LitT" => self.load_literals_table(chunk),
-                "FunT" => self.load_funs_table(chunk),
-                "Attr" => self.load_attributes(chunk),
-                "Code" => self.load_code(chunk),
-                name => println!("Unhandled chunk: {}", name),
-            }
+
+        // build atoms table first
+        self.load_atoms(chunks.remove("AtU8").expect("Atom AtU8 chunk not found!"));
+
+        self.load_local_fun_table(chunks.remove("LocT").expect("LocT chunk not found!")); // can probably be ignored
+        self.load_imports_table(chunks.remove("ImpT").expect("ImpT chunk not found!"));
+        self.load_exports_table(chunks.remove("ExpT").expect("ExpT chunk not found!"));
+        // self.load_strings_table(find_chunk(&chunks, "StrT"));
+        self.load_literals_table(chunks.remove("LitT").expect("LitT chunk not found!"));
+        if let Some(chunk) = chunks.remove("FunT") {
+            self.load_literals_table(chunk);
         }
+        self.load_attributes(chunks.remove("Attr").expect("Attr chunk not found!"));
+        self.load_code(chunks.remove("Code").expect("Code chunk not found!"));
 
         // parse the instructions, swapping for global vals
         // - swap load atoms with global atoms
@@ -80,19 +85,19 @@ impl<'a> Loader<'a> {
     }
 
     fn load_code(&mut self, chunk: Chunk<'a>) {
-        let (_, data) = code_chunk(chunk.data).unwrap();
+        let (_, data) = code_chunk(chunk).unwrap();
         self.code = data.code;
     }
 
     fn load_atoms(&mut self, chunk: Chunk<'a>) {
-        let (_, atoms) = atom_chunk(chunk.data).unwrap();
+        let (_, atoms) = atom_chunk(chunk).unwrap();
         self.atoms = atoms;
     }
 
-    fn load_attributes(&mut self, chunk: Chunk<'a>) {
+    fn load_attributes(&mut self, chunk: Chunk) {
         // Contains two parts: a proplist of module attributes, encoded as External Term Format,
         // and a compiler info (options and version) encoded similarly.
-        let (rest, val) = etf::decode(chunk.data).unwrap();
+        let (rest, val) = etf::decode(chunk).unwrap();
         println!("attrs val: {:?}; rest: {:?}", val, rest);
     }
 
@@ -100,22 +105,22 @@ impl<'a> Loader<'a> {
     //     // println!("StrT {:?}", data);
     // }
 
-    fn load_local_fun_table(&mut self, chunk: Chunk<'a>) {
-        let (_, data) = loct_chunk(chunk.data).unwrap();
+    fn load_local_fun_table(&mut self, chunk: Chunk) {
+        let (_, data) = loct_chunk(chunk).unwrap();
     }
 
-    fn load_imports_table(&mut self, chunk: Chunk<'a>) {
-        let (_, data) = loct_chunk(chunk.data).unwrap();
+    fn load_imports_table(&mut self, chunk: Chunk) {
+        let (_, data) = loct_chunk(chunk).unwrap();
         self.imports = data;
     }
 
-    fn load_exports_table(&mut self, chunk: Chunk<'a>) {
-        let (_, data) = loct_chunk(chunk.data).unwrap();
+    fn load_exports_table(&mut self, chunk: Chunk) {
+        let (_, data) = loct_chunk(chunk).unwrap();
         self.exports = data;
     }
 
-    fn load_literals_table(&mut self, chunk: Chunk<'a>) {
-        let (rest, size) = be_u32(chunk.data).unwrap();
+    fn load_literals_table(&mut self, chunk: Chunk) {
+        let (rest, size) = be_u32(chunk).unwrap();
         let mut data = Vec::with_capacity(size as usize);
 
         // Decompress deflated literal table
@@ -137,8 +142,8 @@ impl<'a> Loader<'a> {
         self.literals = literals;
     }
 
-    fn load_funs_table(&mut self, chunk: Chunk<'a>) {
-        let (_, data) = funt_chunk(chunk.data).unwrap();
+    fn load_lambdas_table(&mut self, chunk: Chunk) {
+        let (_, data) = funt_chunk(chunk).unwrap();
         self.lambdas = data;
     }
 
@@ -220,37 +225,38 @@ named!(
     )
 );
 
-#[derive(Debug, PartialEq)]
-pub struct Chunk<'a> {
-    pub name: &'a str,
-    pub data: &'a [u8],
-}
+// #[derive(Debug, PartialEq)]
+// pub struct Chunk<'a> {
+//     pub name: &'a str,
+//     pub data: &'a [u8],
+// }
+
+type Chunk<'a> = &'a [u8];
 
 named!(
-    pub scan_beam<&[u8], Vec<Chunk>>,
+    pub scan_beam<&[u8], Vec<(&str, Chunk)>>,
     do_parse!(
         tag!("FOR1") >>
         _size: le_u32 >>
         tag!("BEAM") >>
-
         data: chunks >>
         (data)
     )
 );
 
 named!(
-    chunks<&[u8], Vec<Chunk>>,
+    chunks<&[u8], Vec<(&str, Chunk)>>,
     many0!(complete!(chunk))
 );
 
 named!(
-    chunk<&[u8], Chunk>,
+    chunk<&[u8], (&str, Chunk)>,
     do_parse!(
         name: map_res!(take!(4), std::str::from_utf8) >>
         size: be_u32 >>
         bytes: take!(size) >>
         take!(align_bytes(size)) >>
-        (Chunk { name, data: bytes })
+        (( name, bytes ))
     )
 );
 
