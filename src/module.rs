@@ -2,7 +2,7 @@ use crate::loader::Instruction;
 use crate::value::Value;
 use std::collections::HashMap;
 
-pub type ErlFun = (u32, u32, u32); // function, arity, label
+pub type ErlFun = (usize, usize, u32); // function, arity, label
 
 #[derive(Debug, PartialEq)]
 pub struct Lambda {

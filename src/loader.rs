@@ -46,7 +46,6 @@ impl<'a> Loader<'a> {
         let (_, data) = scan_beam(bytes).unwrap();
         let mut chunks = HashMap::new();
         for (name, chunk) in data {
-            println!("name: {}", name);
             chunks.insert(name, chunk);
         }
 
@@ -92,6 +91,16 @@ impl<'a> Loader<'a> {
     fn load_atoms(&mut self, chunk: Chunk<'a>) {
         let (_, atoms) = atom_chunk(chunk).unwrap();
         self.atoms = atoms;
+        ATOMS.reserve(self.atoms.len());
+
+        for (index, a) in self.atoms.iter().enumerate() {
+            let g_index = ATOMS.register_atom(a);
+            // keep a mapping of these to patch the instrs
+            self.atom_map.insert(index, g_index);
+        }
+
+        // Create a new version number for this module and fill self.mod_id
+        // self.set_mod_id(code_server)
     }
 
     fn load_attributes(&mut self, chunk: Chunk) {
@@ -111,7 +120,16 @@ impl<'a> Loader<'a> {
 
     fn load_imports_table(&mut self, chunk: Chunk) {
         let (_, data) = loct_chunk(chunk).unwrap();
-        self.imports = data;
+        self.imports = data
+            .into_iter()
+            .map(|mfa| {
+                (
+                    *self.atom_map.get(&(mfa.0 as usize - 1)).unwrap(),
+                    *self.atom_map.get(&(mfa.1 as usize - 1)).unwrap(),
+                    mfa.2,
+                )
+            })
+            .collect();
     }
 
     fn load_exports_table(&mut self, chunk: Chunk) {
@@ -149,25 +167,12 @@ impl<'a> Loader<'a> {
 
     // TODO: return a Module
     fn prepare(&mut self) {
-        self.register_atoms();
         //self.stage2_fill_lambdas();
 
         self.postprocess_raw_code();
         ////unsafe { disasm::disasm(self.code.as_slice(), None) }
         //self.postprocess_fix_labels()?;
         //self.postprocess_setup_imports()?;
-    }
-
-    fn register_atoms(&mut self) {
-        ATOMS.reserve(self.atoms.len());
-        for (index, a) in self.atoms.iter().enumerate() {
-            let g_index = ATOMS.register_atom(a);
-            // keep a mapping of these to patch the instrs
-            self.atom_map.insert(index, g_index);
-        }
-
-        // Create a new version number for this module and fill self.mod_id
-        // self.set_mod_id(code_server)
     }
 
     fn postprocess_raw_code(&mut self) {
@@ -309,7 +314,7 @@ named!(
         function: be_u32 >>
         arity: be_u32 >>
         label: be_u32 >>
-        (function, arity, label)
+        (function as usize, arity as usize, label)
     )
 );
 

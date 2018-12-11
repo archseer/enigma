@@ -110,15 +110,8 @@ impl Machine {
                             .iter()
                             .map(|mfa| {
                                 (
-                                    atom::from_index(
-                                        // :(
-                                        module.atoms.get(&(mfa.0 as usize - 1)).unwrap(),
-                                    )
-                                    .unwrap(),
-                                    atom::from_index(
-                                        module.atoms.get(&(mfa.1 as usize - 1)).unwrap(),
-                                    )
-                                    .unwrap(),
+                                    atom::from_index(&mfa.0).unwrap(),
+                                    atom::from_index(&mfa.1).unwrap(),
                                     mfa.2,
                                 )
                             })
