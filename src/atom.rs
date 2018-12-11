@@ -1,8 +1,8 @@
 //use std::ptr;
 use crate::value::Value;
 use once_cell::sync::Lazy;
+use parking_lot::RwLock;
 use std::collections::BTreeMap; // TODO: maybe HashMap
-use std::sync::RwLock;
 use std::u16;
 
 #[derive(Debug)]
@@ -67,9 +67,9 @@ impl AtomTable {
     pub fn reserve(&self, len: usize) {}
 
     pub fn register_atom(&self, s: &str) -> usize {
-        let mut index_r = self.index_r.write().unwrap();
+        let mut index_r = self.index_r.write();
         let index = index_r.len();
-        self.index.write().unwrap().insert(s.to_string(), index);
+        self.index.write().insert(s.to_string(), index);
         index_r.push(Atom::new(s));
         index
     }
@@ -77,7 +77,7 @@ impl AtomTable {
     /// Allocate new atom in the atom table or find existing.
     pub fn from_str(&self, val: &str) -> Value {
         {
-            let atoms = self.index.read().unwrap();
+            let atoms = self.index.read();
 
             if atoms.contains_key(val) {
                 return Value::Atom(atoms[val]);
@@ -100,7 +100,7 @@ impl AtomTable {
 
     pub fn lookup(&self, a: &Value) -> Option<*const Atom> {
         if let Value::Atom(index) = a {
-            let index_r = self.index_r.read().unwrap();
+            let index_r = self.index_r.read();
             if *index >= index_r.len() {
                 return None;
             }
@@ -109,7 +109,7 @@ impl AtomTable {
         panic!("Value is not an atom!")
     }
     pub fn lookup_index(&self, index: &usize) -> Option<*const Atom> {
-        let index_r = self.index_r.read().unwrap();
+        let index_r = self.index_r.read();
         if *index >= index_r.len() {
             return None;
         }

@@ -67,7 +67,6 @@ impl<'a> Loader<'a> {
         // - make imports work via pointers..
         self.prepare();
 
-        println!("{:?}", self.atoms);
         Ok(Module {
             atoms: self.atom_map,
             imports: self.imports,
