@@ -108,8 +108,21 @@ impl Machine {
                             self.load_arg(&module, &ins.args[3]).unwrap(),
                             self.load_arg(&module, &ins.args[4]).unwrap(),
                         ];
-                        let res = bif::apply(module.imports.get(*i as usize).unwrap(), args);
-                        println!("res: {}", res);
+                        let val = bif::apply(module.imports.get(*i as usize).unwrap(), args);
+                        println!("res: {:?}", val);
+
+                        // TODO: dedup in a func
+                        match &ins.args[5] {
+                            Value::X(reg) => {
+                                self.x[*reg as usize] = val;
+                                println!("reg: {}", *reg as usize);
+                            }
+                            Value::Y(reg) => {
+                                self.y[*reg as usize] = val;
+                                println!("reg: {}", *reg as usize);
+                            }
+                            reg => panic!("Unhandled register type! {:?}", reg),
+                        }
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }

@@ -37,5 +37,8 @@ pub fn apply(mfa: &module::MFA, args: Vec<Value>) -> Value {
 
 /// Bif implementations
 fn bif_erlang_add_2(args: Vec<Value>) -> Value {
-    Value::Nil()
+    if let [Value::Integer(v1), Value::Integer(v2)] = &args[..] {
+        return Value::Integer(v1 + v2);
+    }
+    panic!("Invalid arguments to erlang::+")
 }
