@@ -2,7 +2,7 @@ use crate::loader::Instruction;
 use crate::value::Value;
 use std::collections::HashMap;
 
-pub type ErlFun = (usize, usize, u32); // function, arity, label
+pub type MFA = (usize, usize, u32); // function, arity, label
 
 #[derive(Debug, PartialEq)]
 pub struct Lambda {
@@ -18,8 +18,8 @@ pub struct Lambda {
 #[derive(Debug)]
 pub struct Module {
     pub atoms: HashMap<usize, usize>, // local -> global mapping
-    pub imports: Vec<ErlFun>,
-    pub exports: Vec<ErlFun>,
+    pub imports: Vec<MFA>,
+    pub exports: Vec<MFA>,
     pub literals: Vec<Value>,
     pub lambdas: Vec<Lambda>,
     pub funs: HashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset

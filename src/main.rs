@@ -1,4 +1,5 @@
 mod atom;
+mod bif;
 mod etf;
 mod loader;
 mod module;

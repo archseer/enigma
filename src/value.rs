@@ -37,7 +37,7 @@ pub enum Value {
     List(Box<Vec<Value>>),
     FloatReg(u64),
     AllocList(u64),
-    ExtendedLiteral(u64), // TODO; replace at load time
+    ExtendedLiteral(usize), // TODO; replace at load time
 }
 
 // TODO: maybe box binaries further:

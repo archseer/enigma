@@ -1,4 +1,5 @@
 use crate::atom;
+use crate::bif;
 use crate::module::Module;
 use crate::opcodes::Opcode;
 use crate::value::Value;
@@ -11,8 +12,8 @@ pub struct Machine {
     // module table
     modules: HashMap<usize, Module>,
     // registers
-    x: [Value; 32],
-    y: [Value; 32],
+    x: [Value; 16],
+    y: [Value; 16],
     // program pointer/reference?
     ip: usize,
     // continuation pointer
@@ -25,8 +26,8 @@ impl Machine {
         unsafe {
             let mut vm = Machine {
                 modules: HashMap::new(),
-                x: std::mem::uninitialized(), //[Value::Nil(); 32],
-                y: std::mem::uninitialized(), //[Value::Nil(); 32],
+                x: std::mem::uninitialized(), //[Value::Nil(); 16],
+                y: std::mem::uninitialized(), //[Value::Nil(); 16],
                 ip: 0,
                 cp: -1,
                 live: 0,
@@ -103,20 +104,12 @@ impl Machine {
                 Opcode::GcBif2 => {
                     // fail label, live, bif, arg1, arg2, dest
                     if let Value::Literal(i) = &ins.args[2] {
-                        // GCBifImpl2 func = (GCBifImpl2) mod->imports[bif].bif;
-                        println!("gcbif2");
-                        let val: Vec<_> = module
-                            .imports
-                            .iter()
-                            .map(|mfa| {
-                                (
-                                    atom::from_index(&mfa.0).unwrap(),
-                                    atom::from_index(&mfa.1).unwrap(),
-                                    mfa.2,
-                                )
-                            })
-                            .collect();
-                        println!("{:?}", val);
+                        let args = vec![
+                            self.load_arg(&module, &ins.args[3]).unwrap(),
+                            self.load_arg(&module, &ins.args[4]).unwrap(),
+                        ];
+                        let res = bif::apply(module.imports.get(*i as usize).unwrap(), args);
+                        println!("res: {}", res);
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
@@ -131,8 +124,13 @@ impl Machine {
     /// Second, probably move some of the terms into vals (regs etc)
     fn load_arg(&self, module: &Module, arg: &Value) -> Result<Value, &str> {
         match arg {
-            Value::Atom(i) => Ok(Value::Atom(*module.atoms.get(&(*i as usize)).unwrap())),
-            Value::ExtendedLiteral(i) => Ok(module.literals.get(*i as usize).unwrap().clone()),
+            Value::Atom(i) => {
+                if *i == 0 {
+                    return Ok(Value::Nil());
+                }
+                Ok(Value::Atom(*module.atoms.get(&(*i - 1)).unwrap()))
+            }
+            Value::ExtendedLiteral(i) => Ok(module.literals.get(*i).unwrap().clone()),
             Value::X(i) => Ok(self.x[*i as usize].clone()),
             Value::Y(i) => Ok(self.y[*i as usize].clone()),
             value => Ok(value.clone()),

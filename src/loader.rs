@@ -1,6 +1,6 @@
 use crate::atom::ATOMS;
 use crate::etf;
-use crate::module::{ErlFun, Lambda, Module};
+use crate::module::{Lambda, Module, MFA};
 use crate::opcodes::*;
 use crate::value::Value;
 use crate::vm::Machine;
@@ -14,8 +14,8 @@ use std::io::{Cursor, Read};
 pub struct Loader<'a> {
     pub vm: &'a Machine,
     atoms: Vec<&'a str>,
-    imports: Vec<ErlFun>,
-    exports: Vec<ErlFun>,
+    imports: Vec<MFA>,
+    exports: Vec<MFA>,
     literals: Vec<Value>,
     lambdas: Vec<Lambda>,
     atom_map: HashMap<usize, usize>, // TODO: remove this; local id -> global id
@@ -309,7 +309,7 @@ named!(
 );
 
 named!(
-    fun_entry<&[u8], ErlFun>,
+    fun_entry<&[u8], MFA>,
     do_parse!(
         function: be_u32 >>
         arity: be_u32 >>
@@ -319,7 +319,7 @@ named!(
 );
 
 named!(
-    loct_chunk<&[u8], Vec<ErlFun>>,
+    loct_chunk<&[u8], Vec<MFA>>,
     do_parse!(
         count: be_u32 >>
         entries: count!(fun_entry, count as usize) >>
@@ -328,7 +328,7 @@ named!(
 );
 
 named!(
-    litt_chunk<&[u8], Vec<ErlFun>>,
+    litt_chunk<&[u8], Vec<MFA>>,
     do_parse!(
         count: be_u32 >>
         entries: count!(fun_entry, count as usize) >>
@@ -460,7 +460,7 @@ fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], Value> {
 fn parse_extended_literal(rest: &[u8]) -> IResult<&[u8], Value> {
     let (rest, b) = be_u8(rest)?;
     let (rest, val) = read_int(b, rest).unwrap();
-    Ok((rest, Value::ExtendedLiteral(val)))
+    Ok((rest, Value::ExtendedLiteral(val as usize)))
 }
 
 // ---------------------------------------------------
