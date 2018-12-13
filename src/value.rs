@@ -1,6 +1,8 @@
+use std::cmp::Ordering;
 use std::rc::Rc;
+
 #[allow(dead_code)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum Value {
     Nil(), // also known as nil
     Integer(u64),
@@ -33,11 +35,12 @@ pub enum Value {
     Literal(u64),
     X(u64),
     Y(u64),
-    Label(u64),
+    Label(usize),
     List(Box<Vec<Value>>),
     FloatReg(u64),
     AllocList(u64),
     ExtendedLiteral(usize), // TODO; replace at load time
+    CP(isize),              // continueation pointer
 }
 
 // TODO: maybe box binaries further:
@@ -53,6 +56,14 @@ impl Value {
         match *self {
             Value::Atom(_) => true,
             _ => false,
+        }
+    }
+
+    pub fn to_usize(&self) -> usize {
+        match *self {
+            Value::Atom(i) => i,
+            Value::Label(i) => i,
+            _ => panic!("Unimplemented to_integer for {:?}", self),
         }
     }
 }

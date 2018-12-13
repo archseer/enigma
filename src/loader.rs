@@ -58,7 +58,9 @@ impl<'a> Loader<'a> {
         self.load_imports_table(chunks.remove("ImpT").expect("ImpT chunk not found!"));
         self.load_exports_table(chunks.remove("ExpT").expect("ExpT chunk not found!"));
         // self.load_strings_table(find_chunk(&chunks, "StrT"));
-        self.load_literals_table(chunks.remove("LitT").expect("LitT chunk not found!"));
+        if let Some(chunk) = chunks.remove("LitT") {
+            self.load_literals_table(chunk);
+        }
         if let Some(chunk) = chunks.remove("FunT") {
             self.load_literals_table(chunk);
         }
@@ -178,7 +180,7 @@ impl<'a> Loader<'a> {
     fn postprocess_raw_code(&mut self) {
         // scan over the Code chunk bits, but we'll need to know bit length of each instruction.
         let (_, code) = scan_instructions(self.code).unwrap();
-        for instruction in code {
+        for mut instruction in code {
             match &instruction.op {
                 Opcode::Line => continue, // skip for now
                 Opcode::Label => {
@@ -209,6 +211,21 @@ impl<'a> Loader<'a> {
                 }
                 _ => {}
             }
+
+            // patch local atoms into global
+            instruction.args = instruction
+                .args
+                .into_iter()
+                .map(|arg| match arg {
+                    Value::Atom(i) => {
+                        if i == 0 {
+                            return Value::Nil();
+                        }
+                        Value::Atom(*self.atom_map.get(&(i - 1)).unwrap())
+                    }
+                    val => val,
+                })
+                .collect();
 
             self.instructions.push(instruction);
         }
@@ -416,7 +433,7 @@ fn compact_term(i: &[u8]) -> IResult<&[u8], Value> {
             2 => Ok((rest, Value::Atom(val as usize))),
             3 => Ok((rest, Value::X(val))),
             4 => Ok((rest, Value::Y(val))),
-            5 => Ok((rest, Value::Label(val))),
+            5 => Ok((rest, Value::Label(val as usize))),
             6 => Ok((rest, Value::Character(val as i64))),
             _ => panic!("can't happen"),
         };

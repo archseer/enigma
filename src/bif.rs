@@ -4,16 +4,17 @@ use crate::value::Value;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
-type BifFn = fn(Vec<Value>) -> Value;
+type BifFn = fn(Vec<&Value>) -> Value;
 type BifTable = HashMap<(&'static str, &'static str, u32), Box<BifFn>>;
 
 static BIFS: Lazy<BifTable> = sync_lazy! {
     let mut bifs = BifTable::new();
     bifs.insert(("erlang", "+", 2), Box::new(bif_erlang_add_2));
+    bifs.insert(("erlang", "-", 2), Box::new(bif_erlang_sub_2));
     bifs
 };
 
-pub fn apply(mfa: &module::MFA, args: Vec<Value>) -> Value {
+pub fn apply(mfa: &module::MFA, args: Vec<&Value>) -> Value {
     (BIFS
         .get(&(
             &atom::from_index(&mfa.0).unwrap(),
@@ -36,9 +37,16 @@ pub fn apply(mfa: &module::MFA, args: Vec<Value>) -> Value {
 //     .collect();
 
 /// Bif implementations
-fn bif_erlang_add_2(args: Vec<Value>) -> Value {
+fn bif_erlang_add_2(args: Vec<&Value>) -> Value {
     if let [Value::Integer(v1), Value::Integer(v2)] = &args[..] {
         return Value::Integer(v1 + v2);
+    }
+    panic!("Invalid arguments to erlang::+")
+}
+
+fn bif_erlang_sub_2(args: Vec<&Value>) -> Value {
+    if let [Value::Integer(v1), Value::Integer(v2)] = &args[..] {
+        return Value::Integer(v1 - v2);
     }
     panic!("Invalid arguments to erlang::+")
 }
