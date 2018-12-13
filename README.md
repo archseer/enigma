@@ -1,11 +1,19 @@
-
 # Enigma
+
+# Goals
+
+- Explore using immix as a GC for Erlang
+- Be able to run the Erlang bootstrap
+- Be able to run Elixir
 
 # TODO
 
 - [ ] full external term representation
 - [ ] bignum math
 - [ ] deep term comparison
+- [ ] more compact cons impl (currently it uses one extra byteword, use a Rc<[Value;2]>)
+- [ ] directly embed labels as ip positions (no more lookups)
+- [ ] directly embed imports as some form of a pointer reference
 
 ## Opcodes
 

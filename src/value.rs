@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::rc::Rc;
 
 #[allow(dead_code)]
@@ -6,7 +5,7 @@ use std::rc::Rc;
 pub enum Value {
     Nil(), // also known as nil
     Integer(u64),
-    Character(i64),
+    Character(u64),
     Atom(usize),
     Catch(),
     // external vals? except Pid can also be internal
@@ -40,7 +39,7 @@ pub enum Value {
     FloatReg(usize),
     AllocList(u64),
     ExtendedLiteral(usize), // TODO; replace at load time
-    CP(isize),              // continueation pointer
+    CP(isize),              // continuation pointer
 }
 
 // TODO: maybe box binaries further:

@@ -1,3 +1,4 @@
+use crate::atom;
 use crate::bif;
 use crate::module::Module;
 use crate::opcodes::Opcode;
@@ -64,6 +65,7 @@ impl Machine {
     #[inline]
     fn expand_arg<'a>(&'a self, module: &'a Module, arg: &'a Value) -> &'a Value {
         match arg {
+            // TODO: optimize away into a reference somehow at load time
             Value::ExtendedLiteral(i) => module.literals.get(*i).unwrap(),
             Value::X(i) => &self.x[*i],
             Value::Y(i) => &self.stack[self.stack.len() - (*i + 2)],
@@ -72,11 +74,8 @@ impl Machine {
     }
 
     pub fn run(&mut self, module: Module, fun: usize) {
-        let local = module.atoms.get(&fun).unwrap();
-        println!("run: {:?}, fun:{:?}, local: {:?}", module.funs, fun, local);
-        self.ip = module.funs.get(&(1, 1)).unwrap().clone();
+        self.ip = *module.funs.get(&(fun, 1)).unwrap();
         self.x[0] = Value::Integer(23);
-        // TODO: modify imports to get *local working
 
         loop {
             let ref ins = module.instructions[self.ip];
@@ -99,7 +98,7 @@ impl Machine {
                 Opcode::Call => {
                     //literal arity, label jmp
                     // store arity as live
-                    if let [Value::Literal(a), Value::Label(i)] = &ins.args[..] {
+                    if let [Value::Literal(_a), Value::Label(i)] = &ins.args[..] {
                         self.cp = self.ip as isize;
                         self.ip = *i - 2;
                     } else {
