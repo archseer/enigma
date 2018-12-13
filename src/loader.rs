@@ -5,6 +5,7 @@ use crate::opcodes::*;
 use crate::value::Value;
 use crate::vm::Machine;
 use compress::zlib;
+use fnv::FnvHashMap;
 use nom::*;
 use num_bigint::{BigInt, Sign};
 use std::collections::HashMap;
@@ -19,8 +20,8 @@ pub struct Loader<'a> {
     literals: Vec<Value>,
     lambdas: Vec<Lambda>,
     atom_map: HashMap<usize, usize>, // TODO: remove this; local id -> global id
-    funs: HashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
-    labels: HashMap<usize, usize>,   // label -> offset
+    funs: FnvHashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
+    labels: FnvHashMap<usize, usize>, // label -> offset
     code: &'a [u8],
     instructions: Vec<Instruction>,
 }
@@ -35,8 +36,8 @@ impl<'a> Loader<'a> {
             literals: Vec::new(),
             lambdas: Vec::new(),
             atom_map: HashMap::new(),
-            labels: HashMap::new(),
-            funs: HashMap::new(),
+            labels: FnvHashMap::default(),
+            funs: FnvHashMap::default(),
             code: &[],
             instructions: Vec::new(),
         }

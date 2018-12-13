@@ -1,5 +1,6 @@
 use crate::loader::Instruction;
 use crate::value::Value;
+use fnv::FnvHashMap;
 use std::collections::HashMap;
 
 pub type MFA = (usize, usize, u32); // function, arity, label
@@ -22,7 +23,7 @@ pub struct Module {
     pub exports: Vec<MFA>,
     pub literals: Vec<Value>,
     pub lambdas: Vec<Lambda>,
-    pub funs: HashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
-    pub labels: HashMap<usize, usize>,        // label -> offset
+    pub funs: FnvHashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
+    pub labels: FnvHashMap<usize, usize>,        // label -> offset
     pub instructions: Vec<Instruction>,
 }
