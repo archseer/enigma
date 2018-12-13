@@ -129,9 +129,17 @@ pub fn from_str(val: &str) -> Value {
     ATOMS.from_str(val)
 }
 
+pub fn i_from_str(val: &str) -> usize {
+    if let Value::Atom(i) = ATOMS.from_str(val) {
+        return i;
+    }
+    panic!("unreachable")
+}
+
 pub fn to_str(a: &Value) -> Result<String, String> {
     ATOMS.to_str(a)
 }
+
 pub fn from_index(index: &usize) -> Result<String, String> {
     if let Some(p) = ATOMS.lookup_index(index) {
         return Ok(unsafe { (*p).name.clone() });

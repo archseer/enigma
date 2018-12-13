@@ -48,7 +48,7 @@ impl Machine {
     // value is an atom
     pub fn run(&mut self, module: Module, fun: usize) {
         let local = module.atoms.get(&fun).unwrap();
-        println!("two: {:?}, fun:{:?}, local: {:?}", module.funs, fun, local);
+        println!("run: {:?}, fun:{:?}, local: {:?}", module.funs, fun, local);
         self.ip = module.funs.get(&(1, 1)).unwrap().clone();
         self.x[0] = Value::Integer(23);
         // TODO: modify imports to get *local working

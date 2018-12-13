@@ -29,6 +29,6 @@ fn main() {
 
     println!(
         "execution time: {:?}",
-        (time::precise_time_ns() - start) / 1000
+        (time::precise_time_ns() - start) // / 1000
     )
 }
