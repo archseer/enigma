@@ -429,11 +429,11 @@ fn compact_term(i: &[u8]) -> IResult<&[u8], Value> {
         let (rest, val) = read_int(b, rest).unwrap();
 
         return match tag {
-            0 => Ok((rest, Value::Literal(val as u64))),
+            0 => Ok((rest, Value::Literal(val as usize))),
             1 => Ok((rest, Value::Integer(val as u64))),
             2 => Ok((rest, Value::Atom(val as usize))),
-            3 => Ok((rest, Value::X(val))),
-            4 => Ok((rest, Value::Y(val))),
+            3 => Ok((rest, Value::X(val as usize))),
+            4 => Ok((rest, Value::Y(val as usize))),
             5 => Ok((rest, Value::Label(val as usize))),
             6 => Ok((rest, Value::Character(val as i64))),
             _ => panic!("can't happen"),
@@ -468,7 +468,7 @@ fn parse_list(rest: &[u8]) -> IResult<&[u8], Value> {
 }
 
 fn parse_float_reg(rest: &[u8]) -> IResult<&[u8], Value> {
-    Ok((rest, Value::FloatReg(22 as u64)))
+    Ok((rest, Value::FloatReg(22 as usize)))
 }
 
 fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], Value> {

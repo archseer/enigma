@@ -25,11 +25,11 @@ macro_rules! set_register {
         match $register {
             Value::X(reg) => {
                 // TODO: remove these clones by using some form of mem::swap/replace
-                $vm.x[*reg as usize] = $value.clone();
+                $vm.x[*reg] = $value.clone();
             }
             Value::Y(reg) => {
                 let len = $vm.stack.len();
-                $vm.stack[len - (*reg as usize + 2)] = $value.clone();
+                $vm.stack[len - (*reg + 2)] = $value.clone();
             }
             reg => panic!("Unhandled register type! {:?}", reg),
         }
@@ -61,6 +61,16 @@ impl Machine {
         self.modules.insert(0, module);
     }
 
+    #[inline]
+    fn expand_arg<'a>(&'a self, module: &'a Module, arg: &'a Value) -> &'a Value {
+        match arg {
+            Value::ExtendedLiteral(i) => module.literals.get(*i).unwrap(),
+            Value::X(i) => &self.x[*i],
+            Value::Y(i) => &self.stack[self.stack.len() - (*i + 2)],
+            value => value,
+        }
+    }
+
     pub fn run(&mut self, module: Module, fun: usize) {
         let local = module.atoms.get(&fun).unwrap();
         println!("run: {:?}, fun:{:?}, local: {:?}", module.funs, fun, local);
@@ -75,14 +85,12 @@ impl Machine {
                 Opcode::FuncInfo => {}//println!("Running a function..."),
                 Opcode::Move => {
                     // arg1 can be either a value or a register
-                    let val = self.load_arg(&module, &ins.args[0]);
+                    let val = self.expand_arg(&module, &ins.args[0]);
                     set_register!(self, &ins.args[1], val)
                 }
                 Opcode::Return => {
                     if self.cp == -1 {
                         println!("Process exited with normal, x0: {:?}", self.x[0]);
-                        println!("x: {:?}", self.x);
-                        println!("y: {:?}", self.stack);
                         break;
                     }
                     self.ip = self.cp as usize;
@@ -93,7 +101,7 @@ impl Machine {
                     // store arity as live
                     if let [Value::Literal(a), Value::Label(i)] = &ins.args[..] {
                         self.cp = self.ip as isize;
-                        self.ip = *i as usize - 2;
+                        self.ip = *i - 2;
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
@@ -113,7 +121,7 @@ impl Machine {
                     // literal nwords
                     if let [Value::Literal(nwords)] = &ins.args[..] {
                         let cp = self.stack.pop().unwrap();
-                        self.stack.truncate(self.stack.len() - *nwords as usize);
+                        self.stack.truncate(self.stack.len() - *nwords);
                         if let Value::CP(cp) = cp {
                             self.cp = cp;
                         } else {
@@ -130,11 +138,11 @@ impl Machine {
                     // shared_equality_opcode(vm, ctx, curr_p, true, Ordering::Less, false)
                     assert_eq!(ins.args.len(), 3);
 
-                    let l = self.load_arg(&module, &ins.args[0]).to_usize();
+                    let l = self.expand_arg(&module, &ins.args[0]).to_usize();
                     let fail = module.labels.get(&(l)).unwrap();
 
-                    let v1 = self.load_arg(&module, &ins.args[1]);
-                    let v2 = self.load_arg(&module, &ins.args[2]);
+                    let v1 = self.expand_arg(&module, &ins.args[1]);
+                    let v2 = self.expand_arg(&module, &ins.args[2]);
 
                     if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(&v2) {
                         // ok
@@ -145,11 +153,11 @@ impl Machine {
                 Opcode::IsEq => {
                     assert_eq!(ins.args.len(), 3);
 
-                    let l = self.load_arg(&module, &ins.args[0]).to_usize();
+                    let l = self.expand_arg(&module, &ins.args[0]).to_usize();
                     let fail = module.labels.get(&(l)).unwrap();
 
-                    let v1 = self.load_arg(&module, &ins.args[1]);
-                    let v2 = self.load_arg(&module, &ins.args[2]);
+                    let v1 = self.expand_arg(&module, &ins.args[1]);
+                    let v2 = self.expand_arg(&module, &ins.args[2]);
 
                     if let Some(std::cmp::Ordering::Equal) = v1.partial_cmp(&v2) {
                         // ok
@@ -161,10 +169,10 @@ impl Machine {
                     // fail label, live, bif, arg1, arg2, dest
                     if let Value::Literal(i) = &ins.args[2] {
                         let args = vec![
-                            self.load_arg(&module, &ins.args[3]),
-                            self.load_arg(&module, &ins.args[4]),
+                            self.expand_arg(&module, &ins.args[3]),
+                            self.expand_arg(&module, &ins.args[4]),
                         ];
-                        let val = bif::apply(module.imports.get(*i as usize).unwrap(), args);
+                        let val = bif::apply(module.imports.get(*i).unwrap(), args);
 
                         set_register!(self, &ins.args[5], val)
                     } else {
@@ -173,16 +181,6 @@ impl Machine {
                 }
                 opcode => println!("Unimplemented opcode {:?}", opcode),
             }
-        }
-    }
-
-    #[inline]
-    fn load_arg<'a>(&'a self, module: &'a Module, arg: &'a Value) -> &'a Value {
-        match arg {
-            Value::ExtendedLiteral(i) => module.literals.get(*i).unwrap(),
-            Value::X(i) => &self.x[*i as usize],
-            Value::Y(i) => &self.stack[self.stack.len() - (*i as usize + 2)],
-            value => value,
         }
     }
 }

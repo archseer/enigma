@@ -15,6 +15,7 @@ static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs
 };
 
+#[inline]
 pub fn apply(mfa: &module::MFA, args: Vec<&Value>) -> Value {
     (BIFS.get(mfa).unwrap())(args)
 }

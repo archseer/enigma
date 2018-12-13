@@ -32,12 +32,12 @@ pub enum Value {
     // Closure(),
     // Import(), Export(),
     /// Special values (invalid in runtime)
-    Literal(u64),
-    X(u64),
-    Y(u64),
+    Literal(usize),
+    X(usize),
+    Y(usize),
     Label(usize),
     List(Box<Vec<Value>>),
-    FloatReg(u64),
+    FloatReg(usize),
     AllocList(u64),
     ExtendedLiteral(usize), // TODO; replace at load time
     CP(isize),              // continueation pointer
