@@ -1,14 +1,14 @@
 use crate::atom;
 use crate::module;
 use crate::value::Value;
+use fnv::FnvHashMap;
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
 
 type BifFn = fn(Vec<&Value>) -> Value;
-type BifTable = HashMap<(usize, usize, u32), Box<BifFn>>;
+type BifTable = FnvHashMap<(usize, usize, u32), Box<BifFn>>;
 
 static BIFS: Lazy<BifTable> = sync_lazy! {
-    let mut bifs = BifTable::new();
+    let mut bifs: BifTable = FnvHashMap::default();
     let erlang = atom::i_from_str("erlang");
     bifs.insert((erlang, atom::i_from_str("+"), 2), Box::new(bif_erlang_add_2));
     bifs.insert((erlang, atom::i_from_str("-"), 2), Box::new(bif_erlang_sub_2));
