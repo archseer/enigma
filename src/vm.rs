@@ -16,8 +16,24 @@ pub struct Machine {
     // program pointer/reference?
     ip: usize,
     // continuation pointer
-    cp: isize, // TODO: ?!
+    cp: isize, // TODO: ?!, isize is lossy here
     live: usize,
+}
+
+macro_rules! set_register {
+    ($vm:expr, $register:expr, $value:expr) => {{
+        match $register {
+            Value::X(reg) => {
+                // TODO: remove these clones by using some form of mem::swap/replace
+                $vm.x[*reg as usize] = $value.clone();
+            }
+            Value::Y(reg) => {
+                let len = $vm.stack.len();
+                $vm.stack[len - (*reg as usize + 2)] = $value.clone();
+            }
+            reg => panic!("Unhandled register type! {:?}", reg),
+        }
+    }};
 }
 
 impl Machine {
@@ -45,7 +61,6 @@ impl Machine {
         self.modules.insert(0, module);
     }
 
-    // value is an atom
     pub fn run(&mut self, module: Module, fun: usize) {
         let local = module.atoms.get(&fun).unwrap();
         println!("run: {:?}, fun:{:?}, local: {:?}", module.funs, fun, local);
@@ -61,17 +76,7 @@ impl Machine {
                 Opcode::Move => {
                     // arg1 can be either a value or a register
                     let val = self.load_arg(&module, &ins.args[0]);
-                    // TODO: remove these clones by using some form of mem::swap/replace
-                    match &ins.args[1] {
-                        Value::X(reg) => {
-                            self.x[*reg as usize] = val.clone();
-                        }
-                        Value::Y(reg) => {
-                            let len = self.stack.len();
-                            self.stack[len - (*reg as usize + 2)] = val.clone();
-                        }
-                        reg => panic!("Unhandled register type! {:?}", reg),
-                    }
+                    set_register!(self, &ins.args[1], val)
                 }
                 Opcode::Return => {
                     if self.cp == -1 {
@@ -161,17 +166,7 @@ impl Machine {
                         ];
                         let val = bif::apply(module.imports.get(*i as usize).unwrap(), args);
 
-                        // TODO: dedup in a func
-                        match &ins.args[5] {
-                            Value::X(reg) => {
-                                self.x[*reg as usize] = val;
-                            }
-                            Value::Y(reg) => {
-                                let len = self.stack.len();
-                                self.stack[len - (*reg as usize + 2)] = val;
-                            }
-                            reg => panic!("Unhandled register type! {:?}", reg),
-                        }
+                        set_register!(self, &ins.args[5], val)
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
