@@ -181,6 +181,7 @@ impl Machine {
         }
     }
 
+    #[inline]
     fn load_arg<'a>(&'a self, module: &'a Module, arg: &'a Value) -> &'a Value {
         match arg {
             Value::ExtendedLiteral(i) => module.literals.get(*i).unwrap(),

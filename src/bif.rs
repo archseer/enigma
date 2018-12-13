@@ -37,6 +37,7 @@ pub fn apply(mfa: &module::MFA, args: Vec<&Value>) -> Value {
 //     .collect();
 
 /// Bif implementations
+#[inline]
 fn bif_erlang_add_2(args: Vec<&Value>) -> Value {
     if let [Value::Integer(v1), Value::Integer(v2)] = &args[..] {
         return Value::Integer(v1 + v2);
@@ -44,6 +45,7 @@ fn bif_erlang_add_2(args: Vec<&Value>) -> Value {
     panic!("Invalid arguments to erlang::+")
 }
 
+#[inline]
 fn bif_erlang_sub_2(args: Vec<&Value>) -> Value {
     if let [Value::Integer(v1), Value::Integer(v2)] = &args[..] {
         return Value::Integer(v1 - v2);
