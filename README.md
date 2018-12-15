@@ -5,22 +5,24 @@
 - Explore using immix as a GC for Erlang
 - Be able to run the Erlang bootstrap
 - Be able to run Elixir
+- Ideally one day, feature parity with OTP
 
 # TODO
 
 - [ ] full external term representation
 - [ ] bignum math
 - [ ] deep term comparison
-- [ ] more compact cons impl (currently it uses one extra byteword, use a Rc<[Value;2]>)
+  [ ] exports global table? that way we can call any method
+- [ ] more compact cons impl (currently it uses one extra byteword, use a Rc&lt;[Value;2]&gt;)
 - [ ] directly embed labels as ip positions (no more lookups)
 - [ ] directly embed imports as some form of a pointer reference
 
 ## Opcodes
 
-- [X] Label = 1
+- [x] Label = 1
 - [ ] FuncInfo = 2
-- [X] IntCodeEnd = 3
-- [X] Call = 4
+- [x] IntCodeEnd = 3
+- [x] Call = 4
 - [ ] CallLast = 5
 - [ ] CallOnly = 6
 - [ ] CallExt = 7
@@ -30,12 +32,12 @@
 - [ ] Bif2 = 11
 - [ ] Allocate = 12
 - [ ] AllocateHeap = 13
-- [X] AllocateZero = 14
+- [x] AllocateZero = 14
 - [ ] AllocateHeapZero = 15
 - [ ] TestHeap = 16
 - [ ] Init = 17
-- [X] Deallocate = 18
-- [X] Return = 19
+- [x] Deallocate = 18
+- [x] Return = 19
 - [ ] Send = 20
 - [ ] RemoveMessage = 21
 - [ ] Timeout = 22
@@ -43,9 +45,9 @@
 - [ ] LoopRecEnd = 24
 - [ ] Wait = 25
 - [ ] WaitTimeout = 26
-- [X] IsLt = 39
+- [x] IsLt = 39
 - [ ] IsGe = 40
-- [X] IsEq = 41
+- [x] IsEq = 41
 - [ ] IsNe = 42
 - [ ] IsEqExact = 43
 - [ ] IsNeExact = 44
@@ -67,7 +69,7 @@
 - [ ] Jump = 61
 - [ ] Catch = 62
 - [ ] CatchEnd = 63
-- [X] Move = 64
+- [x] Move = 64
 - [ ] GetList = 65
 - [ ] GetTupleElement = 66
 - [ ] SetTupleElement = 67
@@ -114,7 +116,7 @@
 - [ ] BsSave2 = 122
 - [ ] BsRestore2 = 123
 - [ ] GcBif1 = 124
-- [X] GcBif2 = 125
+- [x] GcBif2 = 125
 - [ ] IsBitstr = 129
 - [ ] BsContextToBinary = 130
 - [ ] BsTestUnit = 131
@@ -402,8 +404,8 @@
 - [ ] ubif erlang:'=='/2			seqeq_2
 - [ ] ubif erlang:'=/='/2			sneq_2
 - [ ] ubif erlang:'/='/2			sneqeq_2
-- [X] ubif erlang:'+'/2			splus_2
-- [X] ubif erlang:'-'/2			sminus_2
+- [x] ubif erlang:'+'/2			splus_2
+- [x] ubif erlang:'-'/2			sminus_2
 - [ ] ubif erlang:'*'/2			stimes_2
 - [ ] ubif erlang:'/'/2			div_2
 - [ ] ubif erlang:'div'/2			intdiv_2
@@ -743,3 +745,12 @@
 - [ ] bif erts_internal:counters_add/3
 - [ ] bif erts_internal:counters_put/3
 - [ ] bif erts_internal:counters_info/1
+
+# Special thanks
+
+- [Yorick Peterse's Inko](https://gitlab.com/inko-lang/inko/), from which I've
+  stolen the process scheduling code.
+- @kvaks for [ErlangRT](https://github.com/kvakvs/ErlangRT) which I've used for an extensive
+    reference, along with his [BEAM
+    Wisdoms](http://beam-wisdoms.clau.se/en/latest/) website.
+- [The BEAM Book](https://github.com/happi/theBeamBook)

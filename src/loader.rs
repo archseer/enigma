@@ -11,7 +11,6 @@ use num_bigint::{BigInt, Sign};
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
-#[derive(Debug)]
 pub struct Loader<'a> {
     pub vm: &'a Machine,
     atoms: Vec<&'a str>,
@@ -511,11 +510,11 @@ mod tests {
     fn test_compact_term() {
         assert_eq!(
             compact_term(&vec![0b10010000u8]),
-            Ok((&[] as &[u8], 9 as u8))
+            Ok((&[] as &[u8], Value::Literal(9)))
         );
         assert_eq!(
             compact_term(&vec![0b11110000u8]),
-            Ok((&[] as &[u8], 15 as u8))
+            Ok((&[] as &[u8], Value::Literal(15)))
         );
     }
 }

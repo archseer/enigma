@@ -1,12 +1,21 @@
-use crate::atom;
 use crate::bif;
-use crate::module::Module;
+use crate::module::{self, Module};
 use crate::opcodes::Opcode;
+use crate::pool::{Job, Pool};
+use crate::process::{self, RcProcess};
+use crate::process_table::ProcessTable;
 use crate::value::Value;
 use std::collections::HashMap;
+use std::sync::Mutex;
 
-#[derive(Debug)]
 pub struct Machine {
+    /// Table containing all processes.
+    pub process_table: Mutex<ProcessTable<RcProcess>>,
+    /// Use priorities later on
+    pub process_pool: Pool<RcProcess>,
+
+    // env config, arguments, panic handler
+
     // atom table is accessible globally as ATOMS
     // export table
     // module table
@@ -39,8 +48,13 @@ macro_rules! set_register {
 
 impl Machine {
     pub fn new() -> Machine {
+        let primary_threads = 8;
+        let process_pool = Pool::new(primary_threads, Some("primary".to_string()));
+
         unsafe {
             let mut vm = Machine {
+                process_table: Mutex::new(ProcessTable::new()),
+                process_pool,
                 modules: HashMap::new(),
                 x: std::mem::uninitialized(), //[Value::Nil(); 16],
                 stack: Vec::new(),
@@ -55,6 +69,22 @@ impl Machine {
             }
             vm
         }
+    }
+
+    fn terminate(&self) {
+        self.process_pool.terminate();
+    }
+
+    /// Starts the main process
+    pub fn start_main_process(&self, file: &str) {
+        let process = {
+            let module = module::load_file(&self, file).unwrap();
+
+            process::allocate(&self, &module).unwrap()
+        };
+
+        let process = Job::normal(process);
+        self.process_pool.schedule(process);
     }
 
     pub fn register_module(&mut self, module: Module) {
