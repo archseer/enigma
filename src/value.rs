@@ -1,4 +1,5 @@
-use std::rc::Rc;
+// use crate::arc_without_weak::ArcWithoutWeak;
+use std::sync::Arc;
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
@@ -14,11 +15,11 @@ pub enum Value {
     Ref(),
     // continuation pointer?
     Cons {
-        head: Rc<Value>,
-        tail: Rc<Value>,
-    }, // two values TODO: Rc<[Value; 2]>
+        head: Arc<Value>,
+        tail: Arc<Value>,
+    }, // two values TODO: ArcWithoutWeak<[Value; 2]>
     /// Boxed values
-    Tuple(Rc<Vec<Value>>), // TODO: allocate on custom heap
+    Tuple(Arc<Vec<Value>>), // TODO: allocate on custom heap
     Float(f64),
     /// Strings use an Arc so they can be sent to other processes without
     /// requiring a full copy of the data.
@@ -27,7 +28,7 @@ pub enum Value {
     /// An interned string is a string allocated on the permanent space. For
     /// every unique interned string there is only one object allocated.
     //InternedBinary(ArcWithoutWeak<ImmutableString>),
-    // BigInt(Rc<BigInt>),
+    // BigInt(ArcWithoutWeak<BigInt>),
     // Closure(),
     // Import(), Export(),
     /// Special values (invalid in runtime)
@@ -41,6 +42,8 @@ pub enum Value {
     ExtendedLiteral(usize), // TODO; replace at load time
     CP(isize),              // continuation pointer
 }
+
+unsafe impl Sync for Value {}
 
 // TODO: maybe box binaries further:
 // // contains size, followed in memory by the data bytes

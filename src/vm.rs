@@ -1,45 +1,48 @@
+use crate::atom;
 use crate::bif;
-use crate::module::{self, Module};
+use crate::module;
+use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
 use crate::opcodes::Opcode;
-use crate::pool::{Job, Pool};
-use crate::process::{self, RcProcess};
+use crate::pool::{Job, JoinGuard as PoolJoinGuard, Pool, Worker};
+use crate::process::{self, ExecutionContext, RcProcess};
 use crate::process_table::ProcessTable;
 use crate::value::Value;
-use std::collections::HashMap;
+use std::sync::Arc;
 use std::sync::Mutex;
 
-pub struct Machine {
+/// A reference counted State.
+pub type RcState = Arc<State>;
+/// Reference counted ModuleRegistry.
+
+pub struct State {
     /// Table containing all processes.
     pub process_table: Mutex<ProcessTable<RcProcess>>,
     /// Use priorities later on
     pub process_pool: Pool<RcProcess>,
+}
+
+#[derive(Clone)]
+pub struct Machine {
+    pub state: RcState,
 
     // env config, arguments, panic handler
 
     // atom table is accessible globally as ATOMS
     // export table
     // module table
-    modules: HashMap<usize, Module>,
-    // registers
-    x: [Value; 16],
-    stack: Vec<Value>,
-    // program pointer/reference?
-    ip: usize,
-    // continuation pointer
-    cp: isize, // TODO: ?!, isize is lossy here
-    live: usize,
+    modules: RcModuleRegistry,
 }
 
 macro_rules! set_register {
-    ($vm:expr, $register:expr, $value:expr) => {{
+    ($context:expr, $register:expr, $value:expr) => {{
         match $register {
             Value::X(reg) => {
                 // TODO: remove these clones by using some form of mem::swap/replace
-                $vm.x[*reg] = $value.clone();
+                $context.x[*reg] = $value.clone();
             }
             Value::Y(reg) => {
-                let len = $vm.stack.len();
-                $vm.stack[len - (*reg + 2)] = $value.clone();
+                let len = $context.stack.len();
+                $context.stack[len - (*reg + 2)] = $value.clone();
             }
             reg => panic!("Unhandled register type! {:?}", reg),
         }
@@ -51,86 +54,107 @@ impl Machine {
         let primary_threads = 8;
         let process_pool = Pool::new(primary_threads, Some("primary".to_string()));
 
-        unsafe {
-            let mut vm = Machine {
-                process_table: Mutex::new(ProcessTable::new()),
-                process_pool,
-                modules: HashMap::new(),
-                x: std::mem::uninitialized(), //[Value::Nil(); 16],
-                stack: Vec::new(),
-                ip: 0,
-                cp: -1,
-                live: 0,
-            };
-            for (_i, el) in vm.x.iter_mut().enumerate() {
-                // Overwrite `element` without running the destructor of the old value.
-                // Since Value does not implement Copy, it is moved.
-                std::ptr::write(el, Value::Nil());
-            }
-            vm
+        let state = State {
+            process_table: Mutex::new(ProcessTable::new()),
+            process_pool,
+        };
+
+        Machine {
+            state: Arc::new(state),
+            modules: ModuleRegistry::with_rc(),
+        }
+    }
+
+    /// Starts the VM
+    ///
+    /// This method will block the calling thread until it returns.
+    ///
+    /// This method returns true if the VM terminated successfully, false
+    /// otherwise.
+    pub fn start(&self, file: &str) {
+        //self.configure_rayon();
+
+        let primary_guard = self.start_primary_threads();
+
+        self.start_main_process(file);
+
+        // Joining the pools only fails in case of a panic. In this case we
+        // don't want to re-panic as this clutters the error output.
+        if primary_guard.join().is_err() {
+            println!("Primary guard error!")
+            //self.set_exit_status(1);
         }
     }
 
     fn terminate(&self) {
-        self.process_pool.terminate();
+        self.state.process_pool.terminate();
+    }
+
+    fn start_primary_threads(&self) -> PoolJoinGuard<()> {
+        let machine = self.clone();
+        let pool = &self.state.process_pool;
+
+        pool.run(move |_worker, process| machine.run(&process))
     }
 
     /// Starts the main process
-    pub fn start_main_process(&self, file: &str) {
+    pub fn start_main_process(&self, path: &str) {
         let process = {
-            let module = module::load_file(&self, file).unwrap();
+            let module = module::load_module(&self.modules, path).unwrap();
 
-            process::allocate(&self, &module).unwrap()
+            process::allocate(&self.state, module).unwrap()
         };
 
         let process = Job::normal(process);
-        self.process_pool.schedule(process);
-    }
-
-    pub fn register_module(&mut self, module: Module) {
-        // TODO: use a module atom name
-        self.modules.insert(0, module);
+        self.state.process_pool.schedule(process);
     }
 
     #[inline]
-    fn expand_arg<'a>(&'a self, module: &'a Module, arg: &'a Value) -> &'a Value {
+    fn expand_arg<'a>(&'a self, context: &'a ExecutionContext, arg: &'a Value) -> &'a Value {
         match arg {
             // TODO: optimize away into a reference somehow at load time
-            Value::ExtendedLiteral(i) => module.literals.get(*i).unwrap(),
-            Value::X(i) => &self.x[*i],
-            Value::Y(i) => &self.stack[self.stack.len() - (*i + 2)],
+            Value::ExtendedLiteral(i) => unsafe { (*context.module).literals.get(*i).unwrap() },
+            Value::X(i) => &context.x[*i],
+            Value::Y(i) => &context.stack[context.stack.len() - (*i + 2)],
             value => value,
         }
     }
 
-    pub fn run(&mut self, module: Module, fun: usize) {
-        self.ip = *module.funs.get(&(fun, 1)).unwrap();
-        self.x[0] = Value::Integer(23);
+    pub fn run(&self, process: &RcProcess) {
+        let context = process.context_mut();
+
+        // temp
+        let fun = atom::i_from_str("fib");
+        context.x[0] = Value::Integer(23);
+        // end temp
+        unsafe {
+            context.ip = *(*context.module).funs.get(&(fun, 1)).unwrap();
+        }
 
         loop {
-            let ref ins = module.instructions[self.ip];
-            self.ip = self.ip + 1;
+            let ins = unsafe { &(*context.module).instructions[context.ip] };
+            context.ip = context.ip + 1;
             match &ins.op {
                 Opcode::FuncInfo => {}//println!("Running a function..."),
                 Opcode::Move => {
                     // arg1 can be either a value or a register
-                    let val = self.expand_arg(&module, &ins.args[0]);
-                    set_register!(self, &ins.args[1], val)
+                    let val = self.expand_arg(&context, &ins.args[0]);
+                    set_register!(context, &ins.args[1], val)
                 }
                 Opcode::Return => {
-                    if self.cp == -1 {
-                        println!("Process exited with normal, x0: {:?}", self.x[0]);
+                    if context.cp == -1 {
+                        println!("Process exited with normal, x0: {:?}", context.x[0]);
                         break;
                     }
-                    self.ip = self.cp as usize;
-                    self.cp = -1;
+                    context.ip = context.cp as usize;
+                    context.cp = -1;
                 }
                 Opcode::Call => {
                     //literal arity, label jmp
                     // store arity as live
                     if let [Value::Literal(_a), Value::Label(i)] = &ins.args[..] {
-                        self.cp = self.ip as isize;
-                        self.ip = *i - 2;
+                        context.cp = context.ip as isize;
+                        context.ip = *i - 2;
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
@@ -139,9 +163,9 @@ impl Machine {
                     // literal stackneed, literal live
                     if let [Value::Literal(need), Value::Literal(_live)] = &ins.args[..] {
                         for _ in 0..*need {
-                            self.stack.push(Value::Nil())
+                            context.stack.push(Value::Nil())
                         }
-                        self.stack.push(Value::CP(self.cp));
+                        context.stack.push(Value::CP(context.cp));
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
@@ -149,10 +173,10 @@ impl Machine {
                 Opcode::Deallocate => {
                     // literal nwords
                     if let [Value::Literal(nwords)] = &ins.args[..] {
-                        let cp = self.stack.pop().unwrap();
-                        self.stack.truncate(self.stack.len() - *nwords);
+                        let cp = context.stack.pop().unwrap();
+                        context.stack.truncate(context.stack.len() - nwords);
                         if let Value::CP(cp) = cp {
-                            self.cp = cp;
+                            context.cp = cp;
                         } else {
                             panic!("Bad CP value! {:?}", cp)
                         }
@@ -167,43 +191,43 @@ impl Machine {
                     // shared_equality_opcode(vm, ctx, curr_p, true, Ordering::Less, false)
                     assert_eq!(ins.args.len(), 3);
 
-                    let l = self.expand_arg(&module, &ins.args[0]).to_usize();
-                    let fail = module.labels.get(&(l)).unwrap();
+                    let l = self.expand_arg(&context, &ins.args[0]).to_usize();
+                    let fail = unsafe { (*context.module).labels.get(&(l)).unwrap() };
 
-                    let v1 = self.expand_arg(&module, &ins.args[1]);
-                    let v2 = self.expand_arg(&module, &ins.args[2]);
+                    let v1 = self.expand_arg(&context, &ins.args[1]);
+                    let v2 = self.expand_arg(&context, &ins.args[2]);
 
                     if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(&v2) {
                         // ok
                     } else {
-                        self.ip = *fail;
+                        context.ip = *fail;
                     }
                 }
                 Opcode::IsEq => {
                     assert_eq!(ins.args.len(), 3);
 
-                    let l = self.expand_arg(&module, &ins.args[0]).to_usize();
-                    let fail = module.labels.get(&(l)).unwrap();
+                    let l = self.expand_arg(&context, &ins.args[0]).to_usize();
+                    let fail = unsafe { (*context.module).labels.get(&(l)).unwrap() };
 
-                    let v1 = self.expand_arg(&module, &ins.args[1]);
-                    let v2 = self.expand_arg(&module, &ins.args[2]);
+                    let v1 = self.expand_arg(&context, &ins.args[1]);
+                    let v2 = self.expand_arg(&context, &ins.args[2]);
 
                     if let Some(std::cmp::Ordering::Equal) = v1.partial_cmp(&v2) {
                         // ok
                     } else {
-                        self.ip = *fail;
+                        context.ip = *fail;
                     }
                 }
                 Opcode::GcBif2 => {
                     // fail label, live, bif, arg1, arg2, dest
                     if let Value::Literal(i) = &ins.args[2] {
                         let args = vec![
-                            self.expand_arg(&module, &ins.args[3]),
-                            self.expand_arg(&module, &ins.args[4]),
+                            self.expand_arg(&context, &ins.args[3]),
+                            self.expand_arg(&context, &ins.args[4]),
                         ];
-                        let val = bif::apply(module.imports.get(*i).unwrap(), args);
+                        let val = unsafe { bif::apply((*context.module).imports.get(*i).unwrap(), args) };
 
-                        set_register!(self, &ins.args[5], val)
+                        set_register!(context, &ins.args[5], val)
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }

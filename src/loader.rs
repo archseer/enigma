@@ -3,7 +3,6 @@ use crate::etf;
 use crate::module::{Lambda, Module, MFA};
 use crate::opcodes::*;
 use crate::value::Value;
-use crate::vm::Machine;
 use compress::zlib;
 use fnv::FnvHashMap;
 use nom::*;
@@ -12,7 +11,6 @@ use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
 pub struct Loader<'a> {
-    pub vm: &'a Machine,
     atoms: Vec<&'a str>,
     imports: Vec<MFA>,
     exports: Vec<MFA>,
@@ -26,9 +24,8 @@ pub struct Loader<'a> {
 }
 
 impl<'a> Loader<'a> {
-    pub fn new(vm: &Machine) -> Loader {
+    pub fn new() -> Loader<'a> {
         Loader {
-            vm,
             atoms: Vec::new(),
             imports: Vec::new(),
             exports: Vec::new(),
@@ -117,7 +114,7 @@ impl<'a> Loader<'a> {
     // }
 
     fn load_local_fun_table(&mut self, chunk: Chunk) {
-        let (_, data) = loct_chunk(chunk).unwrap();
+        let (_, _data) = loct_chunk(chunk).unwrap();
     }
 
     fn load_imports_table(&mut self, chunk: Chunk) {

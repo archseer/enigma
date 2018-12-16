@@ -1,10 +1,8 @@
-use crate::loader::{Instruction, Loader};
+use crate::loader::Instruction;
+use crate::module_registry::RcModuleRegistry;
 use crate::value::Value;
-use crate::vm;
 use fnv::FnvHashMap;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::Read;
 
 pub type MFA = (usize, usize, u32); // function, arity, label
 
@@ -31,13 +29,12 @@ pub struct Module {
     pub instructions: Vec<Instruction>,
 }
 
-pub fn load_file(vm: &vm::Machine, path: &str) -> Result<Module, std::io::Error> {
-    let mut file = File::open("foo.txt")?;
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
-
-    let loader = Loader::new(&vm);
-    let module = loader.load_file(&bytes[..]).unwrap();
-    vm.register_module(module);
-    Ok(module)
+pub fn load_module(
+    registry: &RcModuleRegistry,
+    path: &str,
+) -> Result<*const Module, std::io::Error> {
+    let mut registry = registry.lock().unwrap();
+    registry
+        .parse_module(path)
+        .map(|module| module as *const Module)
 }

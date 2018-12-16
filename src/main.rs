@@ -4,6 +4,7 @@ mod bif;
 mod etf;
 mod loader;
 mod module;
+mod module_registry;
 mod opcodes;
 mod pool;
 mod process;
@@ -14,7 +15,6 @@ mod vm;
 
 #[macro_use]
 extern crate once_cell;
-use crate::value::Value;
 
 use time;
 
@@ -23,9 +23,8 @@ fn main() {
 
     //vm.register_module(module);
     let start = time::precise_time_ns();
-    if let Value::Atom(index) = atom::from_str("fib") {
-        vm.run(module, index);
-    }
+
+    vm.start("./fib.beam");
 
     println!(
         "execution time: {:?}",
