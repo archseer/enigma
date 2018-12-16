@@ -10,6 +10,7 @@ use crate::value::Value;
 use std::panic;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::time;
 
 /// A reference counted State.
 pub type RcState = Arc<State>;
@@ -20,6 +21,9 @@ pub struct State {
     pub process_table: Mutex<ProcessTable<RcProcess>>,
     /// Use priorities later on
     pub process_pool: Pool<RcProcess>,
+
+    /// The start time of the VM (more or less).
+    pub start_time: time::Instant,
 }
 
 #[derive(Clone)]
@@ -58,6 +62,7 @@ impl Machine {
         let state = State {
             process_table: Mutex::new(ProcessTable::new()),
             process_pool,
+            start_time: time::Instant::now(),
         };
 
         Machine {
@@ -271,5 +276,9 @@ impl Machine {
         }
 
         Ok(())
+    }
+
+    pub fn elapsed_time(&self) -> time::Duration {
+        self.state.start_time.elapsed()
     }
 }

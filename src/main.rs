@@ -19,15 +19,9 @@ extern crate once_cell;
 use time;
 
 fn main() {
-    let mut vm = vm::Machine::new();
-
-    //vm.register_module(module);
-    let start = time::precise_time_ns();
+    let vm = vm::Machine::new();
 
     vm.start("./fib.beam");
 
-    println!(
-        "execution time: {:?}",
-        (time::precise_time_ns() - start) // / 1000
-    )
+    println!("execution time: {:?}", vm.elapsed_time())
 }
