@@ -7,6 +7,7 @@ use crate::pool::{Job, JoinGuard as PoolJoinGuard, Pool, Worker};
 use crate::process::{self, ExecutionContext, RcProcess};
 use crate::process_table::ProcessTable;
 use crate::value::Value;
+use std::panic;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -94,7 +95,7 @@ impl Machine {
         let machine = self.clone();
         let pool = &self.state.process_pool;
 
-        pool.run(move |_worker, process| machine.run(&process))
+        pool.run(move |worker, process| machine.run_with_error_handling(worker, &process))
     }
 
     /// Starts the main process
@@ -120,7 +121,35 @@ impl Machine {
         }
     }
 
-    pub fn run(&self, process: &RcProcess) {
+    /// Executes a single process, terminating in the event of an error.
+    pub fn run_with_error_handling(&self, worker: &mut Worker, process: &RcProcess) {
+        // We are using AssertUnwindSafe here so we can pass a &mut Worker to
+        // run()/panic(). This might be risky if values captured are not unwind
+        // safe, so take care when capturing new variables.
+        let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            if let Err(message) = self.run(process) {
+                //self.panic(worker, process, &message);
+                panic!(message);
+            }
+        }));
+
+        if let Err(error) = result {
+            if let Ok(message) = error.downcast::<String>() {
+                //self.panic(worker, process, &message);
+                panic!(message);
+            } else {
+                panic!("The VM panicked with an unknown error");
+                /*
+                self.panic(
+                    worker,
+                    process,
+                    &"The VM panicked with an unknown error",
+                );*/
+            };
+        }
+    }
+
+    pub fn run(&self, process: &RcProcess) -> Result<(), String> {
         let context = process.context_mut();
 
         // temp
@@ -235,5 +264,12 @@ impl Machine {
                 opcode => println!("Unimplemented opcode {:?}", opcode),
             }
         }
+
+        // Terminate once the main process has finished execution.
+        if process.is_main() {
+            self.terminate();
+        }
+
+        Ok(())
     }
 }

@@ -119,6 +119,10 @@ impl Process {
     pub fn local_data(&self) -> &LocalData {
         unsafe { &*self.local_data.get() }
     }
+
+    pub fn is_main(&self) -> bool {
+        self.pid == 0
+    }
 }
 
 pub fn allocate(state: &RcState, module: *const Module) -> Result<RcProcess, String> {
