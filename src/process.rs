@@ -1,5 +1,6 @@
 use crate::module::Module;
-use crate::process_table::PID;
+use crate::pool::Job;
+pub use crate::process_table::PID;
 use crate::value::Value;
 use crate::vm::RcState;
 use std::cell::UnsafeCell;
@@ -140,14 +141,20 @@ pub fn allocate(state: &RcState, module: *const Module) -> Result<RcProcess, Str
 
     Ok(process)
 }
-/*
-pub fn spawn(state: &RcState, block_ptr: ObjectPointer) -> Result<ObjectPointer, String> {
-    let block_obj = block_ptr.block_value()?;
-    let new_proc = allocate(&state, block_obj)?;
+
+pub fn spawn(
+    state: &RcState,
+    module: *const Module,
+    func: usize,
+    args: Value,
+) -> Result<Value, String> {
+    // let block_obj = block_ptr.block_value()?;
+    let new_proc = allocate(&state, module)?;
     let new_pid = new_proc.pid;
-    let pid_ptr = new_proc.allocate_usize(new_pid, state.integer_prototype);
+    // let pid_ptr = new_proc.allocate_usize(new_pid, state.integer_prototype);
+    let pid_ptr = Value::Pid(new_pid);
 
     state.process_pool.schedule(Job::normal(new_proc));
 
     Ok(pid_ptr)
-}*/
+}

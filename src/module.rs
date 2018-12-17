@@ -4,7 +4,7 @@ use crate::value::Value;
 use fnv::FnvHashMap;
 use std::collections::HashMap;
 
-pub type MFA = (usize, usize, u32); // function, arity, label
+pub type MFA = (usize, usize, usize); // function, arity, label
 
 #[derive(Debug, PartialEq)]
 pub struct Lambda {

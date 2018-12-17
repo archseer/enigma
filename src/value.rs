@@ -1,4 +1,5 @@
 // use crate::arc_without_weak::ArcWithoutWeak;
+use crate::process;
 use std::sync::Arc;
 
 #[allow(dead_code)]
@@ -10,7 +11,7 @@ pub enum Value {
     Atom(usize),
     Catch(),
     // external vals? except Pid can also be internal
-    Pid(),
+    Pid(process::PID),
     Port(),
     Ref(),
     // continuation pointer?

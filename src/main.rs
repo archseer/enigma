@@ -21,7 +21,7 @@ use time;
 fn main() {
     let vm = vm::Machine::new();
 
-    vm.start("./fib.beam");
+    vm.start("./spw.beam");
 
     println!("execution time: {:?}", vm.elapsed_time())
 }

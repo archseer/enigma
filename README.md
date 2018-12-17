@@ -256,7 +256,7 @@
 - [ ] ubif erlang:self/0
 - [ ] bif erlang:setelement/3
 - [ ] ubif erlang:size/1
-- [ ] bif erlang:spawn/3
+- [x] bif erlang:spawn/3
 - [ ] bif erlang:spawn_link/3
 - [ ] bif erlang:split_binary/2
 - [ ] bif erlang:statistics/1

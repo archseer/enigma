@@ -35,7 +35,7 @@ pub struct Machine {
     // atom table is accessible globally as ATOMS
     // export table
     // module table
-    modules: RcModuleRegistry,
+    pub modules: RcModuleRegistry,
 }
 
 macro_rules! set_register {
@@ -158,11 +158,14 @@ impl Machine {
         let context = process.context_mut();
 
         // temp
-        let fun = atom::i_from_str("fib");
-        context.x[0] = Value::Integer(23);
+        // let fun = atom::i_from_str("fib");
+        //let arity = 1;
+        // context.x[0] = Value::Integer(23);
+        let fun = atom::i_from_str("start");
+        let arity = 0;
         // end temp
         unsafe {
-            context.ip = *(*context.module).funs.get(&(fun, 1)).unwrap();
+            context.ip = *(*context.module).funs.get(&(fun, arity)).unwrap();
         }
 
         loop {
@@ -189,6 +192,18 @@ impl Machine {
                     if let [Value::Literal(_a), Value::Label(i)] = &ins.args[..] {
                         context.cp = context.ip as isize;
                         context.ip = *i - 2;
+                    } else {
+                        panic!("Bad argument to {:?}", ins.op)
+                    }
+                }
+                Opcode::CallExtOnly => {
+                    //literal arity, literal destination (module.imports index)
+                        println!("{:?}", &ins.args);
+                    if let [Value::Literal(_a), Value::Literal(dest)] = &ins.args[..] {
+
+                        // TODO: dest can be either a module or a bif, do a specialize
+                        // for that?
+                        panic!("unhandled")
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
@@ -259,7 +274,7 @@ impl Machine {
                             self.expand_arg(&context, &ins.args[3]),
                             self.expand_arg(&context, &ins.args[4]),
                         ];
-                        let val = unsafe { bif::apply((*context.module).imports.get(*i).unwrap(), args) };
+                        let val = unsafe { bif::apply(self, process, (*context.module).imports.get(*i).unwrap(), args) };
 
                         set_register!(context, &ins.args[5], val)
                     } else {

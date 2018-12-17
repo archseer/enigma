@@ -35,4 +35,8 @@ impl ModuleRegistry {
     pub fn add_module(&mut self, atom: usize, module: Module) {
         self.modules.insert(atom, module);
     }
+
+    pub fn lookup(&self, atom: usize) -> Result<&Module, String> {
+        Ok(&self.modules[&atom])
+    }
 }
