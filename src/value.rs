@@ -6,7 +6,7 @@ use std::sync::Arc;
 pub enum Value {
     Nil(), // also known as nil
     Integer(u64),
-    Character(u64),
+    Character(u8),
     Atom(usize),
     Catch(),
     // external vals? except Pid can also be internal

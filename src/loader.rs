@@ -328,7 +328,7 @@ named!(
         function: be_u32 >>
         arity: be_u32 >>
         label: be_u32 >>
-        (function as usize, arity as usize, label)
+        (function as usize, arity as usize, label as usize)
     )
 );
 
@@ -431,7 +431,7 @@ fn compact_term(i: &[u8]) -> IResult<&[u8], Value> {
             3 => Ok((rest, Value::X(val as usize))),
             4 => Ok((rest, Value::Y(val as usize))),
             5 => Ok((rest, Value::Label(val as usize))),
-            6 => Ok((rest, Value::Character(val as u64))),
+            6 => Ok((rest, Value::Character(val as u8))),
             _ => panic!("can't happen"),
         };
     }

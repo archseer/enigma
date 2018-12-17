@@ -61,7 +61,7 @@ pub fn decode_value(rest: &[u8]) -> IResult<&[u8], Value> {
         // Reference
         // Port
         // Pid
-        // String
+        Tag::String => decode_string(rest),
         // Binary
         // NewFun
         // Export
@@ -146,6 +146,46 @@ pub fn decode_list(rest: &[u8]) -> IResult<&[u8], Value> {
     // set the tail
     let (rest, val) = decode_value(rest).unwrap();
     std::mem::replace(&mut *tail, val);
+
+    Ok((rest, start))
+}
+
+/// A string of bytes encoded as tag 107 (String) with 16-bit length.
+/// This is basically a list, but it's optimized to decode to char.
+pub fn decode_string(rest: &[u8]) -> IResult<&[u8], Value> {
+    let (rest, len) = be_u16(rest)?;
+    if len == 0 {
+        return Ok((rest, Value::Nil()));
+    }
+
+    // TODO: use alloc
+    let mut start = Value::Cons {
+        head: Arc::new(Value::Nil()),
+        tail: Arc::new(Value::Nil()),
+    };
+
+    let (tail, rest) = (0..len).fold((&mut start, rest), |(cons, buf), _i| {
+        // TODO: probably doing something wrong here
+        if let &mut Value::Cons {
+            ref mut head,
+            ref mut tail,
+        } = cons
+        {
+            let (rest, elem) = be_u8(rest).unwrap();
+
+            let new_cons = Value::Cons {
+                head: Arc::new(Value::Nil()),
+                tail: Arc::new(Value::Nil()),
+            };
+            std::mem::replace(&mut *head, Arc::new(Value::Character(elem)));
+            std::mem::replace(&mut *tail, Arc::new(new_cons));
+            return (Arc::get_mut(tail).unwrap(), rest);
+        }
+        panic!("Wrong value!")
+    });
+
+    // set the tail
+    std::mem::replace(&mut *tail, Value::Nil());
 
     Ok((rest, start))
 }
