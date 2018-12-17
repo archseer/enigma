@@ -9,6 +9,7 @@ use nom::*;
 use num_bigint::{BigInt, Sign};
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
+use std::sync::Arc;
 
 pub struct Loader<'a> {
     atoms: Vec<&'a str>,
@@ -412,7 +413,7 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], u64> {
 
         let r = BigInt::from_bytes_be(sign, &long_bytes);
         println!("{}", r);
-        //Integral::from_big(r)
+        //Ok((rest, Value::BigInt(Arc::new(r))))
         Ok((rest, 23))
     } // if larger than 11 bits
 }

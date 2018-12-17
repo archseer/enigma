@@ -42,15 +42,25 @@ macro_rules! set_register {
     ($context:expr, $register:expr, $value:expr) => {{
         match $register {
             Value::X(reg) => {
-                // TODO: remove these clones by using some form of mem::swap/replace
-                $context.x[*reg] = $value.clone();
+                $context.x[*reg] = $value;
             }
             Value::Y(reg) => {
                 let len = $context.stack.len();
-                $context.stack[len - (*reg + 2)] = $value.clone();
+                $context.stack[len - (*reg + 2)] = $value;
             }
             reg => panic!("Unhandled register type! {:?}", reg),
         }
+    }};
+}
+
+macro_rules! op_return {
+    ($context:expr) => {{
+        if $context.cp == -1 {
+            println!("Process exited with normal, x0: {:?}", $context.x[0]);
+            break;
+        }
+        $context.ip = $context.cp as usize;
+        $context.cp = -1;
     }};
 }
 
@@ -111,18 +121,34 @@ impl Machine {
             process::allocate(&self.state, module).unwrap()
         };
 
+        /* TEMP */
+        let context = process.context_mut();
+
+        // let fun = atom::i_from_str("fib");
+        //let arity = 1;
+        // context.x[0] = Value::Integer(23);
+        let fun = atom::i_from_str("start");
+        let arity = 0;
+        unsafe {
+            context.ip = *(*context.module).funs.get(&(fun, arity)).unwrap();
+        }
+        unsafe { println!("ins: {:?}", (*context.module).instructions) };
+        /* TEMP */
+
         let process = Job::normal(process);
         self.state.process_pool.schedule(process);
     }
 
     #[inline]
-    fn expand_arg<'a>(&'a self, context: &'a ExecutionContext, arg: &'a Value) -> &'a Value {
+    fn expand_arg<'a>(&'a self, context: &'a ExecutionContext, arg: &'a Value) -> Value {
         match arg {
             // TODO: optimize away into a reference somehow at load time
-            Value::ExtendedLiteral(i) => unsafe { (*context.module).literals.get(*i).unwrap() },
-            Value::X(i) => &context.x[*i],
-            Value::Y(i) => &context.stack[context.stack.len() - (*i + 2)],
-            value => value,
+            Value::ExtendedLiteral(i) => unsafe {
+                (*context.module).literals.get(*i).unwrap().clone()
+            },
+            Value::X(i) => context.x[*i].clone(),
+            Value::Y(i) => context.stack[context.stack.len() - (*i + 2)].clone(),
+            value => value.clone(),
         }
     }
 
@@ -156,20 +182,13 @@ impl Machine {
 
     pub fn run(&self, process: &RcProcess) -> Result<(), String> {
         let context = process.context_mut();
-
-        // temp
-        // let fun = atom::i_from_str("fib");
-        //let arity = 1;
-        // context.x[0] = Value::Integer(23);
-        let fun = atom::i_from_str("start");
-        let arity = 0;
-        // end temp
-        unsafe {
-            context.ip = *(*context.module).funs.get(&(fun, arity)).unwrap();
-        }
-
+        println!(
+            "running proc pid {:?}, offset {:?}",
+            process.pid, context.ip
+        );
         loop {
             let ins = unsafe { &(*context.module).instructions[context.ip] };
+            println!("running proc pid {:?}, ins {:?}", process.pid, ins.op);
             context.ip = context.ip + 1;
             match &ins.op {
                 Opcode::FuncInfo => {}//println!("Running a function..."),
@@ -179,12 +198,7 @@ impl Machine {
                     set_register!(context, &ins.args[1], val)
                 }
                 Opcode::Return => {
-                    if context.cp == -1 {
-                        println!("Process exited with normal, x0: {:?}", context.x[0]);
-                        break;
-                    }
-                    context.ip = context.cp as usize;
-                    context.cp = -1;
+                    op_return!(context)
                 }
                 Opcode::Call => {
                     //literal arity, label jmp
@@ -199,11 +213,23 @@ impl Machine {
                 Opcode::CallExtOnly => {
                     //literal arity, literal destination (module.imports index)
                         println!("{:?}", &ins.args);
-                    if let [Value::Literal(_a), Value::Literal(dest)] = &ins.args[..] {
+                    if let [Value::Literal(arity), Value::Literal(dest)] = &ins.args[..] {
+                        // unsafe { println!("{:?}", (*context.module).imports) };
+                        let mfa = unsafe { &(*context.module).imports[*dest] };
 
-                        // TODO: dest can be either a module or a bif, do a specialize
-                        // for that?
-                        panic!("unhandled")
+                        println!("Is bif: {:?}", bif::is_bif(mfa));
+                        // TODO: precompute which exports are bifs
+                        // call_ext_only Ar=u Bif=u$is_bif => \
+                        // allocate u Ar | call_bif Bif | deallocate_return u
+                        if bif::is_bif(mfa) {
+                            // make a slice out of arity x registers
+                            let args = &context.x[0..*arity];
+                            let val = bif::apply(self, process, mfa, args);
+                            set_register!(context, &Value::X(0), val); // HAXX
+                            op_return!(context);
+                        } else {
+                            panic!("unhandled non-bif call")
+                        }
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
@@ -241,7 +267,7 @@ impl Machine {
                     assert_eq!(ins.args.len(), 3);
 
                     let l = self.expand_arg(&context, &ins.args[0]).to_usize();
-                    let fail = unsafe { (*context.module).labels.get(&(l)).unwrap() };
+                    let fail = unsafe { (*context.module).labels.get(&l).unwrap() };
 
                     let v1 = self.expand_arg(&context, &ins.args[1]);
                     let v2 = self.expand_arg(&context, &ins.args[2]);
@@ -274,7 +300,7 @@ impl Machine {
                             self.expand_arg(&context, &ins.args[3]),
                             self.expand_arg(&context, &ins.args[4]),
                         ];
-                        let val = unsafe { bif::apply(self, process, (*context.module).imports.get(*i).unwrap(), args) };
+                        let val = unsafe { bif::apply(self, process, (*context.module).imports.get(*i).unwrap(), &args[..]) };
 
                         set_register!(context, &ins.args[5], val)
                     } else {

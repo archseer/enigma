@@ -148,11 +148,24 @@ pub fn spawn(
     func: usize,
     args: Value,
 ) -> Result<Value, String> {
+    println!("Spawning..");
     // let block_obj = block_ptr.block_value()?;
     let new_proc = allocate(&state, module)?;
     let new_pid = new_proc.pid;
     // let pid_ptr = new_proc.allocate_usize(new_pid, state.integer_prototype);
     let pid_ptr = Value::Pid(new_pid);
+
+    // TODO: func to ip offset
+    let func = unsafe {
+        (*module)
+            .funs
+            .get(&(func, 1)) // TODO: figure out arity from arglist?
+            .expect("process::spawn could not locate func")
+    };
+    let context = new_proc.context_mut();
+    context.ip = *func;
+
+    // TODO: arglist to process registers, it also needs to clone all the vals
 
     state.process_pool.schedule(Job::normal(new_proc));
 

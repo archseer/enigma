@@ -1,5 +1,6 @@
 // use crate::arc_without_weak::ArcWithoutWeak;
 use crate::process;
+use num::bigint::BigInt;
 use std::sync::Arc;
 
 #[allow(dead_code)]
@@ -29,7 +30,7 @@ pub enum Value {
     /// An interned string is a string allocated on the permanent space. For
     /// every unique interned string there is only one object allocated.
     //InternedBinary(ArcWithoutWeak<ImmutableString>),
-    // BigInt(ArcWithoutWeak<BigInt>),
+    BigInt(Arc<BigInt>), // ArcWithoutWeak<BigInt>
     // Closure(),
     // Import(), Export(),
     /// Special values (invalid in runtime)

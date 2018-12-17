@@ -21,7 +21,7 @@ use time;
 fn main() {
     let vm = vm::Machine::new();
 
-    vm.start("./spw.beam");
+    vm.start("./Elixir.Test.beam");
 
     println!("execution time: {:?}", vm.elapsed_time())
 }
