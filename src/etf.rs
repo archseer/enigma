@@ -50,12 +50,18 @@ pub fn decode_value(rest: &[u8]) -> IResult<&[u8], Value> {
     let (rest, tag) = be_u8(rest)?;
     let tag: Tag = unsafe { ::std::mem::transmute(tag) };
 
+    println!("{:?}", rest);
+
     match tag {
         // TODO:
         // NewFloat
         // BitBinary
         // AtomCacheRef_
-        // SmallInteger
+        Tag::SmallInteger => {
+            let (rest, int) = be_u8(rest)?;
+            // TODO store inside the pointer once we no longer copy
+            Ok((rest, Value::Integer(int as u64)))
+        }
         // Integer
         // Float
         // Reference

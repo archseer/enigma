@@ -451,7 +451,8 @@ fn parse_extended_term(b: u8, rest: &[u8]) -> IResult<&[u8], Value> {
 
 fn parse_list(rest: &[u8]) -> IResult<&[u8], Value> {
     // The stream now contains a smallint size, then size/2 pairs of values
-    let (mut rest, n) = be_u8(rest)?;
+    let (rest, b) = be_u8(rest)?;
+    let (mut rest, n) = read_int(b, rest)?;
     let mut els = Vec::with_capacity(n as usize);
 
     for _i in 0..n {
@@ -464,10 +465,12 @@ fn parse_list(rest: &[u8]) -> IResult<&[u8], Value> {
 }
 
 fn parse_float_reg(rest: &[u8]) -> IResult<&[u8], Value> {
+    panic!("unimplemented parse_float_reg");
     Ok((rest, Value::FloatReg(22 as usize)))
 }
 
 fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], Value> {
+    panic!("unimplemented parse_alloc_list");
     Ok((rest, Value::AllocList(22 as u64)))
 }
 
