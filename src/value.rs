@@ -17,8 +17,8 @@ pub enum Value {
     Ref(),
     // continuation pointer?
     Cons {
-        head: Arc<Value>,
-        tail: Arc<Value>,
+        head: Box<Value>,
+        tail: Box<Value>,
     }, // two values TODO: ArcWithoutWeak<[Value; 2]>
     /// Boxed values
     Tuple(Arc<Vec<Value>>), // TODO: allocate on custom heap

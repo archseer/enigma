@@ -165,7 +165,17 @@ pub fn spawn(
     let context = new_proc.context_mut();
     context.ip = *func;
 
-    // TODO: arglist to process registers, it also needs to clone all the vals
+    // arglist to process registers, it also needs to clone all the vals
+    let mut i = 0;
+    let mut cons = args;
+    // TODO box head box tail once feature(box_patterns) lands
+    while let Value::Cons { head, tail } = cons {
+        context.x[i] = *head;
+        i += 1;
+        cons = *tail
+    }
+    // lastly, the tail
+    context.x[i] = cons;
 
     state.process_pool.schedule(Job::normal(new_proc));
 

@@ -126,8 +126,8 @@ pub fn decode_list(rest: &[u8]) -> IResult<&[u8], Value> {
 
     // TODO: use alloc
     let mut start = Value::Cons {
-        head: Arc::new(Value::Nil()),
-        tail: Arc::new(Value::Nil()),
+        head: Box::new(Value::Nil()),
+        tail: Box::new(Value::Nil()),
     };
 
     let (tail, rest) = (0..len).fold((&mut start, rest), |(cons, buf), _i| {
@@ -139,12 +139,12 @@ pub fn decode_list(rest: &[u8]) -> IResult<&[u8], Value> {
         {
             let (rest, val) = decode_value(buf).unwrap();
             let new_cons = Value::Cons {
-                head: Arc::new(Value::Nil()),
-                tail: Arc::new(Value::Nil()),
+                head: Box::new(Value::Nil()),
+                tail: Box::new(Value::Nil()),
             };
-            std::mem::replace(&mut *head, Arc::new(val));
-            std::mem::replace(&mut *tail, Arc::new(new_cons));
-            return (Arc::get_mut(tail).unwrap(), rest);
+            std::mem::replace(&mut *head, Box::new(val));
+            std::mem::replace(&mut *tail, Box::new(new_cons));
+            return (tail, rest);
         }
         panic!("Wrong value!")
     });
@@ -166,8 +166,8 @@ pub fn decode_string(rest: &[u8]) -> IResult<&[u8], Value> {
 
     // TODO: use alloc
     let mut start = Value::Cons {
-        head: Arc::new(Value::Nil()),
-        tail: Arc::new(Value::Nil()),
+        head: Box::new(Value::Nil()),
+        tail: Box::new(Value::Nil()),
     };
 
     let (tail, rest) = (0..len).fold((&mut start, rest), |(cons, buf), _i| {
@@ -180,12 +180,12 @@ pub fn decode_string(rest: &[u8]) -> IResult<&[u8], Value> {
             let (rest, elem) = be_u8(rest).unwrap();
 
             let new_cons = Value::Cons {
-                head: Arc::new(Value::Nil()),
-                tail: Arc::new(Value::Nil()),
+                head: Box::new(Value::Nil()),
+                tail: Box::new(Value::Nil()),
             };
-            std::mem::replace(&mut *head, Arc::new(Value::Character(elem)));
-            std::mem::replace(&mut *tail, Arc::new(new_cons));
-            return (Arc::get_mut(tail).unwrap(), rest);
+            std::mem::replace(&mut *head, Box::new(Value::Character(elem)));
+            std::mem::replace(&mut *tail, Box::new(new_cons));
+            return (tail, rest);
         }
         panic!("Wrong value!")
     });
