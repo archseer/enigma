@@ -38,7 +38,7 @@ pub enum Value {
     X(usize),
     Y(usize),
     Label(usize),
-    List(Box<Vec<Value>>),
+    List(Vec<Value>),
     FloatReg(usize),
     AllocList(u64),
     ExtendedLiteral(usize), // TODO; replace at load time

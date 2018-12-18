@@ -22,7 +22,7 @@ pub struct Queue<T> {
 
 pub type RcQueue<T> = ArcWithoutWeak<Queue<T>>;
 
-#[cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty))]
+#[allow(clippy::len_without_is_empty)]
 impl<T> Queue<T> {
     /// Returns a new Queue.
     pub fn new() -> Self {

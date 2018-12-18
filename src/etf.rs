@@ -60,7 +60,7 @@ pub fn decode_value(rest: &[u8]) -> IResult<&[u8], Value> {
         Tag::SmallInteger => {
             let (rest, int) = be_u8(rest)?;
             // TODO store inside the pointer once we no longer copy
-            Ok((rest, Value::Integer(int as u64)))
+            Ok((rest, Value::Integer(u64::from(int))))
         }
         // Integer
         // Float
@@ -132,10 +132,10 @@ pub fn decode_list(rest: &[u8]) -> IResult<&[u8], Value> {
 
     let (tail, rest) = (0..len).fold((&mut start, rest), |(cons, buf), _i| {
         // TODO: probably doing something wrong here
-        if let &mut Value::Cons {
+        if let Value::Cons {
             ref mut head,
             ref mut tail,
-        } = cons
+        } = *cons
         {
             let (rest, val) = decode_value(buf).unwrap();
             let new_cons = Value::Cons {
@@ -172,10 +172,10 @@ pub fn decode_string(rest: &[u8]) -> IResult<&[u8], Value> {
 
     let (tail, rest) = (0..len).fold((&mut start, rest), |(cons, buf), _i| {
         // TODO: probably doing something wrong here
-        if let &mut Value::Cons {
+        if let Value::Cons {
             ref mut head,
             ref mut tail,
-        } = cons
+        } = *cons
         {
             let (rest, elem) = be_u8(rest).unwrap();
 

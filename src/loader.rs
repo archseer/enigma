@@ -9,7 +9,6 @@ use nom::*;
 use num_bigint::{BigInt, Sign};
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
-use std::sync::Arc;
 
 pub struct Loader<'a> {
     atoms: Vec<&'a str>,
@@ -124,8 +123,8 @@ impl<'a> Loader<'a> {
             .into_iter()
             .map(|mfa| {
                 (
-                    *self.atom_map.get(&(mfa.0 as usize - 1)).unwrap(),
-                    *self.atom_map.get(&(mfa.1 as usize - 1)).unwrap(),
+                    self.atom_map[&(mfa.0 as usize - 1)],
+                    self.atom_map[&(mfa.1 as usize - 1)],
                     mfa.2,
                 )
             })
@@ -188,7 +187,7 @@ impl<'a> Loader<'a> {
                         if i == 0 {
                             return Value::Nil();
                         }
-                        Value::Atom(*self.atom_map.get(&(i - 1)).unwrap())
+                        Value::Atom(self.atom_map[&(i - 1)])
                     }
                     val => val,
                 })
@@ -377,7 +376,7 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], u64> {
     // it's not extended
     if 0 == (b & 0b1000) {
         // Bit 3 is 0 marks that 4 following bits contain the value
-        return Ok((rest, (b >> 4) as u64));
+        return Ok((rest, u64::from(b >> 4)));
     }
 
     // Bit 3 is 1, but...
@@ -385,7 +384,7 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], u64> {
         // Bit 4 is 0, marks that the following 3 bits (most significant) and
         // the following byte (least significant) will contain the 11-bit value
         let (rest, r) = be_u8(rest)?;
-        Ok((rest, ((b & 0b1110_0000) << 3 | r) as u64))
+        Ok((rest, u64::from((b & 0b1110_0000) << 3 | r)))
     } else {
         // Bit 4 is 1 means that bits 5-6-7 contain amount of bytes+2 to store
         // the value
@@ -462,7 +461,7 @@ fn parse_list(rest: &[u8]) -> IResult<&[u8], Value> {
         rest = new_rest;
     }
 
-    Ok((rest, Value::List(Box::new(els))))
+    Ok((rest, Value::List(els)))
 }
 
 fn parse_float_reg(rest: &[u8]) -> IResult<&[u8], Value> {

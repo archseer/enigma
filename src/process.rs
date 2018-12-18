@@ -37,7 +37,7 @@ impl ExecutionContext {
 
                 // register: Register::new(block.code.registers as usize),
                 // binding: Binding::with_rc(block.locals(), block.receiver),
-                module: module,
+                module,
                 // line: block.code.line,
             };
             for (_i, el) in ctx.x.iter_mut().enumerate() {
@@ -107,12 +107,12 @@ impl Process {
         Process::with_rc(pid, context /*global_allocator, config*/)
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(mut_from_ref))]
+    #[allow(clippy::mut_from_ref)]
     pub fn context_mut(&self) -> &mut ExecutionContext {
         &mut *self.local_data_mut().context
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(mut_from_ref))]
+    #[allow(clippy::mut_from_ref)]
     pub fn local_data_mut(&self) -> &mut LocalData {
         unsafe { &mut *self.local_data.get() }
     }

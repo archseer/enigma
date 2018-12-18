@@ -130,7 +130,7 @@ impl Machine {
         let fun = atom::i_from_str("start");
         let arity = 0;
         unsafe {
-            context.ip = *(*context.module).funs.get(&(fun, arity)).unwrap();
+            context.ip = (*context.module).funs[&(fun, arity)];
         }
         unsafe { println!("ins: {:?}", (*context.module).instructions) };
         /* TEMP */
@@ -143,9 +143,7 @@ impl Machine {
     fn expand_arg<'a>(&'a self, context: &'a ExecutionContext, arg: &'a Value) -> Value {
         match arg {
             // TODO: optimize away into a reference somehow at load time
-            Value::ExtendedLiteral(i) => unsafe {
-                (*context.module).literals.get(*i).unwrap().clone()
-            },
+            Value::ExtendedLiteral(i) => unsafe { (*context.module).literals[*i].clone() },
             Value::X(i) => context.x[*i].clone(),
             Value::Y(i) => context.stack[context.stack.len() - (*i + 2)].clone(),
             value => value.clone(),
@@ -189,7 +187,7 @@ impl Machine {
         loop {
             let ins = unsafe { &(*context.module).instructions[context.ip] };
             println!("running proc pid {:?}, ins {:?}", process.pid, ins.op);
-            context.ip = context.ip + 1;
+            context.ip += 1;
             match &ins.op {
                 Opcode::FuncInfo => {}//println!("Running a function..."),
                 Opcode::Move => {
@@ -267,7 +265,7 @@ impl Machine {
                     assert_eq!(ins.args.len(), 3);
 
                     let l = self.expand_arg(&context, &ins.args[0]).to_usize();
-                    let fail = unsafe { (*context.module).labels.get(&l).unwrap() };
+                    let fail = unsafe { (*context.module).labels[&l] };
 
                     let v1 = self.expand_arg(&context, &ins.args[1]);
                     let v2 = self.expand_arg(&context, &ins.args[2]);
@@ -275,14 +273,14 @@ impl Machine {
                     if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(&v2) {
                         // ok
                     } else {
-                        context.ip = *fail;
+                        context.ip = fail;
                     }
                 }
                 Opcode::IsEq => {
                     assert_eq!(ins.args.len(), 3);
 
                     let l = self.expand_arg(&context, &ins.args[0]).to_usize();
-                    let fail = unsafe { (*context.module).labels.get(&(l)).unwrap() };
+                    let fail = unsafe { (*context.module).labels[&l] };
 
                     let v1 = self.expand_arg(&context, &ins.args[1]);
                     let v2 = self.expand_arg(&context, &ins.args[2]);
@@ -290,7 +288,7 @@ impl Machine {
                     if let Some(std::cmp::Ordering::Equal) = v1.partial_cmp(&v2) {
                         // ok
                     } else {
-                        context.ip = *fail;
+                        context.ip = fail;
                     }
                 }
                 Opcode::GcBif2 => {
@@ -300,7 +298,7 @@ impl Machine {
                             self.expand_arg(&context, &ins.args[3]),
                             self.expand_arg(&context, &ins.args[4]),
                         ];
-                        let val = unsafe { bif::apply(self, process, (*context.module).imports.get(*i).unwrap(), &args[..]) };
+                        let val = unsafe { bif::apply(self, process, &(*context.module).imports[*i], &args[..]) };
 
                         set_register!(context, &ins.args[5], val)
                     } else {

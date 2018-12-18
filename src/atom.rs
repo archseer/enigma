@@ -108,12 +108,12 @@ impl AtomTable {
         }
         panic!("Value is not an atom!")
     }
-    pub fn lookup_index(&self, index: &usize) -> Option<*const Atom> {
+    pub fn lookup_index(&self, index: usize) -> Option<*const Atom> {
         let index_r = self.index_r.read();
-        if *index >= index_r.len() {
+        if index >= index_r.len() {
             return None;
         }
-        return Some(&index_r[*index] as *const Atom);
+        Some(&index_r[index] as *const Atom)
     }
 }
 
@@ -140,9 +140,9 @@ pub fn to_str(a: &Value) -> Result<String, String> {
     ATOMS.to_str(a)
 }
 
-pub fn from_index(index: &usize) -> Result<String, String> {
+pub fn from_index(index: usize) -> Result<String, String> {
     if let Some(p) = ATOMS.lookup_index(index) {
         return Ok(unsafe { (*p).name.clone() });
     }
-    return Err(format!("Atom does not exist: {}", index));
+    Err(format!("Atom does not exist: {}", index))
 }

@@ -731,6 +731,5 @@ pub fn opcode_arity(opcode: u8) -> usize {
 }
 
 pub fn to_opcode(opcode: u8) -> Opcode {
-    let ret = unsafe { ::std::mem::transmute(opcode) };
-    return ret;
+    unsafe { ::std::mem::transmute(opcode) }
 }
