@@ -258,9 +258,9 @@ impl<T: Send + 'static> PoolInner<T> {
                 }
             } else if let Some(job) = queue.pop_nonblock() {
                 job
-            } else if let Some(job) = self.steal_excluding(&worker) {
+            } else if let Some(job) = self.steal_excluding(worker) {
                 job
-            } else if let Some(job) = self.steal_from_global(&queue) {
+            } else if let Some(job) = self.steal_from_global(queue) {
                 job
             } else if let Ok(job) = self.global_queue.pop() {
                 job

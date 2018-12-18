@@ -208,7 +208,7 @@ pub fn decode_bignum(rest: &[u8], size: usize) -> IResult<&[u8], Value> {
     let sign = if sign == 0 { Sign::Plus } else { Sign::Minus };
 
     let (rest, digits) = take!(rest, size)?;
-    let big = BigInt::from_bytes_le(sign, &digits);
+    let big = BigInt::from_bytes_le(sign, digits);
 
     // Assert that the number fits into small
     if big.bits() < WORD_BITS - 4 {

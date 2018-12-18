@@ -192,7 +192,7 @@ impl Machine {
                 Opcode::FuncInfo => {}//println!("Running a function..."),
                 Opcode::Move => {
                     // arg1 can be either a value or a register
-                    let val = self.expand_arg(&context, &ins.args[0]);
+                    let val = self.expand_arg(context, &ins.args[0]);
                     set_register!(context, &ins.args[1], val)
                 }
                 Opcode::Return => {
@@ -264,11 +264,11 @@ impl Machine {
                     // shared_equality_opcode(vm, ctx, curr_p, true, Ordering::Less, false)
                     assert_eq!(ins.args.len(), 3);
 
-                    let l = self.expand_arg(&context, &ins.args[0]).to_usize();
+                    let l = self.expand_arg(context, &ins.args[0]).to_usize();
                     let fail = unsafe { (*context.module).labels[&l] };
 
-                    let v1 = self.expand_arg(&context, &ins.args[1]);
-                    let v2 = self.expand_arg(&context, &ins.args[2]);
+                    let v1 = self.expand_arg(context, &ins.args[1]);
+                    let v2 = self.expand_arg(context, &ins.args[2]);
 
                     if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(&v2) {
                         // ok
@@ -279,11 +279,11 @@ impl Machine {
                 Opcode::IsEq => {
                     assert_eq!(ins.args.len(), 3);
 
-                    let l = self.expand_arg(&context, &ins.args[0]).to_usize();
+                    let l = self.expand_arg(context, &ins.args[0]).to_usize();
                     let fail = unsafe { (*context.module).labels[&l] };
 
-                    let v1 = self.expand_arg(&context, &ins.args[1]);
-                    let v2 = self.expand_arg(&context, &ins.args[2]);
+                    let v1 = self.expand_arg(context, &ins.args[1]);
+                    let v2 = self.expand_arg(context, &ins.args[2]);
 
                     if let Some(std::cmp::Ordering::Equal) = v1.partial_cmp(&v2) {
                         // ok
@@ -295,8 +295,8 @@ impl Machine {
                     // fail label, live, bif, arg1, arg2, dest
                     if let Value::Literal(i) = &ins.args[2] {
                         let args = vec![
-                            self.expand_arg(&context, &ins.args[3]),
-                            self.expand_arg(&context, &ins.args[4]),
+                            self.expand_arg(context, &ins.args[3]),
+                            self.expand_arg(context, &ins.args[4]),
                         ];
                         let val = unsafe { bif::apply(self, process, &(*context.module).imports[*i], &args[..]) };
 

@@ -410,7 +410,7 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], u64> {
             Sign::Plus
         };
 
-        let r = BigInt::from_bytes_be(sign, &long_bytes);
+        let r = BigInt::from_bytes_be(sign, long_bytes);
         println!("{}", r);
         //Ok((rest, Value::BigInt(Arc::new(r))))
         Ok((rest, 23))
