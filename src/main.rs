@@ -3,6 +3,7 @@ mod atom;
 mod bif;
 mod etf;
 mod loader;
+mod mailbox;
 mod module;
 mod module_registry;
 mod opcodes;

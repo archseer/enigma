@@ -1,3 +1,4 @@
+use crate::mailbox::Mailbox;
 use crate::module::Module;
 use crate::pool::Job;
 pub use crate::process_table::PID;
@@ -51,8 +52,10 @@ impl ExecutionContext {
 }
 
 pub struct LocalData {
-    // allocator, mailbox, panic handler
+    // allocator, panic handler
     context: Box<ExecutionContext>,
+
+    pub mailbox: Mailbox,
 
     /// The ID of the thread this process is pinned to.
     pub thread_id: Option<u8>,
@@ -85,7 +88,7 @@ impl Process {
         let local_data = LocalData {
             // allocator: LocalAllocator::new(global_allocator.clone(), config),
             context: Box::new(context),
-            // mailbox: Mailbox::new(global_allocator, config),
+            mailbox: Mailbox::new(),
             thread_id: None,
         };
 
