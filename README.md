@@ -11,12 +11,16 @@
 
 - Distributed Erlang nodes
 
+# Ideas/Experiments
+
+- Process as a generator function (yield to suspend/on reduce)
+
 # TODO
 
 - [ ] full external term representation
 - [ ] bignum math
 - [ ] deep term comparison
-  [ ] exports global table? that way we can call any method
+- [ ] exports global table? that way we can call any method
 - [ ] more compact cons impl (currently it uses one extra byteword, use a Rc&lt;[Value;2]&gt;)
 - [ ] directly embed labels as ip positions (no more lookups)
 - [ ] directly embed imports as some form of a pointer reference
@@ -42,7 +46,7 @@
 - [ ] Init = 17
 - [x] Deallocate = 18
 - [x] Return = 19
-- [ ] Send = 20
+- [x] Send = 20
 - [ ] RemoveMessage = 21
 - [ ] Timeout = 22
 - [ ] LoopRec = 23
@@ -242,9 +246,7 @@
 - [ ] bif erlang:time_offset/0
 - [ ] bif erlang:time_offset/1
 - [ ] bif erlang:timestamp/0
-
 - [ ] bif erts_internal:open_port/2
-
 - [ ] bif erlang:pid_to_list/1
 - [ ] bif erlang:ports/0
 - [ ] bif erlang:pre_loaded/0
@@ -292,28 +294,19 @@
 - [ ] bif erts_internal:port_control/3
 - [ ] bif erts_internal:port_close/1
 - [ ] bif erts_internal:port_connect/2
-- [ ] 
 - [ ] bif erts_internal:request_system_task/3
 - [ ] bif erts_internal:request_system_task/4
 - [ ] bif erts_internal:check_process_code/1
-- [ ] 
 - [ ] bif erts_internal:map_to_tuple_keys/1
 - [ ] bif erts_internal:term_type/1
 - [ ] bif erts_internal:map_hashmap_children/1
-- [ ] 
 - [ ] bif erts_internal:time_unit/0
 - [ ] bif erts_internal:perf_counter_unit/0
-- [ ] 
 - [ ] bif erts_internal:is_system_process/1
-- [ ] 
 - [ ] bif erts_internal:system_check/1
-- [ ] 
 - [ ] bif erts_internal:release_literal_area_switch/0
-- [ ] 
 - [ ] bif erts_internal:scheduler_wall_time/1
-- [ ] 
 - [ ] bif erts_internal:dirty_process_handle_signals/1
-- [ ] 
 - [ ] bif erts_internal:create_dist_channel/4
 
 #### inet_db support
@@ -648,8 +641,8 @@
 - [ ] bif erlang:dt_get_tag_data/0
 - [ ] bif erlang:dt_spread_tag/1
 - [ ] bif erlang:dt_restore_tag/1
-# These are dummies even with enabled dynamic trace unless vm probes are enabled. 
-# They are also internal, for dtrace tags sent to the VM's own drivers (efile)
+##### These are dummies even with enabled dynamic trace unless vm probes are enabled. 
+##### They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 - [ ] bif erlang:dt_prepend_vm_tag_data/1
 - [ ] bif erlang:dt_append_vm_tag_data/1
 
@@ -728,13 +721,14 @@
 - [ ] bif ets:internal_select_delete/2
 
 #### New in 21.2
+##### Persistent terms
 - [ ] bif persistent_term:put/2
 - [ ] bif persistent_term:get/1
 - [ ] bif persistent_term:get/0
 - [ ] bif persistent_term:erase/1
 - [ ] bif persistent_term:info/0
 - [ ] bif erts_internal:erase_persistent_terms/0
-
+##### Atomics
 - [ ] bif erts_internal:atomics_new/2
 - [ ] bif atomics:get/2
 - [ ] bif atomics:put/3
@@ -743,7 +737,7 @@
 - [ ] bif atomics:exchange/3
 - [ ] bif atomics:compare_exchange/4
 - [ ] bif atomics:info/1
-
+##### Counters
 - [ ] bif erts_internal:counters_new/1
 - [ ] bif erts_internal:counters_get/2
 - [ ] bif erts_internal:counters_add/3

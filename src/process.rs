@@ -127,6 +127,14 @@ impl Process {
     pub fn is_main(&self) -> bool {
         self.pid == 0
     }
+
+    pub fn send_message(&self, sender: &RcProcess, message: &Value) {
+        if sender.pid == self.pid {
+            self.local_data_mut().mailbox.send_internal(message);
+        } else {
+            self.local_data_mut().mailbox.send_external(message);
+        }
+    }
 }
 
 pub fn allocate(state: &RcState, module: *const Module) -> Result<RcProcess, String> {
@@ -183,4 +191,24 @@ pub fn spawn(
     state.process_pool.schedule(Job::normal(new_proc));
 
     Ok(pid_ptr)
+}
+
+pub fn send_message<'a>(
+    state: &RcState,
+    process: &RcProcess,
+    // TODO: use pointers for these
+    pid: &Value,
+    msg: &'a Value,
+) -> Result<&'a Value, String> {
+    let pid = pid.to_usize();
+
+    if let Some(receiver) = state.process_table.lock().unwrap().get(pid) {
+        receiver.send_message(&process, &msg);
+
+        //     if receiver.is_waiting_for_message() {
+        //         state.suspension_list.wake_up();
+        //     }
+    }
+
+    Ok(msg)
 }

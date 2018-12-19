@@ -218,6 +218,76 @@ impl Machine {
                 Opcode::Return => {
                     op_return!(context)
                 }
+                Opcode::Send => {
+                    // send x1 to x0, write result to x0
+                    let pid = &context.x[0];
+                    let msg = &context.x[1];
+                    let res = process::send_message(&self.state, process, pid, msg)?;
+                    context.x[0] = res.clone();
+                }
+                Opcode::RemoveMessage => {
+                    // Unlink the current message from the message queue. Remove any timeout.
+                    process.local_data_mut().mailbox.remove();
+                    // TODO: clear timeout
+                }
+                Opcode::Timeout => {
+                    //  Reset the save point of the mailbox and clear the timeout flag.
+                    process.local_data_mut().mailbox.reset();
+                    // TODO: clear timeout
+                }
+                Opcode::LoopRec => { // label, source
+                    // grab message from queue, put to x0, if no message, jump to fail label
+                    if let Some(msg) = process.local_data_mut().mailbox.receive() {
+                        // TODO: this is very hacky
+                        unsafe { context.x[0] = (**msg).clone(); }
+                    } else {
+                        let l = self.expand_arg(context, &ins.args[0]).to_usize();
+                        let fail = unsafe { (*context.module).labels[&l] };
+                        op_jump!(context, fail);
+                    }
+                }
+                Opcode::LoopRecEnd => { // label
+                    // Advance the save pointer to the next message and jump back to Label.
+                    assert_eq!(ins.args.len(), 1);
+
+                    process.local_data_mut().mailbox.advance();
+
+                    let l = self.expand_arg(context, &ins.args[0]).to_usize();
+                    let label = unsafe { (*context.module).labels[&l] };
+                    op_jump!(context, label);
+                }
+                Opcode::Wait => { // label
+                    // jump to label, set wait flag on process
+                    assert_eq!(ins.args.len(), 1);
+
+                    let l = self.expand_arg(context, &ins.args[0]).to_usize();
+                    let label = unsafe { (*context.module).labels[&l] };
+                    op_jump!(context, label);
+
+                    // TODO: set wait flag
+                    // process::wait_for_message(
+                    //     &self.state,
+                    //     process,
+                    //     process::optional_timeout(time_ptr)?,
+                    // );
+                    // TODO: return (suspend process)
+
+                }
+                Opcode::WaitTimeout => {
+                    // @spec wait_timeout Lable Time
+                    // @doc  Sets up a timeout of Time milliseconds and saves the address of the
+                    //       following instruction as the entry point if the timeout triggers.
+
+                    // TODO: timeout and jump to label if time expires
+                    // TODO: set wait flag
+                    // process::wait_for_message(
+                    //     &self.state,
+                    //     process,
+                    //     process::optional_timeout(time_ptr)?,
+                    // );
+                    // TODO: return (suspend process)
+                }
+                // TODO: RecvMark(label)/RecvSet(label) for ref based sends
                 Opcode::Call => {
                     //literal arity, label jmp
                     // store arity as live

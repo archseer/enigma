@@ -120,6 +120,7 @@ impl Value {
     pub fn is_list(&self) -> bool {
         match *self {
             Value::Cons { .. } => true,
+            Value::Nil(..) => true, // apparently also valid
             _ => false,
         }
     }
