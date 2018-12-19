@@ -56,9 +56,84 @@ unsafe impl Sync for Value {}
 // HeapBin { nbytes: Word, refc: Word },
 
 impl Value {
+    pub fn is_integer(&self) -> bool {
+        match *self {
+            Value::BigInt(..) => true,
+            Value::Integer(..) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_float(&self) -> bool {
+        match *self {
+            Value::Float(..) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_number(&self) -> bool {
+        match *self {
+            Value::Float(..) => true,
+            Value::BigInt(..) => true,
+            Value::Integer(..) => true,
+            _ => false,
+        }
+    }
+
     pub fn is_atom(&self) -> bool {
         match *self {
-            Value::Atom(_) => true,
+            Value::Atom(..) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_pid(&self) -> bool {
+        match *self {
+            Value::Pid(..) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_ref(&self) -> bool {
+        match *self {
+            Value::Ref(..) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_port(&self) -> bool {
+        match *self {
+            Value::Port(..) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_nil(&self) -> bool {
+        match *self {
+            Value::Nil(..) => true,
+            _ => false,
+        }
+    }
+
+    // TODO: is_binary
+
+    pub fn is_list(&self) -> bool {
+        match *self {
+            Value::Cons { .. } => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_non_empty_list(&self) -> bool {
+        match *self {
+            Value::Cons { ref tail, .. } => !tail.is_nil(),
+            _ => false,
+        }
+    }
+
+    pub fn is_tuple(&self) -> bool {
+        match *self {
+            Value::Tuple(..) => true,
             _ => false,
         }
     }

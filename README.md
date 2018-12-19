@@ -7,6 +7,10 @@
 - Be able to run Elixir
 - Ideally one day, feature parity with OTP
 
+# (Initial) non-goals
+
+- Distributed Erlang nodes
+
 # TODO
 
 - [ ] full external term representation
@@ -51,22 +55,22 @@
 - [ ] IsNe = 42
 - [ ] IsEqExact = 43
 - [ ] IsNeExact = 44
-- [ ] IsInteger = 45
-- [ ] IsFloat = 46
-- [ ] IsNumber = 47
-- [ ] IsAtom = 48
-- [ ] IsPid = 49
-- [ ] IsReference = 50
-- [ ] IsPort = 51
-- [ ] IsNil = 52
+- [x] IsInteger = 45
+- [x] IsFloat = 46
+- [x] IsNumber = 47
+- [x] IsAtom = 48
+- [x] IsPid = 49
+- [x] IsReference = 50
+- [x] IsPort = 51
+- [x] IsNil = 52
 - [ ] IsBinary = 53
-- [ ] IsList = 55
-- [ ] IsNonemptyList = 56
-- [ ] IsTuple = 57
+- [x] IsList = 55
+- [x] IsNonemptyList = 56
+- [x] IsTuple = 57
 - [ ] TestArity = 58
 - [ ] SelectVal = 59
 - [ ] SelectTupleArity = 60
-- [ ] Jump = 61
+- [x] Jump = 61
 - [ ] Catch = 62
 - [ ] CatchEnd = 63
 - [x] Move = 64

@@ -59,8 +59,30 @@ macro_rules! op_return {
             println!("Process exited with normal, x0: {:?}", $context.x[0]);
             break;
         }
-        $context.ip = $context.cp as usize;
+        op_jump!($context, $context.cp as usize);
         $context.cp = -1;
+    }};
+}
+
+macro_rules! op_jump {
+    ($context:expr, $label:expr) => {{
+        $context.ip = $label;
+    }};
+}
+
+macro_rules! op_is_type {
+    ($vm:expr, $context:expr, $args:expr, $op:ident) => {{
+        assert_eq!($args.len(), 2);
+
+        // TODO: patch the labels to point to exact offsets to avoid labels lookup
+        let l = $vm.expand_arg($context, &$args[0]).to_usize();
+        let fail = unsafe { (*$context.module).labels[&l] };
+
+        let val = $vm.expand_arg($context, &$args[1]);
+
+        if !val.$op() {
+            op_jump!($context, fail);
+        }
     }};
 }
 
@@ -129,9 +151,7 @@ impl Machine {
         // context.x[0] = Value::Integer(23);
         let fun = atom::i_from_str("start");
         let arity = 0;
-        unsafe {
-            context.ip = (*context.module).funs[&(fun, arity)];
-        }
+        unsafe { op_jump!(context, (*context.module).funs[&(fun, arity)]) }
         unsafe { println!("ins: {:?}", (*context.module).instructions) };
         /* TEMP */
 
@@ -203,7 +223,7 @@ impl Machine {
                     // store arity as live
                     if let [Value::Literal(_a), Value::Label(i)] = &ins.args[..] {
                         context.cp = context.ip as isize;
-                        context.ip = *i - 2;
+                        op_jump!(context, *i - 2);
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
@@ -273,7 +293,7 @@ impl Machine {
                     if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(&v2) {
                         // ok
                     } else {
-                        context.ip = fail;
+                        op_jump!(context, fail);
                     }
                 }
                 Opcode::IsEq => {
@@ -288,8 +308,24 @@ impl Machine {
                     if let Some(std::cmp::Ordering::Equal) = v1.partial_cmp(&v2) {
                         // ok
                     } else {
-                        context.ip = fail;
+                        op_jump!(context, fail);
                     }
+                }
+                Opcode::IsFloat        => { op_is_type!(self, context, ins.args, is_float) }
+                Opcode::IsNumber       => { op_is_type!(self, context, ins.args, is_number) }
+                Opcode::IsAtom         => { op_is_type!(self, context, ins.args, is_atom) }
+                Opcode::IsPid          => { op_is_type!(self, context, ins.args, is_pid) }
+                Opcode::IsReference    => { op_is_type!(self, context, ins.args, is_ref) }
+                Opcode::IsPort         => { op_is_type!(self, context, ins.args, is_port) }
+                Opcode::IsNil          => { op_is_type!(self, context, ins.args, is_nil) }
+                // Opcode::IsBinary => { op_is_type!(self, context, ins.args, is_binary) }
+                Opcode::IsList         => { op_is_type!(self, context, ins.args, is_list) }
+                Opcode::IsNonemptyList => { op_is_type!(self, context, ins.args, is_non_empty_list) }
+                Opcode::IsTuple        => { op_is_type!(self, context, ins.args, is_tuple) }
+                Opcode::Jump => {
+                    assert_eq!(ins.args.len(), 1);
+                    let label = self.expand_arg(context, &ins.args[0]).to_usize();
+                    op_jump!(context, label)
                 }
                 Opcode::GcBif2 => {
                     // fail label, live, bif, arg1, arg2, dest
