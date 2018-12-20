@@ -86,6 +86,25 @@ macro_rules! op_is_type {
     }};
 }
 
+macro_rules! safepoint_and_reduce {
+    ($vm:expr, $process:expr, $reductions:expr) => {{
+        // if $vm.gc_safepoint(&$process) {
+        //     return Ok(());
+        // }
+
+        // Reduce once we've exhausted all the instructions in a
+        // context.
+        if $reductions > 0 {
+            $reductions -= 1;
+        } else {
+            $vm.state
+                .process_pool
+                .schedule(Job::normal($process.clone()));
+            return Ok(());
+        }
+    }};
+}
+
 impl Machine {
     pub fn new() -> Machine {
         let primary_threads = 8;
@@ -199,7 +218,9 @@ impl Machine {
     }
 
     pub fn run(&self, process: &RcProcess) -> Result<(), String> {
+        let mut reductions = 2000; // self.state.config.reductions;
         let context = process.context_mut();
+
         println!(
             "running proc pid {:?}, offset {:?}",
             process.pid, context.ip
@@ -297,6 +318,7 @@ impl Machine {
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
+                    safepoint_and_reduce!(self, process, reductions);
                 }
                 Opcode::CallExtOnly => {
                     //literal arity, literal destination (module.imports index)
@@ -321,6 +343,7 @@ impl Machine {
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
+                    safepoint_and_reduce!(self, process, reductions);
                 }
                 Opcode::AllocateZero => {
                     // literal stackneed, literal live
