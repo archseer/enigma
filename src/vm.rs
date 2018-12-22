@@ -285,12 +285,8 @@ impl Machine {
                     let label = unsafe { (*context.module).labels[&l] };
                     op_jump!(context, label);
 
-                    // TODO: set wait flag
-                    // process::wait_for_message(
-                    //     &self.state,
-                    //     process,
-                    //     process::optional_timeout(time_ptr)?,
-                    // );
+                    // set wait flag
+                    process.set_waiting_for_message(true);
                     // TODO: return (suspend process)
 
                 }
@@ -300,12 +296,8 @@ impl Machine {
                     //       following instruction as the entry point if the timeout triggers.
 
                     // TODO: timeout and jump to label if time expires
-                    // TODO: set wait flag
-                    // process::wait_for_message(
-                    //     &self.state,
-                    //     process,
-                    //     process::optional_timeout(time_ptr)?,
-                    // );
+                    // set wait flag
+                    process.set_waiting_for_message(true);
                     // TODO: return (suspend process)
                 }
                 // TODO: RecvMark(label)/RecvSet(label) for ref based sends

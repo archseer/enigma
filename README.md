@@ -25,6 +25,12 @@
 - [ ] directly embed labels as ip positions (no more lookups)
 - [ ] directly embed imports as some form of a pointer reference
 
+- focus on getting preloaded modules to load: {:preLoaded,
+    [:atomics, :counters, :erl_init, :erl_prim_loader, :erl_tracer, :erlang,
+     :erts_code_purger, :erts_dirty_process_signal_handler, :erts_internal,
+     :erts_literal_area_collector, :init, :persistent_term, :prim_buffer,
+     :prim_eval, :prim_file, :prim_inet, :prim_zip, :zlib]},
+
 ## Opcodes
 
 - [x] Label = 1
@@ -752,3 +758,4 @@
     reference, along with his [BEAM
     Wisdoms](http://beam-wisdoms.clau.se/en/latest/) website.
 - [The BEAM Book](https://github.com/happi/theBeamBook)
+- bumpalo for the basis of bump allocation

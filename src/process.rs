@@ -135,6 +135,14 @@ impl Process {
             self.local_data_mut().mailbox.send_external(message);
         }
     }
+
+    pub fn set_waiting_for_message(&self, value: bool) {
+        self.waiting_for_message.store(value, Ordering::Relaxed);
+    }
+
+    pub fn is_waiting_for_message(&self) -> bool {
+        self.waiting_for_message.load(Ordering::Relaxed)
+    }
 }
 
 pub fn allocate(state: &RcState, module: *const Module) -> Result<RcProcess, String> {
@@ -205,9 +213,12 @@ pub fn send_message<'a>(
     if let Some(receiver) = state.process_table.lock().unwrap().get(pid) {
         receiver.send_message(&process, &msg);
 
-        //     if receiver.is_waiting_for_message() {
-        //         state.suspension_list.wake_up();
-        //     }
+        if receiver.is_waiting_for_message() {
+            // wake up
+            receiver.set_waiting_for_message(false);
+
+            state.process_pool.schedule(Job::normal(receiver));
+        }
     }
 
     Ok(msg)
