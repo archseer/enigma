@@ -6,23 +6,23 @@ use std::sync::Arc;
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum Value {
+    // Immediate values
     Nil(), // also known as nil
     Integer(u64),
     Character(u8),
     Atom(usize),
     Catch(),
-    // external vals? except Pid can also be internal
     Pid(process::PID),
     Port(),
     Ref(),
-    // continuation pointer?
+    Float(f64),
+    // Extended values (on heap)
     Cons {
         head: Box<Value>,
         tail: Box<Value>,
     }, // two values TODO: ArcWithoutWeak<[Value; 2]>
-    /// Boxed values
     Tuple(Arc<Vec<Value>>), // TODO: allocate on custom heap
-    Float(f64),
+    /// Boxed values
     /// Strings use an Arc so they can be sent to other processes without
     /// requiring a full copy of the data.
     //Binary(ArcWithoutWeak<ImmutableString>),
@@ -32,8 +32,8 @@ pub enum Value {
     //InternedBinary(ArcWithoutWeak<ImmutableString>),
     BigInt(Arc<BigInt>), // ArcWithoutWeak<BigInt>
     // Closure(),
-    // Import(), Export(),
     /// Special values (invalid in runtime)
+    // Import(), Export(),
     Literal(usize),
     X(usize),
     Y(usize),

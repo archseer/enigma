@@ -2,6 +2,7 @@ mod arc_without_weak;
 mod atom;
 mod bif;
 mod etf;
+mod immix;
 mod loader;
 mod mailbox;
 mod module;

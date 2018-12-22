@@ -72,7 +72,7 @@ macro_rules! op_jump {
 
 macro_rules! op_is_type {
     ($vm:expr, $context:expr, $args:expr, $op:ident) => {{
-        assert_eq!($args.len(), 2);
+        debug_assert_eq!($args.len(), 2);
 
         // TODO: patch the labels to point to exact offsets to avoid labels lookup
         let l = $vm.expand_arg($context, &$args[0]).to_usize();
@@ -221,13 +221,13 @@ impl Machine {
         let mut reductions = 2000; // self.state.config.reductions;
         let context = process.context_mut();
 
-        println!(
-            "running proc pid {:?}, offset {:?}",
-            process.pid, context.ip
-        );
+        // println!(
+        //     "running proc pid {:?}, offset {:?}",
+        //     process.pid, context.ip
+        // );
         loop {
             let ins = unsafe { &(*context.module).instructions[context.ip] };
-            println!("running proc pid {:?}, ins {:?}", process.pid, ins.op);
+            // println!("running proc pid {:?}, ins {:?}", process.pid, ins.op);
             context.ip += 1;
             match &ins.op {
                 Opcode::FuncInfo => {}//println!("Running a function..."),
@@ -237,7 +237,7 @@ impl Machine {
                     set_register!(context, &ins.args[1], val)
                 }
                 Opcode::Return => {
-                    op_return!(context)
+                    op_return!(context);
                 }
                 Opcode::Send => {
                     // send x1 to x0, write result to x0
@@ -269,7 +269,7 @@ impl Machine {
                 }
                 Opcode::LoopRecEnd => { // label
                     // Advance the save pointer to the next message and jump back to Label.
-                    assert_eq!(ins.args.len(), 1);
+                    debug_assert_eq!(ins.args.len(), 1);
 
                     process.local_data_mut().mailbox.advance();
 
@@ -279,7 +279,7 @@ impl Machine {
                 }
                 Opcode::Wait => { // label
                     // jump to label, set wait flag on process
-                    assert_eq!(ins.args.len(), 1);
+                    debug_assert_eq!(ins.args.len(), 1);
 
                     let l = self.expand_arg(context, &ins.args[0]).to_usize();
                     let label = unsafe { (*context.module).labels[&l] };
@@ -321,6 +321,7 @@ impl Machine {
 
                         println!("Is bif: {:?}", bif::is_bif(mfa));
                         // TODO: precompute which exports are bifs
+                        // also precompute the bif lookup
                         // call_ext_only Ar=u Bif=u$is_bif => \
                         // allocate u Ar | call_bif Bif | deallocate_return u
                         if bif::is_bif(mfa) {
@@ -367,7 +368,7 @@ impl Machine {
                     // Structure: is_lt(on_false:CP, a:src, b:src)
                     // assert_arity(gen_op::OPCODE_IS_LT, 3);
                     // shared_equality_opcode(vm, ctx, curr_p, true, Ordering::Less, false)
-                    assert_eq!(ins.args.len(), 3);
+                    debug_assert_eq!(ins.args.len(), 3);
 
                     let l = self.expand_arg(context, &ins.args[0]).to_usize();
                     let fail = unsafe { (*context.module).labels[&l] };
@@ -382,7 +383,7 @@ impl Machine {
                     }
                 }
                 Opcode::IsEq => {
-                    assert_eq!(ins.args.len(), 3);
+                    debug_assert_eq!(ins.args.len(), 3);
 
                     let l = self.expand_arg(context, &ins.args[0]).to_usize();
                     let fail = unsafe { (*context.module).labels[&l] };
@@ -408,7 +409,7 @@ impl Machine {
                 Opcode::IsNonemptyList => { op_is_type!(self, context, ins.args, is_non_empty_list) }
                 Opcode::IsTuple        => { op_is_type!(self, context, ins.args, is_tuple) }
                 Opcode::Jump => {
-                    assert_eq!(ins.args.len(), 1);
+                    debug_assert_eq!(ins.args.len(), 1);
                     let label = self.expand_arg(context, &ins.args[0]).to_usize();
                     op_jump!(context, label)
                 }
