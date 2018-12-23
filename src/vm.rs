@@ -339,6 +339,32 @@ impl Machine {
                     }
                     safepoint_and_reduce!(self, process, reductions);
                 }
+                Opcode::Bif0 => {
+                    // literal export, x reg
+                    println!("{:?}", &ins.args);
+                    if let [Value::Literal(dest), reg] = &ins.args[..] {
+                        let mfa = unsafe { &(*context.module).imports[*dest] };
+                        let val = bif::apply(self, process, mfa, &[]);
+                        set_register!(context, reg, val); // HAXX
+                    } else {
+                        panic!("Bad argument to {:?}", ins.op)
+                    }
+                }
+                // Allocate
+                Opcode::AllocateHeap => {
+                    // literal stackneed, literal heapneed, literal live
+                    // allocate stackneed space on stack, ensure heapneed on heap, if gc, keep live
+                    // num of X regs. save CP on stack.
+                    if let [Value::Literal(stackneed), Value::Literal(heapneed), Value::Literal(_live)] = &ins.args[..] {
+                        for _ in 0..*stackneed {
+                            context.stack.push(Value::Nil())
+                        }
+                        // TODO: check heap for heapneed space!
+                        context.stack.push(Value::CP(context.cp));
+                    } else {
+                        panic!("Bad argument to {:?}", ins.op)
+                    }
+                }
                 Opcode::AllocateZero => {
                     // literal stackneed, literal live
                     if let [Value::Literal(need), Value::Literal(_live)] = &ins.args[..] {
@@ -350,6 +376,9 @@ impl Machine {
                         panic!("Bad argument to {:?}", ins.op)
                     }
                 }
+                // AllocateHeapZero
+                // TestHeap
+                // Init
                 Opcode::Deallocate => {
                     // literal nwords
                     if let [Value::Literal(nwords)] = &ins.args[..] {

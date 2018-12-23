@@ -15,6 +15,7 @@ static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::i_from_str("+"), 2), Box::new(bif_erlang_add_2));
     bifs.insert((erlang, atom::i_from_str("-"), 2), Box::new(bif_erlang_sub_2));
     bifs.insert((erlang, atom::i_from_str("spawn"), 3), Box::new(bif_erlang_spawn_3));
+    bifs.insert((erlang, atom::i_from_str("self"), 0), Box::new(bif_erlang_self_0));
     bifs
 };
 
@@ -72,4 +73,8 @@ fn bif_erlang_sub_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> 
         return Value::Integer(v1 - v2);
     }
     panic!("Invalid arguments to erlang::-")
+}
+
+fn bif_erlang_self_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Value]) -> Value {
+    return Value::Pid(process.pid);
 }
