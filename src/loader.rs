@@ -109,8 +109,8 @@ impl<'a> Loader<'a> {
     fn load_attributes(&mut self, chunk: Chunk) {
         // Contains two parts: a proplist of module attributes, encoded as External Term Format,
         // and a compiler info (options and version) encoded similarly.
-        let (rest, val) = etf::decode(chunk, &self.literal_heap).unwrap();
-        println!("attrs val: {:?}; rest: {:?}", val, rest);
+        let (_rest, val) = etf::decode(chunk, &self.literal_heap).unwrap();
+        println!("attrs: {}", val);
     }
 
     // fn load_strings_table(&mut self, chunk: Chunk<'a>) {
@@ -148,8 +148,6 @@ impl<'a> Loader<'a> {
         let iocursor = Cursor::new(rest);
         zlib::Decoder::new(iocursor).read_to_end(&mut data).unwrap();
         let buf = &data[..];
-
-        println!("raw literals: {:?}", data);
 
         assert_eq!(data.len(), size as usize, "LitT inflate failed");
 

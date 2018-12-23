@@ -287,7 +287,8 @@ impl Machine {
 
                     // set wait flag
                     process.set_waiting_for_message(true);
-                    // TODO: return (suspend process)
+                    // return (suspend process)
+                    return Ok(());
 
                 }
                 Opcode::WaitTimeout => {
