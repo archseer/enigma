@@ -56,7 +56,7 @@ macro_rules! set_register {
 macro_rules! op_return {
     ($context:expr) => {{
         if $context.cp == -1 {
-            println!("Process exited with normal, x0: {:?}", $context.x[0]);
+            println!("Process exited with normal, x0: {}", $context.x[0]);
             break;
         }
         op_jump!($context, $context.cp as usize);

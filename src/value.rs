@@ -139,7 +139,11 @@ impl Value {
 
     pub fn is_non_empty_list(&self) -> bool {
         match *self {
-            Value::Cons { ref tail, .. } => !tail.is_nil(),
+            Value::Cons(ptr) => {
+                // TODO: traverse the list recursively and check the last tail?
+                // !ptr.is_nil()
+                false
+            }
             _ => false,
         }
     }
@@ -189,6 +193,7 @@ impl std::fmt::Display for Value {
                 }
                 write!(f, "]")
             },
+            Value::Pid(pid) => write!(f, "#Pid<{}>", pid),
             Value::X(i) => write!(f, "x({})", i),
             Value::Y(i) => write!(f, "y({})", i),
             Value::Literal(..) => write!(f, "(literal)"),

@@ -2,7 +2,7 @@ use crate::mailbox::Mailbox;
 use crate::module::Module;
 use crate::pool::Job;
 pub use crate::process_table::PID;
-use crate::value::Value;
+use crate::value::{self, Value};
 use crate::vm::RcState;
 use std::cell::UnsafeCell;
 use std::panic::RefUnwindSafe;
@@ -185,16 +185,17 @@ pub fn spawn(
     context.ip = *func;
 
     // arglist to process registers, it also needs to clone all the vals
-    let mut i = 0;
-    let mut cons = args;
-    // TODO box head box tail once feature(box_patterns) lands
-    while let Value::Cons { head, tail } = cons {
-        context.x[i] = *head;
-        i += 1;
-        cons = *tail
+    unsafe {
+        let mut i = 0;
+        let mut cons = &args;
+        while let Value::Cons(ptr) = *cons {
+            context.x[i] = (*ptr).head.clone();
+            i += 1;
+            cons = &(*ptr).tail;
+        }
+        // lastly, the tail
+        context.x[i] = (*cons).clone();
     }
-    // lastly, the tail
-    context.x[i] = cons;
 
     state.process_pool.schedule(Job::normal(new_proc));
 
