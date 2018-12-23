@@ -41,11 +41,11 @@
 - [ ] CallOnly = 6
 - [ ] CallExt = 7
 - [ ] CallExtLast = 8
-- [ ] Bif0 = 9
+- [x] Bif0 = 9
 - [ ] Bif1 = 10
 - [ ] Bif2 = 11
 - [ ] Allocate = 12
-- [ ] AllocateHeap = 13
+- [x] AllocateHeap = 13
 - [x] AllocateZero = 14
 - [ ] AllocateHeapZero = 15
 - [ ] TestHeap = 16
@@ -53,11 +53,11 @@
 - [x] Deallocate = 18
 - [x] Return = 19
 - [x] Send = 20
-- [ ] RemoveMessage = 21
+- [x] RemoveMessage = 21
 - [ ] Timeout = 22
-- [ ] LoopRec = 23
-- [ ] LoopRecEnd = 24
-- [ ] Wait = 25
+- [x] LoopRec = 23
+- [x] LoopRecEnd = 24
+- [x] Wait = 25
 - [ ] WaitTimeout = 26
 - [x] IsLt = 39
 - [ ] IsGe = 40
@@ -265,7 +265,7 @@
 - [ ] bif erlang:register/2
 - [ ] bif erlang:registered/0
 - [ ] ubif erlang:round/1
-- [ ] ubif erlang:self/0
+- [x] ubif erlang:self/0
 - [ ] bif erlang:setelement/3
 - [ ] ubif erlang:size/1
 - [x] bif erlang:spawn/3
@@ -425,7 +425,7 @@
 
 #### New operators
 - [ ] bif erlang:'!'/2		ebif_bang_2
-- [ ] bif erlang:send/2
+- [x] bif erlang:send/2
 - [ ] bif erlang:send/3
 - [ ] bif erlang:'++'/2		ebif_plusplus_2
 - [ ] bif erlang:append/2

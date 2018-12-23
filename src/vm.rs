@@ -6,7 +6,7 @@ use crate::opcodes::Opcode;
 use crate::pool::{Job, JoinGuard as PoolJoinGuard, Pool, Worker};
 use crate::process::{self, ExecutionContext, RcProcess};
 use crate::process_table::ProcessTable;
-use crate::value::Value;
+use crate::value::{self, Value};
 use std::panic;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -231,11 +231,6 @@ impl Machine {
             context.ip += 1;
             match &ins.op {
                 Opcode::FuncInfo => {}//println!("Running a function..."),
-                Opcode::Move => {
-                    // arg1 can be either a value or a register
-                    let val = self.expand_arg(context, &ins.args[0]);
-                    set_register!(context, &ins.args[1], val)
-                }
                 Opcode::Return => {
                     op_return!(context);
                 }
@@ -313,9 +308,37 @@ impl Machine {
                     }
                     safepoint_and_reduce!(self, process, reductions);
                 }
+                // TODO: dedup these
+                Opcode::CallExt => {
+                    //literal arity, literal destination (module.imports index)
+                    if let [Value::Literal(arity), Value::Literal(dest)] = &ins.args[..] {
+                        // save pointer onto CP
+                        context.cp = context.ip as isize;
+
+                        // unsafe { println!("{:?}", (*context.module).imports) };
+                        let mfa = unsafe { &(*context.module).imports[*dest] };
+
+                        println!("Is bif: {:?} <->", bif::is_bif(mfa));
+                        // TODO: precompute which exports are bifs
+                        // also precompute the bif lookup
+                        // call_ext_only Ar=u Bif=u$is_bif => \
+                        // allocate u Ar | call_bif Bif | deallocate_return u
+                        if bif::is_bif(mfa) {
+                            // make a slice out of arity x registers
+                            let args = &context.x[0..*arity];
+                            let val = bif::apply(self, process, mfa, args);
+                            set_register!(context, &Value::X(0), val); // HAXX
+                            op_return!(context);
+                        } else {
+                            panic!("unhandled non-bif call heres")
+                        }
+                    } else {
+                        panic!("Bad argument to {:?}", ins.op)
+                    }
+                    safepoint_and_reduce!(self, process, reductions);
+                }
                 Opcode::CallExtOnly => {
                     //literal arity, literal destination (module.imports index)
-                        println!("{:?}", &ins.args);
                     if let [Value::Literal(arity), Value::Literal(dest)] = &ins.args[..] {
                         // unsafe { println!("{:?}", (*context.module).imports) };
                         let mfa = unsafe { &(*context.module).imports[*dest] };
@@ -341,7 +364,6 @@ impl Machine {
                 }
                 Opcode::Bif0 => {
                     // literal export, x reg
-                    println!("{:?}", &ins.args);
                     if let [Value::Literal(dest), reg] = &ins.args[..] {
                         let mfa = unsafe { &(*context.module).imports[*dest] };
                         let val = bif::apply(self, process, mfa, &[]);
@@ -442,6 +464,19 @@ impl Machine {
                     debug_assert_eq!(ins.args.len(), 1);
                     let label = self.expand_arg(context, &ins.args[0]).to_usize();
                     op_jump!(context, label)
+                }
+                Opcode::Move => {
+                    // arg1 can be either a value or a register
+                    let val = self.expand_arg(context, &ins.args[0]);
+                    set_register!(context, &ins.args[1], val)
+                }
+                Opcode::PutList => {
+                    // put_list H T Dst::slot()
+                    // Creates a cons cell with [H|T] and places the value into Dst.
+                    let head = self.expand_arg(context, &ins.args[0]);
+                    let tail = self.expand_arg(context, &ins.args[1]);
+                    let cons = context.heap.alloc(value::Cons { head, tail });
+                    set_register!(context, &ins.args[2], Value::List(cons))
                 }
                 Opcode::GcBif2 => {
                     // fail label, live, bif, arg1, arg2, dest

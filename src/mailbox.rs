@@ -37,7 +37,7 @@ impl Mailbox {
     }
 
     pub fn receive(&mut self) -> Option<&*const Value> {
-        if self.internal.len() > (self.save - 1) {
+        if self.internal.len() > self.save {
             let _lock = self.write_lock.lock();
 
             self.internal.append(&mut self.external);

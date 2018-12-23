@@ -175,6 +175,7 @@ impl Value {
         match *self {
             Value::Atom(i) => i,
             Value::Label(i) => i,
+            Value::Pid(i) => i,
             _ => panic!("Unimplemented to_integer for {:?}", self),
         }
     }

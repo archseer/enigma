@@ -1,3 +1,4 @@
+use crate::immix::Heap;
 use crate::mailbox::Mailbox;
 use crate::module::Module;
 use crate::pool::Job;
@@ -17,6 +18,7 @@ pub struct ExecutionContext {
     // registers
     pub x: [Value; 16],
     pub stack: Vec<Value>,
+    pub heap: Heap,
     // program pointer/reference?
     pub ip: usize,
     // continuation pointer
@@ -32,6 +34,7 @@ impl ExecutionContext {
             let mut ctx = ExecutionContext {
                 x: std::mem::uninitialized(), //[Value::Nil(); 16],
                 stack: Vec::new(),
+                heap: Heap::new(),
                 ip: 0,
                 cp: -1,
                 live: 0,

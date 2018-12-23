@@ -16,6 +16,7 @@ static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::i_from_str("-"), 2), Box::new(bif_erlang_sub_2));
     bifs.insert((erlang, atom::i_from_str("spawn"), 3), Box::new(bif_erlang_spawn_3));
     bifs.insert((erlang, atom::i_from_str("self"), 0), Box::new(bif_erlang_self_0));
+    bifs.insert((erlang, atom::i_from_str("send"), 2), Box::new(bif_erlang_send_2));
     bifs
 };
 
@@ -77,4 +78,13 @@ fn bif_erlang_sub_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> 
 
 fn bif_erlang_self_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Value]) -> Value {
     return Value::Pid(process.pid);
+}
+
+fn bif_erlang_send_2(vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> Value {
+    // args: dest <pid>, msg <term>
+    let pid = &args[0];
+    let msg = &args[1];
+    process::send_message(&vm.state, process, pid, msg)
+        .unwrap()
+        .clone()
 }
