@@ -191,6 +191,22 @@ impl<'a> Loader<'a> {
                         }
                         Value::Atom(self.atom_map[&(i - 1)])
                     }
+                    // HAXX: do the same remap on extended list
+                    Value::ExtendedList(vec) => {
+                        let vec = vec
+                            .into_iter()
+                            .map(|arg| match arg {
+                                Value::Atom(i) => {
+                                    if i == 0 {
+                                        return Value::Nil();
+                                    }
+                                    Value::Atom(self.atom_map[&(i - 1)])
+                                }
+                                val => val,
+                            })
+                            .collect();
+                        Value::ExtendedList(vec)
+                    }
                     val => val,
                 })
                 .collect();

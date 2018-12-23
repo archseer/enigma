@@ -78,7 +78,7 @@ macro_rules! op_is_type {
 
         if !val.$op() {
             // TODO: patch the labels to point to exact offsets to avoid labels lookup
-            let l = $vm.expand_arg($context, &$args[0]).to_usize();
+            let l = $args[0].to_usize();
             let fail = unsafe { (*$context.module).labels[&l] };
 
             op_jump!($context, fail);
@@ -280,6 +280,9 @@ impl Machine {
                     let label = unsafe { (*context.module).labels[&l] };
                     op_jump!(context, label);
 
+                    // TODO: this currently races if the process is sending us
+                    // a message while we're in the process of suspending.
+
                     // set wait flag
                     process.set_waiting_for_message(true);
                     // return (suspend process)
@@ -460,17 +463,49 @@ impl Machine {
                 Opcode::IsTuple        => { op_is_type!(self, context, ins.args, is_tuple) }
                 Opcode::TestArity => {
                     // check tuple arity 
-                    if let [Value::Label(l), Value::Tuple(t), Value::Literal(arity)] = &ins.args[..] {
-                        unsafe {
-                            if (**t).len != *arity {
-                                let l = self.expand_arg(context, &ins.args[0]).to_usize();
-                                let fail = unsafe { (*context.module).labels[&l] };
-                                op_jump!(context, fail);
+                    if let [Value::Label(l), arg, Value::Literal(arity)] = &ins.args[..] {
+                        if let Value::Tuple(t) = self.expand_arg(context, arg) {
+                            unsafe {
+                                if (**t).len() != *arity {
+                                    let fail = unsafe { (*context.module).labels[&l] };
+                                    op_jump!(context, fail);
+                                }
                             }
+                        } else {
+                            panic!("Bad argument to {:?}", ins.op)
                         }
 
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
+                    }
+                }
+                Opcode::SelectVal => {
+                    println!("selectval");
+                    // arg, fail, dests
+                    // loop over dests
+                    if let [arg, Value::Label(l), Value::ExtendedList(vec)] = &ins.args[..] {
+                        let arg = self.expand_arg(context, arg);
+                        let mut i = 0;
+                        loop {
+                            // if key matches, jump to the following label
+                            if vec[i] == arg {
+                                println!("it's a match!");
+                                println!("{}", vec[i+1]);
+                                let l = vec[i+1].to_usize();
+                                let label = unsafe { (*context.module).labels[&l] };
+                                op_jump!(context, label);
+                                break;
+                            }
+
+                            i += 2;
+
+                            // if we ran out of options, jump to fail
+                            if i >= vec.len() {
+                                let fail = unsafe { (*context.module).labels[&l] };
+                                op_jump!(context, fail);
+                                break;
+                            }
+                        }
                     }
                 }
                 Opcode::Jump => {
