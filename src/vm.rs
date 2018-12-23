@@ -52,6 +52,37 @@ macro_rules! set_register {
         }
     }};
 }
+macro_rules! op_deallocate {
+    ($context:expr, $nwords:expr) => {{
+        let cp = $context.stack.pop().unwrap();
+        $context.stack.truncate($context.stack.len() - $nwords);
+        if let Value::CP(cp) = cp {
+            $context.cp = cp;
+        } else {
+            panic!("Bad CP value! {:?}", cp)
+        }
+    }};
+}
+
+macro_rules! op_call_ext {
+    ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr) => {{
+        let mfa = unsafe { &(*$context.module).imports[*$dest] };
+
+        // TODO: precompute which exports are bifs
+        // also precompute the bif lookup
+        // call_ext_only Ar=u Bif=u$is_bif => \
+        // allocate u Ar | call_bif Bif | deallocate_return u
+        if bif::is_bif(mfa) {
+            // make a slice out of arity x registers
+            let args = &$context.x[0..*$arity];
+            let val = bif::apply($vm, $process, mfa, args);
+            set_register!($context, &Value::X(0), val); // HAXX
+            op_return!($context);
+        } else {
+            panic!("unhandled non-bif call heres")
+        }
+    }};
+}
 
 macro_rules! op_return {
     ($context:expr) => {{
@@ -318,23 +349,7 @@ impl Machine {
                         // save pointer onto CP
                         context.cp = context.ip as isize;
 
-                        // unsafe { println!("{:?}", (*context.module).imports) };
-                        let mfa = unsafe { &(*context.module).imports[*dest] };
-
-                        println!("Is bif: {:?} <->", bif::is_bif(mfa));
-                        // TODO: precompute which exports are bifs
-                        // also precompute the bif lookup
-                        // call_ext_only Ar=u Bif=u$is_bif => \
-                        // allocate u Ar | call_bif Bif | deallocate_return u
-                        if bif::is_bif(mfa) {
-                            // make a slice out of arity x registers
-                            let args = &context.x[0..*arity];
-                            let val = bif::apply(self, process, mfa, args);
-                            set_register!(context, &Value::X(0), val); // HAXX
-                            op_return!(context);
-                        } else {
-                            panic!("unhandled non-bif call heres")
-                        }
+                        op_call_ext!(self, context, process, arity, dest);
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
@@ -343,24 +358,7 @@ impl Machine {
                 Opcode::CallExtOnly => {
                     //literal arity, literal destination (module.imports index)
                     if let [Value::Literal(arity), Value::Literal(dest)] = &ins.args[..] {
-                        // unsafe { println!("{:?}", (*context.module).imports) };
-                        let mfa = unsafe { &(*context.module).imports[*dest] };
-
-                        println!("Is bif: {:?}", bif::is_bif(mfa));
-                        // TODO: precompute which exports are bifs
-                        // also precompute the bif lookup
-                        // call_ext_only Ar=u Bif=u$is_bif => \
-                        // allocate u Ar | call_bif Bif | deallocate_return u
-                        if bif::is_bif(mfa) {
-                            // make a slice out of arity x registers
-                            println!("pid: {}, regs: {:?}", process.pid, &context.x);
-                            let args = &context.x[0..*arity];
-                            let val = bif::apply(self, process, mfa, args);
-                            set_register!(context, &Value::X(0), val); // HAXX
-                            op_return!(context);
-                        } else {
-                            panic!("unhandled non-bif call")
-                        }
+                        op_call_ext!(self, context, process, arity, dest);
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
@@ -369,32 +367,9 @@ impl Machine {
                 Opcode::CallExtLast => {
                     //literal arity, literal destination (module.imports index), literal deallocate
                     if let [Value::Literal(arity), Value::Literal(dest), Value::Literal(nwords)] = &ins.args[..] {
-                        let cp = context.stack.pop().unwrap();
-                        context.stack.truncate(context.stack.len() - nwords);
-                        if let Value::CP(cp) = cp {
-                            context.cp = cp;
-                        } else {
-                            panic!("Bad CP value! {:?}", cp)
-                        }
+                        op_deallocate!(context, nwords);
 
-                        // unsafe { println!("{:?}", (*context.module).imports) };
-                        let mfa = unsafe { &(*context.module).imports[*dest] };
-
-                        println!("Is bif: {:?}", bif::is_bif(mfa));
-                        // TODO: precompute which exports are bifs
-                        // also precompute the bif lookup
-                        // call_ext_only Ar=u Bif=u$is_bif => \
-                        // allocate u Ar | call_bif Bif | deallocate_return u
-                        if bif::is_bif(mfa) {
-                            // make a slice out of arity x registers
-                            println!("pid: {}, regs: {:?}", process.pid, &context.x);
-                            let args = &context.x[0..*arity];
-                            let val = bif::apply(self, process, mfa, args);
-                            set_register!(context, &Value::X(0), val); // HAXX
-                            op_return!(context);
-                        } else {
-                            panic!("unhandled non-bif call")
-                        }
+                        op_call_ext!(self, context, process, arity, dest);
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
@@ -453,13 +428,7 @@ impl Machine {
                 Opcode::Deallocate => {
                     // literal nwords
                     if let [Value::Literal(nwords)] = &ins.args[..] {
-                        let cp = context.stack.pop().unwrap();
-                        context.stack.truncate(context.stack.len() - nwords);
-                        if let Value::CP(cp) = cp {
-                            context.cp = cp;
-                        } else {
-                            panic!("Bad CP value! {:?}", cp)
-                        }
+                        op_deallocate!(context, nwords)
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
