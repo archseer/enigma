@@ -50,9 +50,15 @@
     {line,[{location,"spawn.ex",12}]}.
     {func_info,{atom,'Elixir.Test'},{atom,hello},1}.
   {label,8}.
-    {move,{literal,{hello,[1,2,3]}},{x,1}}.
+    {allocate,1,1}.
+    {move,{literal,{wrong}},{x,1}}.
+    {move,{x,0},{y,0}}.
     {line,[{location,"spawn.ex",14}]}.
-    {call_ext_only,2,{extfunc,erlang,send,2}}.
+    {call_ext,2,{extfunc,erlang,send,2}}.
+    {move,{literal,{hello,[1,2,3]}},{x,1}}.
+    {move,{y,0},{x,0}}.
+    {line,[{location,"spawn.ex",15}]}.
+    {call_ext_last,2,{extfunc,erlang,send,2},1}.
 
 
 {function, start, 0, 10}.

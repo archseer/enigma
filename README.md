@@ -39,12 +39,12 @@
 - [x] Call = 4
 - [ ] CallLast = 5
 - [ ] CallOnly = 6
-- [ ] CallExt = 7
-- [ ] CallExtLast = 8
+- [x] CallExt = 7
+- [x] CallExtLast = 8
 - [x] Bif0 = 9
 - [ ] Bif1 = 10
 - [ ] Bif2 = 11
-- [ ] Allocate = 12
+- [x] Allocate = 12
 - [x] AllocateHeap = 13
 - [x] AllocateZero = 14
 - [ ] AllocateHeapZero = 15
@@ -95,7 +95,7 @@
 - [ ] CaseEnd = 74
 - [ ] CallFun = 75
 - [ ] IsFunction = 77
-- [ ] CallExtOnly = 78
+- [x] CallExtOnly = 78
 - [ ] BsPutInteger = 89
 - [ ] BsPutBinary = 90
 - [ ] BsPutFloat = 91

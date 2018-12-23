@@ -353,6 +353,41 @@ impl Machine {
                         // allocate u Ar | call_bif Bif | deallocate_return u
                         if bif::is_bif(mfa) {
                             // make a slice out of arity x registers
+                            println!("pid: {}, regs: {:?}", process.pid, &context.x);
+                            let args = &context.x[0..*arity];
+                            let val = bif::apply(self, process, mfa, args);
+                            set_register!(context, &Value::X(0), val); // HAXX
+                            op_return!(context);
+                        } else {
+                            panic!("unhandled non-bif call")
+                        }
+                    } else {
+                        panic!("Bad argument to {:?}", ins.op)
+                    }
+                    safepoint_and_reduce!(self, process, reductions);
+                }
+                Opcode::CallExtLast => {
+                    //literal arity, literal destination (module.imports index), literal deallocate
+                    if let [Value::Literal(arity), Value::Literal(dest), Value::Literal(nwords)] = &ins.args[..] {
+                        let cp = context.stack.pop().unwrap();
+                        context.stack.truncate(context.stack.len() - nwords);
+                        if let Value::CP(cp) = cp {
+                            context.cp = cp;
+                        } else {
+                            panic!("Bad CP value! {:?}", cp)
+                        }
+
+                        // unsafe { println!("{:?}", (*context.module).imports) };
+                        let mfa = unsafe { &(*context.module).imports[*dest] };
+
+                        println!("Is bif: {:?}", bif::is_bif(mfa));
+                        // TODO: precompute which exports are bifs
+                        // also precompute the bif lookup
+                        // call_ext_only Ar=u Bif=u$is_bif => \
+                        // allocate u Ar | call_bif Bif | deallocate_return u
+                        if bif::is_bif(mfa) {
+                            // make a slice out of arity x registers
+                            println!("pid: {}, regs: {:?}", process.pid, &context.x);
                             let args = &context.x[0..*arity];
                             let val = bif::apply(self, process, mfa, args);
                             set_register!(context, &Value::X(0), val); // HAXX
@@ -376,6 +411,17 @@ impl Machine {
                     }
                 }
                 // Allocate
+                Opcode::Allocate => {
+                    // stackneed, live
+                    if let [Value::Literal(stackneed), Value::Literal(_live)] = &ins.args[..] {
+                        for _ in 0..*stackneed {
+                            context.stack.push(Value::Nil())
+                        }
+                        context.stack.push(Value::CP(context.cp));
+                    } else {
+                        panic!("Bad argument to {:?}", ins.op)
+                    }
+                }
                 Opcode::AllocateHeap => {
                     // literal stackneed, literal heapneed, literal live
                     // allocate stackneed space on stack, ensure heapneed on heap, if gc, keep live

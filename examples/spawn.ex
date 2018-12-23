@@ -11,6 +11,7 @@ defmodule Test do
 
   def hello(parent) do
     # IO.puts "sending"
+    send(parent, {:wrong})
     send(parent, {:hello, [1, 2, 3]})
   end
 end
