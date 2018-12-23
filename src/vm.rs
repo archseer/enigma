@@ -336,7 +336,7 @@ impl Machine {
                     // store arity as live
                     if let [Value::Literal(_a), Value::Label(i)] = &ins.args[..] {
                         context.cp = context.ip as isize;
-                        op_jump!(context, *i - 2);
+                        op_jump!(context, *i - 1);
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
@@ -384,7 +384,6 @@ impl Machine {
                         panic!("Bad argument to {:?}", ins.op)
                     }
                 }
-                // Allocate
                 Opcode::Allocate => {
                     // stackneed, live
                     if let [Value::Literal(stackneed), Value::Literal(_live)] = &ins.args[..] {
