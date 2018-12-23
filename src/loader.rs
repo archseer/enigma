@@ -109,7 +109,7 @@ impl<'a> Loader<'a> {
     fn load_attributes(&mut self, chunk: Chunk) {
         // Contains two parts: a proplist of module attributes, encoded as External Term Format,
         // and a compiler info (options and version) encoded similarly.
-        let (rest, val) = etf::decode(chunk, &mut self.literal_heap).unwrap();
+        let (rest, val) = etf::decode(chunk, &self.literal_heap).unwrap();
         println!("attrs val: {:?}; rest: {:?}", val, rest);
     }
 
@@ -159,7 +159,7 @@ impl<'a> Loader<'a> {
         // pass in an allocator that allocates to a permanent non GC heap
         // TODO: probably GC'd when module is deallocated?
         // &self.literal_allocator
-        let (_, literals) = decode_literals(buf, &mut self.literal_heap).unwrap();
+        let (_, literals) = decode_literals(buf, &self.literal_heap).unwrap();
         self.literals = literals;
     }
 

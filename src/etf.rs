@@ -142,7 +142,7 @@ pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> 
             });
             std::mem::replace(&mut *head, val);
             std::mem::replace(&mut *tail, Value::Cons(new_cons as *const value::Cons));
-            return (new_cons as *mut value::Cons, rest);
+            (new_cons as *mut value::Cons, rest)
         });
 
         // set the tail
@@ -181,7 +181,7 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value
                 });
                 std::mem::replace(&mut *head, Value::Character(elem));
                 std::mem::replace(&mut *tail, Value::Cons(new_cons as *const value::Cons));
-                return (new_cons as *mut value::Cons, rest);
+                (new_cons as *mut value::Cons, rest)
             });
 
         // set the tail

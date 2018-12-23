@@ -211,7 +211,7 @@ pub fn send_message<'a>(
     let pid = pid.to_usize();
 
     if let Some(receiver) = state.process_table.lock().unwrap().get(pid) {
-        receiver.send_message(&process, &msg);
+        receiver.send_message(process, msg);
 
         if receiver.is_waiting_for_message() {
             // wake up

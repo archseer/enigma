@@ -301,7 +301,7 @@ impl<T: Send + 'static> PoolInner<T> {
                 if let Some(jobs) = queue.pop_half() {
                     let (our_jobs, pinned_jobs): (VecDeque<Job<T>>, VecDeque<Job<T>>) = jobs
                         .into_iter()
-                        .partition(|ref job| our_worker.should_process(job));
+                        .partition(|job| our_worker.should_process(job));
 
                     // Pinned jobs need to be pushed back into the appropriate
                     // queues.
