@@ -173,6 +173,7 @@ impl Value {
 
     pub fn to_usize(&self) -> usize {
         match *self {
+            Value::Literal(i) => i,
             Value::Atom(i) => i,
             Value::Label(i) => i,
             Value::Pid(i) => i,

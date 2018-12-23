@@ -74,13 +74,13 @@ macro_rules! op_is_type {
     ($vm:expr, $context:expr, $args:expr, $op:ident) => {{
         debug_assert_eq!($args.len(), 2);
 
-        // TODO: patch the labels to point to exact offsets to avoid labels lookup
-        let l = $vm.expand_arg($context, &$args[0]).to_usize();
-        let fail = unsafe { (*$context.module).labels[&l] };
-
         let val = $vm.expand_arg($context, &$args[1]);
 
         if !val.$op() {
+            // TODO: patch the labels to point to exact offsets to avoid labels lookup
+            let l = $vm.expand_arg($context, &$args[0]).to_usize();
+            let fail = unsafe { (*$context.module).labels[&l] };
+
             op_jump!($context, fail);
         }
     }};
@@ -422,23 +422,19 @@ impl Machine {
                     // shared_equality_opcode(vm, ctx, curr_p, true, Ordering::Less, false)
                     debug_assert_eq!(ins.args.len(), 3);
 
-                    let l = self.expand_arg(context, &ins.args[0]).to_usize();
-                    let fail = unsafe { (*context.module).labels[&l] };
-
                     let v1 = self.expand_arg(context, &ins.args[1]);
                     let v2 = self.expand_arg(context, &ins.args[2]);
 
                     if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(&v2) {
                         // ok
                     } else {
+                        let l = self.expand_arg(context, &ins.args[0]).to_usize();
+                        let fail = unsafe { (*context.module).labels[&l] };
                         op_jump!(context, fail);
                     }
                 }
                 Opcode::IsEq => {
                     debug_assert_eq!(ins.args.len(), 3);
-
-                    let l = self.expand_arg(context, &ins.args[0]).to_usize();
-                    let fail = unsafe { (*context.module).labels[&l] };
 
                     let v1 = self.expand_arg(context, &ins.args[1]);
                     let v2 = self.expand_arg(context, &ins.args[2]);
@@ -446,6 +442,8 @@ impl Machine {
                     if let Some(std::cmp::Ordering::Equal) = v1.partial_cmp(&v2) {
                         // ok
                     } else {
+                        let l = self.expand_arg(context, &ins.args[0]).to_usize();
+                        let fail = unsafe { (*context.module).labels[&l] };
                         op_jump!(context, fail);
                     }
                 }
@@ -460,6 +458,21 @@ impl Machine {
                 Opcode::IsList         => { op_is_type!(self, context, ins.args, is_list) }
                 Opcode::IsNonemptyList => { op_is_type!(self, context, ins.args, is_non_empty_list) }
                 Opcode::IsTuple        => { op_is_type!(self, context, ins.args, is_tuple) }
+                Opcode::TestArity => {
+                    // check tuple arity 
+                    if let [Value::Label(l), Value::Tuple(t), Value::Literal(arity)] = &ins.args[..] {
+                        unsafe {
+                            if (**t).len != *arity {
+                                let l = self.expand_arg(context, &ins.args[0]).to_usize();
+                                let fail = unsafe { (*context.module).labels[&l] };
+                                op_jump!(context, fail);
+                            }
+                        }
+
+                    } else {
+                        panic!("Bad argument to {:?}", ins.op)
+                    }
+                }
                 Opcode::Jump => {
                     debug_assert_eq!(ins.args.len(), 1);
                     let label = self.expand_arg(context, &ins.args[0]).to_usize();
@@ -469,6 +482,20 @@ impl Machine {
                     // arg1 can be either a value or a register
                     let val = self.expand_arg(context, &ins.args[0]);
                     set_register!(context, &ins.args[1], val)
+                }
+                Opcode::GetTupleElement => {
+                    // source, element, dest
+                    let source = self.expand_arg(context, &ins.args[0]);
+                    let n = self.expand_arg(context, &ins.args[1]).to_usize();
+                    if let Value::Tuple(t) = source {
+                        let elem = unsafe {
+                            let slice: &[Value] = &(**t);
+                            slice[n].clone()
+                        };
+                        set_register!(context, &ins.args[2], elem)
+                    } else {
+                        panic!("GetTupleElement: source is of wrong type")
+                    }
                 }
                 Opcode::PutList => {
                     // put_list H T Dst::slot()
