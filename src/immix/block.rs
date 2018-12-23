@@ -53,6 +53,9 @@ pub struct Heap {
     all_blocks: Cell<NonNull<Block>>,
 }
 
+unsafe impl Sync for Heap {}
+unsafe impl Send for Heap {}
+
 #[inline]
 pub(crate) fn round_up_to(n: usize, divisor: usize) -> usize {
     debug_assert!(divisor.is_power_of_two());
@@ -97,7 +100,7 @@ impl Block {
             let data = Global.alloc(layout).unwrap();
 
             let next = Cell::new(None);
-            let ptr = data.as_ptr() as usize + size - mem::size_of::<Block>();
+            let ptr = data.as_ptr() as usize + mem::size_of::<Block>();
             let ptr = ptr as *mut u8;
             ptr::write(
                 data.as_ptr() as *mut Block,
@@ -148,15 +151,15 @@ impl Heap {
         unsafe {
             let header = self.current_block.get();
             let header = header.as_ref();
-            let ptr = header.ptr.as_ptr() as usize;
+            let ptr = header.ptr.get().as_ptr() as usize;
             let ptr = round_up_to(ptr, layout.align());
-            let end = header as *const _ as usize;
+            let end = header.data.as_ptr() as usize + header.layout.size();
             debug_assert!(ptr <= end);
 
             let new_ptr = ptr + layout.size();
             if new_ptr <= end {
                 let p = ptr as *mut u8;
-                debug_assert!(new_ptr <= header as *const _ as usize);
+                debug_assert!(new_ptr > header as *const _ as usize);
                 header.ptr.set(NonNull::new_unchecked(new_ptr as *mut u8));
                 return NonNull::new_unchecked(p);
             }
@@ -184,7 +187,7 @@ impl Heap {
             let header = header.as_ref();
             let ptr = header.ptr.as_ptr() as usize + size;
             debug_assert!(
-                ptr <= header as *const _ as usize,
+                ptr > header as *const _ as usize,
                 "{} <= {}",
                 ptr,
                 header as *const _ as usize

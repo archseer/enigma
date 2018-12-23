@@ -5,6 +5,6 @@ defmodule Test do
   end
 
   def hello(x) do
-    x
+    [1,2,3]
   end
 end

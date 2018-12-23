@@ -1,5 +1,6 @@
 use crate::atom;
-use crate::value::Value;
+use crate::immix::Heap;
+use crate::value::{self, Value};
 use nom::*;
 use num::traits::ToPrimitive;
 use num_bigint::{BigInt, Sign};
@@ -38,14 +39,14 @@ enum Tag {
     SmallAtomU8 = 119,
 }
 
-pub fn decode(rest: &[u8]) -> IResult<&[u8], Value> {
+pub fn decode<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> {
     // starts with  be_u8 that's 131
     let (rest, ver) = be_u8(rest)?;
     assert_eq!(ver, 131, "Expected ETF version number to be 131!");
-    decode_value(rest)
+    decode_value(rest, heap)
 }
 
-pub fn decode_value(rest: &[u8]) -> IResult<&[u8], Value> {
+pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> {
     // next be_u8 specifies the type tag
     let (rest, tag) = be_u8(rest)?;
     let tag: Tag = unsafe { ::std::mem::transmute(tag) };
@@ -65,7 +66,7 @@ pub fn decode_value(rest: &[u8]) -> IResult<&[u8], Value> {
         // Reference
         // Port
         // Pid
-        Tag::String => decode_string(rest),
+        Tag::String => decode_string(rest, heap),
         // Binary
         // NewFun
         // Export
@@ -75,16 +76,16 @@ pub fn decode_value(rest: &[u8]) -> IResult<&[u8], Value> {
         // Fun
         // AtomU8
         // SmallAtomU8
-        Tag::List => decode_list(rest),
+        Tag::List => decode_list(rest, heap),
         Tag::Atom => decode_atom(rest),
         Tag::Nil => Ok((rest, Value::Nil())),
         Tag::SmallTuple => {
             let (rest, size) = be_u8(rest)?;
-            decode_tuple(rest, size as usize)
+            decode_tuple(rest, size as usize, heap)
         }
         Tag::LargeTuple => {
             let (rest, size) = be_u32(rest)?;
-            decode_tuple(rest, size as usize)
+            decode_tuple(rest, size as usize, heap)
         }
         Tag::SmallBig => {
             let (rest, size) = be_u8(rest)?;
@@ -107,11 +108,11 @@ pub fn decode_atom(rest: &[u8]) -> IResult<&[u8], Value> {
     Ok((rest, atom::from_str(string)))
 }
 
-pub fn decode_tuple(rest: &[u8], len: usize) -> IResult<&[u8], Value> {
+pub fn decode_tuple<'a>(rest: &'a [u8], len: usize, heap: &Heap) -> IResult<&'a [u8], Value> {
     let mut els: Vec<Value> = Vec::with_capacity(len);
 
     let rest = (0..len).fold(rest, |rest, _i| {
-        let (rest, el) = decode_value(rest).unwrap();
+        let (rest, el) = decode_value(rest, heap).unwrap();
         els.push(el);
         rest
     });
@@ -119,79 +120,78 @@ pub fn decode_tuple(rest: &[u8], len: usize) -> IResult<&[u8], Value> {
     Ok((rest, Value::Tuple(Arc::new(els))))
 }
 
-pub fn decode_list(rest: &[u8]) -> IResult<&[u8], Value> {
+pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> {
     let (rest, len) = be_u32(rest)?;
 
-    // TODO: use alloc
-    let mut start = Value::Cons {
-        head: Box::new(Value::Nil()),
-        tail: Box::new(Value::Nil()),
-    };
+    unsafe {
+        let start = heap.alloc(value::Cons {
+            head: Value::Nil(),
+            tail: Value::Nil(),
+        });
 
-    let (tail, rest) = (0..len).fold((&mut start, rest), |(cons, buf), _i| {
-        // TODO: probably doing something wrong here
-        if let Value::Cons {
-            ref mut head,
-            ref mut tail,
-        } = *cons
-        {
-            let (rest, val) = decode_value(buf).unwrap();
-            let new_cons = Value::Cons {
-                head: Box::new(Value::Nil()),
-                tail: Box::new(Value::Nil()),
-            };
-            std::mem::replace(&mut *head, Box::new(val));
-            std::mem::replace(&mut *tail, Box::new(new_cons));
-            return (tail, rest);
-        }
-        panic!("Wrong value!")
-    });
+        let (tail, rest) = (0..len).fold((start as *mut value::Cons, rest), |(cons, rest), _i| {
+            // TODO: probably doing something wrong here
+            let value::Cons {
+                ref mut head,
+                ref mut tail,
+            } = *cons;
+            let (rest, val) = decode_value(rest, heap).unwrap();
+            let new_cons = heap.alloc(value::Cons {
+                head: Value::Nil(),
+                tail: Value::Nil(),
+            });
+            std::mem::replace(&mut *head, val);
+            std::mem::replace(&mut *tail, Value::Cons(new_cons as *const value::Cons));
+            return (new_cons as *mut value::Cons, rest);
+        });
 
-    // set the tail
-    let (rest, val) = decode_value(rest).unwrap();
-    std::mem::replace(&mut *tail, val);
-
-    Ok((rest, start))
+        // set the tail
+        let (rest, val) = decode_value(rest, heap).unwrap();
+        (*tail).tail = val;
+        println!("val: {}", Value::Cons(start));
+        Ok((rest, Value::Cons(start)))
+    }
 }
 
 /// A string of bytes encoded as tag 107 (String) with 16-bit length.
 /// This is basically a list, but it's optimized to decode to char.
-pub fn decode_string(rest: &[u8]) -> IResult<&[u8], Value> {
+pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> {
     let (rest, len) = be_u16(rest)?;
     if len == 0 {
         return Ok((rest, Value::Nil()));
     }
 
-    // TODO: use alloc
-    let mut start = Value::Cons {
-        head: Box::new(Value::Nil()),
-        tail: Box::new(Value::Nil()),
-    };
+    unsafe {
+        let start = heap.alloc(value::Cons {
+            head: Value::Nil(),
+            tail: Value::Nil(),
+        });
 
-    let (tail, rest) = (0..len).fold((&mut start, rest), |(cons, buf), _i| {
-        // TODO: probably doing something wrong here
-        if let Value::Cons {
-            ref mut head,
-            ref mut tail,
-        } = *cons
-        {
-            let (rest, elem) = be_u8(rest).unwrap();
+        let (tail, rest) =
+            (0..len - 1).fold((start as *mut value::Cons, rest), |(cons, rest), _i| {
+                // TODO: probably doing something wrong here
+                let value::Cons {
+                    ref mut head,
+                    ref mut tail,
+                } = *cons;
+                let (rest, elem) = be_u8(rest).unwrap();
+                let new_cons = heap.alloc(value::Cons {
+                    head: Value::Nil(),
+                    tail: Value::Nil(),
+                });
+                std::mem::replace(&mut *head, Value::Character(elem));
+                std::mem::replace(&mut *tail, Value::Cons(new_cons as *const value::Cons));
+                return (new_cons as *mut value::Cons, rest);
+            });
 
-            let new_cons = Value::Cons {
-                head: Box::new(Value::Nil()),
-                tail: Box::new(Value::Nil()),
-            };
-            std::mem::replace(&mut *head, Box::new(Value::Character(elem)));
-            std::mem::replace(&mut *tail, Box::new(new_cons));
-            return (tail, rest);
-        }
-        panic!("Wrong value!")
-    });
+        // set the tail
+        let (rest, val) = be_u8(rest).unwrap();
+        (*tail).head = Value::Character(val);
+        println!("{:?}", rest);
 
-    // set the tail
-    std::mem::replace(&mut *tail, Value::Nil());
-
-    Ok((rest, start))
+        println!("val: {}", Value::Cons(start));
+        Ok((rest, Value::Cons(start)))
+    }
 }
 
 #[cfg(target_pointer_width = "32")]

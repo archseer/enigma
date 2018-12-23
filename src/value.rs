@@ -1,4 +1,5 @@
 // use crate::arc_without_weak::ArcWithoutWeak;
+use crate::atom;
 use crate::process;
 use num::bigint::BigInt;
 use std::sync::Arc;
@@ -17,10 +18,7 @@ pub enum Value {
     Ref(),
     Float(f64),
     // Extended values (on heap)
-    Cons {
-        head: Box<Value>,
-        tail: Box<Value>,
-    }, // two values TODO: ArcWithoutWeak<[Value; 2]>
+    Cons(*const self::Cons),
     Tuple(Arc<Vec<Value>>), // TODO: allocate on custom heap
     /// Boxed values
     /// Strings use an Arc so they can be sent to other processes without
@@ -45,7 +43,21 @@ pub enum Value {
     CP(isize),              // continuation pointer
 }
 
+#[derive(Debug)]
+pub struct Cons {
+    pub head: Value,
+    pub tail: Value,
+}
+
+pub struct Tuple {
+    /// Number of elements following the header.
+    pub len: usize,
+}
+
 unsafe impl Sync for Value {}
+unsafe impl Send for Value {}
+
+unsafe impl Sync for Cons {}
 
 // TODO: maybe box binaries further:
 // // contains size, followed in memory by the data bytes
@@ -152,7 +164,36 @@ impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Value::Nil() => write!(f, "nil"),
-            _ => write!(f, "(val)"),
+            Value::Integer(i) => write!(f, "{}", i),
+            Value::Character(i) => write!(f, "{}", i),
+            Value::Atom(i) => write!(f, "{}", atom::to_str(&Value::Atom(*i)).unwrap()),
+            Value::Cons(c) => unsafe {
+                write!(f, "[")?;
+                let mut cons = *c;
+                loop {
+                    write!(f, "{}", (*cons).head)?;
+                    match &(*cons).tail {
+                        // Proper list ends here, do not show the tail
+                        Value::Nil() => break,
+                        // List continues, print a comma and follow the tail
+                        Value::Cons(c) => {
+                            write!(f, ", ")?;
+                            cons = *c;
+                        }
+                        // Improper list, show tail
+                        val => {
+                            write!(f, "| {}", val)?;
+                            break;
+                        }
+                    }
+                }
+                write!(f, "]")
+            },
+            Value::X(i) => write!(f, "x({})", i),
+            Value::Y(i) => write!(f, "y({})", i),
+            Value::Literal(..) => write!(f, "(literal)"),
+            Value::Label(..) => write!(f, "(label)"),
+            v => write!(f, "({:?})", v),
         }
     }
 }

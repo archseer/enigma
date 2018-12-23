@@ -1,3 +1,4 @@
+use crate::immix::Heap;
 use crate::loader::Instruction;
 use crate::module_registry::RcModuleRegistry;
 use crate::value::Value;
@@ -23,6 +24,7 @@ pub struct Module {
     pub imports: Vec<MFA>,
     pub exports: Vec<MFA>,
     pub literals: Vec<Value>,
+    pub literal_heap: Heap,
     pub lambdas: Vec<Lambda>,
     pub funs: FnvHashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
     pub labels: FnvHashMap<usize, usize>,        // label -> offset

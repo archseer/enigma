@@ -1,5 +1,6 @@
 use crate::atom::ATOMS;
 use crate::etf;
+use crate::immix::Heap;
 use crate::module::{Lambda, Module, MFA};
 use crate::opcodes::*;
 use crate::value::Value;
@@ -20,6 +21,7 @@ pub struct Loader<'a> {
     funs: FnvHashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
     labels: FnvHashMap<usize, usize>, // label -> offset
     code: &'a [u8],
+    literal_heap: Heap,
     instructions: Vec<Instruction>,
 }
 
@@ -30,6 +32,7 @@ impl<'a> Loader<'a> {
             imports: Vec::new(),
             exports: Vec::new(),
             literals: Vec::new(),
+            literal_heap: Heap::new(),
             lambdas: Vec::new(),
             atom_map: HashMap::new(),
             labels: FnvHashMap::default(),
@@ -75,6 +78,7 @@ impl<'a> Loader<'a> {
             imports: self.imports,
             exports: self.exports,
             literals: self.literals,
+            literal_heap: self.literal_heap,
             lambdas: self.lambdas,
             funs: self.funs,
             labels: self.labels,
@@ -105,7 +109,7 @@ impl<'a> Loader<'a> {
     fn load_attributes(&mut self, chunk: Chunk) {
         // Contains two parts: a proplist of module attributes, encoded as External Term Format,
         // and a compiler info (options and version) encoded similarly.
-        let (rest, val) = etf::decode(chunk).unwrap();
+        let (rest, val) = etf::decode(chunk, &mut self.literal_heap).unwrap();
         println!("attrs val: {:?}; rest: {:?}", val, rest);
     }
 
@@ -155,7 +159,7 @@ impl<'a> Loader<'a> {
         // pass in an allocator that allocates to a permanent non GC heap
         // TODO: probably GC'd when module is deallocated?
         // &self.literal_allocator
-        let (_, literals) = decode_literals(buf).unwrap();
+        let (_, literals) = decode_literals(buf, &mut self.literal_heap).unwrap();
         self.literals = literals;
     }
 
@@ -229,20 +233,17 @@ impl<'a> Loader<'a> {
     }
 }
 
-named!(
-    decode_literals<&[u8], Vec<Value>>,
+fn decode_literals<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Vec<Value>> {
     do_parse!(
-        _count: be_u32 >>
-        literals: many0!(complete!(
-            do_parse!(
-                _size: be_u32 >>
-                literal: call!(etf::decode) >>
-                (literal)
-            )
-        )) >>
-        (literals)
+        rest,
+        _count: be_u32
+            >> literals:
+                many0!(complete!(do_parse!(
+                    _size: be_u32 >> literal: call!(etf::decode, heap) >> (literal)
+                )))
+            >> (literals)
     )
-);
+}
 
 // #[derive(Debug, PartialEq)]
 // pub struct Chunk<'a> {
