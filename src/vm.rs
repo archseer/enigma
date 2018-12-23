@@ -459,6 +459,7 @@ impl Machine {
                         op_jump!(context, fail);
                     }
                 }
+                Opcode::IsInteger      => { op_is_type!(self, context, ins.args, is_integer) }
                 Opcode::IsFloat        => { op_is_type!(self, context, ins.args, is_float) }
                 Opcode::IsNumber       => { op_is_type!(self, context, ins.args, is_number) }
                 Opcode::IsAtom         => { op_is_type!(self, context, ins.args, is_atom) }
