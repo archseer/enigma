@@ -342,7 +342,6 @@ impl Machine {
                     }
                     safepoint_and_reduce!(self, process, reductions);
                 }
-                // TODO: dedup these
                 Opcode::CallExt => {
                     //literal arity, literal destination (module.imports index)
                     if let [Value::Literal(arity), Value::Literal(dest)] = &ins.args[..] {
@@ -434,10 +433,6 @@ impl Machine {
                     }
                 }
                 Opcode::IsLt => {
-                    // Checks relation, that arg1 IS LESS than arg2, jump to arg0 otherwise.
-                    // Structure: is_lt(on_false:CP, a:src, b:src)
-                    // assert_arity(gen_op::OPCODE_IS_LT, 3);
-                    // shared_equality_opcode(vm, ctx, curr_p, true, Ordering::Less, false)
                     debug_assert_eq!(ins.args.len(), 3);
 
                     let v1 = self.expand_arg(context, &ins.args[1]);
@@ -495,7 +490,6 @@ impl Machine {
                     }
                 }
                 Opcode::SelectVal => {
-                    println!("selectval");
                     // arg, fail, dests
                     // loop over dests
                     if let [arg, Value::Label(l), Value::ExtendedList(vec)] = &ins.args[..] {
@@ -504,8 +498,6 @@ impl Machine {
                         loop {
                             // if key matches, jump to the following label
                             if vec[i] == arg {
-                                println!("it's a match!");
-                                println!("{}", vec[i+1]);
                                 let l = vec[i+1].to_usize();
                                 let label = unsafe { (*context.module).labels[&l] };
                                 op_jump!(context, label);
