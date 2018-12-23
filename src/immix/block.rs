@@ -12,15 +12,6 @@ pub const DEFAULT_BLOCK_SIZE: usize = 32 * 1024 + mem::size_of::<Block>();
 
 pub const DEFAULT_BLOCK_ALIGN: usize = mem::align_of::<Block>();
 
-/// Set of possible block allocation failures
-#[derive(Debug, PartialEq)]
-pub enum Error {
-    /// Usually means requested block size, and therefore alignment, wasn't a power of two
-    BadRequest,
-    /// Insufficient memory, couldn't allocate a block
-    OOM,
-}
-
 pub struct Block {
     /// Points to the start of the block (including this header)
     data: NonNull<u8>,
