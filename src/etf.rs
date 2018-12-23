@@ -135,31 +135,29 @@ pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> 
     let (rest, len) = be_u32(rest)?;
 
     unsafe {
+        let (rest, val) = decode_value(rest, heap).unwrap();
+
         let start = heap.alloc(value::Cons {
-            head: Value::Nil(),
+            head: val,
             tail: Value::Nil(),
         });
 
-        let (tail, rest) = (0..len).fold((start as *mut value::Cons, rest), |(cons, rest), _i| {
-            // TODO: probably doing something wrong here
-            let value::Cons {
-                ref mut head,
-                ref mut tail,
-            } = *cons;
-            let (rest, val) = decode_value(rest, heap).unwrap();
-            let new_cons = heap.alloc(value::Cons {
-                head: Value::Nil(),
-                tail: Value::Nil(),
+        let (tail, rest) =
+            (0..len - 1).fold((start as *mut value::Cons, rest), |(cons, rest), _i| {
+                let value::Cons { ref mut tail, .. } = *cons;
+                let (rest, val) = decode_value(rest, heap).unwrap();
+                let new_cons = heap.alloc(value::Cons {
+                    head: val,
+                    tail: Value::Nil(),
+                });
+                std::mem::replace(&mut *tail, Value::List(new_cons as *const value::Cons));
+                (new_cons as *mut value::Cons, rest)
             });
-            std::mem::replace(&mut *head, val);
-            std::mem::replace(&mut *tail, Value::List(new_cons as *const value::Cons));
-            (new_cons as *mut value::Cons, rest)
-        });
 
         // set the tail
         let (rest, val) = decode_value(rest, heap).unwrap();
         (*tail).tail = val;
-        println!("val: {}", Value::List(start));
+
         Ok((rest, Value::List(start)))
     }
 }
@@ -173,34 +171,30 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value
     }
 
     unsafe {
+        let (rest, elem) = be_u8(rest).unwrap();
+
         let start = heap.alloc(value::Cons {
-            head: Value::Nil(),
+            head: Value::Character(elem),
             tail: Value::Nil(),
         });
 
         let (tail, rest) =
             (0..len - 1).fold((start as *mut value::Cons, rest), |(cons, rest), _i| {
-                // TODO: probably doing something wrong here
-                let value::Cons {
-                    ref mut head,
-                    ref mut tail,
-                } = *cons;
+                let value::Cons { ref mut tail, .. } = *cons;
                 let (rest, elem) = be_u8(rest).unwrap();
+
                 let new_cons = heap.alloc(value::Cons {
-                    head: Value::Nil(),
+                    head: Value::Character(elem),
                     tail: Value::Nil(),
                 });
-                std::mem::replace(&mut *head, Value::Character(elem));
+
                 std::mem::replace(&mut *tail, Value::List(new_cons as *const value::Cons));
                 (new_cons as *mut value::Cons, rest)
             });
 
         // set the tail
-        let (rest, val) = be_u8(rest).unwrap();
-        (*tail).head = Value::Character(val);
-        println!("{:?}", rest);
+        (*tail).tail = Value::Nil();
 
-        println!("val: {}", Value::List(start));
         Ok((rest, Value::List(start)))
     }
 }
