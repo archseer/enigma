@@ -3,8 +3,7 @@ use allocator_api::{Alloc, Global, Layout};
 use std::cell::{Cell, UnsafeCell};
 use std::cmp;
 use std::mem;
-use std::ptr;
-use std::ptr::NonNull;
+use std::ptr::{self, NonNull};
 
 // TODO: implement immix lines later on
 
@@ -147,7 +146,7 @@ impl Heap {
     }
 
     #[inline(always)]
-    fn alloc_layout(&self, layout: Layout) -> NonNull<u8> {
+    pub fn alloc_layout(&self, layout: Layout) -> NonNull<u8> {
         unsafe {
             let header = self.current_block.get();
             let header = header.as_ref();

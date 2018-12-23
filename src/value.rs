@@ -2,6 +2,8 @@
 use crate::atom;
 use crate::process;
 use num::bigint::BigInt;
+use std::ops::{Deref, DerefMut};
+use std::ptr::NonNull;
 use std::sync::Arc;
 
 #[allow(dead_code)]
@@ -19,7 +21,7 @@ pub enum Value {
     Float(f64),
     // Extended values (on heap)
     List(*const self::Cons),
-    Tuple(Arc<Vec<Value>>), // TODO: allocate on custom heap
+    Tuple(*const self::Tuple), // TODO: allocate on custom heap
     /// Boxed values
     /// Strings use an Arc so they can be sent to other processes without
     /// requiring a full copy of the data.
@@ -52,6 +54,20 @@ pub struct Cons {
 pub struct Tuple {
     /// Number of elements following the header.
     pub len: usize,
+    pub ptr: NonNull<Value>,
+}
+
+impl Deref for Tuple {
+    type Target = [Value];
+    fn deref(&self) -> &[Value] {
+        unsafe { ::std::slice::from_raw_parts(self.ptr.as_ptr(), self.len) }
+    }
+}
+
+impl DerefMut for Tuple {
+    fn deref_mut(&mut self) -> &mut [Value] {
+        unsafe { ::std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len) }
+    }
 }
 
 unsafe impl Sync for Value {}
@@ -170,7 +186,15 @@ impl std::fmt::Display for Value {
             Value::Nil() => write!(f, "nil"),
             Value::Integer(i) => write!(f, "{}", i),
             Value::Character(i) => write!(f, "{}", i),
-            Value::Atom(i) => write!(f, "{}", atom::to_str(&Value::Atom(*i)).unwrap()),
+            Value::Atom(i) => write!(f, ":{}", atom::to_str(&Value::Atom(*i)).unwrap()),
+            Value::Tuple(t) => unsafe {
+                write!(f, "{{")?;
+                let slice: &[Value] = &(**t);
+                slice.iter().for_each(|val| {
+                    write!(f, "{}, ", val);
+                });
+                write!(f, "}}")
+            },
             Value::List(c) => unsafe {
                 write!(f, "[")?;
                 let mut cons = *c;

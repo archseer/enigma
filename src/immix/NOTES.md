@@ -34,3 +34,6 @@ addresses, for passing arguments to functions, and for keeping local variables.
 Larger structures, such as lists and tuples are stored on the heap.
 
 only heap allocate lists, etc.
+
+
+TUPLES should allocate as a len + ptr and be usable as a slice.

@@ -1,9 +1,11 @@
 use crate::atom;
 use crate::immix::Heap;
 use crate::value::{self, Value};
+use allocator_api::Layout;
 use nom::*;
 use num::traits::ToPrimitive;
 use num_bigint::{BigInt, Sign};
+use std::ptr::NonNull;
 use std::sync::Arc;
 
 /// External Term Format parser
@@ -109,15 +111,24 @@ pub fn decode_atom(rest: &[u8]) -> IResult<&[u8], Value> {
 }
 
 pub fn decode_tuple<'a>(rest: &'a [u8], len: usize, heap: &Heap) -> IResult<&'a [u8], Value> {
-    let mut els: Vec<Value> = Vec::with_capacity(len);
+    let mut tuple = heap.alloc(value::Tuple {
+        len,
+        ptr: NonNull::dangling(),
+    });
 
-    let rest = (0..len).fold(rest, |rest, _i| {
+    // alloc space for elements
+    let layout = Layout::new::<Value>().repeat(len).unwrap().0;
+    tuple.ptr = heap.alloc_layout(layout).cast();
+
+    let els: &mut [Value] = tuple;
+
+    let rest = (0..len).fold(rest, |rest, i| {
         let (rest, el) = decode_value(rest, heap).unwrap();
-        els.push(el);
+        els[i] = el;
         rest
     });
 
-    Ok((rest, Value::Tuple(Arc::new(els))))
+    Ok((rest, Value::Tuple(tuple)))
 }
 
 pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> {
