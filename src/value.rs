@@ -18,7 +18,7 @@ pub enum Value {
     Ref(),
     Float(f64),
     // Extended values (on heap)
-    Cons(*const self::Cons),
+    List(*const self::Cons),
     Tuple(Arc<Vec<Value>>), // TODO: allocate on custom heap
     /// Boxed values
     /// Strings use an Arc so they can be sent to other processes without
@@ -36,7 +36,7 @@ pub enum Value {
     X(usize),
     Y(usize),
     Label(usize),
-    List(Vec<Value>),
+    ExtendedList(Vec<Value>),
     FloatReg(usize),
     AllocList(u64),
     ExtendedLiteral(usize), // TODO; replace at load time
@@ -131,7 +131,7 @@ impl Value {
 
     pub fn is_list(&self) -> bool {
         match *self {
-            Value::Cons { .. } => true,
+            Value::List { .. } => true,
             Value::Nil(..) => true, // apparently also valid
             _ => false,
         }
@@ -139,7 +139,7 @@ impl Value {
 
     pub fn is_non_empty_list(&self) -> bool {
         match *self {
-            Value::Cons(ptr) => {
+            Value::List(ptr) => {
                 // TODO: traverse the list recursively and check the last tail?
                 // !ptr.is_nil()
                 false
@@ -171,7 +171,7 @@ impl std::fmt::Display for Value {
             Value::Integer(i) => write!(f, "{}", i),
             Value::Character(i) => write!(f, "{}", i),
             Value::Atom(i) => write!(f, "{}", atom::to_str(&Value::Atom(*i)).unwrap()),
-            Value::Cons(c) => unsafe {
+            Value::List(c) => unsafe {
                 write!(f, "[")?;
                 let mut cons = *c;
                 loop {
@@ -180,7 +180,7 @@ impl std::fmt::Display for Value {
                         // Proper list ends here, do not show the tail
                         Value::Nil() => break,
                         // List continues, print a comma and follow the tail
-                        Value::Cons(c) => {
+                        Value::List(c) => {
                             write!(f, ", ")?;
                             cons = *c;
                         }

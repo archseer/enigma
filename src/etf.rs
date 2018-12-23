@@ -141,15 +141,15 @@ pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> 
                 tail: Value::Nil(),
             });
             std::mem::replace(&mut *head, val);
-            std::mem::replace(&mut *tail, Value::Cons(new_cons as *const value::Cons));
+            std::mem::replace(&mut *tail, Value::List(new_cons as *const value::Cons));
             (new_cons as *mut value::Cons, rest)
         });
 
         // set the tail
         let (rest, val) = decode_value(rest, heap).unwrap();
         (*tail).tail = val;
-        println!("val: {}", Value::Cons(start));
-        Ok((rest, Value::Cons(start)))
+        println!("val: {}", Value::List(start));
+        Ok((rest, Value::List(start)))
     }
 }
 
@@ -180,7 +180,7 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value
                     tail: Value::Nil(),
                 });
                 std::mem::replace(&mut *head, Value::Character(elem));
-                std::mem::replace(&mut *tail, Value::Cons(new_cons as *const value::Cons));
+                std::mem::replace(&mut *tail, Value::List(new_cons as *const value::Cons));
                 (new_cons as *mut value::Cons, rest)
             });
 
@@ -189,8 +189,8 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value
         (*tail).head = Value::Character(val);
         println!("{:?}", rest);
 
-        println!("val: {}", Value::Cons(start));
-        Ok((rest, Value::Cons(start)))
+        println!("val: {}", Value::List(start));
+        Ok((rest, Value::List(start)))
     }
 }
 

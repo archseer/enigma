@@ -184,11 +184,12 @@ pub fn spawn(
     let context = new_proc.context_mut();
     context.ip = *func;
 
-    // arglist to process registers, it also needs to clone all the vals
+    // arglist to process registers,
+    // TODO: it also needs to deep clone all the vals (for example lists etc)
     unsafe {
         let mut i = 0;
         let mut cons = &args;
-        while let Value::Cons(ptr) = *cons {
+        while let Value::List(ptr) = *cons {
             context.x[i] = (*ptr).head.clone();
             i += 1;
             cons = &(*ptr).tail;

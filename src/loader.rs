@@ -456,13 +456,16 @@ fn parse_list(rest: &[u8]) -> IResult<&[u8], Value> {
     let (mut rest, n) = read_int(b, rest)?;
     let mut els = Vec::with_capacity(n as usize);
 
+    // TODO: create tuple of size n, then read n/2 pairs of key/label
+    // sequentially into the tuple. (used for select_val ops)
+
     for _i in 0..n {
         let (new_rest, term) = compact_term(rest)?;
         els.push(term);
         rest = new_rest;
     }
 
-    Ok((rest, Value::List(els)))
+    Ok((rest, Value::ExtendedList(els)))
 }
 
 fn parse_float_reg(rest: &[u8]) -> IResult<&[u8], Value> {
