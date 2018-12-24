@@ -209,13 +209,13 @@ impl Machine {
     }
 
     #[inline]
-    fn expand_arg<'a>(&'a self, context: &'a ExecutionContext, arg: &'a Value) -> Value {
+    fn expand_arg<'a>(&'a self, context: &'a ExecutionContext, arg: &'a Value) -> &Value {
         match arg {
             // TODO: optimize away into a reference somehow at load time
-            Value::ExtendedLiteral(i) => unsafe { (*context.module).literals[*i].clone() },
-            Value::X(i) => context.x[*i].clone(),
-            Value::Y(i) => context.stack[context.stack.len() - (*i + 2)].clone(),
-            value => value.clone(),
+            Value::ExtendedLiteral(i) => unsafe { &(*context.module).literals[*i] },
+            Value::X(i) => &context.x[*i],
+            Value::Y(i) => &context.stack[context.stack.len() - (*i + 2)],
+            value => &value,
         }
     }
 
@@ -433,7 +433,7 @@ impl Machine {
                     let v1 = self.expand_arg(context, &ins.args[1]);
                     let v2 = self.expand_arg(context, &ins.args[2]);
 
-                    if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(&v2) {
+                    if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(v2) {
                         // ok
                     } else {
                         let fail = self.expand_arg(context, &ins.args[0]).to_usize();
@@ -490,7 +490,7 @@ impl Machine {
                         let mut i = 0;
                         loop {
                             // if key matches, jump to the following label
-                            if vec[i] == arg {
+                            if vec[i] == *arg {
                                 let label = vec[i+1].to_usize();
                                 op_jump!(context, label);
                                 break;
@@ -514,7 +514,7 @@ impl Machine {
                 Opcode::Move => {
                     // arg1 can be either a value or a register
                     let val = self.expand_arg(context, &ins.args[0]);
-                    set_register!(context, &ins.args[1], val)
+                    set_register!(context, &ins.args[1], val.clone()) // TODO: mem::move would be preferred
                 }
                 Opcode::GetTupleElement => {
                     // source, element, dest
@@ -533,8 +533,8 @@ impl Machine {
                 Opcode::PutList => {
                     // put_list H T Dst::slot()
                     // Creates a cons cell with [H|T] and places the value into Dst.
-                    let head = self.expand_arg(context, &ins.args[0]);
-                    let tail = self.expand_arg(context, &ins.args[1]);
+                    let head = self.expand_arg(context, &ins.args[0]).clone();
+                    let tail = self.expand_arg(context, &ins.args[1]).clone();
                     let cons = context.heap.alloc(value::Cons { head, tail });
                     set_register!(context, &ins.args[2], Value::List(cons))
                 }
@@ -542,8 +542,8 @@ impl Machine {
                     // fail label, live, bif, arg1, arg2, dest
                     if let Value::Literal(i) = &ins.args[2] {
                         let args = vec![
-                            self.expand_arg(context, &ins.args[3]),
-                            self.expand_arg(context, &ins.args[4]),
+                            self.expand_arg(context, &ins.args[3]).clone(),
+                            self.expand_arg(context, &ins.args[4]).clone(),
                         ];
                         let val = unsafe { bif::apply(self, process, &(*context.module).imports[*i], &args[..]) };
 
