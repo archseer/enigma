@@ -15,3 +15,8 @@ parking_lot = "0.7.0"
 time = "0.1.40"
 fnv = "1.0.6"
 allocator_api = "0.5.0"
+num-traits = "0.2.6"
+num-integer = "0.1.39"
+
+# [profile.release]
+# debug = true

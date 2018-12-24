@@ -1,3 +1,5 @@
+#[macro_use]
+mod macros;
 mod arc_without_weak;
 mod atom;
 mod bif;
@@ -7,6 +9,7 @@ mod loader;
 mod mailbox;
 mod module;
 mod module_registry;
+mod numeric;
 mod opcodes;
 mod pool;
 mod process;

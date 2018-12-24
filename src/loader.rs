@@ -456,7 +456,7 @@ fn compact_term(i: &[u8]) -> IResult<&[u8], Value> {
 
         return match tag {
             0 => Ok((rest, Value::Literal(val as usize))),
-            1 => Ok((rest, Value::Integer(val as u64))),
+            1 => Ok((rest, Value::Integer(val as i64))), // TODO: this cast is unsafe
             2 => Ok((rest, Value::Atom(val as usize))),
             3 => Ok((rest, Value::X(val as usize))),
             4 => Ok((rest, Value::Y(val as usize))),

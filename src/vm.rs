@@ -75,7 +75,7 @@ macro_rules! op_call_ext {
         if bif::is_bif(mfa) {
             // make a slice out of arity x registers
             let args = &$context.x[0..*$arity];
-            let val = bif::apply($vm, $process, mfa, args);
+            let val = bif::apply($vm, $process, mfa, args).unwrap(); // TODO handle fail
             set_register!($context, &Value::X(0), val); // HAXX
             op_return!($context);
         } else {
@@ -195,13 +195,13 @@ impl Machine {
         /* TEMP */
         let context = process.context_mut();
 
-        // let fun = atom::i_from_str("fib");
-        // let arity = 1;
-        // context.x[0] = Value::Integer(17); // 28
-        let fun = atom::i_from_str("start");
-        let arity = 0;
+        let fun = atom::i_from_str("fib");
+        let arity = 1;
+        context.x[0] = Value::Integer(23); // 28
+                                           // let fun = atom::i_from_str("start");
+                                           // let arity = 0;
         unsafe { op_jump!(context, (*context.module).funs[&(fun, arity)]) }
-        unsafe { println!("ins: {:?}", (*context.module).instructions) };
+        // unsafe { println!("ins: {:?}", (*context.module).instructions) };
         /* TEMP */
 
         let process = Job::normal(process);
@@ -374,7 +374,7 @@ impl Machine {
                     // literal export, x reg
                     if let [Value::Literal(dest), reg] = &ins.args[..] {
                         let mfa = unsafe { &(*context.module).imports[*dest] };
-                        let val = bif::apply(self, process, mfa, &[]);
+                        let val = bif::apply(self, process, mfa, &[]).unwrap(); // TODO handle fail
                         set_register!(context, reg, val); // HAXX
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
@@ -545,7 +545,7 @@ impl Machine {
                             self.expand_arg(context, &ins.args[3]).clone(),
                             self.expand_arg(context, &ins.args[4]).clone(),
                         ];
-                        let val = unsafe { bif::apply(self, process, &(*context.module).imports[*i], &args[..]) };
+                        let val = unsafe { bif::apply(self, process, &(*context.module).imports[*i], &args[..]).unwrap() }; // TODO: handle fail
 
                         // TODO: consume fail label if not 0
 

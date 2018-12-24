@@ -61,7 +61,7 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value>
         Tag::SmallInteger => {
             let (rest, int) = be_u8(rest)?;
             // TODO store inside the pointer once we no longer copy
-            Ok((rest, Value::Integer(u64::from(int))))
+            Ok((rest, Value::Integer(i64::from(int))))
         }
         // Integer
         // Float
@@ -216,7 +216,7 @@ pub fn decode_bignum(rest: &[u8], size: usize) -> IResult<&[u8], Value> {
     // Assert that the number fits into small
     if big.bits() < WORD_BITS - 4 {
         let b_signed = big.to_isize().unwrap();
-        return Ok((rest, Value::Integer(b_signed as u64)));
+        return Ok((rest, Value::Integer(b_signed as i64)));
     }
 
     // Determine storage size in words

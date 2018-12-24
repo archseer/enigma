@@ -11,7 +11,7 @@ use std::sync::Arc;
 pub enum Value {
     // Immediate values
     Nil(), // also known as nil
-    Integer(u64),
+    Integer(i64),
     Character(u8),
     Atom(usize),
     Catch(),
@@ -30,7 +30,7 @@ pub enum Value {
     /// An interned string is a string allocated on the permanent space. For
     /// every unique interned string there is only one object allocated.
     //InternedBinary(ArcWithoutWeak<ImmutableString>),
-    BigInt(Arc<BigInt>), // ArcWithoutWeak<BigInt>
+    BigInt(Box<BigInt>), // ArcWithoutWeak<BigInt>
     // Closure(),
     /// Special values (invalid in runtime)
     // Import(), Export(),
@@ -177,7 +177,7 @@ impl Value {
             Value::Atom(i) => i,
             Value::Label(i) => i,
             Value::Pid(i) => i,
-            _ => panic!("Unimplemented to_integer for {:?}", self),
+            _ => panic!("Unimplemented to_usize for {:?}", self),
         }
     }
 }

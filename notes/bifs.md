@@ -235,10 +235,10 @@
 - [ ] ubif erlang:'/='/2			sneqeq_2
 - [x] ubif erlang:'+'/2			splus_2
 - [x] ubif erlang:'-'/2			sminus_2
-- [ ] ubif erlang:'*'/2			stimes_2
+- [x] ubif erlang:'*'/2			stimes_2
 - [ ] ubif erlang:'/'/2			div_2
-- [ ] ubif erlang:'div'/2			intdiv_2
-- [ ] ubif erlang:'rem'/2
+- [x] ubif erlang:'div'/2			intdiv_2
+- [x] ubif erlang:'rem'/2
 - [ ] ubif erlang:'bor'/2
 - [ ] ubif erlang:'band'/2
 - [ ] ubif erlang:'bxor'/2
