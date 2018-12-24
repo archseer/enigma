@@ -27,7 +27,6 @@ pub struct Module {
     pub literal_heap: Heap,
     pub lambdas: Vec<Lambda>,
     pub funs: FnvHashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
-    pub labels: FnvHashMap<usize, usize>,        // label -> offset
     pub instructions: Vec<Instruction>,
 }
 

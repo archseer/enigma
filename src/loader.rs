@@ -81,7 +81,6 @@ impl<'a> Loader<'a> {
             literal_heap: self.literal_heap,
             lambdas: self.lambdas,
             funs: self.funs,
-            labels: self.labels,
             instructions: self.instructions,
         })
     }
@@ -176,41 +175,13 @@ impl<'a> Loader<'a> {
         //self.postprocess_setup_imports()?;
     }
 
+    /// Loops twice, once to parse annotations, once to remap the args.
     fn postprocess_raw_code(&mut self) {
         // scan over the Code chunk bits, but we'll need to know bit length of each instruction.
         let (_, code) = scan_instructions(self.code).unwrap();
-        for mut instruction in code {
-            // patch local atoms into global
-            instruction.args = instruction
-                .args
-                .into_iter()
-                .map(|arg| match arg {
-                    Value::Atom(i) => {
-                        if i == 0 {
-                            return Value::Nil();
-                        }
-                        Value::Atom(self.atom_map[&(i - 1)])
-                    }
-                    // HAXX: do the same remap on extended list
-                    Value::ExtendedList(vec) => {
-                        let vec = vec
-                            .into_iter()
-                            .map(|arg| match arg {
-                                Value::Atom(i) => {
-                                    if i == 0 {
-                                        return Value::Nil();
-                                    }
-                                    Value::Atom(self.atom_map[&(i - 1)])
-                                }
-                                val => val,
-                            })
-                            .collect();
-                        Value::ExtendedList(vec)
-                    }
-                    val => val,
-                })
-                .collect();
+        let mut instructions = Vec::new();
 
+        for instruction in code {
             match &instruction.op {
                 Opcode::Line => continue, // skip for now
                 Opcode::Label => {
@@ -218,7 +189,7 @@ impl<'a> Loader<'a> {
                     if let Value::Literal(i) = instruction.args[0] {
                         // Store weak ptr to function and code offset to this label
                         // let floc = self.code.len(); // current byte length
-                        self.labels.insert(i as usize, self.instructions.len());
+                        self.labels.insert(i as usize, instructions.len());
                     } else {
                         // op_badarg_panic(op, &args, 0);
                         panic!("Bad argument to {:?}", instruction.op)
@@ -229,8 +200,8 @@ impl<'a> Loader<'a> {
                     // record function data M:F/A
                     // don't skip so we can apply tracing during runtime
                     if let [_module, Value::Atom(f), Value::Literal(a)] = &instruction.args[..] {
-                        self.funs
-                            .insert((*f as usize, *a as usize), self.instructions.len());
+                        let f = self.atom_map[&(*f - 1)]; // necessary because atoms weren't remapped yet
+                        self.funs.insert((f, *a as usize), instructions.len());
                     } else {
                         panic!("Bad argument to {:?}", instruction.op)
                     }
@@ -242,8 +213,47 @@ impl<'a> Loader<'a> {
                 _ => {}
             }
 
-            self.instructions.push(instruction);
+            instructions.push(instruction);
         }
+
+        self.instructions = instructions
+            .into_iter()
+            .map(|mut instruction| {
+                // patch local atoms into global
+                instruction.args = instruction
+                    .args
+                    .into_iter()
+                    .map(|arg| match arg {
+                        Value::Atom(i) => {
+                            if i == 0 {
+                                return Value::Nil();
+                            }
+                            Value::Atom(self.atom_map[&(i - 1)])
+                        }
+                        Value::Label(l) => Value::Label(self.labels[&l]),
+                        // HAXX: do the same remap on extended list
+                        Value::ExtendedList(vec) => {
+                            let vec = vec
+                                .into_iter()
+                                .map(|arg| match arg {
+                                    Value::Atom(i) => {
+                                        if i == 0 {
+                                            return Value::Nil();
+                                        }
+                                        Value::Atom(self.atom_map[&(i - 1)])
+                                    }
+                                    Value::Label(l) => Value::Label(self.labels[&l]),
+                                    val => val,
+                                })
+                                .collect();
+                            Value::ExtendedList(vec)
+                        }
+                        val => val,
+                    })
+                    .collect();
+                instruction
+            })
+            .collect()
     }
 }
 

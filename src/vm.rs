@@ -109,8 +109,7 @@ macro_rules! op_is_type {
 
         if !val.$op() {
             // TODO: patch the labels to point to exact offsets to avoid labels lookup
-            let l = $args[0].to_usize();
-            let fail = unsafe { (*$context.module).labels[&l] };
+            let fail = $args[0].to_usize();
 
             op_jump!($context, fail);
         }
@@ -288,8 +287,7 @@ impl Machine {
                         // TODO: this is very hacky
                         unsafe { context.x[0] = (**msg).clone(); }
                     } else {
-                        let l = self.expand_arg(context, &ins.args[0]).to_usize();
-                        let fail = unsafe { (*context.module).labels[&l] };
+                        let fail = self.expand_arg(context, &ins.args[0]).to_usize();
                         op_jump!(context, fail);
                     }
                 }
@@ -299,16 +297,14 @@ impl Machine {
 
                     process.local_data_mut().mailbox.advance();
 
-                    let l = self.expand_arg(context, &ins.args[0]).to_usize();
-                    let label = unsafe { (*context.module).labels[&l] };
+                    let label = self.expand_arg(context, &ins.args[0]).to_usize();
                     op_jump!(context, label);
                 }
                 Opcode::Wait => { // label
                     // jump to label, set wait flag on process
                     debug_assert_eq!(ins.args.len(), 1);
 
-                    let l = self.expand_arg(context, &ins.args[0]).to_usize();
-                    let label = unsafe { (*context.module).labels[&l] };
+                    let label = self.expand_arg(context, &ins.args[0]).to_usize();
                     op_jump!(context, label);
 
                     // TODO: this currently races if the process is sending us
@@ -440,8 +436,7 @@ impl Machine {
                     if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(&v2) {
                         // ok
                     } else {
-                        let l = self.expand_arg(context, &ins.args[0]).to_usize();
-                        let fail = unsafe { (*context.module).labels[&l] };
+                        let fail = self.expand_arg(context, &ins.args[0]).to_usize();
                         op_jump!(context, fail);
                     }
                 }
@@ -454,8 +449,7 @@ impl Machine {
                     if let Some(std::cmp::Ordering::Equal) = v1.partial_cmp(&v2) {
                         // ok
                     } else {
-                        let l = self.expand_arg(context, &ins.args[0]).to_usize();
-                        let fail = unsafe { (*context.module).labels[&l] };
+                        let fail = self.expand_arg(context, &ins.args[0]).to_usize();
                         op_jump!(context, fail);
                     }
                 }
@@ -473,12 +467,11 @@ impl Machine {
                 Opcode::IsTuple        => { op_is_type!(self, context, ins.args, is_tuple) }
                 Opcode::TestArity => {
                     // check tuple arity 
-                    if let [Value::Label(l), arg, Value::Literal(arity)] = &ins.args[..] {
+                    if let [Value::Label(fail), arg, Value::Literal(arity)] = &ins.args[..] {
                         if let Value::Tuple(t) = self.expand_arg(context, arg) {
                             unsafe {
                                 if (**t).len() != *arity {
-                                    let fail = unsafe { (*context.module).labels[&l] };
-                                    op_jump!(context, fail);
+                                    op_jump!(context, *fail);
                                 }
                             }
                         } else {
@@ -492,14 +485,13 @@ impl Machine {
                 Opcode::SelectVal => {
                     // arg, fail, dests
                     // loop over dests
-                    if let [arg, Value::Label(l), Value::ExtendedList(vec)] = &ins.args[..] {
+                    if let [arg, Value::Label(fail), Value::ExtendedList(vec)] = &ins.args[..] {
                         let arg = self.expand_arg(context, arg);
                         let mut i = 0;
                         loop {
                             // if key matches, jump to the following label
                             if vec[i] == arg {
-                                let l = vec[i+1].to_usize();
-                                let label = unsafe { (*context.module).labels[&l] };
+                                let label = vec[i+1].to_usize();
                                 op_jump!(context, label);
                                 break;
                             }
@@ -508,8 +500,7 @@ impl Machine {
 
                             // if we ran out of options, jump to fail
                             if i >= vec.len() {
-                                let fail = unsafe { (*context.module).labels[&l] };
-                                op_jump!(context, fail);
+                                op_jump!(context, *fail);
                                 break;
                             }
                         }
