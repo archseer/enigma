@@ -230,7 +230,12 @@ impl<'a> Loader<'a> {
                             }
                             Value::Atom(self.atom_map[&(i - 1)])
                         }
-                        Value::Label(l) => Value::Label(self.labels[&l]),
+                        Value::Label(l) => {
+                            if l == 0 {
+                                return Value::Label(0);
+                            }
+                            Value::Label(self.labels[&l])
+                        }
                         // HAXX: do the same remap on extended list
                         Value::ExtendedList(vec) => {
                             let vec = vec

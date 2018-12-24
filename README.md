@@ -45,7 +45,6 @@ crashes, but a basic spawn + send multi-process model already works.
 - [ ] deep term comparison
 - [ ] GC!
 - [ ] exports global table? that way we can call any method
-- [ ] directly embed labels as ip positions (no more lookups)
 - [ ] directly embed imports as some form of a pointer reference
 
 - focus on getting preloaded modules to load: {:preLoaded,

@@ -547,6 +547,8 @@ impl Machine {
                         ];
                         let val = unsafe { bif::apply(self, process, &(*context.module).imports[*i], &args[..]) };
 
+                        // TODO: consume fail label if not 0
+
                         set_register!(context, &ins.args[5], val)
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
