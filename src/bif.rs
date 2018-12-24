@@ -24,6 +24,7 @@ static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::i_from_str("-"), 2), Box::new(bif_erlang_sub_2));
     bifs.insert((erlang, atom::i_from_str("*"), 2), Box::new(bif_erlang_mult_2));
     bifs.insert((erlang, atom::i_from_str("div"), 2), Box::new(bif_erlang_intdiv_2));
+    bifs.insert((erlang, atom::i_from_str("rem"), 2), Box::new(bif_erlang_mod_2));
     bifs.insert((erlang, atom::i_from_str("spawn"), 3), Box::new(bif_erlang_spawn_3));
     bifs.insert((erlang, atom::i_from_str("self"), 0), Box::new(bif_erlang_self_0));
     bifs.insert((erlang, atom::i_from_str("send"), 2), Box::new(bif_erlang_send_2));
@@ -115,4 +116,70 @@ fn bif_erlang_send_2(vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> B
         .unwrap()
         .clone();
     Ok(res)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_bif_erlang_add_2() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+        let args = vec![Value::Integer(1), Value::Integer(2)];
+        let res = bif_erlang_add_2(&vm, &process, &args);
+        assert_eq!(res, Ok(Value::Integer(3)));
+    }
+
+    #[test]
+    fn test_bif_erlang_sub_2() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+        let args = vec![Value::Integer(2), Value::Integer(1)];
+        let res = bif_erlang_sub_2(&vm, &process, &args);
+        assert_eq!(res, Ok(Value::Integer(1)));
+    }
+
+    #[test]
+    fn test_bif_erlang_mult_2() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+        let args = vec![Value::Integer(2), Value::Integer(4)];
+        let res = bif_erlang_mult_2(&vm, &process, &args);
+        assert_eq!(res, Ok(Value::Integer(8)));
+    }
+
+    #[test]
+    fn test_bif_erlang_intdiv_2() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+        let args = vec![Value::Integer(8), Value::Integer(4)];
+        let res = bif_erlang_intdiv_2(&vm, &process, &args);
+        assert_eq!(res, Ok(Value::Integer(2)));
+    }
+
+    #[test]
+    fn test_bif_erlang_mod_2() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+        let args = vec![Value::Integer(4), Value::Integer(3)];
+        let res = bif_erlang_mod_2(&vm, &process, &args);
+        assert_eq!(res, Ok(Value::Integer(1)));
+    }
+
+    #[test]
+    fn test_bif_erlang_self_0() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+        let args = vec![];
+        let res = bif_erlang_self_0(&vm, &process, &args);
+        assert_eq!(res, Ok(Value::Pid(process.pid)));
+    }
+
+    // TODO: test send_2
 }
