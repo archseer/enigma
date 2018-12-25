@@ -538,9 +538,31 @@ impl Machine {
                     let cons = context.heap.alloc(value::Cons { head, tail });
                     set_register!(context, &ins.args[2], Value::List(cons))
                 }
+                Opcode::PutTuple => {
+                    // put_tuple dest size
+                    // followed by multiple put() ops (put val [potentially regX/Y])
+                    panic!("Unimplemented PutTuple")
+                }
+                Opcode::GcBif1 => {
+                    // fail label, live, bif, arg1, dest
+                    if let Value::Literal(i) = &ins.args[2] {
+                        // TODO: GcBif needs to handle GC as necessary
+                        let args = vec![
+                            self.expand_arg(context, &ins.args[3]).clone(),
+                        ];
+                        let val = unsafe { bif::apply(self, process, &(*context.module).imports[*i], &args[..]).unwrap() }; // TODO: handle fail
+
+                        // TODO: consume fail label if not 0
+
+                        set_register!(context, &ins.args[4], val)
+                    } else {
+                        panic!("Bad argument to {:?}", ins.op)
+                    }
+                }
                 Opcode::GcBif2 => {
                     // fail label, live, bif, arg1, arg2, dest
                     if let Value::Literal(i) = &ins.args[2] {
+                        // TODO: GcBif needs to handle GC as necessary
                         let args = vec![
                             self.expand_arg(context, &ins.args[3]).clone(),
                             self.expand_arg(context, &ins.args[4]).clone(),
@@ -553,6 +575,14 @@ impl Machine {
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
+                }
+                Opcode::Trim => {
+                    // trim N, _remain
+                    // drop N words from stack, (but keeping the CP). Second arg unused?
+                    let nwords = ins.args[0].to_usize();
+                    let cp = context.stack.pop().unwrap();
+                    context.stack.truncate(context.stack.len() - nwords);
+                    context.stack.push(cp);
                 }
                 opcode => println!("Unimplemented opcode {:?}", opcode),
             }

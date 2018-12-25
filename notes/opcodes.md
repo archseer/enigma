@@ -54,7 +54,7 @@
 - [ ] GetList = 65
 - [x] GetTupleElement = 66
 - [ ] SetTupleElement = 67
-- [ ] PutList = 69
+- [x] PutList = 69
 - [ ] PutTuple = 70
 - [ ] Put = 71
 - [ ] Badmatch = 72
@@ -96,7 +96,7 @@
 - [ ] BsTestTail2 = 121
 - [ ] BsSave2 = 122
 - [ ] BsRestore2 = 123
-- [ ] GcBif1 = 124
+- [x] GcBif1 = 124
 - [x] GcBif2 = 125
 - [ ] IsBitstr = 129
 - [ ] BsContextToBinary = 130
@@ -105,7 +105,7 @@
 - [ ] BsInitWritable = 133
 - [ ] BsAppend = 134
 - [ ] BsPrivateAppend = 135
-- [ ] Trim = 136
+- [x] Trim = 136
 - [ ] BsInitBits = 137
 - [ ] BsGetUtf8 = 138
 - [ ] BsSkipUtf8 = 139
