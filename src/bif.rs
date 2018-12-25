@@ -313,7 +313,7 @@ fn bif_erlang_get_1(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> B
     let pdict = &process.local_data_mut().dictionary;
     Ok(pdict
         .get(&(args[0]))
-        .map(|val| val.clone()) // TODO: try to avoid the clone if possible
+        .cloned() // TODO: try to avoid the clone if possible
         .unwrap_or_else(|| Value::Atom(atom::UNDEFINED)))
 }
 

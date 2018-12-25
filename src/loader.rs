@@ -235,12 +235,12 @@ impl<'a> Loader<'a> {
                         if *l == 0 {
                             return Value::Label(0);
                         }
-                        Value::Label(labels[&l])
+                        Value::Label(labels[l])
                     }
                     // HAXX: do the same remap on extended list
                     Value::ExtendedList(vec) => {
                         let vec = vec
-                            .into_iter()
+                            .iter()
                             .map(|arg| match arg {
                                 Value::Atom(i) => {
                                     if *i == 0 {
@@ -248,7 +248,7 @@ impl<'a> Loader<'a> {
                                     }
                                     Value::Atom(atom_map[&(i - 1)])
                                 }
-                                Value::Label(l) => Value::Label(labels[&l]),
+                                Value::Label(l) => Value::Label(labels[l]),
                                 val => val.clone(),
                             })
                             .collect();

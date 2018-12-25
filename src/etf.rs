@@ -1,11 +1,9 @@
 use crate::atom;
 use crate::immix::Heap;
 use crate::value::{self, Value};
-use allocator_api::Layout;
 use nom::*;
 use num::traits::ToPrimitive;
 use num_bigint::{BigInt, Sign};
-use std::ptr::NonNull;
 
 /// External Term Format parser
 
