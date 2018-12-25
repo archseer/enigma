@@ -41,7 +41,6 @@ crashes, but a basic spawn + send multi-process model already works.
 # TODO
 
 - [ ] full external term representation
-- [ ] bignum math
 - [ ] deep term comparison
 - [ ] GC!
 - [ ] exports global table? that way we can call any method

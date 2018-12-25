@@ -22,7 +22,7 @@ pub struct ExecutionContext {
     // program pointer/reference?
     pub ip: usize,
     // continuation pointer
-    pub cp: isize, // TODO: ?!, isize is lossy here
+    pub cp: Option<usize>,
     pub live: usize,
     // pointer to the current code
     pub module: *const Module,
@@ -36,7 +36,7 @@ impl ExecutionContext {
                 stack: Vec::new(),
                 heap: Heap::new(),
                 ip: 0,
-                cp: -1,
+                cp: None,
                 live: 0,
 
                 // register: Register::new(block.code.registers as usize),

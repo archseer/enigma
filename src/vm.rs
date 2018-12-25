@@ -87,12 +87,13 @@ macro_rules! op_call_ext {
 
 macro_rules! op_return {
     ($context:expr) => {{
-        if $context.cp == -1 {
+        if let Some(i) = $context.cp {
+            op_jump!($context, i);
+            $context.cp = None;
+        } else {
             println!("Process exited with normal, x0: {}", $context.x[0]);
             break;
         }
-        op_jump!($context, $context.cp as usize);
-        $context.cp = -1;
     }};
 }
 
@@ -332,7 +333,7 @@ impl Machine {
                     //literal arity, label jmp
                     // store arity as live
                     if let [Value::Literal(_a), Value::Label(i)] = &ins.args[..] {
-                        context.cp = context.ip as isize;
+                        context.cp = Some(context.ip);
                         op_jump!(context, *i - 1);
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
@@ -343,7 +344,7 @@ impl Machine {
                     //literal arity, literal destination (module.imports index)
                     if let [Value::Literal(arity), Value::Literal(dest)] = &ins.args[..] {
                         // save pointer onto CP
-                        context.cp = context.ip as isize;
+                        context.cp = Some(context.ip);
 
                         op_call_ext!(self, context, process, arity, dest);
                     } else {

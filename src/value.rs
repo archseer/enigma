@@ -41,7 +41,7 @@ pub enum Value {
     FloatReg(usize),
     AllocList(u64),
     ExtendedLiteral(usize), // TODO; replace at load time
-    CP(isize),              // continuation pointer
+    CP(Option<usize>),      // continuation pointer
 }
 
 #[derive(Debug)]
