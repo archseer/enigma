@@ -6,6 +6,7 @@ pub use crate::process_table::PID;
 use crate::value::Value;
 use crate::vm::RcState;
 use std::cell::UnsafeCell;
+use std::collections::HashMap;
 use std::panic::RefUnwindSafe;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -62,6 +63,9 @@ pub struct LocalData {
 
     /// The ID of the thread this process is pinned to.
     pub thread_id: Option<u8>,
+
+    /// A [process dictionary](https://www.erlang.org/course/advanced#dict)
+    pub dictionary: HashMap<Value, Value>,
 }
 
 pub struct Process {
@@ -93,6 +97,7 @@ impl Process {
             context: Box::new(context),
             mailbox: Mailbox::new(),
             thread_id: None,
+            dictionary: HashMap::new(),
         };
 
         Arc::new(Process {

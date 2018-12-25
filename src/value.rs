@@ -1,13 +1,26 @@
 // use crate::arc_without_weak::ArcWithoutWeak;
 use crate::atom;
+use crate::immix::Heap;
 use crate::module;
 use crate::process;
+use allocator_api::Layout;
 use num::bigint::BigInt;
+use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
 
-#[allow(dead_code)]
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
+// annoying: we have to wrap Floats to be able to define hash
+pub struct Float(pub f64);
+impl Eq for Float {}
+impl Hash for Float {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        panic!("Don't use floats as hash keys")
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Clone, Hash)]
 pub enum Value {
     // Immediate values
     Nil(), // also known as nil
@@ -18,7 +31,7 @@ pub enum Value {
     Pid(process::PID),
     Port(),
     Ref(),
-    Float(f64),
+    Float(self::Float),
     // Extended values (on heap)
     List(*const self::Cons),
     Tuple(*const self::Tuple), // TODO: allocate on custom heap
@@ -254,6 +267,20 @@ impl std::fmt::Display for Value {
             v => write!(f, "({:?})", v),
         }
     }
+}
+
+pub fn tuple(heap: &Heap, len: usize) -> &mut Tuple {
+    let layout = Layout::new::<Value>().repeat(len).unwrap().0;
+    let tuple = heap.alloc(self::Tuple {
+        len,
+        ptr: NonNull::dangling(),
+    });
+    tuple.ptr = heap.alloc_layout(layout).cast();
+    tuple
+}
+
+pub fn cons(heap: &Heap, head: Value, tail: Value) -> Value {
+    Value::List(heap.alloc(self::Cons { head, tail }))
 }
 
 // /// A pointer to a value managed by the GC.

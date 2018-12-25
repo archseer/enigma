@@ -18,8 +18,8 @@
 - [ ] bif erlang:display_string/1
 - [ ] bif erlang:display_nl/0
 - [ ] ubif erlang:element/2
-- [ ] bif erlang:erase/0
-- [ ] bif erlang:erase/1
+- [x] bif erlang:erase/0
+- [x] bif erlang:erase/1
 - [ ] bif erlang:exit/1
 - [ ] bif erlang:exit/2
 - [ ] bif erlang:exit_signal/2
@@ -30,9 +30,9 @@
 - [ ] bif erlang:float_to_list/2
 - [ ] bif erlang:fun_info/2
 - [ ] bif erts_internal:garbage_collect/1
-- [ ] bif erlang:get/0
-- [ ] bif erlang:get/1
-- [ ] bif erlang:get_keys/1
+- [x] bif erlang:get/0
+- [x] bif erlang:get/1
+- [x] bif erlang:get_keys/1
 - [ ] bif erlang:group_leader/0
 - [ ] bif erts_internal:group_leader/2
 - [ ] bif erts_internal:group_leader/3
@@ -87,7 +87,7 @@
 - [ ] bif erlang:process_info/1
 - [ ] bif erlang:process_info/2
 - [ ] bif erlang:processes/0
-- [ ] bif erlang:put/2
+- [x] bif erlang:put/2
 - [ ] bif erlang:register/2
 - [ ] bif erlang:registered/0
 - [ ] ubif erlang:round/1
@@ -514,7 +514,7 @@
 - [ ] bif erlang:fun_info_mfa/1
 
 #### New in 18.0
-- [ ] bif erlang:get_keys/0
+- [x] bif erlang:get_keys/0
 - [ ] bif ets:update_counter/4
 - [ ] bif erts_debug:map_info/1
 

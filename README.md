@@ -40,9 +40,25 @@ crashes, but a basic spawn + send multi-process model already works.
 
 # TODO
 
-- [ ] full external term representation
+- [x] Process Dictionary
+- [ ] PutTuple
+- [ ] lists module
+- [ ] Date/Time (non monotonic) via https://github.com/chronotope/chrono
+- [ ] Timers
+- [ ] Cross-module calls (need to store module in ip/cp)
+- [ ] try/catch/raise/etc.
+- [ ] Binaries
+- [ ] Equality ops
+- [ ] float registers
+- [ ] Ports
+- [ ] Monitors
+- [ ] Maps
+- [ ] File IO base NIF http://erlang.org/doc/man/erl_nif.html
+- [ ] Full External Term Representation
+- [ ] ETS
 - [ ] deep term comparison
 - [ ] GC!
+- [ ] Tracing/debugging support
 - [ ] exports global table? that way we can call any method
 - [ ] directly embed imports as some form of a pointer reference
 

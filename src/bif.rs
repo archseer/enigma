@@ -3,7 +3,7 @@ use crate::module;
 use crate::numeric::division::{FlooredDiv, OverflowingFlooredDiv};
 use crate::numeric::modulo::{Modulo, OverflowingModulo};
 use crate::process::{self, RcProcess};
-use crate::value::Value;
+use crate::value::{self, Value};
 use crate::vm;
 use fnv::FnvHashMap;
 use num::bigint::BigInt;
@@ -55,6 +55,14 @@ static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((math, atom::i_from_str("log10"), 1), Box::new(bif_math_log10_1));
     bifs.insert((math, atom::i_from_str("sqrt"), 1), Box::new(bif_math_sqrt_1));
     bifs.insert((math, atom::i_from_str("atan2"), 2), Box::new(bif_math_atan2_2));
+    // pdict
+    bifs.insert((erlang, atom::i_from_str("get"), 0), Box::new(bif_erlang_get_0));
+    bifs.insert((erlang, atom::i_from_str("get"), 1), Box::new(bif_erlang_get_1));
+    bifs.insert((erlang, atom::i_from_str("get_keys"), 0), Box::new(bif_erlang_get_keys_0));
+    bifs.insert((erlang, atom::i_from_str("get_keys"), 1), Box::new(bif_erlang_get_keys_1));
+    bifs.insert((erlang, atom::i_from_str("put"), 2), Box::new(bif_erlang_put_2));
+    bifs.insert((erlang, atom::i_from_str("erase"), 0), Box::new(bif_erlang_erase_0));
+    bifs.insert((erlang, atom::i_from_str("erase"), 1), Box::new(bif_erlang_erase_1));
     bifs
 };
 
@@ -194,11 +202,11 @@ macro_rules! trig_func {
 ) => {{
         let res = match $arg {
             Value::Integer(i) => i as f64, // TODO: potentially unsafe
-            Value::Float(f) => f,
+            Value::Float(value::Float(f)) => f,
             Value::BigInt(..) => panic!("Unimplemented math function for BigInt"),
             _ => return Err("argument error".to_string()),
         };
-        Ok(Value::Float(res.$op()))
+        Ok(Value::Float(value::Float(res.$op())))
     }};
 }
 
@@ -268,17 +276,107 @@ fn bif_math_sqrt_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> B
 fn bif_math_atan2_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     let res = match args[0] {
         Value::Integer(i) => i as f64, // TODO: potentially unsafe
-        Value::Float(f) => f,
+        Value::Float(value::Float(f)) => f,
         Value::BigInt(..) => panic!("Unimplemented math function for BigInt"),
         _ => return Err("argument error".to_string()),
     };
     let arg = match args[1] {
         Value::Integer(i) => i as f64, // TODO: potentially unsafe
-        Value::Float(f) => f,
+        Value::Float(value::Float(f)) => f,
         Value::BigInt(..) => panic!("Unimplemented math function for BigInt"),
         _ => return Err("argument error".to_string()),
     };
-    Ok(Value::Float(res.atan2(arg)))
+    Ok(Value::Float(value::Float(res.atan2(arg))))
+}
+
+// Process dictionary
+
+/// Get the whole pdict.
+fn bif_erlang_get_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Value]) -> BifResult {
+    let pdict = &process.local_data_mut().dictionary;
+    let heap = &process.context_mut().heap;
+
+    let result: Value = pdict.iter().fold(Value::Nil(), |res, (key, val)| {
+        // make tuple
+        let tuple = value::tuple(heap, 2);
+        tuple[0] = key.clone();
+        tuple[1] = val.clone();
+
+        // make cons
+        value::cons(heap, Value::Tuple(tuple), res)
+    });
+    Ok(result)
+}
+
+/// Get the value for key in pdict.
+fn bif_erlang_get_1(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
+    let pdict = &process.local_data_mut().dictionary;
+    Ok(pdict
+        .get(&(args[0]))
+        .map(|val| val.clone()) // TODO: try to avoid the clone if possible
+        .unwrap_or_else(|| Value::Atom(atom::UNDEFINED)))
+}
+
+/// Get all the keys in pdict.
+fn bif_erlang_get_keys_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Value]) -> BifResult {
+    let pdict = &process.local_data_mut().dictionary;
+    let heap = &process.context_mut().heap;
+
+    let result: Value = pdict
+        .keys()
+        .fold(Value::Nil(), |res, key| value::cons(heap, key.clone(), res));
+    Ok(result)
+}
+
+/// Return all the keys that have val
+fn bif_erlang_get_keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
+    let pdict = &process.local_data_mut().dictionary;
+    let heap = &process.context_mut().heap;
+
+    let result: Value = pdict.iter().fold(Value::Nil(), |res, (key, val)| {
+        if args[1] == *val {
+            value::cons(heap, key.clone(), res)
+        } else {
+            res
+        }
+    });
+    Ok(result)
+}
+
+/// Set the key to val. Return undefined if a key was inserted, or old val if it was updated.
+fn bif_erlang_put_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
+    let pdict = &mut process.local_data_mut().dictionary;
+    Ok(pdict
+        .insert(args[0].clone(), args[1].clone())
+        .unwrap_or_else(|| Value::Atom(atom::UNDEFINED)))
+}
+
+/// Remove all pdict entries, returning the pdict.
+fn bif_erlang_erase_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Value]) -> BifResult {
+    // deletes all the entries, returning the whole dict tuple
+    let pdict = &mut process.local_data_mut().dictionary;
+    let heap = &process.context_mut().heap;
+
+    // we use drain since it means we do a move instead of a copy
+    let result: Value = pdict.drain().fold(Value::Nil(), |res, (key, val)| {
+        // make tuple
+        let tuple = value::tuple(heap, 2);
+        tuple[0] = key;
+        tuple[1] = val;
+
+        // make cons
+        value::cons(heap, Value::Tuple(tuple), res)
+    });
+    Ok(result)
+}
+
+/// Remove a single entry from the pdict and return it.
+fn bif_erlang_erase_1(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
+    // deletes a single entry, returning the val
+    let pdict = &mut process.local_data_mut().dictionary;
+    Ok(pdict
+        .remove(&(args[0]))
+        .unwrap_or_else(|| Value::Atom(atom::UNDEFINED)))
 }
 
 #[cfg(test)]
@@ -369,10 +467,40 @@ mod tests {
         let process = process::allocate(&vm.state, module).unwrap();
         let args = vec![Value::Integer(1)];
         let res = bif_math_cos_1(&vm, &process, &args);
-        assert_eq!(res, Ok(Value::Float(1.0_f64.cos())));
+        assert_eq!(res, Ok(Value::Float(value::Float(1.0_f64.cos()))));
 
-        let args = vec![Value::Float(1.0)];
+        let args = vec![Value::Float(value::Float(1.0))];
         let res = bif_math_cos_1(&vm, &process, &args);
-        assert_eq!(res, Ok(Value::Float(1.0_f64.cos())));
+        assert_eq!(res, Ok(Value::Float(value::Float(1.0_f64.cos()))));
+    }
+
+    // TODO: test rest of math funcs
+
+    #[test]
+    fn test_bif_pdict() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let args = vec![Value::Atom(1), Value::Integer(2)];
+        let res = bif_erlang_put_2(&vm, &process, &args);
+        assert_eq!(res, Ok(Value::Atom(atom::UNDEFINED)));
+
+        let args = vec![Value::Atom(1), Value::Integer(3)];
+        let res = bif_erlang_put_2(&vm, &process, &args);
+        assert_eq!(res, Ok(Value::Integer(2)));
+
+        let args = vec![Value::Atom(2), Value::Integer(1)];
+        let res = bif_erlang_put_2(&vm, &process, &args);
+        assert_eq!(res, Ok(Value::Atom(atom::UNDEFINED)));
+
+        let args = vec![Value::Atom(2)];
+        let res = bif_erlang_get_1(&vm, &process, &args);
+        assert_eq!(res, Ok(Value::Integer(1)));
+
+        // TODO: add a assert helper for lists
+        let args = vec![];
+        let res = bif_erlang_get_0(&vm, &process, &args);
+        assert_eq!(res, Ok(Value::Integer(1)));
     }
 }

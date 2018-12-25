@@ -122,11 +122,13 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("nil");   // 0
     atoms.register_atom("true");  // 1
     atoms.register_atom("false"); // 2
+    atoms.register_atom("undefined"); // 3
     atoms
 };
 
 pub const TRUE: usize = 1;
 pub const FALSE: usize = 2;
+pub const UNDEFINED: usize = 3;
 
 pub fn from_str(val: &str) -> Value {
     ATOMS.from_str(val)

@@ -110,20 +110,12 @@ pub fn decode_atom(rest: &[u8]) -> IResult<&[u8], Value> {
 }
 
 pub fn decode_tuple<'a>(rest: &'a [u8], len: usize, heap: &Heap) -> IResult<&'a [u8], Value> {
-    let mut tuple = heap.alloc(value::Tuple {
-        len,
-        ptr: NonNull::dangling(),
-    });
-
     // alloc space for elements
-    let layout = Layout::new::<Value>().repeat(len).unwrap().0;
-    tuple.ptr = heap.alloc_layout(layout).cast();
-
-    let els: &mut [Value] = tuple;
+    let tuple = value::tuple(heap, len);
 
     let rest = (0..len).fold(rest, |rest, i| {
         let (rest, el) = decode_value(rest, heap).unwrap();
-        els[i] = el;
+        tuple[i] = el;
         rest
     });
 
@@ -149,7 +141,7 @@ pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> 
                     head: val,
                     tail: Value::Nil(),
                 });
-                std::mem::replace(&mut *tail, Value::List(new_cons as *const value::Cons));
+                std::mem::replace(&mut *tail, Value::List(new_cons));
                 (new_cons as *mut value::Cons, rest)
             });
 
