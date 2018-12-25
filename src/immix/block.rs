@@ -1,6 +1,6 @@
 //use std::alloc::{Alloc, Global, Layout};
 use allocator_api::{Alloc, Global, Layout};
-use std::cell::{Cell, UnsafeCell};
+use std::cell::Cell;
 use std::cmp;
 use std::mem;
 use std::ptr::{self, NonNull};

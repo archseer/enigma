@@ -6,7 +6,6 @@ use nom::*;
 use num::traits::ToPrimitive;
 use num_bigint::{BigInt, Sign};
 use std::ptr::NonNull;
-use std::sync::Arc;
 
 /// External Term Format parser
 

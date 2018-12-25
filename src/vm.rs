@@ -19,7 +19,7 @@ pub type RcState = Arc<State>;
 pub struct State {
     /// Table containing all processes.
     pub process_table: Mutex<ProcessTable<RcProcess>>,
-    /// Use priorities later on
+    /// TODO: Use priorities later on
     pub process_pool: Pool<RcProcess>,
 
     /// The start time of the VM (more or less).
@@ -28,13 +28,14 @@ pub struct State {
 
 #[derive(Clone)]
 pub struct Machine {
+    /// VM internal state
     pub state: RcState,
 
     // env config, arguments, panic handler
 
     // atom table is accessible globally as ATOMS
     // export table
-    // module table
+    /// Module registry
     pub modules: RcModuleRegistry,
 }
 
@@ -215,7 +216,7 @@ impl Machine {
             Value::ExtendedLiteral(i) => unsafe { &(*context.module).literals[*i] },
             Value::X(i) => &context.x[*i],
             Value::Y(i) => &context.stack[context.stack.len() - (*i + 2)],
-            value => &value,
+            value => value,
         }
     }
 
@@ -446,7 +447,7 @@ impl Machine {
                     let v1 = self.expand_arg(context, &ins.args[1]);
                     let v2 = self.expand_arg(context, &ins.args[2]);
 
-                    if let Some(std::cmp::Ordering::Equal) = v1.partial_cmp(&v2) {
+                    if let Some(std::cmp::Ordering::Equal) = v1.partial_cmp(v2) {
                         // ok
                     } else {
                         let fail = self.expand_arg(context, &ins.args[0]).to_usize();

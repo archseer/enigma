@@ -3,7 +3,7 @@ use crate::mailbox::Mailbox;
 use crate::module::Module;
 use crate::pool::Job;
 pub use crate::process_table::PID;
-use crate::value::{self, Value};
+use crate::value::Value;
 use crate::vm::RcState;
 use std::cell::UnsafeCell;
 use std::panic::RefUnwindSafe;

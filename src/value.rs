@@ -4,7 +4,6 @@ use crate::process;
 use num::bigint::BigInt;
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
-use std::sync::Arc;
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
@@ -199,9 +198,7 @@ impl std::fmt::Display for Value {
             Value::Tuple(t) => unsafe {
                 write!(f, "{{")?;
                 let slice: &[Value] = &(**t);
-                slice.iter().for_each(|val| {
-                    write!(f, "{}, ", val);
-                });
+                slice.iter().for_each(|val| write!(f, "{}, ", val).unwrap());
                 write!(f, "}}")
             },
             Value::List(c) => unsafe {
