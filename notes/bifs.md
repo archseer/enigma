@@ -269,7 +269,7 @@
 - [x] ubif erlang:is_port/1
 - [x] ubif erlang:is_reference/1
 - [ ] ubif erlang:is_binary/1
-- [ ] ubif erlang:is_function/1
+- [x] ubif erlang:is_function/1
 - [ ] ubif erlang:is_function/2
 - [ ] ubif erlang:is_record/2
 - [ ] ubif erlang:is_record/3
@@ -381,7 +381,7 @@
 #### New Bifs in R10B.
 - [ ] bif erlang:get_module_info/1
 - [ ] bif erlang:get_module_info/2
-- [ ] ubif erlang:is_boolean/1
+- [x] ubif erlang:is_boolean/1
 - [ ] bif string:list_to_integer/1
 - [ ] bif string:list_to_float/1
 - [ ] bif erlang:make_fun/3

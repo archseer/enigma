@@ -34,6 +34,8 @@ static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::i_from_str("is_number"), 1), Box::new(bif_erlang_is_number_1));
     bifs.insert((erlang, atom::i_from_str("is_port"), 1), Box::new(bif_erlang_is_port_1));
     bifs.insert((erlang, atom::i_from_str("is_reference"), 1), Box::new(bif_erlang_is_reference_1));
+    bifs.insert((erlang, atom::i_from_str("is_function"), 1), Box::new(bif_erlang_is_function_1));
+    bifs.insert((erlang, atom::i_from_str("is_boolean"), 1), Box::new(bif_erlang_is_boolean_1));
     // math
     let math = atom::i_from_str("math");
     bifs.insert((math, atom::i_from_str("cos"), 1), Box::new(bif_math_cos_1));
@@ -176,6 +178,14 @@ fn bif_erlang_is_reference_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Va
 }
 
 // TODO: is_binary, is_function, is_record
+
+fn bif_erlang_is_function_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    Ok(Value::boolean(args[0].is_function()))
+}
+
+fn bif_erlang_is_boolean_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    Ok(Value::boolean(args[0].is_boolean()))
+}
 
 macro_rules! trig_func {
     (

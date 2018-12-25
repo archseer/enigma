@@ -179,6 +179,20 @@ impl Value {
         }
     }
 
+    pub fn is_function(&self) -> bool {
+        match *self {
+            Value::Closure(..) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_boolean(&self) -> bool {
+        match *self {
+            Value::Atom(atom::TRUE) | Value::Atom(atom::FALSE) => true,
+            _ => false,
+        }
+    }
+
     pub fn to_usize(&self) -> usize {
         match *self {
             Value::Literal(i) => i,

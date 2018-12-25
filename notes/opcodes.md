@@ -60,8 +60,8 @@
 - [ ] Badmatch = 72
 - [ ] IfEnd = 73
 - [ ] CaseEnd = 74
-- [ ] CallFun = 75
-- [ ] IsFunction = 77
+- [x] CallFun = 75
+- [x] IsFunction = 77
 - [x] CallExtOnly = 78
 - [ ] BsPutInteger = 89
 - [ ] BsPutBinary = 90
@@ -76,7 +76,7 @@
 - [ ] Fmul = 100
 - [ ] Fdiv = 101
 - [ ] Fnegate = 102
-- [ ] MakeFun2 = 103
+- [x] MakeFun2 = 103
 - [ ] Try = 104
 - [ ] TryEnd = 105
 - [ ] TryCase = 106
@@ -86,8 +86,8 @@
 - [ ] BsAdd = 111
 - [ ] Apply = 112
 - [ ] ApplyLast = 113
-- [ ] IsBoolean = 114
-- [ ] IsFunction2 = 115
+- [x] IsBoolean = 114
+- [x] IsFunction2 = 115
 - [ ] BsStartMatch2 = 116
 - [ ] BsGetInteger2 = 117
 - [ ] BsGetFloat2 = 118

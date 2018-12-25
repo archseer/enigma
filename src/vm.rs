@@ -467,8 +467,22 @@ impl Machine {
                 Opcode::IsList         => { op_is_type!(self, context, ins.args, is_list) }
                 Opcode::IsNonemptyList => { op_is_type!(self, context, ins.args, is_non_empty_list) }
                 Opcode::IsTuple        => { op_is_type!(self, context, ins.args, is_tuple) }
+                Opcode::IsFunction     => { op_is_type!(self, context, ins.args, is_function) }
+                Opcode::IsBoolean      => { op_is_type!(self, context, ins.args, is_boolean) }
+                Opcode::IsFunction2    => {
+                    if let Value::Closure(closure) = self.expand_arg(context, &ins.args[0]) {
+                        let arity = self.expand_arg(context, &ins.args[1]).to_usize();
+                        unsafe {
+                            if (**closure).mfa.2 == arity {
+                                continue;
+                            }
+                        }
+                    }
+                    let fail = self.expand_arg(context, &ins.args[2]).to_usize();
+                    op_jump!(context, fail);
+                }
                 Opcode::TestArity => {
-                    // check tuple arity 
+                    // check tuple arity
                     if let [Value::Label(fail), arg, Value::Literal(arity)] = &ins.args[..] {
                         if let Value::Tuple(t) = self.expand_arg(context, arg) {
                             unsafe {
