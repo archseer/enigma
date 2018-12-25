@@ -1,5 +1,6 @@
 // use crate::arc_without_weak::ArcWithoutWeak;
 use crate::atom;
+use crate::module;
 use crate::process;
 use num::bigint::BigInt;
 use std::ops::{Deref, DerefMut};
@@ -30,7 +31,7 @@ pub enum Value {
     /// every unique interned string there is only one object allocated.
     //InternedBinary(ArcWithoutWeak<ImmutableString>),
     BigInt(Box<BigInt>), // ArcWithoutWeak<BigInt>
-    // Closure(),
+    Closure(*const self::Closure),
     /// Special values (invalid in runtime)
     // Import(), Export(),
     Literal(usize),
@@ -50,10 +51,18 @@ pub struct Cons {
     pub tail: Value,
 }
 
+#[derive(Debug)]
 pub struct Tuple {
     /// Number of elements following the header.
     pub len: usize,
     pub ptr: NonNull<Value>,
+}
+
+#[derive(Debug)]
+pub struct Closure {
+    pub mfa: module::MFA,
+    pub ptr: usize,
+    pub binding: Option<Vec<Value>>,
 }
 
 impl Deref for Tuple {

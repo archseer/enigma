@@ -586,6 +586,48 @@ impl Machine {
                     context.stack.truncate(context.stack.len() - nwords);
                     context.stack.push(cp);
                 }
+                Opcode::MakeFun2 => {
+                    // literal n -> points to lambda
+                    // nfree means capture N x-registers into the closure
+                    let i = ins.args[0].to_usize();
+                    let lambda = unsafe { &(*context.module).lambdas[i] };
+                    println!("make_fun2 args: {:?}", lambda);
+
+                    let binding = if lambda.nfree != 0 {
+                        Some(context.x[0..(lambda.nfree as usize)].to_vec())
+                    } else {
+                        None
+                    };
+
+                    let closure = context.heap.alloc(value::Closure {
+                        mfa: (0, lambda.name as usize, lambda.arity as usize), // TODO: module_id
+                        ptr: lambda.offset,
+                        binding
+                    });
+                    context.x[0] = Value::Closure(closure);
+                }
+                Opcode::CallFun => {
+                    // literal arity
+                    let arity = ins.args[0].to_usize();
+                    if let Value::Closure(closure) = &context.x[arity] {
+                        // store ip in cp
+                        context.cp = Some(context.ip);
+                        // keep X regs set based on arity
+                        // set additional X regs based on lambda.binding
+                        // set x from 1 + arity (x0 is func, followed by call params) onwards to binding
+                        unsafe {
+                            let closure = *closure;
+                            if let Some(binding) = &(*closure).binding {
+                                // TODO: maybe we can copy_from_slice in the future
+                                context.x[arity..arity+binding.len()].clone_from_slice(&binding[..]);
+                            }
+
+                            op_jump!(context, (*closure).ptr);
+                        }
+                    } else {
+                        panic!("badarg to CallFun")
+                    }
+                }
                 opcode => println!("Unimplemented opcode {:?}", opcode),
             }
         }

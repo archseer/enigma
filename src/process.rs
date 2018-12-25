@@ -20,7 +20,7 @@ pub struct ExecutionContext {
     pub stack: Vec<Value>,
     pub heap: Heap,
     // program pointer/reference?
-    pub ip: usize,
+    pub ip: usize, // TODO: ip/cp need to store (offset as usize, *const Module)
     // continuation pointer
     pub cp: Option<usize>,
     pub live: usize,

@@ -5,8 +5,12 @@ defmodule Lambda do
     add.(1)
   end
 
-  def captures do
-    y = 2
+  def start2 do
+    sub = captures(2)
+    sub.(3)
+  end
+
+  def captures(y) do
     sub = fn x -> x - y end
   end
 end

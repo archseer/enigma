@@ -162,15 +162,17 @@ impl<'a> Loader<'a> {
 
     fn load_lambdas_table(&mut self, chunk: Chunk) {
         let (_, data) = funt_chunk(chunk).unwrap();
+        // TODO: convert at load time, if nfree == 0, then allocate as a literal --> move instruction,
+        // if captures env, then allocate a func --> make_fun2
+        //
         self.lambdas = data;
     }
 
     // TODO: return a Module
     fn prepare(&mut self) {
-        //self.stage2_fill_lambdas();
-
         self.postprocess_raw_code();
-        ////unsafe { disasm::disasm(self.code.as_slice(), None) }
+        self.postprocess_lambdas();
+
         //self.postprocess_fix_labels()?;
         //self.postprocess_setup_imports()?;
     }
@@ -179,7 +181,6 @@ impl<'a> Loader<'a> {
     fn postprocess_raw_code(&mut self) {
         // scan over the Code chunk bits, but we'll need to know bit length of each instruction.
         let (_, code) = scan_instructions(self.code).unwrap();
-        let mut instructions = Vec::new();
 
         for instruction in code {
             match &instruction.op {
@@ -189,7 +190,7 @@ impl<'a> Loader<'a> {
                     if let Value::Literal(i) = instruction.args[0] {
                         // Store weak ptr to function and code offset to this label
                         // let floc = self.code.len(); // current byte length
-                        self.labels.insert(i as usize, instructions.len());
+                        self.labels.insert(i as usize, self.instructions.len());
                     } else {
                         // op_badarg_panic(op, &args, 0);
                         panic!("Bad argument to {:?}", instruction.op)
@@ -201,7 +202,7 @@ impl<'a> Loader<'a> {
                     // don't skip so we can apply tracing during runtime
                     if let [_module, Value::Atom(f), Value::Literal(a)] = &instruction.args[..] {
                         let f = self.atom_map[&(*f - 1)]; // necessary because atoms weren't remapped yet
-                        self.funs.insert((f, *a as usize), instructions.len());
+                        self.funs.insert((f, *a as usize), self.instructions.len());
                     } else {
                         panic!("Bad argument to {:?}", instruction.op)
                     }
@@ -213,52 +214,57 @@ impl<'a> Loader<'a> {
                 _ => {}
             }
 
-            instructions.push(instruction);
+            self.instructions.push(instruction);
         }
 
-        self.instructions = instructions
-            .into_iter()
-            .map(|mut instruction| {
-                // patch local atoms into global
-                instruction.args = instruction
-                    .args
-                    .into_iter()
-                    .map(|arg| match arg {
-                        Value::Atom(i) => {
-                            if i == 0 {
-                                return Value::Nil();
-                            }
-                            Value::Atom(self.atom_map[&(i - 1)])
+        let atom_map = &self.atom_map;
+        let labels = &self.labels;
+        self.instructions.iter_mut().for_each(|instruction| {
+            // patch local atoms into global
+            instruction.args = instruction
+                .args
+                .iter()
+                .map(|arg| match arg {
+                    Value::Atom(i) => {
+                        if *i == 0 {
+                            return Value::Nil();
                         }
-                        Value::Label(l) => {
-                            if l == 0 {
-                                return Value::Label(0);
-                            }
-                            Value::Label(self.labels[&l])
+                        Value::Atom(atom_map[&(i - 1)])
+                    }
+                    Value::Label(l) => {
+                        if *l == 0 {
+                            return Value::Label(0);
                         }
-                        // HAXX: do the same remap on extended list
-                        Value::ExtendedList(vec) => {
-                            let vec = vec
-                                .into_iter()
-                                .map(|arg| match arg {
-                                    Value::Atom(i) => {
-                                        if i == 0 {
-                                            return Value::Nil();
-                                        }
-                                        Value::Atom(self.atom_map[&(i - 1)])
+                        Value::Label(labels[&l])
+                    }
+                    // HAXX: do the same remap on extended list
+                    Value::ExtendedList(vec) => {
+                        let vec = vec
+                            .into_iter()
+                            .map(|arg| match arg {
+                                Value::Atom(i) => {
+                                    if *i == 0 {
+                                        return Value::Nil();
                                     }
-                                    Value::Label(l) => Value::Label(self.labels[&l]),
-                                    val => val,
-                                })
-                                .collect();
-                            Value::ExtendedList(vec)
-                        }
-                        val => val,
-                    })
-                    .collect();
-                instruction
-            })
-            .collect()
+                                    Value::Atom(atom_map[&(i - 1)])
+                                }
+                                Value::Label(l) => Value::Label(labels[&l]),
+                                val => val.clone(),
+                            })
+                            .collect();
+                        Value::ExtendedList(vec)
+                    }
+                    val => val.clone(),
+                })
+                .collect();
+        })
+    }
+
+    fn postprocess_lambdas(&mut self) {
+        let labels = &self.labels;
+        self.lambdas.iter_mut().for_each(|lambda| {
+            lambda.offset = labels[&lambda.offset];
+        });
     }
 }
 
@@ -391,7 +397,7 @@ named!(
             index: be_u32 >>
             nfree: be_u32 >>
             ouniq: be_u32 >>
-            (Lambda { name, arity, offset, index, nfree, ouniq })
+            (Lambda { name, arity, offset: offset as usize, index, nfree, ouniq })
             )
         , count as usize) >>
         (entries)
@@ -499,12 +505,10 @@ fn parse_list(rest: &[u8]) -> IResult<&[u8], Value> {
 
 fn parse_float_reg(rest: &[u8]) -> IResult<&[u8], Value> {
     panic!("unimplemented parse_float_reg");
-    Ok((rest, Value::FloatReg(22 as usize)))
 }
 
 fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], Value> {
     panic!("unimplemented parse_alloc_list");
-    Ok((rest, Value::AllocList(22 as u64)))
 }
 
 fn parse_extended_literal(rest: &[u8]) -> IResult<&[u8], Value> {

@@ -11,7 +11,7 @@ pub type MFA = (usize, usize, usize); // function, arity, label
 pub struct Lambda {
     pub name: u32,
     pub arity: u32,
-    pub offset: u32,
+    pub offset: usize,
     pub index: u32,
     pub nfree: u32, // frozen values for closures
     pub ouniq: u32, // ?
