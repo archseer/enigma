@@ -1,17 +1,15 @@
 use crate::atom;
+use crate::module;
 use crate::numeric::division::{FlooredDiv, OverflowingFlooredDiv};
 use crate::numeric::modulo::{Modulo, OverflowingModulo};
-use num::bigint::BigInt;
-use std::ops::{Add, Mul, Sub};
-#[macro_use]
-use crate::macros::arith;
-use crate::module;
 use crate::process::{self, RcProcess};
 use crate::value::Value;
 use crate::vm;
 use fnv::FnvHashMap;
+use num::bigint::BigInt;
 use once_cell::sync::Lazy;
 use std::i32;
+use std::ops::{Add, Mul, Sub};
 
 type BifResult = Result<Value, String>;
 type BifFn = fn(&vm::Machine, &RcProcess, &[Value]) -> BifResult;
@@ -28,6 +26,14 @@ static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::i_from_str("spawn"), 3), Box::new(bif_erlang_spawn_3));
     bifs.insert((erlang, atom::i_from_str("self"), 0), Box::new(bif_erlang_self_0));
     bifs.insert((erlang, atom::i_from_str("send"), 2), Box::new(bif_erlang_send_2));
+    bifs.insert((erlang, atom::i_from_str("is_atom"), 1), Box::new(bif_erlang_is_atom_1));
+    bifs.insert((erlang, atom::i_from_str("is_list"), 1), Box::new(bif_erlang_is_list_1));
+    bifs.insert((erlang, atom::i_from_str("is_tuple"), 1), Box::new(bif_erlang_is_tuple_1));
+    bifs.insert((erlang, atom::i_from_str("is_float"), 1), Box::new(bif_erlang_is_float_1));
+    bifs.insert((erlang, atom::i_from_str("is_integer"), 1), Box::new(bif_erlang_is_integer_1));
+    bifs.insert((erlang, atom::i_from_str("is_number"), 1), Box::new(bif_erlang_is_number_1));
+    bifs.insert((erlang, atom::i_from_str("is_port"), 1), Box::new(bif_erlang_is_port_1));
+    bifs.insert((erlang, atom::i_from_str("is_reference"), 1), Box::new(bif_erlang_is_reference_1));
     bifs
 };
 
@@ -60,7 +66,7 @@ pub fn apply(
 
 /// Bif implementations
 #[inline]
-fn bif_erlang_spawn_3(vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
+fn bif_erlang_spawn_3(vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     // parent: TODO: track parent of process
     // arg[0] = atom for module
     // arg[1] = atom for function
@@ -117,6 +123,40 @@ fn bif_erlang_send_2(vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> B
         .clone();
     Ok(res)
 }
+
+fn bif_erlang_is_atom_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    Ok(Value::boolean(args[0].is_atom()))
+}
+
+fn bif_erlang_is_list_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    Ok(Value::boolean(args[0].is_list()))
+}
+
+fn bif_erlang_is_tuple_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    Ok(Value::boolean(args[0].is_tuple()))
+}
+
+fn bif_erlang_is_float_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    Ok(Value::boolean(args[0].is_float()))
+}
+
+fn bif_erlang_is_integer_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    Ok(Value::boolean(args[0].is_integer()))
+}
+
+fn bif_erlang_is_number_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    Ok(Value::boolean(args[0].is_number()))
+}
+
+fn bif_erlang_is_port_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    Ok(Value::boolean(args[0].is_port()))
+}
+
+fn bif_erlang_is_reference_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    Ok(Value::boolean(args[0].is_ref()))
+}
+
+// TODO: is_binary, is_function, is_record
 
 #[cfg(test)]
 mod tests {
@@ -182,4 +222,18 @@ mod tests {
     }
 
     // TODO: test send_2
+
+    #[test]
+    fn test_bif_erlang_is_atom_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+        let args = vec![Value::Atom(3)];
+        let res = bif_erlang_is_atom_1(&vm, &process, &args);
+        assert_eq!(res, Ok(Value::Atom(atom::TRUE)));
+
+        let args = vec![Value::Integer(3)];
+        let res = bif_erlang_is_atom_1(&vm, &process, &args);
+        assert_eq!(res, Ok(Value::Atom(atom::FALSE)));
+    }
 }

@@ -180,6 +180,13 @@ impl Value {
             _ => panic!("Unimplemented to_usize for {:?}", self),
         }
     }
+
+    pub fn boolean(value: bool) -> Self {
+        if value {
+            return Value::Atom(atom::TRUE);
+        }
+        Value::Atom(atom::FALSE)
+    }
 }
 
 impl std::fmt::Display for Value {

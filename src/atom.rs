@@ -119,11 +119,14 @@ impl AtomTable {
 
 pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     let atoms = AtomTable::new();
-    // m.insert(0, "foo");
-    // m.insert(1, "bar");
-    // m.insert(2, "baz");
+    atoms.register_atom("nil");   // 0
+    atoms.register_atom("true");  // 1
+    atoms.register_atom("false"); // 2
     atoms
 };
+
+pub const TRUE: usize = 1;
+pub const FALSE: usize = 2;
 
 pub fn from_str(val: &str) -> Value {
     ATOMS.from_str(val)

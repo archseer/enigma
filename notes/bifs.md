@@ -258,15 +258,15 @@
 - [ ] bif erlang:'--'/2		ebif_minusminus_2
 - [ ] bif erlang:subtract/2
 
-- [ ] ubif erlang:is_atom/1
-- [ ] ubif erlang:is_list/1
-- [ ] ubif erlang:is_tuple/1
-- [ ] ubif erlang:is_float/1
-- [ ] ubif erlang:is_integer/1
-- [ ] ubif erlang:is_number/1
-- [ ] ubif erlang:is_pid/1
-- [ ] ubif erlang:is_port/1
-- [ ] ubif erlang:is_reference/1
+- [x] ubif erlang:is_atom/1
+- [x] ubif erlang:is_list/1
+- [x] ubif erlang:is_tuple/1
+- [x] ubif erlang:is_float/1
+- [x] ubif erlang:is_integer/1
+- [x] ubif erlang:is_number/1
+- [x] ubif erlang:is_pid/1
+- [x] ubif erlang:is_port/1
+- [x] ubif erlang:is_reference/1
 - [ ] ubif erlang:is_binary/1
 - [ ] ubif erlang:is_function/1
 - [ ] ubif erlang:is_function/2
