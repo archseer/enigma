@@ -62,7 +62,7 @@ impl<'a> Loader<'a> {
             self.load_literals_table(chunk);
         }
         if let Some(chunk) = chunks.remove("FunT") {
-            self.load_literals_table(chunk);
+            self.load_lambdas_table(chunk);
         }
         self.load_attributes(chunks.remove("Attr").expect("Attr chunk not found!"));
         self.load_code(chunks.remove("Code").expect("Code chunk not found!"));

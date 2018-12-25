@@ -196,11 +196,11 @@ impl Machine {
         /* TEMP */
         let context = process.context_mut();
 
-        let fun = atom::i_from_str("fib");
-        let arity = 1;
-        context.x[0] = Value::Integer(23); // 28
-                                           // let fun = atom::i_from_str("start");
-                                           // let arity = 0;
+        // let fun = atom::i_from_str("fib");
+        // let arity = 1;
+        // context.x[0] = Value::Integer(23); // 28
+        let fun = atom::i_from_str("start");
+        let arity = 0;
         unsafe { op_jump!(context, (*context.module).funs[&(fun, arity)]) }
         // unsafe { println!("ins: {:?}", (*context.module).instructions) };
         /* TEMP */
