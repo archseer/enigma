@@ -160,27 +160,28 @@
 - [ ] bif erlang:bump_reductions/1
 
 #### Math
-- [ ] bif math:cos/1
-- [ ] bif math:cosh/1
-- [ ] bif math:sin/1
-- [ ] bif math:sinh/1
-- [ ] bif math:tan/1
-- [ ] bif math:tanh/1
-- [ ] bif math:acos/1
-- [ ] bif math:acosh/1
-- [ ] bif math:asin/1
-- [ ] bif math:asinh/1
-- [ ] bif math:atan/1
-- [ ] bif math:atanh/1
+- [x] bif math:cos/1
+- [x] bif math:cosh/1
+- [x] bif math:sin/1
+- [x] bif math:sinh/1
+- [x] bif math:tan/1
+- [x] bif math:tanh/1
+- [x] bif math:acos/1
+- [x] bif math:acosh/1
+- [x] bif math:asin/1
+- [x] bif math:asinh/1
+- [x] bif math:atan/1
+- [x] bif math:atanh/1
 - [ ] bif math:erf/1
 - [ ] bif math:erfc/1
 - [ ] bif math:exp/1
-- [ ] bif math:log/1
-- [ ] bif math:log2/1
-- [ ] bif math:log10/1
-- [ ] bif math:sqrt/1
+- [x] bif math:log/1
+- [x] bif math:log2/1
+- [x] bif math:log10/1
+- [x] bif math:sqrt/1
 - [ ] bif math:atan2/2
 - [ ] bif math:pow/2
+#### Timers
 - [ ] bif erlang:start_timer/3
 - [ ] bif erlang:start_timer/4
 - [ ] bif erlang:send_after/3
