@@ -103,7 +103,7 @@
 - [ ] bif erlang:throw/1
 - [ ] bif erlang:time/0
 - [x] ubif erlang:tl/1
-- [ ] ubif erlang:trunc/1
+- [x] ubif erlang:trunc/1
 - [ ] bif erlang:tuple_to_list/1
 - [x] bif erlang:universaltime/0
 - [ ] bif erlang:universaltime_to_localtime/1

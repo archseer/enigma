@@ -68,6 +68,7 @@ static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::i_from_str("is_boolean"), 1), Box::new(bif_erlang_is_boolean_1));
     bifs.insert((erlang, atom::i_from_str("hd"), 1), Box::new(bif_erlang_hd_1));
     bifs.insert((erlang, atom::i_from_str("tl"), 1), Box::new(bif_erlang_tl_1));
+    bifs.insert((erlang, atom::i_from_str("trunc"), 1), Box::new(bif_erlang_trunc_1));
     // math
     let math = atom::i_from_str("math");
     bifs.insert((math, atom::i_from_str("cos"), 1), Box::new(bif_math_cos_1));
@@ -671,6 +672,15 @@ fn bif_erlang_tl_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> B
         unsafe { return Ok((*cons).tail.clone()) }
     }
     Err("badarg".to_string())
+}
+
+fn bif_erlang_trunc_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    match &args[0] {
+        Value::Integer(i) => Ok(Value::Integer(*i)),
+        Value::Float(value::Float(f)) => Ok(Value::Float(value::Float(f.trunc()))),
+        Value::BigInt(v) => Ok(Value::BigInt(v.clone())),
+        _ => return Err("badarg".to_string()),
+    }
 }
 
 /// Swap process out after this number
