@@ -603,6 +603,24 @@ impl Machine {
                         panic!("Bad argument to {:?}", ins.op)
                     }
                 }
+                Opcode::GcBif3 => {
+                    // fail label, live, bif, arg1, arg2, arg3, dest
+                    if let Value::Literal(i) = &ins.args[2] {
+                        // TODO: GcBif needs to handle GC as necessary
+                        let args = &[
+                            self.expand_arg(context, &ins.args[3]).clone(),
+                            self.expand_arg(context, &ins.args[4]).clone(),
+                            self.expand_arg(context, &ins.args[5]).clone(),
+                        ];
+                        let val = unsafe { bif::apply(self, process, &(*context.module).imports[*i], &args[..]).unwrap() }; // TODO: handle fail
+
+                        // TODO: consume fail label if not 0
+
+                        set_register!(context, &ins.args[6], val)
+                    } else {
+                        panic!("Bad argument to {:?}", ins.op)
+                    }
+                }
                 Opcode::Trim => {
                     // trim N, _remain
                     // drop N words from stack, (but keeping the CP). Second arg unused?

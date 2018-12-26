@@ -121,7 +121,7 @@
 - [ ] OnLoad = 149
 - [ ] RecvMark = 150
 - [ ] RecvSet = 151
-- [ ] GcBif3 = 152
+- [x] GcBif3 = 152
 - [ ] Line = 153
 - [ ] PutMapAssoc = 154
 - [ ] PutMapExact = 155
