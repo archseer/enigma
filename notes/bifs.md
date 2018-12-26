@@ -1,6 +1,6 @@
 # BIFs
 
-- [ ] ubif erlang:abs/1
+- [x] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
 - [ ] bif erlang:adler32/2
 - [ ] bif erlang:adler32_combine/3
