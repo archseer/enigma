@@ -563,7 +563,7 @@ impl Machine {
                     // fail label, live, bif, arg1, dest
                     if let Value::Literal(i) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
-                        let args = vec![
+                        let args = &[
                             self.expand_arg(context, &ins.args[3]).clone(),
                         ];
                         let val = unsafe { bif::apply(self, process, &(*context.module).imports[*i], &args[..]).unwrap() }; // TODO: handle fail
@@ -579,7 +579,7 @@ impl Machine {
                     // fail label, live, bif, arg1, arg2, dest
                     if let Value::Literal(i) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
-                        let args = vec![
+                        let args = &[
                             self.expand_arg(context, &ins.args[3]).clone(),
                             self.expand_arg(context, &ins.args[4]).clone(),
                         ];
