@@ -532,6 +532,17 @@ impl Machine {
                     let val = self.expand_arg(context, &ins.args[0]);
                     set_register!(context, &ins.args[1], val.clone()) // TODO: mem::move would be preferred
                 }
+                Opcode::GetList => {
+                    // source, head, tail
+                    if let Value::List(cons) = self.expand_arg(context, &ins.args[0]) {
+                        let head = unsafe { (**cons).head.clone() };
+                        let tail = unsafe { (**cons).tail.clone() };
+                        set_register!(context, &ins.args[1], head);
+                        set_register!(context, &ins.args[2], tail);
+                    } else {
+                        panic!("badarg to GetHd")
+                    }
+                }
                 Opcode::GetTupleElement => {
                     // source, element, dest
                     let source = self.expand_arg(context, &ins.args[0]);

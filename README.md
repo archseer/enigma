@@ -40,10 +40,12 @@ crashes, but a basic spawn + send multi-process model already works.
 
 # TODO
 
+x => done, - => partial
+
 - [x] Process Dictionary
 - [ ] PutTuple
 - [-] lists module
-- [ ] Date/Time (non monotonic) via https://github.com/chronotope/chrono
+- [-] Date/Time (non monotonic) via https://github.com/chronotope/chrono
 - [ ] Equality ops
 - [ ] Timers
 - [ ] Cross-module calls (need to store module in ip/cp)

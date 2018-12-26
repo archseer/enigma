@@ -51,7 +51,7 @@
 - [ ] Catch = 62
 - [ ] CatchEnd = 63
 - [x] Move = 64
-- [ ] GetList = 65
+- [x] GetList = 65
 - [x] GetTupleElement = 66
 - [ ] SetTupleElement = 67
 - [x] PutList = 69
