@@ -212,6 +212,7 @@ impl Value {
             Value::Atom(i) => i,
             Value::Label(i) => i,
             Value::Pid(i) => i,
+            Value::Integer(i) => i as usize,
             _ => panic!("Unimplemented to_usize for {:?}", self),
         }
     }

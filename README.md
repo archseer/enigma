@@ -44,15 +44,15 @@ crashes, but a basic spawn + send multi-process model already works.
 - [ ] PutTuple
 - [ ] lists module
 - [ ] Date/Time (non monotonic) via https://github.com/chronotope/chrono
+- [ ] Equality ops
 - [ ] Timers
 - [ ] Cross-module calls (need to store module in ip/cp)
 - [ ] try/catch/raise/etc.
 - [ ] Binaries
-- [ ] Equality ops
 - [ ] float registers
 - [ ] Ports
-- [ ] Monitors
-- [ ] Maps
+- [ ] Monitors (rbtree: https://crates.io/crates/intrusive-collections)
+- [ ] Maps (small maps: tuples, large maps: https://github.com/michaelwoerister/hamt-rs)
 - [ ] File IO base NIF http://erlang.org/doc/man/erl_nif.html
 - [ ] Full External Term Representation
 - [ ] ETS

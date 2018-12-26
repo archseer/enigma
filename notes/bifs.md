@@ -343,11 +343,11 @@
 - [ ] bif re:run/3
 
 #### Bifs in lists module.
-- [ ] bif lists:member/2
+- [x] bif lists:member/2
 - [ ] bif lists:reverse/2
-- [ ] bif lists:keymember/3
-- [ ] bif lists:keysearch/3
-- [ ] bif lists:keyfind/3
+- [x] bif lists:keymember/3
+- [x] bif lists:keysearch/3
+- [x] bif lists:keyfind/3
 
 #### Bifs for debugging.
 - [ ] bif erts_debug:disassemble/1
