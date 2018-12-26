@@ -17,6 +17,7 @@ fnv = "1.0.6"
 allocator_api = "0.5.0"
 num-traits = "0.2.6"
 num-integer = "0.1.39"
+chrono = "0.4.6"
 
 # [profile.release]
 # debug = true

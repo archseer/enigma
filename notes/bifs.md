@@ -12,7 +12,7 @@
 - [ ] bif erlang:crc32/1
 - [ ] bif erlang:crc32/2
 - [ ] bif erlang:crc32_combine/3
-- [ ] bif erlang:date/0
+- [x] bif erlang:date/0
 - [ ] bif erlang:delete_module/1
 - [ ] bif erlang:display/1
 - [ ] bif erlang:display_string/1
@@ -54,7 +54,7 @@
 - [ ] bif erlang:list_to_ref/1
 - [ ] bif erlang:list_to_tuple/1
 - [ ] bif erlang:loaded/0
-- [ ] bif erlang:localtime/0
+- [x] bif erlang:localtime/0
 - [ ] bif erlang:localtime_to_universaltime/2
 - [ ] bif erlang:make_ref/0
 - [ ] bif erlang:unique_integer/0
@@ -71,9 +71,9 @@
 - [ ] ubif erlang:node/0
 - [ ] bif erlang:nodes/1
 - [ ] bif erlang:now/0
-- [ ] bif erlang:monotonic_time/0
+- [x] bif erlang:monotonic_time/0
 - [ ] bif erlang:monotonic_time/1
-- [ ] bif erlang:system_time/0
+- [x] bif erlang:system_time/0
 - [ ] bif erlang:system_time/1
 - [ ] bif erlang:time_offset/0
 - [ ] bif erlang:time_offset/1
@@ -105,7 +105,7 @@
 - [ ] ubif erlang:tl/1
 - [ ] ubif erlang:trunc/1
 - [ ] bif erlang:tuple_to_list/1
-- [ ] bif erlang:universaltime/0
+- [x] bif erlang:universaltime/0
 - [ ] bif erlang:universaltime_to_localtime/1
 - [ ] bif erlang:unlink/1
 - [ ] bif erlang:unregister/1

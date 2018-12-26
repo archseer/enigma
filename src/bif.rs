@@ -12,6 +12,29 @@ use once_cell::sync::Lazy;
 use std::i32;
 use std::ops::{Add, Mul, Sub};
 
+#[macro_export]
+macro_rules! tup2 {
+    ($heap:expr, $element1:expr, $element2:expr) => {{
+        let tuple = value::tuple($heap, 2);
+        tuple[0] = $element1;
+        tuple[1] = $element2;
+        Value::Tuple(tuple)
+    }};
+}
+
+#[macro_export]
+macro_rules! tup3 {
+    ($heap:expr, $element1:expr, $element2:expr, $element3:expr) => {{
+        let tuple = value::tuple($heap, 3);
+        tuple[0] = $element1;
+        tuple[1] = $element2;
+        tuple[1] = $element3;
+        Value::Tuple(tuple)
+    }};
+}
+
+mod chrono;
+
 type BifResult = Result<Value, String>;
 type BifFn = fn(&vm::Machine, &RcProcess, &[Value]) -> BifResult;
 type BifTable = FnvHashMap<(usize, usize, usize), Box<BifFn>>;
@@ -20,6 +43,11 @@ static BIFS: Lazy<BifTable> = sync_lazy! {
     let mut bifs: BifTable = FnvHashMap::default();
     let erlang = atom::i_from_str("erlang");
     bifs.insert((erlang, atom::i_from_str("abs"), 1), Box::new(bif_erlang_abs_1));
+    bifs.insert((erlang, atom::i_from_str("date"), 0), Box::new(chrono::bif_erlang_date_0));
+    bifs.insert((erlang, atom::i_from_str("localtime"), 0), Box::new(chrono::bif_erlang_localtime_0));
+    bifs.insert((erlang, atom::i_from_str("monotonic_time"), 0), Box::new(chrono::bif_erlang_monotonic_time_0));
+    bifs.insert((erlang, atom::i_from_str("system_time"), 0), Box::new(chrono::bif_erlang_system_time_0));
+    bifs.insert((erlang, atom::i_from_str("universaltime"), 0), Box::new(chrono::bif_erlang_universaltime_0));
     bifs.insert((erlang, atom::i_from_str("+"), 2), Box::new(bif_erlang_add_2));
     bifs.insert((erlang, atom::i_from_str("-"), 2), Box::new(bif_erlang_sub_2));
     bifs.insert((erlang, atom::i_from_str("*"), 2), Box::new(bif_erlang_mult_2));
@@ -690,15 +718,6 @@ mod tests {
         vec.into_iter()
             .rev()
             .fold(Value::Nil(), |res, val| value::cons(heap, val, res))
-    }
-
-    macro_rules! tup2 {
-        ($heap:expr, $element1:expr, $element2:expr) => {{
-            let mut tuple = value::tuple($heap, 2);
-            tuple[0] = $element1;
-            tuple[1] = $element2;
-            Value::Tuple(tuple)
-        }};
     }
 
     macro_rules! atom {

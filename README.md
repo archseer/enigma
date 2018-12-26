@@ -42,13 +42,13 @@ crashes, but a basic spawn + send multi-process model already works.
 
 - [x] Process Dictionary
 - [ ] PutTuple
-- [ ] lists module
+- [-] lists module
 - [ ] Date/Time (non monotonic) via https://github.com/chronotope/chrono
 - [ ] Equality ops
 - [ ] Timers
 - [ ] Cross-module calls (need to store module in ip/cp)
 - [ ] try/catch/raise/etc.
-- [ ] Binaries
+- [ ] Binaries (SIMD: https://github.com/AdamNiederer/faster / https://doc.rust-lang.org/1.26.0/std/simd/index.html<Paste>)
 - [ ] float registers
 - [ ] Ports
 - [ ] Monitors (rbtree: https://crates.io/crates/intrusive-collections)
