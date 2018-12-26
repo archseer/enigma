@@ -64,6 +64,7 @@ static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::i_from_str("is_number"), 1), Box::new(bif_erlang_is_number_1));
     bifs.insert((erlang, atom::i_from_str("is_port"), 1), Box::new(bif_erlang_is_port_1));
     bifs.insert((erlang, atom::i_from_str("is_reference"), 1), Box::new(bif_erlang_is_reference_1));
+    bifs.insert((erlang, atom::i_from_str("is_binary"), 1), Box::new(bif_erlang_is_binary_1));
     bifs.insert((erlang, atom::i_from_str("is_function"), 1), Box::new(bif_erlang_is_function_1));
     bifs.insert((erlang, atom::i_from_str("is_boolean"), 1), Box::new(bif_erlang_is_boolean_1));
     bifs.insert((erlang, atom::i_from_str("hd"), 1), Box::new(bif_erlang_hd_1));
@@ -248,12 +249,17 @@ fn bif_erlang_is_reference_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Va
     Ok(Value::boolean(args[0].is_ref()))
 }
 
-// TODO: is_binary, is_record
+#[inline]
+fn bif_erlang_is_binary_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    Ok(Value::boolean(args[0].is_binary()))
+}
 
 #[inline]
 fn bif_erlang_is_function_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Ok(Value::boolean(args[0].is_function()))
 }
+
+// TODO: is_function_2, is_record
 
 #[inline]
 fn bif_erlang_is_boolean_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {

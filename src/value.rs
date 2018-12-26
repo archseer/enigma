@@ -167,7 +167,12 @@ impl Value {
         }
     }
 
-    // TODO: is_binary
+    pub fn is_binary(&self) -> bool {
+        match *self {
+            Value::Binary(..) => true,
+            _ => false,
+        }
+    }
 
     pub fn is_list(&self) -> bool {
         match *self {

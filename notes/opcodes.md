@@ -40,7 +40,7 @@
 - [x] IsReference = 50
 - [x] IsPort = 51
 - [x] IsNil = 52
-- [ ] IsBinary = 53
+- [x] IsBinary = 53
 - [x] IsList = 55
 - [x] IsNonemptyList = 56
 - [x] IsTuple = 57

@@ -473,7 +473,7 @@ impl Machine {
                 Opcode::IsReference    => { op_is_type!(self, context, ins.args, is_ref) }
                 Opcode::IsPort         => { op_is_type!(self, context, ins.args, is_port) }
                 Opcode::IsNil          => { op_is_type!(self, context, ins.args, is_nil) }
-                // Opcode::IsBinary => { op_is_type!(self, context, ins.args, is_binary) }
+                Opcode::IsBinary       => { op_is_type!(self, context, ins.args, is_binary) }
                 Opcode::IsList         => { op_is_type!(self, context, ins.args, is_list) }
                 Opcode::IsNonemptyList => { op_is_type!(self, context, ins.args, is_non_empty_list) }
                 Opcode::IsTuple        => { op_is_type!(self, context, ins.args, is_tuple) }
@@ -699,7 +699,7 @@ impl Machine {
                         panic!("badarg to GetHd")
                     }
                 }
-                opcode => println!("Unimplemented opcode {:?}", opcode),
+                opcode => println!("Unimplemented opcode {:?}: {:?}", opcode, ins),
             }
         }
 

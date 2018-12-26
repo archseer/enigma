@@ -268,7 +268,7 @@
 - [x] ubif erlang:is_pid/1
 - [x] ubif erlang:is_port/1
 - [x] ubif erlang:is_reference/1
-- [ ] ubif erlang:is_binary/1
+- [x] ubif erlang:is_binary/1
 - [x] ubif erlang:is_function/1
 - [ ] ubif erlang:is_function/2
 - [ ] ubif erlang:is_record/2
