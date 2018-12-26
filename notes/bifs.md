@@ -40,7 +40,7 @@
 - [ ] bif erlang:phash/2
 - [ ] bif erlang:phash2/1
 - [ ] bif erlang:phash2/2
-- [ ] ubif erlang:hd/1
+- [x] ubif erlang:hd/1
 - [ ] bif erlang:integer_to_list/1
 - [ ] bif erlang:is_alive/0
 - [ ] ubif erlang:length/1
@@ -102,7 +102,7 @@
 - [ ] bif erlang:term_to_binary/2
 - [ ] bif erlang:throw/1
 - [ ] bif erlang:time/0
-- [ ] ubif erlang:tl/1
+- [x] ubif erlang:tl/1
 - [ ] ubif erlang:trunc/1
 - [ ] bif erlang:tuple_to_list/1
 - [x] bif erlang:universaltime/0

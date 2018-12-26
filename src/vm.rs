@@ -642,6 +642,24 @@ impl Machine {
                         panic!("badarg to CallFun")
                     }
                 }
+                Opcode::GetHd => {
+                    // source head
+                    if let Value::List(cons) = self.expand_arg(context, &ins.args[0]) {
+                        let val = unsafe { (**cons).head.clone() };
+                        set_register!(context, &ins.args[1], val);
+                    } else {
+                        panic!("badarg to GetHd")
+                    }
+                }
+                Opcode::GetTl => {
+                    // source head
+                    if let Value::List(cons) = self.expand_arg(context, &ins.args[0]) {
+                        let val = unsafe { (**cons).tail.clone() };
+                        set_register!(context, &ins.args[1], val);
+                    } else {
+                        panic!("badarg to GetHd")
+                    }
+                }
                 opcode => println!("Unimplemented opcode {:?}", opcode),
             }
         }

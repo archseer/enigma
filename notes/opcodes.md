@@ -131,8 +131,8 @@
 - [ ] IsTaggedTuple = 159
 - [ ] BuildStacktrace = 160
 - [ ] RawRaise = 161
-- [ ] GetHd = 162
-- [ ] GetTl = 163
+- [x] GetHd = 162
+- [x] GetTl = 163
 - [ ] PutTuple2 = 164
 - [ ] BsGetTail = 165
 - [ ] BsStartMatch3 = 166
