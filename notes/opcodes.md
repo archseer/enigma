@@ -5,7 +5,7 @@
 - [x] IntCodeEnd = 3
 - [x] Call = 4
 - [ ] CallLast = 5
-- [ ] CallOnly = 6
+- [x] CallOnly = 6
 - [x] CallExt = 7
 - [x] CallExtLast = 8
 - [x] Bif0 = 9

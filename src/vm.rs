@@ -340,6 +340,16 @@ impl Machine {
                     }
                     safepoint_and_reduce!(self, process, reductions);
                 }
+                Opcode::CallOnly => {
+                    //literal arity, label jmp
+                    // store arity as live
+                    if let [Value::Literal(_a), Value::Label(i)] = &ins.args[..] {
+                        op_jump!(context, *i - 1);
+                    } else {
+                        panic!("Bad argument to {:?}", ins.op)
+                    }
+                    safepoint_and_reduce!(self, process, reductions);
+                }
                 Opcode::CallExt => {
                     //literal arity, literal destination (module.imports index)
                     if let [Value::Literal(arity), Value::Literal(dest)] = &ins.args[..] {
