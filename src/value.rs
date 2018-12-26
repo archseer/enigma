@@ -1,4 +1,4 @@
-// use crate::arc_without_weak::ArcWithoutWeak;
+use crate::arc_without_weak::ArcWithoutWeak;
 use crate::atom;
 use crate::immix::Heap;
 use crate::module;
@@ -14,7 +14,7 @@ use std::ptr::NonNull;
 pub struct Float(pub f64);
 impl Eq for Float {}
 impl Hash for Float {
-    fn hash<H: Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, _state: &mut H) {
         panic!("Don't use floats as hash keys")
     }
 }
@@ -38,7 +38,7 @@ pub enum Value {
     /// Boxed values
     /// Strings use an Arc so they can be sent to other processes without
     /// requiring a full copy of the data.
-    //Binary(ArcWithoutWeak<ImmutableString>),
+    Binary(ArcWithoutWeak<String>),
 
     /// An interned string is a string allocated on the permanent space. For
     /// every unique interned string there is only one object allocated.
@@ -96,13 +96,16 @@ unsafe impl Send for Value {}
 
 unsafe impl Sync for Cons {}
 
-// TODO: maybe box binaries further:
-// // contains size, followed in memory by the data bytes
-// ProcBin { nbytes: Word } ,
-// // contains reference to heapbin
-// RefBin,
-// // stores data on a separate heap somewhere else with refcount
-// HeapBin { nbytes: Word, refc: Word },
+// Stores data on the process heap. Small, but expensive to copy.
+// HeapBin(len + ptr)
+// Stores data off the process heap, in an ArcWithoutWeak<>. Cheap to copy around.
+// RefBin(Arc<String/Vec<u8?>>)
+// ^^ start with just RefBin since Rust already will do the String management for us
+// SubBin(len (original?), offset, bitsize,bitoffset,is_writable, orig_ptr -> Bin/RefBin)
+
+// bitstring is the base model, binary is an 8-bit aligned bitstring
+// https://www.reddit.com/r/rust/comments/2d7rrj/bit_level_pattern_matching/
+// https://docs.rs/bitstring/0.1.1/bitstring/bit_string/trait.BitString.html
 
 impl Value {
     pub fn is_integer(&self) -> bool {

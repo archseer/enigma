@@ -1,3 +1,4 @@
+use crate::arc_without_weak::ArcWithoutWeak;
 use crate::atom;
 use crate::immix::Heap;
 use crate::value::{self, Value};
@@ -66,7 +67,7 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value>
         // Port
         // Pid
         Tag::String => decode_string(rest, heap),
-        // Binary
+        Tag::Binary => decode_binary(rest, heap),
         // NewFun
         // Export
         // NewReference
@@ -186,6 +187,17 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value
 
         Ok((rest, Value::List(start)))
     }
+}
+
+pub fn decode_binary<'a>(rest: &'a [u8], _heap: &Heap) -> IResult<&'a [u8], Value> {
+    let (rest, len) = be_u32(rest)?;
+    if len == 0 {
+        return Ok((rest, Value::Binary(ArcWithoutWeak::new(String::new()))));
+    }
+
+    let (rest, bytes) = take!(rest, len)?;
+    let string = std::str::from_utf8(bytes).unwrap().to_string();
+    Ok((rest, Value::Binary(ArcWithoutWeak::new(string))))
 }
 
 #[cfg(target_pointer_width = "32")]
