@@ -48,15 +48,19 @@ x => done, - => partial
 - [-] Date/Time (non monotonic) via https://github.com/chronotope/chrono
 - [ ] Equality ops
 - [ ] Timers
+- [ ] Precalculate Bif0/1/2,GcBif1/2/3 as vals that reference a bif ptr directly (no more imports+bifs hash lookups)
 - [ ] Cross-module calls (need to store module in ip/cp)
 - [ ] try/catch/raise/etc.
 - [ ] Binaries (SIMD: https://github.com/AdamNiederer/faster / https://doc.rust-lang.org/1.26.0/std/simd/index.html<Paste>)
-- [ ] float registers
+- [ ] Binary matching (multi: https://github.com/BurntSushi/aho-corasick
++ single: https://github.com/killerswan/boyer-moore-search / https://docs.rs/needle/0.1.1/needle/ / https://github.com/ethanpailes/regex/commit/d2e28f959ac384db62f7cbeba1576cf39a75b294)
+- [ ] float registers (https://pdfs.semanticscholar.org/7347/354eaaad96d40e12ea4373178b784fc39bfc.pdf)
 - [ ] Ports
 - [ ] Monitors (rbtree: https://crates.io/crates/intrusive-collections)
 - [ ] Maps (small maps: tuples, large maps: https://github.com/michaelwoerister/hamt-rs)
 - [ ] File IO base NIF http://erlang.org/doc/man/erl_nif.html
 - [ ] Full External Term Representation
+- [ ] Optimize select_val with a jump table
 - [ ] ETS
 - [ ] deep term comparison
 - [ ] GC!
@@ -64,7 +68,7 @@ x => done, - => partial
 - [ ] exports global table? that way we can call any method
 - [ ] directly embed imports as some form of a pointer reference
 
-- focus on getting preloaded modules to load: {:preLoaded,
+Focus on getting preloaded modules to load: {:preLoaded,
     [:atomics, :counters, :erl_init, :erl_prim_loader, :erl_tracer, :erlang,
      :erts_code_purger, :erts_dirty_process_signal_handler, :erts_internal,
      :erts_literal_area_collector, :init, :persistent_term, :prim_buffer,

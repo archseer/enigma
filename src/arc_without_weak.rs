@@ -4,6 +4,9 @@
 //! references are supported. This makes ArcWithoutWeak ideal for performance
 //! sensitive code where weak references are not needed.
 
+use core::fmt;
+use core::hash::{Hash, Hasher};
+use core::usize;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -73,6 +76,64 @@ impl<T> Drop for ArcWithoutWeak<T> {
                 drop(boxed);
             }
         }
+    }
+}
+
+impl<T: Hash> Hash for ArcWithoutWeak<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (**self).hash(state)
+    }
+}
+
+impl<T: PartialEq> PartialEq for ArcWithoutWeak<T> {
+    fn eq(&self, other: &ArcWithoutWeak<T>) -> bool {
+        *(*self) == *(*other)
+    }
+
+    fn ne(&self, other: &ArcWithoutWeak<T>) -> bool {
+        *(*self) != *(*other)
+    }
+}
+
+impl<T: PartialOrd> PartialOrd for ArcWithoutWeak<T> {
+    fn partial_cmp(&self, other: &ArcWithoutWeak<T>) -> Option<std::cmp::Ordering> {
+        (**self).partial_cmp(&**other)
+    }
+
+    fn lt(&self, other: &ArcWithoutWeak<T>) -> bool {
+        *(*self) < *(*other)
+    }
+
+    fn le(&self, other: &ArcWithoutWeak<T>) -> bool {
+        *(*self) <= *(*other)
+    }
+
+    fn gt(&self, other: &ArcWithoutWeak<T>) -> bool {
+        *(*self) > *(*other)
+    }
+
+    fn ge(&self, other: &ArcWithoutWeak<T>) -> bool {
+        *(*self) >= *(*other)
+    }
+}
+
+impl<T: Ord> Ord for ArcWithoutWeak<T> {
+    fn cmp(&self, other: &ArcWithoutWeak<T>) -> std::cmp::Ordering {
+        (**self).cmp(&**other)
+    }
+}
+
+impl<T: Eq> Eq for ArcWithoutWeak<T> {}
+
+impl<T: fmt::Display> fmt::Display for ArcWithoutWeak<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&**self, f)
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for ArcWithoutWeak<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&**self, f)
     }
 }
 
