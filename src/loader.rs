@@ -504,11 +504,31 @@ fn parse_list(rest: &[u8]) -> IResult<&[u8], Value> {
 }
 
 fn parse_float_reg(rest: &[u8]) -> IResult<&[u8], Value> {
-    unimplemented!()
+    let (rest, b) = be_u8(rest)?;
+    let (rest, n) = read_int(b, rest).unwrap();
+
+    Ok((rest, Value::FloatReg(n as usize)))
 }
 
 fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], Value> {
-    unimplemented!()
+    let (rest, b) = be_u8(rest)?;
+    let (mut rest, n) = read_int(b, rest).unwrap();
+    let mut els = Vec::with_capacity(n as usize);
+
+    for _i in 0..n {
+        // decode int Type (0 = words, 1 = floats, 2 = literal)
+        let (new_rest, b) = be_u8(rest)?;
+        let (new_rest, typ) = read_int(b, new_rest).unwrap();
+        // decode int Val as is, except  type = 2, get(literals, val)
+        // TODO: decide how to handle literals 2
+        let (new_rest, b) = be_u8(new_rest)?;
+        let (new_rest, val) = read_int(b, new_rest).unwrap();
+
+        els.push((typ as u8, val as usize));
+        rest = new_rest;
+    }
+
+    Ok((rest, Value::AllocList(els)))
 }
 
 fn parse_extended_literal(rest: &[u8]) -> IResult<&[u8], Value> {

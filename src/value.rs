@@ -53,7 +53,7 @@ pub enum Value {
     Label(usize),
     ExtendedList(Vec<Value>),
     FloatReg(usize),
-    AllocList(u64),
+    AllocList(Vec<(u8, usize)>),
     ExtendedLiteral(usize), // TODO; replace at load time
     CP(Option<usize>),      // continuation pointer
 }
