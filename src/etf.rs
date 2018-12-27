@@ -52,8 +52,11 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value>
     let tag: Tag = unsafe { ::std::mem::transmute(tag) };
 
     match tag {
+        Tag::NewFloat => {
+            let (rest, flt) = be_u64(rest)?;
+            Ok((rest, Value::Float(value::Float(f64::from_bits(flt)))))
+        }
         // TODO:
-        // NewFloat
         // BitBinary
         // AtomCacheRef_
         Tag::SmallInteger => {
@@ -61,8 +64,8 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value>
             // TODO store inside the pointer once we no longer copy
             Ok((rest, Value::Integer(i64::from(int))))
         }
-        // Integer
-        // Float
+        // Integer: Signed 32-bit integer in big-endian format.
+        // Float: outdated? in favour of NewFloat
         // Reference
         // Port
         // Pid
@@ -71,7 +74,7 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value>
         // NewFun
         // Export
         // NewReference
-        // SmallAtom
+        // SmallAtom (deprecated?)
         // Map
         // Fun
         // AtomU8
@@ -196,7 +199,7 @@ pub fn decode_binary<'a>(rest: &'a [u8], _heap: &Heap) -> IResult<&'a [u8], Valu
     }
 
     let (rest, bytes) = take!(rest, len)?;
-    let string = std::str::from_utf8(bytes).unwrap().to_string();
+    let string = unsafe { std::str::from_utf8_unchecked(bytes).to_string() };
     Ok((rest, Value::Binary(ArcWithoutWeak::new(string))))
 }
 
