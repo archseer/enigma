@@ -465,6 +465,17 @@ impl Machine {
                         op_jump!(context, fail);
                     }
                 }
+                Opcode::IsNe => {
+                    debug_assert_eq!(ins.args.len(), 3);
+
+                    let v1 = self.expand_arg(context, &ins.args[1]);
+                    let v2 = self.expand_arg(context, &ins.args[2]);
+
+                    if let Some(std::cmp::Ordering::Equal) = v1.partial_cmp(v2) {
+                        let fail = self.expand_arg(context, &ins.args[0]).to_usize();
+                        op_jump!(context, fail);
+                    }
+                }
                 Opcode::IsInteger      => { op_is_type!(self, context, ins.args, is_integer) }
                 Opcode::IsFloat        => { op_is_type!(self, context, ins.args, is_float) }
                 Opcode::IsNumber       => { op_is_type!(self, context, ins.args, is_number) }
