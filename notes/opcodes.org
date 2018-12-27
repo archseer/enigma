@@ -1,9 +1,9 @@
-* Opcodes [50/138]
+* Opcodes [51/138]
 - [X] Label = 1
 - [ ] FuncInfo = 2
 - [X] IntCodeEnd = 3
 - [X] Call = 4
-- [ ] CallLast = 5
+- [X] CallLast = 5
 - [X] CallOnly = 6
 - [X] CallExt = 7
 - [X] CallExtLast = 8
