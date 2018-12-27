@@ -96,7 +96,7 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value>
             decode_bignum(rest, size as usize)
         }
 
-        _ => panic!("Tag is {:?}", tag),
+        _ => unimplemented!("etf: {:?}", tag),
     }
 }
 

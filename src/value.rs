@@ -221,7 +221,7 @@ impl Value {
             Value::Label(i) => i,
             Value::Pid(i) => i,
             Value::Integer(i) => i as usize,
-            _ => panic!("Unimplemented to_usize for {:?}", self),
+            _ => unimplemented!("to_usize for {:?}", self),
         }
     }
 

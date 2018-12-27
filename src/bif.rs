@@ -274,7 +274,7 @@ macro_rules! trig_func {
         let res = match $arg {
             Value::Integer(i) => i as f64, // TODO: potentially unsafe
             Value::Float(value::Float(f)) => f,
-            Value::BigInt(..) => panic!("Unimplemented math function for BigInt"),
+            Value::BigInt(..) => unimplemented!(),
             _ => return Err("argument error".to_string()),
         };
         Ok(Value::Float(value::Float(res.$op())))
@@ -366,13 +366,13 @@ fn bif_math_atan2_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> 
     let res = match args[0] {
         Value::Integer(i) => i as f64, // TODO: potentially unsafe
         Value::Float(value::Float(f)) => f,
-        Value::BigInt(..) => panic!("Unimplemented math function for BigInt"),
+        Value::BigInt(..) => unimplemented!(),
         _ => return Err("argument error".to_string()),
     };
     let arg = match args[1] {
         Value::Integer(i) => i as f64, // TODO: potentially unsafe
         Value::Float(value::Float(f)) => f,
-        Value::BigInt(..) => panic!("Unimplemented math function for BigInt"),
+        Value::BigInt(..) => unimplemented!(),
         _ => return Err("argument error".to_string()),
     };
     Ok(Value::Float(value::Float(res.atan2(arg))))
@@ -630,7 +630,7 @@ fn bif_lists_reverse_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -
 
     // return lists_reverse_alloc(BIF_P, BIF_ARG_1, BIF_ARG_2);
 
-    Err("unimplemented!".to_string())
+    unimplemented!()
 }
 
 fn bif_lists_keymember_3(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {

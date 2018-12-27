@@ -49,7 +49,7 @@ macro_rules! set_register {
                 let len = $context.stack.len();
                 $context.stack[len - (*reg + 2)] = $value;
             }
-            reg => panic!("Unhandled register type! {:?}", reg),
+            _reg => unimplemented!(),
         }
     }};
 }
@@ -80,7 +80,7 @@ macro_rules! op_call_ext {
             set_register!($context, &Value::X(0), val); // HAXX
             op_return!($context);
         } else {
-            panic!("unhandled non-bif call heres")
+            unimplemented!()
         }
     }};
 }
@@ -589,7 +589,7 @@ impl Machine {
                 Opcode::PutTuple => {
                     // put_tuple dest size
                     // followed by multiple put() ops (put val [potentially regX/Y])
-                    panic!("Unimplemented PutTuple")
+                    unimplemented!()
                 }
                 Opcode::GcBif1 => {
                     // fail label, live, bif, arg1, dest

@@ -140,7 +140,7 @@ pub fn i_from_str(val: &str) -> usize {
     if let Value::Atom(i) = ATOMS.from_str(val) {
         return i;
     }
-    panic!("unreachable")
+    unreachable!()
 }
 
 pub fn to_str(a: &Value) -> Result<String, String> {

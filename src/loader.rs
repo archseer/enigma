@@ -468,7 +468,7 @@ fn compact_term(i: &[u8]) -> IResult<&[u8], Value> {
             4 => Ok((rest, Value::Y(val as usize))),
             5 => Ok((rest, Value::Label(val as usize))),
             6 => Ok((rest, Value::Character(val as u8))),
-            _ => panic!("can't happen"),
+            _ => unreachable!(),
         };
     }
 
@@ -481,7 +481,7 @@ fn parse_extended_term(b: u8, rest: &[u8]) -> IResult<&[u8], Value> {
         0b0010_0111 => parse_float_reg(rest),
         0b0011_0111 => parse_alloc_list(rest),
         0b0100_0111 => parse_extended_literal(rest),
-        _ => panic!("can't happen"),
+        _ => unreachable!(),
     }
 }
 
@@ -504,11 +504,11 @@ fn parse_list(rest: &[u8]) -> IResult<&[u8], Value> {
 }
 
 fn parse_float_reg(rest: &[u8]) -> IResult<&[u8], Value> {
-    panic!("unimplemented parse_float_reg");
+    unimplemented!()
 }
 
 fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], Value> {
-    panic!("unimplemented parse_alloc_list");
+    unimplemented!()
 }
 
 fn parse_extended_literal(rest: &[u8]) -> IResult<&[u8], Value> {
