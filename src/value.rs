@@ -188,11 +188,7 @@ impl Value {
 
     pub fn is_non_empty_list(&self) -> bool {
         match *self {
-            Value::List(ptr) => {
-                // TODO: traverse the list recursively and check the last tail?
-                // !ptr.is_nil()
-                false
-            }
+            Value::List(ptr) => unsafe { !(*ptr).head.is_nil() }
             _ => false,
         }
     }
