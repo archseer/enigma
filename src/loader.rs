@@ -1,4 +1,5 @@
-use crate::atom::ATOMS;
+use crate::atom::{self, ATOMS};
+use crate::arc_without_weak::ArcWithoutWeak;
 use crate::etf;
 use crate::immix::Heap;
 use crate::module::{Lambda, Module, MFA};
@@ -96,7 +97,7 @@ impl<'a> Loader<'a> {
         ATOMS.reserve(self.atoms.len());
 
         for (index, a) in self.atoms.iter().enumerate() {
-            let g_index = ATOMS.register_atom(a);
+            let g_index = atom::from_str(a);
             // keep a mapping of these to patch the instrs
             self.atom_map.insert(index, g_index);
         }
@@ -449,7 +450,7 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], u64> {
         let r = BigInt::from_bytes_be(sign, long_bytes);
         println!("{}", r);
         //Ok((rest, Value::BigInt(Arc::new(r))))
-        Ok((rest, 23))
+        unimplemented!()
     } // if larger than 11 bits
 }
 

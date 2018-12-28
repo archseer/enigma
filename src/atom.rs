@@ -75,17 +75,16 @@ impl AtomTable {
     }
 
     /// Allocate new atom in the atom table or find existing.
-    pub fn from_str(&self, val: &str) -> Value {
+    pub fn from_str(&self, val: &str) -> usize {
         {
             let atoms = self.index.read();
 
             if atoms.contains_key(val) {
-                return Value::Atom(atoms[val]);
+                return atoms[val];
             }
         } // drop read lock
 
-        let index = self.register_atom(val);
-        Value::Atom(index)
+        self.register_atom(val)
     }
 
     pub fn to_str(&self, a: &Value) -> Result<String, String> {
@@ -124,6 +123,7 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("false"); // 2
     atoms.register_atom("undefined"); // 3
     atoms.register_atom("value"); // 4
+    atoms.register_atom("all"); // 5
     atoms
 };
 
@@ -131,16 +131,10 @@ pub const TRUE: usize = 1;
 pub const FALSE: usize = 2;
 pub const UNDEFINED: usize = 3;
 pub const VALUE: usize = 4;
+pub const ALL: usize = 5;
 
-pub fn from_str(val: &str) -> Value {
+pub fn from_str(val: &str) -> usize {
     ATOMS.from_str(val)
-}
-
-pub fn i_from_str(val: &str) -> usize {
-    if let Value::Atom(i) = ATOMS.from_str(val) {
-        return i;
-    }
-    unreachable!()
 }
 
 pub fn to_str(a: &Value) -> Result<String, String> {

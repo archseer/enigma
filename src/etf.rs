@@ -108,7 +108,7 @@ pub fn decode_atom(rest: &[u8]) -> IResult<&[u8], Value> {
     let (rest, string) = take_str!(rest, len)?;
 
     // TODO: create atom &string
-    Ok((rest, atom::from_str(string)))
+    Ok((rest, Value::Atom(atom::from_str(string))))
 }
 
 pub fn decode_tuple<'a>(rest: &'a [u8], len: usize, heap: &Heap) -> IResult<&'a [u8], Value> {
