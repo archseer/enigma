@@ -15,9 +15,16 @@ use std::sync::Arc;
 
 pub type RcProcess = Arc<Process>;
 
+// TODO: max registers should be a MAX_REG constant for (x and freg), OTP uses 1024
+// regs should be growable and shrink on live
+// also, only store "live" regs in the execution context and swap them into VM/scheduler
+// ---> sched should have it's own ExecutionContext
+// also this way, regs could be a &mut [] slice with no clone?
+
 pub struct ExecutionContext {
     // registers
     pub x: [Value; 16],
+    pub f: [f64; 16],
     pub stack: Vec<Value>,
     pub heap: Heap,
     // program pointer/reference?
@@ -36,6 +43,7 @@ impl ExecutionContext {
         unsafe {
             let mut ctx = ExecutionContext {
                 x: std::mem::uninitialized(), //[Value::Nil(); 16],
+                f: [0.0f64; 16],
                 stack: Vec::new(),
                 heap: Heap::new(),
                 ip: 0,

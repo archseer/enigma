@@ -43,17 +43,45 @@ pub struct Machine {
 macro_rules! set_register {
     ($context:expr, $register:expr, $value:expr) => {{
         match $register {
-            Value::X(reg) => {
-                $context.x[*reg] = $value;
+            &Value::X(reg) => {
+                $context.x[reg] = $value;
             }
-            Value::Y(reg) => {
+            &Value::Y(reg) => {
                 let len = $context.stack.len();
-                $context.stack[len - (*reg + 2)] = $value;
+                $context.stack[len - (reg + 2)] = $value;
             }
             _reg => unimplemented!(),
         }
     }};
 }
+
+macro_rules! expand_float {
+    ($context:expr, $value:expr) => {{
+        match $value {
+            &Value::ExtendedLiteral(i) => unsafe {
+                if let Value::Float(value::Float(f)) = (*$context.module).literals[i] {
+                    f
+                } else { unreachable!() }
+            },
+            &Value::X(reg) => {
+                if let Value::Float(value::Float(f)) = $context.x[reg] {
+                    f
+                } else { unreachable!() }
+            }
+            &Value::Y(reg) => {
+                let len = $context.stack.len();
+                if let Value::Float(value::Float(f)) = $context.stack[len - (reg + 2)] {
+                    f
+                } else { unreachable!() }
+            }
+            &Value::FloatReg(reg) => {
+                $context.f[reg]
+            }
+            _ => unreachable!(),
+        }
+    }};
+}
+
 macro_rules! op_deallocate {
     ($context:expr, $nwords:expr) => {{
         let cp = $context.stack.pop().unwrap();
@@ -115,6 +143,25 @@ macro_rules! op_is_type {
             let fail = $args[0].to_usize();
 
             op_jump!($context, fail);
+        }
+    }};
+}
+
+macro_rules! to_expr {
+    ($e:expr) => {
+        $e
+    };
+}
+
+macro_rules! op_float {
+    ($context:expr, $args:expr, $op:tt) => {{
+        debug_assert_eq!($args.len(), 4);
+
+        // TODO: I think this fail is always unused
+        if let [_fail, Value::FloatReg(a), Value::FloatReg(b), Value::FloatReg(dest)] = $args {
+            $context.f[*dest] = to_expr!($context.f[*a] $op $context.f[*b]);
+        } else {
+            unreachable!()
         }
     }};
 }
@@ -223,7 +270,7 @@ impl Machine {
     }
 
     /// Executes a single process, terminating in the event of an error.
-    pub fn run_with_error_handling(&self, worker: &mut Worker, process: &RcProcess) {
+    pub fn run_with_error_handling(&self, _worker: &mut Worker, process: &RcProcess) {
         // We are using AssertUnwindSafe here so we can pass a &mut Worker to
         // run()/panic(). This might be risky if values captured are not unwind
         // safe, so take care when capturing new variables.
@@ -261,8 +308,13 @@ impl Machine {
         // );
         loop {
             let ins = unsafe { &(*context.module).instructions[context.ip] };
-            // println!("running proc pid {:?}, ins {:?}", process.pid, ins.op);
             context.ip += 1;
+
+            // println!(
+            //     "running proc pid {:?}, ins {:?}, args: {:?}",
+            //     process.pid, ins.op, ins.args, context.f
+            // );
+
             match &ins.op {
                 Opcode::FuncInfo => {}//println!("Running a function..."),
                 Opcode::Return => {
@@ -738,6 +790,65 @@ impl Machine {
                     // a new shared data, a new ProcBin, and a new subbinary. For all heap
                     // allocation, a space for more Arg1 words are requested. Arg2 is Live. Arg3 is
                     // unit. Saves the resultant subbinary to Arg4.
+
+                }
+                Opcode::Fclearerror => {
+                    // src, dest
+                    // TODO: we currently don't have a separate flag
+                }
+                Opcode::Fcheckerror => {
+                    // I think it always checks register fr0
+                    // let f = expand_float!(context, &ins.args[0]);
+                    // if !f.is_finite() {
+                    //     panic!("badarith: TODO raise as exception")
+                    // }
+                }
+                Opcode::Fmove => {
+                    // src, dest
+
+                    // basically a normal move, except if we're moving out of floats we make a Val
+                    // otherwise we keep as a float
+                    let f = expand_float!(context, &ins.args[0]);
+
+                    match &ins.args[1] {
+                        &Value::X(reg) => {
+                            context.x[reg] = Value::Float(value::Float(f));
+                        }
+                        &Value::Y(reg) => {
+                            let len = context.stack.len();
+                            context.stack[len - (reg + 2)] = Value::Float(value::Float(f));
+                        }
+                        &Value::FloatReg(reg) => {
+                            context.f[reg] = f;
+                        }
+                        _reg => unimplemented!(),
+                    }
+                }
+                Opcode::Fconv => {
+                    // reg (x), dest (float reg)
+                    let val: f64 = match self.expand_arg(context, &ins.args[0]) {
+                        &Value::Float(value::Float(f)) => f,
+                        &Value::Integer(i) => i as f64, // TODO: i64 -> f64 is unsafe
+                        _ => unimplemented!()
+                    };
+
+                    if let &Value::FloatReg(dest) = &ins.args[1] {
+                        context.f[dest] = val;
+                    } else {
+                        unreachable!()
+                    }
+                }
+                Opcode::Fadd => { op_float!(context, &ins.args[..], +) }
+                Opcode::Fsub => { op_float!(context, &ins.args[..], -) }
+                Opcode::Fmul => { op_float!(context, &ins.args[..], *) }
+                Opcode::Fdiv => { op_float!(context, &ins.args[..], /) }
+                Opcode::Fnegate => {
+                    debug_assert_eq!(ins.args.len(), 2);
+                    if let [Value::FloatReg(a), Value::FloatReg(dest)] = ins.args[..] {
+                        context.f[dest] = -context.f[a];
+                    } else {
+                        unreachable!()
+                    }
                 }
                 Opcode::GcBif2 => {
                     // fail label, live, bif, arg1, arg2, dest

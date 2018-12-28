@@ -56,7 +56,7 @@ x => done, - => partial
 - [ ] Binaries (SIMD: https://github.com/AdamNiederer/faster / https://doc.rust-lang.org/1.26.0/std/simd/index.html<Paste>)
 - [ ] Binary matching (multi: https://github.com/BurntSushi/aho-corasick
 + single: https://github.com/killerswan/boyer-moore-search / https://docs.rs/needle/0.1.1/needle/ / https://github.com/ethanpailes/regex/commit/d2e28f959ac384db62f7cbeba1576cf39a75b294)
-- [ ] float registers (https://pdfs.semanticscholar.org/7347/354eaaad96d40e12ea4373178b784fc39bfc.pdf)
+- [x] float registers (https://pdfs.semanticscholar.org/7347/354eaaad96d40e12ea4373178b784fc39bfc.pdf)
 - [ ] Ports
     - [ ] inet_drv
     - [ ] ram_file_drv
