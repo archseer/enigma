@@ -278,6 +278,7 @@ impl std::fmt::Display for Value {
     }
 }
 
+#[allow(clippy::mut_from_ref)]
 pub fn tuple(heap: &Heap, len: usize) -> &mut Tuple {
     let layout = Layout::new::<Value>().repeat(len).unwrap().0;
     let tuple = heap.alloc(self::Tuple {

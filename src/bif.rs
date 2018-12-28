@@ -159,7 +159,7 @@ fn bif_erlang_abs_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> 
         Value::Integer(i) => Ok(Value::Integer(i.abs())),
         Value::Float(value::Float(f)) => Ok(Value::Float(value::Float(f.abs()))),
         Value::BigInt(i) => Ok(Value::BigInt(Box::new((**i).abs()))),
-        _ => return Err("argument error".to_string()),
+        _ => Err("argument error".to_string()),
     }
 }
 
@@ -695,7 +695,7 @@ fn bif_erlang_trunc_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -
         Value::Integer(i) => Ok(Value::Integer(*i)),
         Value::Float(value::Float(f)) => Ok(Value::Float(value::Float(f.trunc()))),
         Value::BigInt(v) => Ok(Value::BigInt(v.clone())),
-        _ => return Err("badarg".to_string()),
+        _ => Err("badarg".to_string()),
     }
 }
 
@@ -725,10 +725,8 @@ fn keyfind(_func: BifFn, _process: &RcProcess, args: &[Value]) -> BifResult {
         list = unsafe { &(*ptr).tail };
         if let Value::Tuple(ptr) = term {
             let tuple = unsafe { &**ptr };
-            if pos <= tuple.len {
-                if *key == tuple[pos] {
-                    return Ok(term.clone());
-                }
+            if pos <= tuple.len && *key == tuple[pos] {
+                return Ok(term.clone());
             }
         }
     }

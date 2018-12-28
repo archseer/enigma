@@ -1,9 +1,8 @@
-use crate::atom;
-use crate::bif::{BifFn, BifResult};
+use crate::bif::BifResult;
 use crate::process::RcProcess;
 use crate::value::{self, Value};
 use crate::vm;
-use chrono::{DateTime, Datelike, Local, TimeZone, Timelike, Utc};
+use chrono::{Datelike, Local, Timelike, Utc};
 use num::bigint::ToBigInt;
 use std::time::SystemTime;
 
@@ -65,7 +64,7 @@ pub fn bif_erlang_monotonic_time_0(
 // TODO monotonic_time_1
 
 pub fn bif_erlang_system_time_0(
-    vm: &vm::Machine,
+    _vm: &vm::Machine,
     _process: &RcProcess,
     _args: &[Value],
 ) -> BifResult {

@@ -226,7 +226,5 @@ pub fn decode_bignum(rest: &[u8], size: usize) -> IResult<&[u8], Value> {
         return Ok((rest, Value::Integer(b_signed as i64)));
     }
 
-    // Determine storage size in words
-    //unsafe { Ok(tb.create_bignum(big)?) }
     Ok((rest, Value::BigInt(Box::new(big))))
 }

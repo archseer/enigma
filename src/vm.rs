@@ -250,6 +250,7 @@ impl Machine {
         }
     }
 
+    #[allow(clippy::cyclomatic_complexity)]
     pub fn run(&self, process: &RcProcess) -> Result<(), String> {
         let mut reductions = 2000; // self.state.config.reductions;
         let context = process.context_mut();

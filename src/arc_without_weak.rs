@@ -89,10 +89,6 @@ impl<T: PartialEq> PartialEq for ArcWithoutWeak<T> {
     fn eq(&self, other: &ArcWithoutWeak<T>) -> bool {
         *(*self) == *(*other)
     }
-
-    fn ne(&self, other: &ArcWithoutWeak<T>) -> bool {
-        *(*self) != *(*other)
-    }
 }
 
 impl<T: PartialOrd> PartialOrd for ArcWithoutWeak<T> {

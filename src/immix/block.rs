@@ -65,6 +65,7 @@ impl Block {
     ///
     /// If given, `alloc_layout` is the layout of the allocation request that
     /// triggered us to fall back to allocating a new block of memory.
+    #[allow(clippy::cast_ptr_alignment)]
     fn new(alloc_layout: Option<Layout>) -> NonNull<Block> {
         let layout = alloc_layout.map_or_else(Block::default_block_layout, |l| {
             let align = cmp::max(l.align(), mem::align_of::<Block>());
@@ -84,7 +85,7 @@ impl Block {
             }
         });
 
-        let size = layout.size();
+        // let size = layout.size();
 
         unsafe {
             let data = Global.alloc(layout).unwrap();
