@@ -470,6 +470,9 @@ impl Machine {
                     }
                 }
                 Opcode::AllocateHeap => {
+                    // TODO: this also zeroes the values, make it dynamically change the
+                    // capacity/len of the Vec to bypass initing these.
+
                     // literal stackneed, literal heapneed, literal live
                     // allocate stackneed space on stack, ensure heapneed on heap, if gc, keep live
                     // num of X regs. save CP on stack.
@@ -494,9 +497,25 @@ impl Machine {
                         panic!("Bad argument to {:?}", ins.op)
                     }
                 }
-                // AllocateHeapZero
+                Opcode::AllocateHeapZero => {
+                    // literal stackneed, literal heapneed, literal live
+                    // allocate stackneed space on stack, ensure heapneed on heap, if gc, keep live
+                    // num of X regs. save CP on stack.
+                    if let [Value::Literal(stackneed), Value::Literal(_heapneed), Value::Literal(_live)] = &ins.args[..] {
+                        for _ in 0..*stackneed {
+                            context.stack.push(Value::Nil())
+                        }
+                        // TODO: check heap for heapneed space!
+                        context.stack.push(Value::CP(context.cp));
+                    } else {
+                        panic!("Bad argument to {:?}", ins.op)
+                    }
+                }
                 // TestHeap
-                // Init
+                Opcode::Init => {
+                    debug_assert_eq!(ins.args.len(), 3);
+                    set_register!(context, &ins.args[0], Value::Nil())
+                }
                 Opcode::Deallocate => {
                     // literal nwords
                     if let [Value::Literal(nwords)] = &ins.args[..] {
