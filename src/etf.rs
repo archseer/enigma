@@ -64,7 +64,10 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value>
             // TODO store inside the pointer once we no longer copy
             Ok((rest, Value::Integer(i64::from(int))))
         }
-        // Integer: Signed 32-bit integer in big-endian format.
+        Tag::Integer => {
+            let (rest, int) = be_i32(rest)?;
+            Ok((rest, Value::Integer(i64::from(int))))
+        }
         // Float: outdated? in favour of NewFloat
         // Reference
         // Port
@@ -225,6 +228,5 @@ pub fn decode_bignum(rest: &[u8], size: usize) -> IResult<&[u8], Value> {
 
     // Determine storage size in words
     //unsafe { Ok(tb.create_bignum(big)?) }
-    Ok((rest, Value::Integer(123)))
-    //Ok((rest, Value::BigNum(b_signed));
+    Ok((rest, Value::BigInt(Box::new(big))))
 }
