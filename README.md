@@ -37,6 +37,8 @@ crashes, but a basic spawn + send multi-process model already works.
 # Ideas/Experiments
 
 - Process as a generator function (yield to suspend/on reduce)
+- Use Commentz-Walter for binary matching. ["Commentz-Walter is an algorithm that combines Aho-Corasick with Boyer-Moore. (Only implementation I know of is in GNU grep.)"](https://github.com/rust-lang/regex/issues/197))
+    https://en.wikipedia.org/wiki/Commentz-Walter_algorithm
 
 # TODO
 

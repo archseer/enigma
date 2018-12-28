@@ -27,6 +27,8 @@ pub struct ExecutionContext {
     pub live: usize,
     // pointer to the current code
     pub module: *const Module,
+    // binary construction state
+    pub bs: *mut String,
 }
 
 impl ExecutionContext {
@@ -44,6 +46,9 @@ impl ExecutionContext {
                 // binding: Binding::with_rc(block.locals(), block.receiver),
                 module,
                 // line: block.code.line,
+
+                // TODO: not great
+                bs: std::mem::uninitialized(),
             };
             for (_i, el) in ctx.x.iter_mut().enumerate() {
                 // Overwrite `element` without running the destructor of the old value.

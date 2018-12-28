@@ -17,6 +17,7 @@ pub struct Loader<'a> {
     imports: Vec<MFA>,
     exports: Vec<MFA>,
     literals: Vec<Value>,
+    strings: String,
     lambdas: Vec<Lambda>,
     atom_map: HashMap<usize, usize>, // TODO: remove this; local id -> global id
     funs: FnvHashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
@@ -34,6 +35,7 @@ impl<'a> Loader<'a> {
             exports: Vec::new(),
             literals: Vec::new(),
             literal_heap: Heap::new(),
+            strings: String::new(),
             lambdas: Vec::new(),
             atom_map: HashMap::new(),
             labels: FnvHashMap::default(),
@@ -58,7 +60,9 @@ impl<'a> Loader<'a> {
         self.load_local_fun_table(chunks.remove("LocT").expect("LocT chunk not found!")); // can probably be ignored
         self.load_imports_table(chunks.remove("ImpT").expect("ImpT chunk not found!"));
         self.load_exports_table(chunks.remove("ExpT").expect("ExpT chunk not found!"));
-        // self.load_strings_table(find_chunk(&chunks, "StrT"));
+        if let Some(chunk) = chunks.remove("StrT") {
+            self.load_strings_table(chunk);
+        }
         if let Some(chunk) = chunks.remove("LitT") {
             self.load_literals_table(chunk);
         }
@@ -140,6 +144,10 @@ impl<'a> Loader<'a> {
         self.exports = data;
     }
 
+    fn load_strings_table(&mut self, chunk: Chunk) {
+        self.strings = unsafe { std::str::from_utf8_unchecked(chunk).to_string() };
+    }
+
     fn load_literals_table(&mut self, chunk: Chunk) {
         let (rest, size) = be_u32(chunk).unwrap();
         let mut data = Vec::with_capacity(size as usize);
@@ -183,8 +191,8 @@ impl<'a> Loader<'a> {
         // scan over the Code chunk bits, but we'll need to know bit length of each instruction.
         let (_, code) = scan_instructions(self.code).unwrap();
 
-        for instruction in code {
-            match &instruction.op {
+        for mut instruction in code {
+            let instruction = match &instruction.op {
                 Opcode::Line => continue, // skip for now
                 Opcode::Label => {
                     // one operand, Integer
@@ -207,13 +215,24 @@ impl<'a> Loader<'a> {
                     } else {
                         panic!("Bad argument to {:?}", instruction.op)
                     }
+                    instruction
                 }
                 Opcode::IntCodeEnd => {
                     println!("Finished processing instructions");
                     break;
                 }
-                _ => {}
-            }
+                Opcode::BsPutString => {
+                    if let [Value::Literal(len), Value::Literal(offset)] = instruction.args[..] {
+                        // TODO: ideally use a single string that we slice into for these interned strings
+                        // but need to tie them to the string heap lifetime
+                        let bytes = &self.strings[offset..offset+len];
+                        let string = bytes.to_string();
+                        instruction.args = vec![Value::Binary(ArcWithoutWeak::new(string))];
+                        instruction
+                    } else { unreachable!() }
+                }
+                _ => instruction
+            };
 
             self.instructions.push(instruction);
         }

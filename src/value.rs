@@ -42,7 +42,7 @@ pub enum Value {
 
     /// An interned string is a string allocated on the permanent space. For
     /// every unique interned string there is only one object allocated.
-    //InternedBinary(ArcWithoutWeak<ImmutableString>),
+    // InternedBinary(ArcWithoutWeak<String>),
     BigInt(Box<BigInt>), // ArcWithoutWeak<BigInt>
     Closure(*const self::Closure),
     /// Special values (invalid in runtime)
@@ -102,6 +102,10 @@ unsafe impl Sync for Cons {}
 // RefBin(Arc<String/Vec<u8?>>)
 // ^^ start with just RefBin since Rust already will do the String management for us
 // SubBin(len (original?), offset, bitsize,bitoffset,is_writable, orig_ptr -> Bin/RefBin)
+
+// consider using an Arc<RwLock<>> to make the inner string mutable? is the overhead worth it?
+// data is always append only, so maybe have an atomic bool for the writable bit and keep the
+// normal structure lockless.
 
 // bitstring is the base model, binary is an 8-bit aligned bitstring
 // https://www.reddit.com/r/rust/comments/2d7rrj/bit_level_pattern_matching/

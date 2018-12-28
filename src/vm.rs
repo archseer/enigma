@@ -1,4 +1,5 @@
 use crate::atom;
+use crate::arc_without_weak::ArcWithoutWeak;
 use crate::bif;
 use crate::module;
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
@@ -419,7 +420,7 @@ impl Machine {
                     // literal stackneed, literal heapneed, literal live
                     // allocate stackneed space on stack, ensure heapneed on heap, if gc, keep live
                     // num of X regs. save CP on stack.
-                    if let [Value::Literal(stackneed), Value::Literal(heapneed), Value::Literal(_live)] = &ins.args[..] {
+                    if let [Value::Literal(stackneed), Value::Literal(_heapneed), Value::Literal(_live)] = &ins.args[..] {
                         for _ in 0..*stackneed {
                             context.stack.push(Value::Nil())
                         }
@@ -618,6 +619,124 @@ impl Machine {
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
+                }
+                Opcode::BsAdd => {
+                     // Calculates the total of the number of bits in Src1 and the number of units in Src2. Stores the result to Dst.
+                     // bs_add(Fail, Src1, Src2, Unit, Dst)
+                     // dst = (src1 + src2) * unit
+
+                     // TODO: trickier since we need to check both nums are positive and can fit
+                     // into int/bigint
+
+                     // optimize when one append is 0 and unit is 1, it's just a move
+                     // bs_add Fail S1=i==0 S2 Unit=u==1 D => move S2 D
+
+                    if let [Value::Label(_fail), s1, s2, Value::Literal(unit), dest] = &ins.args[..] {
+                        // TODO use fail label
+                        let s1 = self.expand_arg(context, s1).to_usize();
+                        let s2 = self.expand_arg(context, s2).to_usize();
+
+                        let res = Value::Integer(((s1 + s2) * (*unit)) as i64);
+                        set_register!(context, dest, res)
+                    } else {
+                        panic!("Bad argument to {:?}", ins.op)
+                    }
+
+                }
+                Opcode::BsInit2 => {
+                    // optimize when init is with empty size
+                    // bs_init2 Fail Sz=u Words=u==0 Regs Flags Dst => i_bs_init Sz Regs Dst
+
+                    // Words is heap alloc size
+                    // regs is live regs for GC
+                    // flags is unused
+
+                    // bs_init2 Fail Sz Words=u==0 Regs Flags Dst => \
+                    //   i_bs_init_fail Sz Fail Regs Dst
+                    //   op1 = size, op2 = 0?,
+                    //   verify that the size is within limits (if non0) or jump to fail
+                    //   allocate binary + procbin
+                    //   set as non writable initially??
+
+                    if let [Value::Label(_fail), s1, Value::Literal(_words), Value::Literal(_live), _flags, dest] = &ins.args[..] {
+                        // TODO: use a current_string ptr to be able to write to the Arc wrapped str
+                        // alternatively, loop through the instrs until we hit a non bs_ instr.
+                        // that way, no unsafe ptrs!
+                        let size = self.expand_arg(context, s1).to_usize();
+                        let mut arc = ArcWithoutWeak::new(String::with_capacity(size));
+                        context.bs = &mut (*arc); // TODO: this feels a bit off
+                        set_register!(context, dest, Value::Binary(arc));
+                    } else {
+                        panic!("Bad argument to {:?}", ins.op)
+                    }
+                }
+                Opcode::BsPutString => {
+                    // BsPutString uses the StrT strings table! needs to be patched in loader
+
+                    // needs a build context
+                    if let Value::Binary(str) = &ins.args[0] {
+                        unsafe { (*context.bs).push_str(&*str); }
+                    } else {
+                        panic!("Bad argument to {:?}", ins.op)
+                    }
+                }
+                Opcode::BsPutBinary => {
+                    if let [Value::Label(fail), size, Value::Literal(unit), _flags, src] = &ins.args[..] {
+                        // TODO: fail label
+                        if *unit != 8 { unimplemented!() }
+
+                        if let Value::Binary(str) = self.expand_arg(context, src) {
+                            match size {
+                                Value::Atom(atom::ALL) => {
+                                    unsafe { (*context.bs).push_str(&*str); }
+                                }
+                                _ => unimplemented!()
+                            }
+                        } else {
+                            panic!("Bad argument to {:?}", ins.op)
+                        }
+                    } else {
+                        panic!("Bad argument to {:?}", ins.op)
+                    }
+                }
+                Opcode::BsPutFloat => {
+                    // gen_put_float(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
+                    // Size can be atom all
+                    unimplemented!()
+                }
+                Opcode::BsPutInteger => {
+                    // gen_put_integer(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
+                    // Size can be atom all
+                    unimplemented!()
+                }
+                // BsGet and BsSkip should be implemented over an Iterator inside a match context (.skip/take)
+                // maybe we can even use nom for this
+                Opcode::BsAppend => { // append and init also sets the string as current (state.current_binary) [seems to be used to copy string literals too]
+
+                    // bs_append Fail Size Extra Live Unit Bin Flags Dst => \
+                    //   move Bin x | i_bs_append Fail Extra Live Unit Size Dst
+
+                    if let [Value::Label(fail), Value::Integer(size), Value::Literal(extra_heap), Value::Literal(live), Value::Literal(unit), src, _flags, dest] = &ins.args[..] {
+                        // TODO: execute fail if non zero
+                        // unit: byte alignment (8 for binary)
+                        //
+                        // size * unit = total_bytes?
+
+                        // make sure it's a binary otherwise badarg
+                        // make sure it's a sub binary and it's writable
+                        // if so, expand the current string and make it non-writable
+                        // else, copy it into a new string, append and return a sub-binary refering to it
+
+                    } else {
+                        panic!("badarg for BsAppend")
+                    }
+
+                    // If the binary is a writable subbinary
+                    // referencing a ProcBin with enough empty space then a new writable subbinary
+                    // is created and the old one is made non-writable. In other cases, creates
+                    // a new shared data, a new ProcBin, and a new subbinary. For all heap
+                    // allocation, a space for more Arg1 words are requested. Arg2 is Live. Arg3 is
+                    // unit. Saves the resultant subbinary to Arg4.
                 }
                 Opcode::GcBif2 => {
                     // fail label, live, bif, arg1, arg2, dest

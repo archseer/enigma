@@ -1,4 +1,4 @@
-* Opcodes [51/138]
+* Opcodes [54/138]
 - [X] Label = 1
 - [ ] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -65,24 +65,24 @@
 - [ ] BsPutInteger = 89
 - [ ] BsPutBinary = 90
 - [ ] BsPutFloat = 91
-- [ ] BsPutString = 92
-- [ ] Fclearerror = 94
-- [ ] Fcheckerror = 95
-- [ ] Fmove = 96
-- [ ] Fconv = 97
-- [ ] Fadd = 98
-- [ ] Fsub = 99
-- [ ] Fmul = 100
-- [ ] Fdiv = 101
-- [ ] Fnegate = 102
+- [X] BsPutString = 92
+- [ ] Fclearerror = 94 Clears the error flag
+- [ ] Fcheckerror = 95 Checks if the FR0 contains Nan or +-Inf. Raises badarith exception if this is the case.
+- [ ] Fmove = 96 copy from src to dest
+- [ ] Fconv = 97 convert arg to float and place in dest
+- [ ] Fadd = 98 arg[2] = arg[0] + arg[1]
+- [ ] Fsub = 99  arg[2] = arg[0] - arg[1]
+- [ ] Fmul = 100 arg[2] = arg[0] * arg[1]
+- [ ] Fdiv = 101 arg[2] = arg[0] / arg[1]
+- [ ] Fnegate = 102 arg[1] = -arg[0]
 - [X] MakeFun2 = 103
 - [ ] Try = 104
 - [ ] TryEnd = 105
 - [ ] TryCase = 106
 - [ ] TryCaseEnd = 107
 - [ ] Raise = 108
-- [ ] BsInit2 = 109
-- [ ] BsAdd = 111
+- [X] BsInit2 = 109
+- [X] BsAdd = 111
 - [ ] Apply = 112
 - [ ] ApplyLast = 113
 - [X] IsBoolean = 114
