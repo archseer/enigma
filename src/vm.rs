@@ -4,6 +4,7 @@ use crate::bif;
 use crate::module;
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
 use crate::opcodes::Opcode;
+use crate::exception::Exception;
 use crate::pool::{Job, JoinGuard as PoolJoinGuard, Pool, Worker};
 use crate::process::{self, ExecutionContext, RcProcess};
 use crate::process_table::ProcessTable;
@@ -298,7 +299,7 @@ impl Machine {
     }
 
     #[allow(clippy::cyclomatic_complexity)]
-    pub fn run(&self, process: &RcProcess) -> Result<(), String> {
+    pub fn run(&self, process: &RcProcess) -> Result<(), Exception> {
         let mut reductions = 2000; // self.state.config.reductions;
         let context = process.context_mut();
 
@@ -316,7 +317,13 @@ impl Machine {
             // );
 
             match &ins.op {
-                Opcode::FuncInfo => {}//println!("Running a function..."),
+                Opcode::FuncInfo => {
+                    // Raises function clause exception. Arg1, Arg2, Arg3 are MFA. Arg0 is a mystery
+                    // coming out of nowhere, probably, needed for NIFs.
+
+                    // happens if no other clause matches
+                    return Err(Exception::Error{ reason: atom::FUNCTION_CLAUSE, value: Value::Nil() });
+                }//println!("Running a function..."),
                 Opcode::Return => {
                     op_return!(context);
                 }
@@ -675,6 +682,110 @@ impl Machine {
                     // put_tuple dest size
                     // followed by multiple put() ops (put val [potentially regX/Y])
                     unimplemented!()
+                }
+                // Eterm fvalue;		/* Exit & Throw value (failure reason) */
+                // Uint freason;		/* Reason for detected failure */
+                // Eterm ftrace;		/* Latest exception stack trace dump */
+
+                Opcode::Badmatch => {
+                    let value = self.expand_arg(context, &ins.args[0]).clone();
+                    return Err(Exception::Error{ reason: atom::BADMATCH, value });
+
+                    // #define SWAPOUT            \
+                    //     HEAP_TOP(c_p) = HTOP;  \ clear the heap
+                    //     c_p->stop = E
+                    //
+                    //    /* Stack pointer.  Grows downwards; points
+                    // * to last item pushed (normally a saved
+                    // * continuation pointer).
+                    // */
+                    // register Eterm* E REG_stop = NULL;
+
+                    // find_func_info being:
+                    //  SWAPOUT;
+                    // I = handle_error(c_p, I, reg, NULL);
+                    // goto post_error_handling;
+
+                    /*
+                    * To fully understand the error handling, one must keep in mind that
+                    * when an exception is thrown, the search for a handler can jump back
+                    * and forth between Beam and native code. Upon each mode switch, a
+                    * dummy handler is inserted so that if an exception reaches that point,
+                    * the handler is invoked (like any handler) and transfers control so
+                    * that the search for a real handler is continued in the other mode.
+                    * Therefore, c_p->freason and c_p->fvalue must still hold the exception
+                    * info when the handler is executed, but normalized so that creation of
+                    * error terms and saving of the stack trace is only done once, even if
+                    * we pass through the error handling code several times.
+                    *
+                    * When a new exception is raised, the current stack trace information
+                    * is quick-saved in a small structure allocated on the heap. Depending
+                    * on how the exception is eventually caught (perhaps by causing the
+                    * current process to terminate), the saved information may be used to
+                    * create a symbolic (human-readable) representation of the stack trace
+                    * at the point of the original exception.
+                    */
+                }
+                Opcode::IfEnd => {
+                    // Raises the if_clause exception.
+                    return Err(Exception::Error{ reason: atom::IF_CLAUSE, value: Value::Nil() });
+                }
+                Opcode::CaseEnd => {
+                    // Raises the case_clause exception with the value of Arg0
+                    let value = self.expand_arg(context, &ins.args[0]).clone();
+                    return Err(Exception::Error{ reason: atom::CASE_CLAUSE, value });
+                }
+                Opcode::Try => { // TODO: try is identical to catch, and is remapped in the OTP loader
+                    // y f
+                    // create a catch context that wraps f - fail label, and stores to y - reg.
+                    context.catches += 1;
+                    let fail = ins.args[1].to_usize();
+                    set_register!(context, &ins.args[0], Value::Catch(fail));
+                }
+                Opcode::TryEnd => {
+                    // y
+                    context.catches -= 1;
+                    set_register!(context, &ins.args[0], Value::Nil()) // TODO: make_blank macro
+
+                }
+                Opcode::TryCase => {
+                    // pops a catch context in y  Erases the label saved in the Arg0 slot. Noval in R0 indicate that something is caught. If so, R0 is set to R1, R1 — to R2, R2 — to R3.
+
+                    // TODO: this initial part is identical to TryEnd
+                    context.catches -= 1;
+                    set_register!(context, &ins.args[0], Value::Nil()); // TODO: make_blank macro
+
+                    // ASSERT(is_non_value(r(0)));
+                    // c_p->fvalue = NIL;
+                    // r(0) = x(1);
+                    // x(1) = x(2);
+                    // x(2) = x(3);
+                }
+                Opcode::TryCaseEnd => {
+                    // Raises a try_clause exception with the value read from Arg0.
+                    let value = self.expand_arg(context, &ins.args[0]).clone();
+                    return Err(Exception::Error{ reason: atom::TRY_CLAUSE, value });
+                }
+                Opcode::Catch => {
+                    // create a catch context that wraps f - fail label, and stores to y - reg.
+                    context.catches += 1;
+                    let fail = ins.args[1].to_usize();
+                    set_register!(context, &ins.args[0], Value::Catch(fail));
+                }
+                Opcode::CatchEnd => {
+                    // y
+                    // Pops a “catch” context. Erases the label saved in the Arg0 slot. Noval in R0
+                    // indicates that something is caught. If R1 contains atom throw then R0 is set
+                    // to R2. If R1 contains atom error than a stack trace is added to R2. R0 is
+                    // set to {exit,R2}.
+                    //
+                    // difference fron try is, try will exhaust all the options then fail, whereas
+                    // catch will keep going upwards.
+                }
+                Opcode::Raise => {
+                    // Raises the exception. The instruction is garbled by backward compatibility. Arg0 is a stack trace
+                    // and Arg1 is the value accompanying the exception. The reason of the raised exception is dug up
+                    // from the stack trace
                 }
                 Opcode::GcBif1 => {
                     // fail label, live, bif, arg1, dest

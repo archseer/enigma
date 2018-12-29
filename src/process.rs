@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::panic::RefUnwindSafe;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use crate::exception::Exception;
 
 /// Heavily inspired by inko
 
@@ -22,20 +23,33 @@ pub type RcProcess = Arc<Process>;
 // also this way, regs could be a &mut [] slice with no clone?
 
 pub struct ExecutionContext {
-    // registers
+    /// X registers.
     pub x: [Value; 16],
+    /// Floating point registers.
     pub f: [f64; 16],
+    /// Stack (accessible through Y registers).
     pub stack: Vec<Value>,
     pub heap: Heap,
-    // program pointer/reference?
+    /// Number of catches on stack.
+    pub catches: usize,
+    /// Program pointer, points to the current instruction.
     pub ip: usize, // TODO: ip/cp need to store (offset as usize, *const Module)
-    // continuation pointer
+    /// Continuation pointer
     pub cp: Option<usize>,
     pub live: usize,
-    // pointer to the current code
+    /// pointer to the current module
     pub module: *const Module,
-    // binary construction state
+    /// binary construction state
     pub bs: *mut String,
+    /// 
+    pub exc: Option<Exception>
+}
+
+pub struct InstrPtr {
+    /// Module containing the instruction set.
+    pub module: *const Module,
+    /// Offset to the current instruction.
+    pub ip: usize,
 }
 
 impl ExecutionContext {
@@ -46,6 +60,7 @@ impl ExecutionContext {
                 f: [0.0f64; 16],
                 stack: Vec::new(),
                 heap: Heap::new(),
+                catches: 0,
                 ip: 0,
                 cp: None,
                 live: 0,
@@ -230,7 +245,7 @@ pub fn send_message<'a>(
     // TODO: use pointers for these
     pid: &Value,
     msg: &'a Value,
-) -> Result<&'a Value, String> {
+) -> Result<&'a Value, Exception> {
     let pid = pid.to_usize();
 
     if let Some(receiver) = state.process_table.lock().unwrap().get(pid) {

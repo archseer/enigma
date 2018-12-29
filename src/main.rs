@@ -16,17 +16,16 @@ mod process;
 mod process_table;
 mod queue;
 mod value;
+mod exception;
 mod vm;
 
 #[macro_use]
 extern crate once_cell;
 
-use time;
-
 fn main() {
     let vm = vm::Machine::new();
 
-    vm.start("./examples/Elixir.Bin.beam");
+    vm.start("./examples/Elixir.Floats.beam");
 
     println!("execution time: {:?}", vm.elapsed_time())
 }

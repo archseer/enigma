@@ -1,6 +1,6 @@
-* Opcodes [63/138]
+* Opcodes [71/138]
 - [X] Label = 1
-- [ ] FuncInfo = 2
+- [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
 - [X] Call = 4
 - [X] CallLast = 5
@@ -47,7 +47,7 @@
 - [X] SelectVal = 59
 - [ ] SelectTupleArity = 60
 - [X] Jump = 61
-- [ ] Catch = 62
+- [X] Catch = 62
 - [ ] CatchEnd = 63
 - [X] Move = 64
 - [X] GetList = 65
@@ -56,9 +56,9 @@
 - [X] PutList = 69
 - [ ] PutTuple = 70
 - [ ] Put = 71
-- [ ] Badmatch = 72
-- [ ] IfEnd = 73
-- [ ] CaseEnd = 74
+- [X] Badmatch = 72
+- [X] IfEnd = 73
+- [X] CaseEnd = 74
 - [X] CallFun = 75
 - [X] IsFunction = 77
 - [X] CallExtOnly = 78
@@ -76,10 +76,10 @@
 - [X] Fdiv = 101 arg[2] = arg[0] / arg[1]
 - [X] Fnegate = 102 arg[1] = -arg[0]
 - [X] MakeFun2 = 103
-- [ ] Try = 104
-- [ ] TryEnd = 105
+- [X] Try = 104
+- [X] TryEnd = 105
 - [ ] TryCase = 106
-- [ ] TryCaseEnd = 107
+- [X] TryCaseEnd = 107
 - [ ] Raise = 108
 - [X] BsInit2 = 109
 - [X] BsAdd = 111

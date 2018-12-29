@@ -27,7 +27,6 @@ pub enum Value {
     Integer(i64),
     Character(u8),
     Atom(usize),
-    Catch(),
     Pid(process::PID),
     Port(),
     Ref(),
@@ -56,6 +55,7 @@ pub enum Value {
     AllocList(Vec<(u8, usize)>),
     ExtendedLiteral(usize), // TODO; replace at load time
     CP(Option<usize>),      // continuation pointer
+    Catch(usize) // catch context
 }
 
 #[derive(Debug)]
@@ -210,6 +210,20 @@ impl Value {
     pub fn is_boolean(&self) -> bool {
         match *self {
             Value::Atom(atom::TRUE) | Value::Atom(atom::FALSE) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_boolean(&self) -> bool {
+        match *self {
+            Value::Atom(atom::TRUE) | Value::Atom(atom::FALSE) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_cp(&self) -> bool {
+        match *self {
+            Value::CP(..) => true,
             _ => false,
         }
     }

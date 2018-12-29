@@ -124,6 +124,11 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("undefined"); // 3
     atoms.register_atom("value"); // 4
     atoms.register_atom("all"); // 5
+    atoms.register_atom("function_clause"); // 6
+    atoms.register_atom("if_clause"); // 7
+    atoms.register_atom("case_clause"); // 8
+    atoms.register_atom("try_clause"); // 9
+    atoms.register_atom("badmatch"); // 10
     atoms
 };
 
@@ -132,6 +137,11 @@ pub const FALSE: usize = 2;
 pub const UNDEFINED: usize = 3;
 pub const VALUE: usize = 4;
 pub const ALL: usize = 5;
+pub const FUNCTION_CLAUSE: usize = 6;
+pub const IF_CLAUSE: usize = 7;
+pub const CASE_CLAUSE: usize = 8;
+pub const TRY_CLAUSE: usize = 9;
+pub const BADMATCH: usize = 10;
 
 pub fn from_str(val: &str) -> usize {
     ATOMS.from_str(val)
