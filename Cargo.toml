@@ -18,6 +18,7 @@ fnv = "1.0.6"
 allocator_api = "0.5.0"
 time = "0.1.40"
 chrono = "0.4.6"
+bitflags = "1.0.4"
 
 [profile.release]
 debug = true

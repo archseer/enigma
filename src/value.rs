@@ -2,7 +2,7 @@ use crate::arc_without_weak::ArcWithoutWeak;
 use crate::atom;
 use crate::immix::Heap;
 use crate::module;
-use crate::process;
+use crate::process::{self,InstrPtr};
 use allocator_api::Layout;
 use num::bigint::BigInt;
 use std::hash::{Hash, Hasher};
@@ -54,7 +54,7 @@ pub enum Value {
     FloatReg(usize),
     AllocList(Vec<(u8, usize)>),
     ExtendedLiteral(usize), // TODO; replace at load time
-    CP(Option<usize>),      // continuation pointer
+    CP(Option<InstrPtr>),      // continuation pointer
     Catch(usize) // catch context
 }
 
@@ -203,13 +203,6 @@ impl Value {
     pub fn is_function(&self) -> bool {
         match *self {
             Value::Closure(..) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_boolean(&self) -> bool {
-        match *self {
-            Value::Atom(atom::TRUE) | Value::Atom(atom::FALSE) => true,
             _ => false,
         }
     }

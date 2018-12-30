@@ -1,10 +1,10 @@
-use crate::atom;
 use crate::arc_without_weak::ArcWithoutWeak;
+use crate::atom;
 use crate::bif;
+use crate::exception::Exception;
 use crate::module;
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
 use crate::opcodes::Opcode;
-use crate::exception::Exception;
 use crate::pool::{Job, JoinGuard as PoolJoinGuard, Pool, Worker};
 use crate::process::{self, ExecutionContext, RcProcess};
 use crate::process_table::ProcessTable;
@@ -13,6 +13,7 @@ use std::panic;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time;
+use crate::process::InstrPtr;
 
 /// A reference counted State.
 pub type RcState = Arc<State>;
@@ -62,22 +63,26 @@ macro_rules! expand_float {
             &Value::ExtendedLiteral(i) => unsafe {
                 if let Value::Float(value::Float(f)) = (*$context.module).literals[i] {
                     f
-                } else { unreachable!() }
+                } else {
+                    unreachable!()
+                }
             },
             &Value::X(reg) => {
                 if let Value::Float(value::Float(f)) = $context.x[reg] {
                     f
-                } else { unreachable!() }
+                } else {
+                    unreachable!()
+                }
             }
             &Value::Y(reg) => {
                 let len = $context.stack.len();
                 if let Value::Float(value::Float(f)) = $context.stack[len - (reg + 2)] {
                     f
-                } else { unreachable!() }
+                } else {
+                    unreachable!()
+                }
             }
-            &Value::FloatReg(reg) => {
-                $context.f[reg]
-            }
+            &Value::FloatReg(reg) => $context.f[reg],
             _ => unreachable!(),
         }
     }};
@@ -308,8 +313,8 @@ impl Machine {
         //     process.pid, context.ip
         // );
         loop {
-            let ins = unsafe { &(*context.module).instructions[context.ip] };
-            context.ip += 1;
+            let ins = unsafe { &(*context.module).instructions[context.ip.ptr] };
+            context.ip.ptr += 1;
 
             // println!(
             //     "running proc pid {:?}, ins {:?}, args: {:?}",
@@ -461,6 +466,8 @@ impl Machine {
                         let mfa = unsafe { &(*context.module).imports[*dest] };
                         let val = bif::apply(self, process, mfa, &[]).unwrap(); // TODO handle fail
                         set_register!(context, reg, val); // HAXX
+                        // TODO: no fail label means this is not a func header call,
+                        // but body, run the handle_error routine
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }

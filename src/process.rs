@@ -1,6 +1,7 @@
+use crate::exception::Exception;
 use crate::immix::Heap;
 use crate::mailbox::Mailbox;
-use crate::module::Module;
+use crate::module::{Module, MFA};
 use crate::pool::Job;
 pub use crate::process_table::PID;
 use crate::value::Value;
@@ -10,7 +11,6 @@ use std::collections::HashMap;
 use std::panic::RefUnwindSafe;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use crate::exception::Exception;
 
 /// Heavily inspired by inko
 
@@ -33,23 +33,30 @@ pub struct ExecutionContext {
     /// Number of catches on stack.
     pub catches: usize,
     /// Program pointer, points to the current instruction.
-    pub ip: usize, // TODO: ip/cp need to store (offset as usize, *const Module)
+    pub ip: InstrPtr,
     /// Continuation pointer
-    pub cp: Option<usize>,
+    pub cp: Option<InstrPtr>,
+    /// Current function
+    pub current: MFA,
     pub live: usize,
-    /// pointer to the current module
-    pub module: *const Module,
     /// binary construction state
     pub bs: *mut String,
-    /// 
-    pub exc: Option<Exception>
+    ///
+    pub exc: Option<Exception>,
 }
 
+#[derive(Clone, Copy)]
 pub struct InstrPtr {
     /// Module containing the instruction set.
     pub module: *const Module,
     /// Offset to the current instruction.
-    pub ip: usize,
+    pub ptr: usize,
+}
+
+impl InstrPtr {
+    pub fn new(module: *const Module, ptr: usize) -> Self {
+        InstrPtr { module, ptr }
+    }
 }
 
 impl ExecutionContext {

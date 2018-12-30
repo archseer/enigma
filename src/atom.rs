@@ -124,24 +124,57 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("undefined"); // 3
     atoms.register_atom("value"); // 4
     atoms.register_atom("all"); // 5
-    atoms.register_atom("function_clause"); // 6
-    atoms.register_atom("if_clause"); // 7
-    atoms.register_atom("case_clause"); // 8
-    atoms.register_atom("try_clause"); // 9
-    atoms.register_atom("badmatch"); // 10
+
+    atoms.register_atom("normal");
+    atoms.register_atom("internal_error");
+    atoms.register_atom("badarg");
+    atoms.register_atom("badarith");
+    atoms.register_atom("badmatch");
+    atoms.register_atom("function_clause");
+    atoms.register_atom("case_clause");
+    atoms.register_atom("if_clause");
+    atoms.register_atom("undef");
+    atoms.register_atom("badfun");
+    atoms.register_atom("badarity");
+    atoms.register_atom("timeout_value");
+    atoms.register_atom("no_proc");
+    atoms.register_atom("not_alive");
+    atoms.register_atom("system_limit");
+    atoms.register_atom("try_clause");
+    atoms.register_atom("not_sup");
+    atoms.register_atom("bad_map");
+    atoms.register_atom("bad_key");
+
+    atoms.register_atom("nocatch");
     atoms
 };
 
-pub const TRUE: usize = 1;
-pub const FALSE: usize = 2;
-pub const UNDEFINED: usize = 3;
-pub const VALUE: usize = 4;
-pub const ALL: usize = 5;
-pub const FUNCTION_CLAUSE: usize = 6;
-pub const IF_CLAUSE: usize = 7;
-pub const CASE_CLAUSE: usize = 8;
-pub const TRY_CLAUSE: usize = 9;
-pub const BADMATCH: usize = 10;
+pub const TRUE:            usize = 1;
+pub const FALSE:           usize = 2;
+pub const UNDEFINED:       usize = 3;
+pub const VALUE:           usize = 4;
+pub const ALL:             usize = 5;
+pub const NORMAL:          usize = 6;
+pub const INTERNAL_ERROR:  usize = 7;
+pub const BADARG:          usize = 8;
+pub const BADARITH:        usize = 9;
+pub const BADMATCH:        usize = 10;
+pub const FUNCTION_CLAUSE: usize = 11;
+pub const CASE_CLAUSE:     usize = 12;
+pub const IF_CLAUSE:       usize = 13;
+pub const UNDEF:           usize = 14;
+pub const BADFUN:          usize = 15;
+pub const BADARITY:        usize = 16;
+pub const TIMEOUT_VALUE:   usize = 17;
+pub const NO_PROC:         usize = 18;
+pub const NOT_ALIVE:       usize = 19;
+pub const SYSTEM_LIMIT:    usize = 20;
+pub const TRY_CLAUSE:      usize = 21;
+pub const NOT_SUP:         usize = 22;
+pub const BAD_MAP:         usize = 23;
+pub const BAD_KEY:         usize = 24;
+
+pub const NOCATCH:         usize = 25;
 
 pub fn from_str(val: &str) -> usize {
     ATOMS.from_str(val)

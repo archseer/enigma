@@ -1,20 +1,196 @@
 use crate::process::RcProcess;
+use crate::atom;
 use crate::process::InstrPtr;
 use crate::value::{self, Value};
 use crate::module::MFA;
 
 /// http://erlang.org/doc/reference_manual/errors.html#exceptions
-pub enum Exception {
-    /// Runtime error or the process called erlang:error/1,2
-    Error { reason: usize, value: Value },
-    /// The process called exit/1
-    Exit(Value),
-    /// The process called throw/1
-    Throw(Value),
+pub struct Exception {
+    reason: Reason, // bitflags
+    value: Value,
+    trace: Value
 }
 
+bitflags! {
+    struct Reason: u32 {
+        /// There are three primary exception classes:
+        /// 
+        ///      - exit			Process termination - not an error.
+        ///      - error			Error (adds stacktrace; will be logged).
+        ///      - thrown		Nonlocal return (turns into a 'nocatch'
+        ///      			error if not caught by the process).
+        /// 
+        /// In addition, we define a number of exit codes as a convenient
+        /// short-hand: instead of building the error descriptor term at the time
+        /// the exception is raised, it is built as necessary when the exception
+        /// is handled. Examples are EXC_NORMAL, EXC_BADARG, EXC_BADARITH, etc.
+        /// Some of these have convenient aliases, like BADARG and BADARITH.
+
+        /// Tag
+        const EXT_OFFSET = 0;
+        const EXT_BITS = 2;
+
+        /// Runtime error or the process called erlang:error/1,2
+        const EXT_ERROR = 0b00;
+        /// The process called exit/1
+        const EXT_EXIT  = 0b01;
+        /// The process called throw/1
+        const EXT_THROW = 0b10;
+
+        const EXT_TAGBITS = (1 << Self::EXT_BITS.bits) - 1;
+
+        /// Exit code flags
+        ///
+        /// These flags make is easier and quicker to decide what to do with the
+        /// exception in the early stages, before a handler is found, and also
+        /// maintains some separation between the class tag and the actions.
+
+        const EXF_OFFSET = Self::EXT_TAGBITS.bits;
+        const EXF_BITS = 7;
+
+        /// ignore catches
+        const EXF_PANIC       = 1 << (0 + Self::EXF_OFFSET.bits);
+        /// nonlocal return
+        const EXF_THROWN      = 1 << (1 + Self::EXF_OFFSET.bits);
+        /// write to logger on termination
+        const EXF_LOG         = 1 << (2 + Self::EXF_OFFSET.bits);
+        /// occurred in native code
+        const EXF_NATIVE      = 1 << (3 + Self::EXF_OFFSET.bits);
+        /// save stack trace in internal form
+        const EXF_SAVETRACE   = 1 << (4 + Self::EXF_OFFSET.bits);
+        /// has arglist for top of trace
+        const EXF_ARGLIST     = 1 << (5 + Self::EXF_OFFSET.bits);
+        /// restore original bif/nif
+        const EXF_RESTORE_NIF = 1 << (6 + Self::EXF_OFFSET.bits);
+
+        const EXF_FLAGBITS  = (((1<<(Self::EXF_BITS.bits + Self::EXF_OFFSET.bits))-1) & !((1<<(Self::EXF_OFFSET.bits))-1));
+
+        /// Primary exception
+        const EXF_PRIMARY = Self::EXF_PANIC.bits | Self::EXF_THROWN.bits | Self::EXF_LOG.bits | Self::EXF_NATIVE.bits;
+
+        /// Exit codes used for raising a fresh exception. The primary exceptions
+        /// share index 0 in the descriptor table. EXC_NULL signals that no
+        /// exception has occurred. The primary exit codes EXC_EXIT, EXC_ERROR
+        /// and EXC_THROWN are the basis for all other exit codes, and must
+        /// always have the EXF_SAVETRACE flag set so that a trace is saved
+        /// whenever a new exception occurs; the flag is then cleared.
+        /// Initial value for p->freason
+
+        /// Error code used for indexing into the short-hand error descriptor table.
+        const EXC_OFFSET = Self::EXF_OFFSET.bits + Self::EXF_BITS.bits;
+        const EXC_BITS   = 5;
+
+        const EXC_CODEBITS = (((1<<(Self::EXC_BITS.bits + Self::EXC_OFFSET.bits))-1) & !((1<<(Self::EXC_OFFSET.bits))-1));
+
+        /// Default value on boot.
+        const EXC_NULL = 0;
+
+        const EXC_PRIMARY = (0 | Self::EXF_SAVETRACE.bits);
+
+        /// Generic error (exit term in p->fvalue)
+        const EXC_ERROR  = (Self::EXC_PRIMARY.bits | Self::EXT_ERROR.bits | Self::EXF_LOG.bits);
+        /// Generic exit (exit term in p->fvalue)
+        const EXC_EXIT   = (Self::EXC_PRIMARY.bits | Self::EXT_EXIT.bits);
+        /// Generic nonlocal return (thrown term in p->fvalue)
+        const EXC_THROWN = (Self::EXC_PRIMARY.bits | Self::EXT_THROW.bits | Self::EXF_THROWN.bits);
+
+        /// Error with given arglist term (exit reason in p->fvalue)
+        const EXC_ERROR_2  = (Self::EXC_ERROR.bits | Self::EXF_ARGLIST.bits);
+
+        /// Normal exit (reason 'normal')
+        const EXC_NORMAL          = ((1 << Self::EXC_OFFSET.bits) | Self::EXC_EXIT.bits);
+        /// Things that shouldn't happen
+        const EXC_INTERNAL_ERROR  = ((2 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits | Self::EXF_PANIC.bits);
+        /// Bad argument to a BIF
+        const EXC_BADARG          = ((3 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+        /// Bad arithmetic
+        const EXC_BADARITH        = ((4 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+        /// Bad match in function body
+        const EXC_BADMATCH        = ((5 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+        /// No matching function head
+        const EXC_FUNCTION_CLAUSE = ((6 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+        /// No matching case clause
+        const EXC_CASE_CLAUSE     = ((7 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+        /// No matching if clause
+        const EXC_IF_CLAUSE       = ((8 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+        /// No farity that matches
+        const EXC_UNDEF           = ((9 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+        /// Not an existing fun
+        const EXC_BADFUN          = ((10 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+        /// Attempt to call fun with wrong number of arguments.
+        const EXC_BADARITY        = ((11 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+        /// Bad time out value
+        const EXC_TIMEOUT_VALUE   = ((12 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+        ///* No process or port
+        const EXC_NOPROC          = ((13 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+        ///* Not distributed
+        const EXC_NOTALIVE        = ((14 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+        /// Ran out of something
+        const EXC_SYSTEM_LIMIT    = ((15 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+        /// No matching try clause
+        const EXC_TRY_CLAUSE      = ((16 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+        /// Not supported
+        const EXC_NOTSUP          = ((17 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+        /// Bad map
+        const EXC_BADMAP          = ((18 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+        /// Bad key in map
+        const EXC_BADKEY          = ((19 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
+
+        /*
+        * Internal pseudo-error codes.
+        */
+
+        /// BIF Trap to erlang code
+        const TRAP = (1 << Self::EXC_OFFSET.bits);
+    }
+}
+
+macro_rules! exception_class {
+    ($x:expr) => {$x & Reason::EXT_BITS}
+}
+
+macro_rules! primary_exception {
+    ($x:expr) => {$x & (Reason::EXF_PRIMARY | Reason::EXT_BITS)}
+}
+// #define PRIMARY_EXCEPTION(x) ((x) & (EXF_PRIMARY | EXC_CLASSBITS))
+
+macro_rules! native_exception {
+    ($x:expr) => {$x & Reason::EXF_NATIVE}
+}
+// #define NATIVE_EXCEPTION(x) ((x) | EXF_NATIVE)
+
+
+// get_exc_index
+macro_rules! exception_code {
+    ($x:expr) => { (($x.bits & Reason::EXC_CODEBITS.bits) >> Reason::EXC_OFFSET.bits) }
+}
+
+
+const MAX_BACKTRACE_SIZE: usize = 64;
+const DEFAULT_BACKTRACE_SIZE: usize = 8;
+
 /// Mapping from error code 'index' to atoms.
-pub enum Reason {
+const EXIT_CODES: [usize; 20] = [
+    atom::INTERNAL_ERROR, // 0
+    atom::NORMAL,
+    atom::INTERNAL_ERROR,
+    atom::BADARG,
+    atom::BADARITH,
+    atom::BADMATCH,
+    atom::FUNCTION_CLAUSE,
+    atom::CASE_CLAUSE,
+    atom::IF_CLAUSE,
+    atom::UNDEF,
+    atom::BADFUN,
+    atom::BADARITY,
+    atom::TIMEOUT_VALUE,
+    atom::NO_PROC,
+    atom::NOT_ALIVE,
+    atom::SYSTEM_LIMIT,
+    atom::TRY_CLAUSE,
+    atom::NOT_SUP,
+    atom::BAD_MAP,
+    atom::BAD_KEY // 19
     // Eterm error_atom[NUMBER_EXIT_CODES] = {
     //   am_internal_error,	/* 0 */
     //   am_normal,		/* 1 */
@@ -36,7 +212,21 @@ pub enum Reason {
     //   am_notsup,		/* 17 */
     //   am_badmap,		/* 18 */
     //   am_badkey,		/* 19 */
+];
+
+/// The quick-saved stack trace structure
+struct StackTrace {
+    /// original exception reason is saved in the struct
+    reason: Reason, // bitflags
+    ///
+    pc: InstrPtr,
+    current: MFA,
+    // /// number of saved pointers in trace[]
+    // int depth;
+    // BeamInstr *trace[1];  /* varying size - must be last in struct */
+    trace: Vec<InstrPtr>,
 }
+
 
 /// To fully understand the error handling, one must keep in mind that
 /// when an exception is thrown, the search for a handler can jump back
@@ -63,24 +253,15 @@ pub enum Reason {
 // {
 pub fn handle_error(process: &RcProcess, pc: usize, reg: &Value, bif_mfa: &MFA) -> Option<InstrPtr> {
        let heap = &process.context_mut().heap;
-//     Eterm Value = c_p->fvalue;
-//     let mut value = ;
        let args = Value::Atom(atom::TRUE);
 
        let context = process.context_mut();
+       let exc = &mut context.exc.unwrap();
 
-//     ASSERT(c_p->freason != TRAP); /* Should have been handled earlier. */
+       assert!(!exc.reason.contains(Reason::TRAP)); /* Should have been handled earlier. */
 //     if (c_p->freason & EXF_RESTORE_NIF) {
 //      	erts_nif_export_restore_error(c_p, &pc, reg, &bif_mfa);
 //     }
-
-// #ifdef DEBUG
-//     if (bif_mfa) {
-// 	/* Verify that bif_mfa does not point into our nif export */
-// 	NifExport *nep = ERTS_PROC_GET_NIF_TRAP_EXPORT(c_p);
-// 	ASSERT(!nep || !ErtsInArea(bif_mfa, (char *)nep, sizeof(NifExport)));
-//     }
-// #endif
 
 //     c_p->i = pc;    /* In case we call erts_exit(). */
 //     /*
@@ -96,55 +277,51 @@ pub fn handle_error(process: &RcProcess, pc: usize, reg: &Value, bif_mfa: &MFA) 
 // 	  args = tp[2];
 //     }
 
-//     /*
-//      * Save the stack trace info if the EXF_SAVETRACE flag is set. The
-//      * main reason for doing this separately is to allow throws to later
-//      * become promoted to errors without losing the original stack
-//      * trace, even if they have passed through one or more catch and
-//      * rethrow. It also makes the creation of symbolic stack traces much
-//      * more modular.
-//      */
-       // if (c_p->freason & EXF_SAVETRACE) {
-       //     save_stacktrace(c_p, pc, reg, bif_mfa, args);
-       // }
-
-       // Throws that are not caught are turned into 'nocatch' errors
-//
-       if let Some(Exception::Throw{ catches }) = context.exc {
-           if context.catches <= 0 {
-            //  value = tup2!(heap, Value::Atom(atom::NOCATCH), value);
-            //  c_p->freason = EXC_ERROR;
-           }
+       /*
+        * Save the stack trace info if the EXF_SAVETRACE flag is set. The
+        * main reason for doing this separately is to allow throws to later
+        * become promoted to errors without losing the original stack
+        * trace, even if they have passed through one or more catch and
+        * rethrow. It also makes the creation of symbolic stack traces much
+        * more modular.
+        */
+       if exc.reason.contains(Reason::EXF_SAVETRACE) {
+           save_stacktrace(process, pc, reg, bif_mfa, args);
        }
 
-       // Get the fully expanded error term */
-       value = expand_error_value(process, c_p->freason, value);
+       // Throws that are not caught are turned into 'nocatch' errors
+       //
+        if exc.reason.contains(Reason::EXC_THROWN) && context.catches <= 0 {
+            exc.value = tup2!(heap, Value::Atom(atom::NOCATCH), exc.value);
+            exc.reason = Reason::EXC_ERROR;
+        }
+
+       // Get the fully expanded error term
+       exc.value = expand_error_value(process, exc.reason, exc.value);
 
        // Save final error term and stabilize the exception flags so no
        // further expansion is done.
-       c_p->fvalue = Value;
-       c_p->freason = PRIMARY_EXCEPTION(c_p->freason);
+       exc.reason = primary_exception!(exc.reason);
 
        //  Find a handler or die
-       if ((context.catches > 0 || IS_TRACED_FL(c_p, F_EXCEPTION_TRACE))
-           && !(c_p->freason & EXF_PANIC)) {
-// 	BeamInstr *new_pc;
-//         /* The Beam handler code (catch_end or try_end) checks reg[0]
-// 	   for THE_NON_VALUE to see if the previous code finished
-// 	   abnormally. If so, reg[1], reg[2] and reg[3] should hold the
-// 	   exception class, term and trace, respectively. (If the
-// 	   handler is just a trap to native code, these registers will
-// 	   be ignored.) */
-// 	reg[0] = THE_NON_VALUE;
-// 	reg[1] = exception_tag[GET_EXC_CLASS(c_p->freason)];
-// 	reg[2] = Value;
-// 	reg[3] = c_p->ftrace;
-//         if ((new_pc = next_catch(c_p, reg))) {
-// 	    c_p->cp = 0;	/* To avoid keeping stale references. */
-//             ERTS_RECV_MARK_CLEAR(c_p); /* No longer safe to use this position */
-// 	    return new_pc;
-// 	}
-// 	if (c_p->catches > 0) erts_exit(ERTS_ERROR_EXIT, "Catch not found");
+       if context.catches > 0 && !exc.reason.contains(Reason::EXF_PANIC) {
+           // BeamInstr *new_pc;
+           // /* The Beam handler code (catch_end or try_end) checks reg[0]
+           // for THE_NON_VALUE to see if the previous code finished
+           // abnormally. If so, reg[1], reg[2] and reg[3] should hold the
+           // exception class, term and trace, respectively. (If the
+           // handler is just a trap to native code, these registers will
+           // be ignored.) */
+           // reg[0] = THE_NON_VALUE;
+           // reg[1] = exception_tag[GET_EXC_CLASS(c_p->freason)];
+           // reg[2] = Value;
+           // reg[3] = c_p->ftrace;
+           if let Some(new_pc) = next_catch(process, reg) {
+               context.cp = 0; // To avoid keeping stale references.
+               //ERTS_RECV_MARK_CLEAR(c_p); // No longer safe to use this position
+           } else {
+               erts_exit(ERTS_ERROR_EXIT, "Catch not found")
+           }
        }
 //     ERTS_UNREQ_PROC_MAIN_LOCK(c_p);
 //     terminate_proc(c_p, Value);
@@ -160,7 +337,7 @@ fn next_catch(process: &RcProcess, reg: &Value) -> Option<InstrPtr> {
        let mut prev = 0;
        let mut ptr = context.stack.len();
 
-       debug_assert!(context.stack.last().is_cp());
+       debug_assert!(context.stack.last().unwrap().is_cp());
        // ASSERT(ptr <= STACK_START(c_p));
        // if (ptr == STACK_START(c_p)) return NULL;
 
@@ -169,15 +346,14 @@ fn next_catch(process: &RcProcess, reg: &Value) -> Option<InstrPtr> {
        while ptr > 0 {
            match &context.stack[ptr-1] {
                &Value::Catch(..) => {
-                   if active_catches {
-                       // ASSERT(ptr < STACK_START(c_p));
-                       // Unwind the stack up to the current frame.
-                       context.stack.truncate(prev);
-                       // TODO: tracing handling here
-                       // return catch_pc(*ptr);
-                   }
+                    // ASSERT(ptr < STACK_START(c_p));
+                    // Unwind the stack up to the current frame.
+                    context.stack.truncate(prev);
+                    // context.stack.shrink_to_fit();
+                    // TODO: tracing handling here
+                    // return catch_pc(*ptr);
                }
-               &Value::CP(..) => {
+               &Value::CP(cp) => {
                    prev = ptr;
                    // TODO: OTP does tracing instr handling here
                }
@@ -189,149 +365,132 @@ fn next_catch(process: &RcProcess, reg: &Value) -> Option<InstrPtr> {
 }
 
 /// Terminating the process when an exception is not caught
-// static void
-// terminate_proc(Process* c_p, Eterm Value)
-// {
-//     Eterm *hp;
-//     Eterm Args = NIL;
+fn terminate_proc(process: &RcProcess, value: Value) {
+    //     Eterm *hp;
+    //     Eterm Args = NIL;
 
-//     /* Add a stacktrace if this is an error. */
-//     if (GET_EXC_CLASS(c_p->freason) == EXTAG_ERROR) {
-//         Value = add_stacktrace(c_p, Value, c_p->ftrace);
-//     }
-//     /* EXF_LOG is a primary exception flag */
-//     if (c_p->freason & EXF_LOG) {
-// 	int alive = erts_is_alive;
-// 	erts_dsprintf_buf_t *dsbufp = erts_create_logger_dsbuf();
+    // Add a stacktrace if this is an error.
+    // if (GET_EXC_CLASS(process->freason) == EXTAG_ERROR) {
+    //     value = add_stacktrace(process, value, process->ftrace);
+    // }
+    // // EXF_LOG is a primary exception flag
+    // if (process->freason & EXF_LOG) {
+        // int alive = erts_is_alive;
+        // erts_dsprintf_buf_t *dsbufp = erts_create_logger_dsbuf();
 
-//         /* Build the format message */
-// 	erts_dsprintf(dsbufp, "Error in process ~p ");
-// 	if (alive)
-// 	    erts_dsprintf(dsbufp, "on node ~p ");
-// 	erts_dsprintf(dsbufp, "with exit value:~n~p~n");
+        // Build the format message
+        // erts_dsprintf(dsbufp, "Error in process ~p ");
+        // if (alive)
+        //     erts_dsprintf(dsbufp, "on node ~p ");
+        // erts_dsprintf(dsbufp, "with exit value:~n~p~n");
 
-//         /* Build the args in reverse order */
-// 	hp = HAlloc(c_p, 2);
-// 	Args = CONS(hp, Value, Args);
-// 	if (alive) {
-// 	    hp = HAlloc(c_p, 2);
-// 	    Args = CONS(hp, erts_this_node->sysname, Args);
-// 	}
-// 	hp = HAlloc(c_p, 2);
-// 	Args = CONS(hp, c_p->common.id, Args);
+        // Build the args in reverse order
+        // hp = HAlloc(process, 2);
+        // Args = CONS(hp, value, Args);
+        // if (alive) {
+        //     hp = HAlloc(process, 2);
+        //     Args = CONS(hp, erts_this_node->sysname, Args);
+        // }
+        // hp = HAlloc(process, 2);
+        // Args = CONS(hp, process->common.id, Args);
 
-// 	erts_send_error_term_to_logger(c_p->group_leader, dsbufp, Args);
-//     }
-//     /*
-//      * If we use a shared heap, the process will be garbage-collected.
-//      * Must zero c_p->arity to indicate that there are no live registers.
-//      */
-//     c_p->arity = 0;
-//     erts_do_exit_process(c_p, Value);
-// }
+        // erts_send_error_term_to_logger(process->group_leader, dsbufp, Args);
+    //  }
+
+    // If we use a shared heap, the process will be garbage-collected.
+    // Must zero process->arity to indicate that there are no live registers.
+    // process->arity = 0;
+    // erts_do_exit_process(process, value);
+}
 
 /// Build and add a symbolic stack trace to the error value.
 fn add_stacktrace(process: &RcProcess, value: Value, exc: Value) -> Value {
+    let heap = &process.context_mut().heap;
     let origin = build_stacktrace(process, exc);
     tup2!(heap, value, origin)
 }
 
 /// Forming the correct error value from the internal error code.
 /// This does not update c_p->fvalue or c_p->freason.
-// Eterm
-// expand_error_value(Process* c_p, Uint freason, Eterm Value) {
-//     Eterm* hp;
-//     Uint r;
+fn expand_error_value(process: &RcProcess, reason: Reason, value: Value) -> Value {
+    match exception_code!(reason) {
+        // primary
+        0 => {
+            // Primary exceptions use fvalue as it is
+            value
+        }
+        // badmatch | case_clause | try_clause | badfun | badarity | badmap | badkey
+        5 | 7 | 16 | 11 | 18 | 19 => {
+                let heap = &process.context_mut().heap;
+                //Some common exceptions: value -> {atom, value}
+                //    ASSERT(is_value(Value));
+                // heap = HAlloc(c_p, 3);
+                // Value = TUPLE2(heap, error_atom[r], Value);
+                let error_atom = Value::Atom(EXIT_CODES[exception_code!(reason) as usize]);
+                tup2!(heap, error_atom, value)
+        }
+        _ => {
+            // Other exceptions just use an atom as descriptor
+            Value::Atom(EXIT_CODES[exception_code!(reason) as usize])
+        }
 
-//     r = GET_EXC_INDEX(freason);
-//     ASSERT(r < NUMBER_EXIT_CODES); /* range check */
-//     ASSERT(is_value(Value));
+    }
+}
 
-//     switch (r) {
-//     case (GET_EXC_INDEX(EXC_PRIMARY)):
-//         /* Primary exceptions use fvalue as it is */
-// 	break;
-//     case (GET_EXC_INDEX(EXC_BADMATCH)):
-//     case (GET_EXC_INDEX(EXC_CASE_CLAUSE)):
-//     case (GET_EXC_INDEX(EXC_TRY_CLAUSE)):
-//     case (GET_EXC_INDEX(EXC_BADFUN)):
-//     case (GET_EXC_INDEX(EXC_BADARITY)):
-//     case (GET_EXC_INDEX(EXC_BADMAP)):
-//     case (GET_EXC_INDEX(EXC_BADKEY)):
-//         /* Some common exceptions: value -> {atom, value} */
-//         ASSERT(is_value(Value));
-// 	hp = HAlloc(c_p, 3);
-// 	Value = TUPLE2(hp, error_atom[r], Value);
-// 	break;
-//     default:
-//         /* Other exceptions just use an atom as descriptor */
-//         Value = error_atom[r];
-// 	break;
-//     }
-// #ifdef DEBUG
-//     ASSERT(Value != am_internal_error);
-// #endif
-//     return Value;
-// }
+/// Quick-saving the stack trace in an internal form on the heap. Note
+/// that c_p->ftrace will point to a cons cell which holds the given args
+/// and the saved data (encoded as a bignum).
+///
+/// There is an issue with line number information. Line number
+/// information is associated with the address *before* an operation
+/// that may fail or be stored stored on the stack. But continuation
+/// pointers point after its call instruction, not before. To avoid
+/// finding the wrong line number, we'll need to adjust them so that
+/// they point at the beginning of the call instruction or inside the
+/// call instruction. Since its impractical to point at the beginning,
+/// we'll do the simplest thing and decrement the continuation pointers
+/// by one.
+///
+/// Here is an example of what can go wrong. Without the adjustment
+/// of continuation pointers, the call at line 42 below would seem to
+/// be at line 43:
+///
+/// line 42
+/// call ...
+/// line 43
+/// gc_bif ...
+///
+/// (It would be much better to put the arglist - when it exists - in the
+/// error value instead of in the actual trace; e.g. '{badarg, Args}'
+/// instead of using 'badarg' with Args in the trace. The arglist may
+/// contain very large values, and right now they will be kept alive as
+/// long as the stack trace is live. Preferably, the stack trace should
+/// always be small, so that it does not matter if it is long-lived.
+/// However, it is probably not possible to ever change the format of
+/// error terms.)
 
-// /*
-//  * Quick-saving the stack trace in an internal form on the heap. Note
-//  * that c_p->ftrace will point to a cons cell which holds the given args
-//  * and the saved data (encoded as a bignum).
-//  *
-//  * There is an issue with line number information. Line number
-//  * information is associated with the address *before* an operation
-//  * that may fail or be stored stored on the stack. But continuation
-//  * pointers point after its call instruction, not before. To avoid
-//  * finding the wrong line number, we'll need to adjust them so that
-//  * they point at the beginning of the call instruction or inside the
-//  * call instruction. Since its impractical to point at the beginning,
-//  * we'll do the simplest thing and decrement the continuation pointers
-//  * by one.
-//  *
-//  * Here is an example of what can go wrong. Without the adjustment
-//  * of continuation pointers, the call at line 42 below would seem to
-//  * be at line 43:
-//  *
-//  * line 42
-//  * call ...
-//  * line 43
-//  * gc_bif ...
-//  *
-//  * (It would be much better to put the arglist - when it exists - in the
-//  * error value instead of in the actual trace; e.g. '{badarg, Args}'
-//  * instead of using 'badarg' with Args in the trace. The arglist may
-//  * contain very large values, and right now they will be kept alive as
-//  * long as the stack trace is live. Preferably, the stack trace should
-//  * always be small, so that it does not matter if it is long-lived.
-//  * However, it is probably not possible to ever change the format of
-//  * error terms.)
-//  */
-// static void
 // save_stacktrace(Process* c_p, BeamInstr* pc, Eterm* reg,
 // 		ErtsCodeMFA *bif_mfa, Eterm args) {
-//     struct StackTrace* s;
-//     int sz;
-//     int depth = erts_backtrace_depth;    /* max depth (never negative) */
-//     if (depth > 0) {
-// 	/* There will always be a current function */
-// 	depth --;
-//     }
+fn save_stacktrace(process: &RcProcess, pc: &InstrPtr, reg: &[Value], bif_mfa: &MFA, args: Value) {
+       let depth = 8;
+        // int depth = erts_backtrace_depth;    /* max depth (never negative) */
+       if depth > 0 {
+           // There will always be a current function
+           depth -= 1;
+       }
 
-//     /* Create a container for the exception data */
-//     sz = (offsetof(struct StackTrace, trace) + sizeof(BeamInstr *)*depth
-//           + sizeof(Eterm) - 1) / sizeof(Eterm);
-//     s = (struct StackTrace *) HAlloc(c_p, 1 + sz);
-//     /* The following fields are inside the bignum */
-//     s->header = make_pos_bignum_header(sz);
-//     s->freason = c_p->freason;
-//     s->depth = 0;
+       let heap = &process.context_mut().heap;
+       // Create a container for the exception data
+       let s = heap.alloc(StackTrace {
+           reason: context.reason,
+           trace: Vec::new()
+       });
 
-//     /*
-//      * If the failure was in a BIF other than 'error/1', 'error/2',
-//      * 'exit/1' or 'throw/1', save BIF-MFA and save the argument
-//      * registers by consing up an arglist.
-//      */
+       /*
+        * If the failure was in a BIF other than 'error/1', 'error/2',
+        * 'exit/1' or 'throw/1', save BIF-MFA and save the argument
+        * registers by consing up an arglist.
+        */
 //     if (bif_mfa) {
 // 	if (bif_mfa->module == am_erlang) {
 // 	    switch (bif_mfa->function) {
@@ -369,116 +528,67 @@ fn add_stacktrace(process: &RcProcess, value: Value, exc: Value) -> Value {
 
 //     non_bif_stacktrace:
 
-// 	s->current = c_p->current;
-//         /*
-// 	 * For a function_clause error, the arguments are in the beam
-// 	 * registers, c_p->cp is valid, and c_p->current is set.
-// 	 */
-// 	if ( (GET_EXC_INDEX(s->freason)) ==
-// 	     (GET_EXC_INDEX(EXC_FUNCTION_CLAUSE)) ) {
-// 	    int a;
-// 	    ASSERT(s->current);
-// 	    a = s->current->arity;
-// 	    args = make_arglist(c_p, reg, a); /* Overwrite CAR(c_p->ftrace) */
-// 	    /* Save first stack entry */
-// 	    ASSERT(c_p->cp);
-// 	    if (depth > 0) {
-// 		s->trace[s->depth++] = c_p->cp - 1;
-// 		depth--;
-// 	    }
-// 	    s->pc = NULL; /* Ignore pc */
-// 	} else {
-// 	    if (depth > 0 && c_p->cp != 0 && c_p->cp != pc) {
-// 		s->trace[s->depth++] = c_p->cp - 1;
-// 		depth--;
-// 	    }
-// 	    s->pc = pc;
-// 	}
-//     }
+    s.current = context.current; // current MFA, is set on BIF calls? also call_fun/apply_fun or any sort of call/dispatch -> jump
+    /*
+     * For a function_clause error, the arguments are in the beam
+     * registers, c_p->cp is valid, and c_p->current is set.
+     */
+    if s.reason.contains(Reason::EXC_FUNCTION_CLAUSE) {
+        // int a;
+        // ASSERT(s->current);
+        // a = s->current->arity;
+        // args = make_arglist(c_p, reg, a); /* Overwrite CAR(c_p->ftrace) */
+        // /* Save first stack entry */
+        // ASSERT(c_p->cp);
+        // if (depth > 0) {
+        //     s->trace[s->depth++] = c_p->cp - 1;
+        //     depth--;
+        // }
+        // s->pc = NULL; /* Ignore pc */
+    } else {
+        // if (depth > 0 && c_p->cp != 0 && c_p->cp != pc) {
+        // s->trace[s->depth++] = c_p->cp - 1;
+        // depth--;
+        // }
+        // s->pc = pc;
+    }
+    // }
 
-//     /* Package args and stack trace */
+//     // Package args and stack trace
 //     {
 // 	Eterm *hp;
 // 	hp = HAlloc(c_p, 2);
 // 	c_p->ftrace = CONS(hp, args, make_big((Eterm *) s));
 //     }
 
-//     /* Save the actual stack trace */
-//     erts_save_stacktrace(c_p, s, depth);
-// }
+//     // Save the actual stack trace
+       erts_save_stacktrace(process, s, depth)
+}
 
-// void
-// erts_save_stacktrace(Process* p, struct StackTrace* s, int depth)
-// {
-//     if (depth > 0) {
-// 	Eterm *ptr;
-// 	BeamInstr *prev = s->depth ? s->trace[s->depth-1] : NULL;
-// 	BeamInstr i_return_trace = beam_return_trace[0];
-// 	BeamInstr i_return_to_trace = beam_return_to_trace[0];
+fn erts_save_stacktrace(process: &RcProcess, s: &StackTrace, depth: usize) {
+    let context = process.context_mut();
+    if depth <= 0 { return }
+    let mut ptr = context.stack.len();
+    //  BeamInstr *prev = s->depth ? s->trace[s->depth-1] : NULL;
 
-// 	/*
-// 	 * Traverse the stack backwards and add all unique continuation
-// 	 * pointers to the buffer, up to the maximum stack trace size.
-// 	 *
-// 	 * Skip trace stack frames.
-// 	 */
-// 	ptr = p->stop;
-// 	if (ptr < STACK_START(p) &&
-// 	    (is_not_CP(*ptr)|| (*cp_val(*ptr) != i_return_trace &&
-// 				*cp_val(*ptr) != i_return_to_trace)) &&
-// 	    p->cp) {
-// 	    /* Cannot follow cp here - code may be unloaded */
-// 	    BeamInstr *cpp = p->cp;
-// 	    int trace_cp;
-// 	    if (cpp == beam_exception_trace || cpp == beam_return_trace) {
-// 		/* Skip return_trace parameters */
-// 		ptr += 2;
-// 		trace_cp = 1;
-// 	    } else if (cpp == beam_return_to_trace) {
-// 		/* Skip return_to_trace parameters */
-// 		ptr += 1;
-// 		trace_cp = 1;
-// 	    }
-// 	    else {
-// 		trace_cp = 0;
-// 	    }
-// 	    if (trace_cp && s->pc == cpp) {
-// 		/*
-// 		 * If process 'cp' points to a return/exception trace
-// 		 * instruction and 'cp' has been saved as 'pc' in
-// 		 * stacktrace, we need to update 'pc' in stacktrace
-// 		 * with the actual 'cp' located on the top of the
-// 		 * stack; otherwise, we will lose the top stackframe
-// 		 * when building the stack trace.
-// 		 */
-// 		ASSERT(is_CP(p->stop[0]));
-// 		s->pc = cp_val(p->stop[0]);
-// 	    }
-// 	}
-// 	while (ptr < STACK_START(p) && depth > 0) {
-// 	    if (is_CP(*ptr)) {
-// 		if (*cp_val(*ptr) == i_return_trace) {
-// 		    /* Skip stack frame variables */
-// 		    do ++ptr; while (is_not_CP(*ptr));
-// 		    /* Skip return_trace parameters */
-// 		    ptr += 2;
-// 		} else if (*cp_val(*ptr) == i_return_to_trace) {
-// 		    /* Skip stack frame variables */
-// 		    do ++ptr; while (is_not_CP(*ptr));
-// 		} else {
-// 		    BeamInstr *cp = cp_val(*ptr);
-// 		    if (cp != prev) {
-// 			/* Record non-duplicates only */
-// 			prev = cp;
-// 			s->trace[s->depth++] = cp - 1;
-// 			depth--;
-// 		    }
-// 		    ptr++;
-// 		}
-// 	    } else ptr++;
-// 	}
-//     }
-// }
+    /*
+     * Traverse the stack backwards and add all unique continuation
+     * pointers to the buffer, up to the maximum stack trace size.
+     *
+     * Skip trace stack frames.
+     */
+    while ptr > 0 && depth > 0 {
+        if let Value::CP(cp) = &context.stack[ptr-1] {
+            if cp != prev {
+                // Record non-duplicates only
+                prev = cp;
+                s.trace.push(cp - 1);
+                depth -= 1;
+            }
+        }
+        ptr -= 1
+    }
+}
 
 // /*
 //  * Getting the relevant fields from the term pointed to by ftrace
@@ -528,278 +638,85 @@ fn add_stacktrace(process: &RcProcess, value: Value, exc: Value) -> Value {
 /// Building a symbolic representation of a saved stack trace. Note that
 /// the exception object 'exc', unless NIL, points to a cons cell which
 /// holds the given args and the quick-saved data (encoded as a bignum).
-/// 
+///
 /// If the bignum is negative, the given args is a complete stacktrace.
 pub fn build_stacktrace(process: &RcProcess, exc: Value) -> Value {
-// Eterm
-// build_stacktrace(Process* c_p, Eterm exc) {
-//     struct StackTrace* s;
-//     Eterm  args;
-//     int    depth;
-//     FunctionInfo fi;
-//     FunctionInfo* stk;
-//     FunctionInfo* stkp;
-//     Eterm res = NIL;
-//     Uint heap_size;
-//     Eterm* hp;
-//     Eterm mfa;
-//     int i;
+    struct StackTrace* s;
+    Eterm  args;
+    int    depth;
+    FunctionInfo fi;
+    FunctionInfo* stk;
+    FunctionInfo* stkp;
+    Eterm res = NIL;
+    Uint heap_size;
+    Eterm* hp;
+    Eterm mfa;
+    int i;
 
-//     if (! (s = get_trace_from_exc(exc))) {
-//         return NIL;
-//     }
-// #ifdef HIPE
-//     if (s->freason & EXF_NATIVE) {
-// 	return hipe_build_stacktrace(c_p, s);
-//     }
-// #endif
-//     if (is_raised_exc(exc)) {
-// 	return get_args_from_exc(exc);
-//     }
+    if (! (s = get_trace_from_exc(exc))) {
+        return NIL;
+    }
+    if (is_raised_exc(exc)) {
+     return get_args_from_exc(exc);
+    }
 
-//     /*
-//      * Find the current function. If the saved s->pc is null, then the
-//      * saved s->current should already contain the proper value.
-//      */
-//     if (s->pc != NULL) {
-// 	erts_lookup_function_info(&fi, s->pc, 1);
-//     } else if (GET_EXC_INDEX(s->freason) ==
-// 	       GET_EXC_INDEX(EXC_FUNCTION_CLAUSE)) {
-// 	erts_lookup_function_info(&fi, erts_codemfa_to_code(s->current), 1);
-//     } else {
-// 	erts_set_current_function(&fi, s->current);
-//     }
+    /*
+     * Find the current function. If the saved s->pc is null, then the
+     * saved s->current should already contain the proper value.
+     */
+    if (s->pc != NULL) {
+     erts_lookup_function_info(&fi, s->pc, 1);
+    } else if (GET_EXC_INDEX(s->freason) ==
+            GET_EXC_INDEX(EXC_FUNCTION_CLAUSE)) {
+     erts_lookup_function_info(&fi, erts_codemfa_to_code(s->current), 1);
+    } else {
+     erts_set_current_function(&fi, s->current);
+    }
 
-//     depth = s->depth;
-//     /*
-//      * If fi.current is still NULL, and we have no
-//      * stack at all, default to the initial function
-//      * (e.g. spawn_link(erlang, abs, [1])).
-//      */
-//     if (fi.mfa == NULL) {
-// 	if (depth <= 0)
-//             erts_set_current_function(&fi, &c_p->u.initial);
-// 	args = am_true; /* Just in case */
-//     } else {
-// 	args = get_args_from_exc(exc);
-//     }
+    depth = s->depth;
+    /*
+     * If fi.current is still NULL, and we have no
+     * stack at all, default to the initial function
+     * (e.g. spawn_link(erlang, abs, [1])).
+     */
+    if (fi.mfa == NULL) {
+     if (depth <= 0)
+            erts_set_current_function(&fi, &c_p->u.initial);
+     args = am_true; /* Just in case */
+    } else {
+     args = get_args_from_exc(exc);
+    }
 
-//     /*
-//      * Look up all saved continuation pointers and calculate
-//      * needed heap space.
-//      */
-//     stk = stkp = (FunctionInfo *) erts_alloc(ERTS_ALC_T_TMP,
-// 				      depth*sizeof(FunctionInfo));
-//     heap_size = fi.mfa ? fi.needed + 2 : 0;
-//     for (i = 0; i < depth; i++) {
-// 	erts_lookup_function_info(stkp, s->trace[i], 1);
-// 	if (stkp->mfa) {
-// 	    heap_size += stkp->needed + 2;
-// 	    stkp++;
-// 	}
-//     }
+    /*
+     * Look up all saved continuation pointers and calculate
+     * needed heap space.
+     */
+    stk = stkp = (FunctionInfo *) erts_alloc(ERTS_ALC_T_TMP,
+     			      depth*sizeof(FunctionInfo));
+    heap_size = fi.mfa ? fi.needed + 2 : 0;
+    for (i = 0; i < depth; i++) {
+     erts_lookup_function_info(stkp, s->trace[i], 1);
+     if (stkp->mfa) {
+         heap_size += stkp->needed + 2;
+         stkp++;
+     }
+    }
 
-//     /*
-//      * Allocate heap space and build the stacktrace.
-//      */
-//     hp = HAlloc(c_p, heap_size);
-//     while (stkp > stk) {
-// 	stkp--;
-// 	hp = erts_build_mfa_item(stkp, hp, am_true, &mfa);
-// 	res = CONS(hp, mfa, res);
-// 	hp += 2;
-//     }
-//     if (fi.mfa) {
-// 	hp = erts_build_mfa_item(&fi, hp, args, &mfa);
-// 	res = CONS(hp, mfa, res);
-//     }
+    /*
+     * Allocate heap space and build the stacktrace.
+     */
+    hp = HAlloc(c_p, heap_size);
+    while (stkp > stk) {
+     stkp--;
+     hp = erts_build_mfa_item(stkp, hp, am_true, &mfa);
+     res = CONS(hp, mfa, res);
+     hp += 2;
+    }
+    if (fi.mfa) {
+     hp = erts_build_mfa_item(&fi, hp, args, &mfa);
+     res = CONS(hp, mfa, res);
+    }
 
-//     erts_free(ERTS_ALC_T_TMP, (void *) stk);
-//     return res;
-// }
+    erts_free(ERTS_ALC_T_TMP, (void *) stk);
+    return res;
 }
-
-// static BeamInstr*
-// call_error_handler(Process* p, ErtsCodeMFA* mfa, Eterm* reg, Eterm func)
-// {
-//     Eterm* hp;
-//     Export* ep;
-//     int arity;
-//     Eterm args;
-//     Uint sz;
-//     int i;
-
-//     DBG_TRACE_MFA_P(mfa, "call_error_handler");
-//     /*
-//      * Search for the error_handler module.
-//      */
-//     ep = erts_find_function(erts_proc_get_error_handler(p), func, 3,
-// 			    erts_active_code_ix());
-//     if (ep == NULL) {		/* No error handler */
-// 	p->current = mfa;
-// 	p->freason = EXC_UNDEF;
-// 	return 0;
-//     }
-
-//     /*
-//      * Create a list with all arguments in the x registers.
-//      */
-//     arity = mfa->arity;
-//     sz = 2 * arity;
-//     if (HeapWordsLeft(p) < sz) {
-// 	erts_garbage_collect(p, sz, reg, arity);
-//     }
-//     hp = HEAP_TOP(p);
-//     HEAP_TOP(p) += sz;
-//     args = NIL;
-//     for (i = arity-1; i >= 0; i--) {
-// 	args = CONS(hp, reg[i], args);
-// 	hp += 2;
-//     }
-
-//     /*
-//      * Set up registers for call to error_handler:<func>/3.
-//      */
-//     reg[0] = mfa->module;
-//     reg[1] = mfa->function;
-//     reg[2] = args;
-//     return ep->addressv[erts_active_code_ix()];
-// }
-
-// static Export*
-// apply_setup_error_handler(Process* p, Eterm module, Eterm function, Uint arity, Eterm* reg)
-// {
-//     Export* ep;
-
-//     /*
-//      * Find the export table index for the error handler. Return NULL if
-//      * there is no error handler module.
-//      */
-//     if ((ep = erts_active_export_entry(erts_proc_get_error_handler(p),
-// 				     am_undefined_function, 3)) == NULL) {
-// 	return NULL;
-//     } else {
-// 	int i;
-// 	Uint sz = 2*arity;
-// 	Eterm* hp;
-// 	Eterm args = NIL;
-
-// 	/*
-// 	 * Always copy args from registers to a new list; this ensures
-// 	 * that we have the same behaviour whether or not this was
-// 	 * called from apply or fixed_apply (any additional last
-// 	 * THIS-argument will be included, assuming that arity has been
-// 	 * properly adjusted).
-// 	 */
-// 	if (HeapWordsLeft(p) < sz) {
-// 	    erts_garbage_collect(p, sz, reg, arity);
-// 	}
-// 	hp = HEAP_TOP(p);
-// 	HEAP_TOP(p) += sz;
-// 	for (i = arity-1; i >= 0; i--) {
-// 	    args = CONS(hp, reg[i], args);
-// 	    hp += 2;
-// 	}
-// 	reg[0] = module;
-// 	reg[1] = function;
-// 	reg[2] = args;
-//     }
-
-//     return ep;
-// }
-
-// static ERTS_INLINE void
-// apply_bif_error_adjustment(Process *p, Export *ep,
-// 			   Eterm *reg, Uint arity,
-// 			   BeamInstr *I, Uint stack_offset)
-// {
-//     /*
-//      * I is only set when the apply is a tail call, i.e.,
-//      * from the instructions i_apply_only, i_apply_last_P,
-//      * and apply_last_IP.
-//      */
-//     if (I
-// 	&& BeamIsOpCode(ep->beam[0], op_apply_bif)
-//         && (ep == bif_export[BIF_error_1]
-// 	    || ep == bif_export[BIF_error_2]
-// 	    || ep == bif_export[BIF_exit_1]
-// 	    || ep == bif_export[BIF_throw_1])) {
-// 	/*
-// 	 * We are about to tail apply one of the BIFs
-// 	 * erlang:error/1, erlang:error/2, erlang:exit/1,
-// 	 * or erlang:throw/1. Error handling of these BIFs is
-// 	 * special!
-// 	 *
-// 	 * We need 'p->cp' to point into the calling
-// 	 * function when handling the error after the BIF has
-// 	 * been applied. This in order to get the topmost
-// 	 * stackframe correct. Without the following adjustment,
-// 	 * 'p->cp' will point into the function that called
-// 	 * current function when handling the error. We add a
-// 	 * dummy stackframe in order to achieve this.
-// 	 *
-// 	 * Note that these BIFs unconditionally will cause
-// 	 * an exception to be raised. That is, our modifications
-// 	 * of 'p->cp' as well as the stack will be corrected by
-// 	 * the error handling code.
-// 	 *
-// 	 * If we find an exception/return-to trace continuation
-// 	 * pointer as the topmost continuation pointer, we do not
-// 	 * need to do anything since the information already will
-// 	 * be available for generation of the stacktrace.
-// 	 */
-// 	int apply_only = stack_offset == 0;
-// 	BeamInstr *cpp;
-
-// 	if (apply_only) {
-// 	    ASSERT(p->cp != NULL);
-// 	    cpp = p->cp;
-// 	}
-// 	else {
-// 	    ASSERT(is_CP(p->stop[0]));
-// 	    cpp = cp_val(p->stop[0]);
-// 	}
-
-// 	if (cpp != beam_exception_trace
-// 	    && cpp != beam_return_trace
-// 	    && cpp != beam_return_to_trace) {
-// 	    Uint need = stack_offset /* bytes */ / sizeof(Eterm);
-// 	    if (need == 0)
-// 		need = 1; /* i_apply_only */
-// 	    if (p->stop - p->htop < need)
-// 		erts_garbage_collect(p, (int) need, reg, arity+1);
-// 	    p->stop -= need;
-
-// 	    if (apply_only) {
-// 		/*
-// 		 * Called from the i_apply_only instruction.
-// 		 *
-// 		 * 'p->cp' contains continuation pointer pointing
-// 		 * into the function that called current function.
-// 		 * We push that continuation pointer onto the stack,
-// 		 * and set 'p->cp' to point into current function.
-// 		 */
-// 		p->stop[0] = make_cp(p->cp);
-// 		p->cp = I;
-// 	    }
-// 	    else {
-// 		/*
-// 		 * Called from an i_apply_last_p, or apply_last_IP,
-// 		 * instruction.
-// 		 *
-// 		 * Calling instruction will after we return read
-// 		 * a continuation pointer from the stack and write
-// 		 * it to 'p->cp', and then remove the topmost
-// 		 * stackframe of size 'stack_offset'.
-// 		 *
-// 		 * We have sized the dummy-stackframe so that it
-// 		 * will be removed by the instruction we currently
-// 		 * are executing, and leave the stackframe that
-// 		 * normally would have been removed intact.
-// 		 *
-// 		 */
-// 		p->stop[0] = make_cp(I);
-// 	    }
-// 	}
-//     }
-// }

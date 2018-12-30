@@ -4,6 +4,7 @@ mod arc_without_weak;
 mod atom;
 mod bif;
 mod etf;
+mod exception;
 mod immix;
 mod loader;
 mod mailbox;
@@ -16,11 +17,13 @@ mod process;
 mod process_table;
 mod queue;
 mod value;
-mod exception;
 mod vm;
 
 #[macro_use]
 extern crate once_cell;
+
+#[macro_use]
+extern crate bitflags;
 
 fn main() {
     let vm = vm::Machine::new();

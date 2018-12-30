@@ -51,7 +51,7 @@ x => done, - => partial
 - [ ] Equality ops
 - [ ] Timers
 - [ ] Precalculate Bif0/1/2,GcBif1/2/3 as vals that reference a bif ptr directly (no more imports+bifs hash lookups)
-- [ ] Cross-module calls (need to store module in ip/cp)
+- [x] Cross-module calls (need to store module in ip/cp)
 - [ ] try/catch/raise/etc.
 - [ ] Binaries (SIMD: https://github.com/AdamNiederer/faster / https://doc.rust-lang.org/1.26.0/std/simd/index.html<Paste>)
 - [ ] Binary matching (multi: https://github.com/BurntSushi/aho-corasick
