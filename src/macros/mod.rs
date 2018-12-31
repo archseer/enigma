@@ -20,3 +20,10 @@ macro_rules! tup3 {
         Value::Tuple(tuple)
     }};
 }
+
+#[macro_export]
+macro_rules! cons {
+    ($heap:expr, $head:expr, $tail:expr) => {{
+        value::cons($heap, $head, $tail);
+    }};
+}

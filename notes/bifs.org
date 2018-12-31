@@ -1,4 +1,4 @@
-* BIFs [17/117]
+* BIFs [18/117]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
@@ -100,7 +100,7 @@
 - [ ] bif erlang:statistics/1
 - [ ] bif erlang:term_to_binary/1
 - [ ] bif erlang:term_to_binary/2
-- [ ] bif erlang:throw/1
+- [X] bif erlang:throw/1
 - [ ] bif erlang:time/0
 - [X] ubif erlang:tl/1
 - [X] ubif erlang:trunc/1
@@ -389,10 +389,10 @@
 - [ ] bif erlang:iolist_to_binary/1
 - [ ] bif erlang:list_to_existing_atom/1
 
-** New Bifs in R12B-0
+** New Bifs in R12B-0 [1/6]
 - [ ] ubif erlang:is_bitstring/1
 - [ ] ubif erlang:tuple_size/1
-- [ ] ubif erlang:byte_size/1
+- [X] ubif erlang:byte_size/1
 - [ ] ubif erlang:bit_size/1
 - [ ] bif erlang:list_to_bitstring/1
 - [ ] bif erlang:bitstring_to_list/1

@@ -28,7 +28,7 @@ extern crate bitflags;
 fn main() {
     let vm = vm::Machine::new();
 
-    vm.start("./examples/Elixir.Floats.beam");
+    vm.start("./examples/Elixir.Try.beam");
 
     println!("execution time: {:?}", vm.elapsed_time())
 }

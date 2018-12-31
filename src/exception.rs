@@ -5,14 +5,33 @@ use crate::value::{self, Value};
 use crate::module::MFA;
 
 /// http://erlang.org/doc/reference_manual/errors.html#exceptions
+#[derive(Debug)]
 pub struct Exception {
-    reason: Reason, // bitflags
-    value: Value,
-    trace: Value
+    pub reason: Reason, // bitflags
+    pub value: Value,
+    pub trace: Value
+}
+
+impl Exception {
+    pub fn new(reason: Reason) -> Self {
+        Exception {
+            reason,
+            value: Value::Nil(),
+            trace: Value::Nil()
+        }
+    }
+
+    pub fn with_value(reason: Reason, value: Value) -> Self {
+        Exception {
+            reason,
+            value,
+            trace: Value::Nil()
+        }
+    }
 }
 
 bitflags! {
-    struct Reason: u32 {
+    pub struct Reason: u32 {
         /// There are three primary exception classes:
         /// 
         ///      - exit			Process termination - not an error.
@@ -162,7 +181,7 @@ macro_rules! native_exception {
 
 // get_exc_index
 macro_rules! exception_code {
-    ($x:expr) => { (($x.bits & Reason::EXC_CODEBITS.bits) >> Reason::EXC_OFFSET.bits) }
+    ($x:expr) => { ($x.bits & Reason::EXC_CODEBITS.bits) >> Reason::EXC_OFFSET.bits }
 }
 
 
@@ -249,21 +268,20 @@ struct StackTrace {
 // return val is another pc pointer (usize + module)
 
 // static BeamInstr*
-// handle_error(Process* c_p, BeamInstr* pc, Eterm* reg, ErtsCodeMFA *bif_mfa)
+// handle_error(Process* c_p, BeamInstr* pc, ErtsCodeMFA *bif_mfa)
 // {
-pub fn handle_error(process: &RcProcess, pc: usize, reg: &Value, bif_mfa: &MFA) -> Option<InstrPtr> {
+pub fn handle_error(process: &RcProcess, mut exc: Exception, /*, bif_mfa: &MFA*/) -> Option<InstrPtr> {
        let heap = &process.context_mut().heap;
        let args = Value::Atom(atom::TRUE);
 
        let context = process.context_mut();
-       let exc = &mut context.exc.unwrap();
+       // let exc = &mut context.exc.unwrap();
 
        assert!(!exc.reason.contains(Reason::TRAP)); /* Should have been handled earlier. */
 //     if (c_p->freason & EXF_RESTORE_NIF) {
-//      	erts_nif_export_restore_error(c_p, &pc, reg, &bif_mfa);
+//      	erts_nif_export_restore_error(c_p, reg, &bif_mfa);
 //     }
 
-//     c_p->i = pc;    /* In case we call erts_exit(). */
 //     /*
 //      * Check if we have an arglist for the top level call. If so, this
 //      * is encoded in Value, so we have to dig out the real Value as well
@@ -285,9 +303,9 @@ pub fn handle_error(process: &RcProcess, pc: usize, reg: &Value, bif_mfa: &MFA) 
         * rethrow. It also makes the creation of symbolic stack traces much
         * more modular.
         */
-       if exc.reason.contains(Reason::EXF_SAVETRACE) {
-           save_stacktrace(process, pc, reg, bif_mfa, args);
-       }
+       // if exc.reason.contains(Reason::EXF_SAVETRACE) {
+       //     save_stacktrace(process, exc/*, bif_mfa, args*/);
+       // }
 
        // Throws that are not caught are turned into 'nocatch' errors
        //
@@ -305,7 +323,6 @@ pub fn handle_error(process: &RcProcess, pc: usize, reg: &Value, bif_mfa: &MFA) 
 
        //  Find a handler or die
        if context.catches > 0 && !exc.reason.contains(Reason::EXF_PANIC) {
-           // BeamInstr *new_pc;
            // /* The Beam handler code (catch_end or try_end) checks reg[0]
            // for THE_NON_VALUE to see if the previous code finished
            // abnormally. If so, reg[1], reg[2] and reg[3] should hold the
@@ -314,24 +331,24 @@ pub fn handle_error(process: &RcProcess, pc: usize, reg: &Value, bif_mfa: &MFA) 
            // be ignored.) */
            // reg[0] = THE_NON_VALUE;
            // reg[1] = exception_tag[GET_EXC_CLASS(c_p->freason)];
-           // reg[2] = Value;
-           // reg[3] = c_p->ftrace;
-           if let Some(new_pc) = next_catch(process, reg) {
-               context.cp = 0; // To avoid keeping stale references.
+           context.x[2] = exc.value.clone();
+           context.x[3] = exc.trace.clone();
+           if let Some(new_pc) = next_catch(process) {
+               context.cp = None; // To avoid keeping stale references.
                //ERTS_RECV_MARK_CLEAR(c_p); // No longer safe to use this position
+               return Some(new_pc);
            } else {
-               erts_exit(ERTS_ERROR_EXIT, "Catch not found")
+               //erts_exit(ERTS_ERROR_EXIT, "Catch not found")
+               panic!("Catch not found")
            }
        }
-//     ERTS_UNREQ_PROC_MAIN_LOCK(c_p);
-//     terminate_proc(c_p, Value);
-//     ERTS_REQ_PROC_MAIN_LOCK(c_p);
+       terminate_process(process, exc);
        None
 }
 
 /// Find the nearest catch handler
 /// TODO: return is instr pointer
-fn next_catch(process: &RcProcess, reg: &Value) -> Option<InstrPtr> {
+fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
        let context = process.context_mut();
        let active_catches = context.catches > 0;
        let mut prev = 0;
@@ -339,7 +356,7 @@ fn next_catch(process: &RcProcess, reg: &Value) -> Option<InstrPtr> {
 
        debug_assert!(context.stack.last().unwrap().is_cp());
        // ASSERT(ptr <= STACK_START(c_p));
-       // if (ptr == STACK_START(c_p)) return NULL;
+       if ptr == 0 { return None; }
 
        // TODO: tracing instr handling here
 
@@ -365,16 +382,15 @@ fn next_catch(process: &RcProcess, reg: &Value) -> Option<InstrPtr> {
 }
 
 /// Terminating the process when an exception is not caught
-fn terminate_proc(process: &RcProcess, value: Value) {
-    //     Eterm *hp;
-    //     Eterm Args = NIL;
+fn terminate_process(process: &RcProcess, exc: Exception) {
+    let heap = &process.context_mut().heap;
 
     // Add a stacktrace if this is an error.
-    // if (GET_EXC_CLASS(process->freason) == EXTAG_ERROR) {
-    //     value = add_stacktrace(process, value, process->ftrace);
-    // }
-    // // EXF_LOG is a primary exception flag
-    // if (process->freason & EXF_LOG) {
+    if exception_class!(exc.reason) == Reason::EXT_ERROR {
+        // exc.value = add_stacktrace(process, exc);
+    }
+    // EXF_LOG is a primary exception flag
+    if exc.reason.contains(Reason::EXF_LOG) {
         // int alive = erts_is_alive;
         // erts_dsprintf_buf_t *dsbufp = erts_create_logger_dsbuf();
 
@@ -395,20 +411,17 @@ fn terminate_proc(process: &RcProcess, value: Value) {
         // Args = CONS(hp, process->common.id, Args);
 
         // erts_send_error_term_to_logger(process->group_leader, dsbufp, Args);
-    //  }
-
-    // If we use a shared heap, the process will be garbage-collected.
-    // Must zero process->arity to indicate that there are no live registers.
-    // process->arity = 0;
-    // erts_do_exit_process(process, value);
+        println!("Error in process {} with exit value: {}", process.pid, exc.value);
+    }
 }
 
+/*
 /// Build and add a symbolic stack trace to the error value.
-fn add_stacktrace(process: &RcProcess, value: Value, exc: Value) -> Value {
+fn add_stacktrace(process: &RcProcess, exc: &mut Exception) -> Value {
     let heap = &process.context_mut().heap;
-    let origin = build_stacktrace(process, exc);
-    tup2!(heap, value, origin)
-}
+    let origin = build_stacktrace(process, exc.trace);
+    tup2!(heap, exc.value, origin)
+}*/
 
 /// Forming the correct error value from the internal error code.
 /// This does not update c_p->fvalue or c_p->freason.
@@ -423,9 +436,7 @@ fn expand_error_value(process: &RcProcess, reason: Reason, value: Value) -> Valu
         5 | 7 | 16 | 11 | 18 | 19 => {
                 let heap = &process.context_mut().heap;
                 //Some common exceptions: value -> {atom, value}
-                //    ASSERT(is_value(Value));
-                // heap = HAlloc(c_p, 3);
-                // Value = TUPLE2(heap, error_atom[r], Value);
+                //    ASSERT(is_value(Value)); TODO: check that is not non-value
                 let error_atom = Value::Atom(EXIT_CODES[exception_code!(reason) as usize]);
                 tup2!(heap, error_atom, value)
         }
@@ -437,6 +448,7 @@ fn expand_error_value(process: &RcProcess, reason: Reason, value: Value) -> Valu
     }
 }
 
+/*
 /// Quick-saving the stack trace in an internal form on the heap. Note
 /// that c_p->ftrace will point to a cons cell which holds the given args
 /// and the saved data (encoded as a bignum).
@@ -471,7 +483,9 @@ fn expand_error_value(process: &RcProcess, reason: Reason, value: Value) -> Valu
 
 // save_stacktrace(Process* c_p, BeamInstr* pc, Eterm* reg,
 // 		ErtsCodeMFA *bif_mfa, Eterm args) {
-fn save_stacktrace(process: &RcProcess, pc: &InstrPtr, reg: &[Value], bif_mfa: &MFA, args: Value) {
+fn save_stacktrace(process: &RcProcess, exc: &mut Exception/*, bif_mfa: &MFA, args: Value*/) {
+       let context = process.context_mut();
+       // pc = context.i
        let depth = 8;
         // int depth = erts_backtrace_depth;    /* max depth (never negative) */
        if depth > 0 {
@@ -482,8 +496,11 @@ fn save_stacktrace(process: &RcProcess, pc: &InstrPtr, reg: &[Value], bif_mfa: &
        let heap = &process.context_mut().heap;
        // Create a container for the exception data
        let s = heap.alloc(StackTrace {
-           reason: context.reason,
-           trace: Vec::new()
+           reason: context.exc.unwrap().reason,
+           trace: Vec::new(),
+            // TODO: bad
+           current: std::mem::uninitialized(),
+           pc: std::mem::uninitialized(),
        });
 
        /*
@@ -523,7 +540,7 @@ fn save_stacktrace(process: &RcProcess, pc: &InstrPtr, reg: &[Value], bif_mfa: &
 // 	    depth--;
 // 	}
 // 	s->pc = NULL;
-// 	args = make_arglist(c_p, reg, bif_mfa->arity); /* Overwrite CAR(c_p->ftrace) */
+// 	args = make_arglist(process, &context.x, bif_mfa->arity); /* Overwrite CAR(c_p->ftrace) */
 //     } else {
 
 //     non_bif_stacktrace:
@@ -546,23 +563,22 @@ fn save_stacktrace(process: &RcProcess, pc: &InstrPtr, reg: &[Value], bif_mfa: &
         // }
         // s->pc = NULL; /* Ignore pc */
     } else {
-        // if (depth > 0 && c_p->cp != 0 && c_p->cp != pc) {
-        // s->trace[s->depth++] = c_p->cp - 1;
-        // depth--;
-        // }
+        if let Some(cp) = &context.cp {
+            if depth > 0 /* != None && cp != pc*/ {
+                s.trace.push(context.cp - 1);
+                depth -= 1;
+            }
+        }
         // s->pc = pc;
     }
     // }
 
-//     // Package args and stack trace
-//     {
-// 	Eterm *hp;
-// 	hp = HAlloc(c_p, 2);
-// 	c_p->ftrace = CONS(hp, args, make_big((Eterm *) s));
-//     }
+    // Package args and stack trace
+    // c_p->ftrace = CONS(hp, args, make_big((Eterm *) s));
+    context.exc.trace = cons!(heap, args, s); // TODO: need to cast S into something
 
-//     // Save the actual stack trace
-       erts_save_stacktrace(process, s, depth)
+    // Save the actual stack trace
+    erts_save_stacktrace(process, s, depth)
 }
 
 fn erts_save_stacktrace(process: &RcProcess, s: &StackTrace, depth: usize) {
@@ -588,7 +604,7 @@ fn erts_save_stacktrace(process: &RcProcess, s: &StackTrace, depth: usize) {
         }
         ptr -= 1
     }
-}
+}*/
 
 // /*
 //  * Getting the relevant fields from the term pointed to by ftrace
@@ -635,6 +651,7 @@ fn erts_save_stacktrace(process: &RcProcess, s: &StackTrace, depth: usize) {
 //     return args;
 // }
 
+/*
 /// Building a symbolic representation of a saved stack trace. Note that
 /// the exception object 'exc', unless NIL, points to a cons cell which
 /// holds the given args and the quick-saved data (encoded as a bignum).
@@ -719,4 +736,4 @@ pub fn build_stacktrace(process: &RcProcess, exc: Value) -> Value {
 
     erts_free(ERTS_ALC_T_TMP, (void *) stk);
     return res;
-}
+}*/

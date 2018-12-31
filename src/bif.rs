@@ -1,4 +1,5 @@
 use crate::atom;
+use crate::exception::{Exception, Reason};
 use crate::module;
 use crate::numeric::division::{FlooredDiv, OverflowingFlooredDiv};
 use crate::numeric::modulo::{Modulo, OverflowingModulo};
@@ -14,7 +15,7 @@ use std::ops::{Add, Mul, Sub};
 
 mod chrono;
 
-type BifResult = Result<Value, String>;
+type BifResult = Result<Value, Exception>;
 type BifFn = fn(&vm::Machine, &RcProcess, &[Value]) -> BifResult;
 type BifTable = FnvHashMap<(usize, usize, usize), Box<BifFn>>;
 
@@ -50,6 +51,7 @@ static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::from_str("tl"), 1), Box::new(bif_erlang_tl_1));
     bifs.insert((erlang, atom::from_str("trunc"), 1), Box::new(bif_erlang_trunc_1));
     bifs.insert((erlang, atom::from_str("byte_size"), 1), Box::new(bif_erlang_byte_size_1));
+    bifs.insert((erlang, atom::from_str("throw"), 1), Box::new(bif_erlang_throw_1));
     // math
     let math = atom::from_str("math");
     bifs.insert((math, atom::from_str("cos"), 1), Box::new(bif_math_cos_1));
@@ -129,7 +131,7 @@ fn bif_erlang_spawn_3(vm: &vm::Machine, _process: &RcProcess, args: &[Value]) ->
         // TODO: avoid the clone here since we copy later
         return process::spawn(&vm.state, module, *func, arglist.clone());
     }
-    Err("Invalid arguments to erlang::spawn/3".to_string())
+    Err(Exception::new(Reason::EXC_BADARG))
 }
 
 #[inline]
@@ -138,7 +140,7 @@ fn bif_erlang_abs_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> 
         Value::Integer(i) => Ok(Value::Integer(i.abs())),
         Value::Float(value::Float(f)) => Ok(Value::Float(value::Float(f.abs()))),
         Value::BigInt(i) => Ok(Value::BigInt(Box::new((**i).abs()))),
-        _ => Err("argument error".to_string()),
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     }
 }
 
@@ -255,7 +257,7 @@ macro_rules! trig_func {
             Value::Integer(i) => i as f64, // TODO: potentially unsafe
             Value::Float(value::Float(f)) => f,
             Value::BigInt(..) => unimplemented!(),
-            _ => return Err("argument error".to_string()),
+            _ => return Err(Exception::new(Reason::EXC_BADARG)),
         };
         Ok(Value::Float(value::Float(res.$op())))
     }};
@@ -347,13 +349,13 @@ fn bif_math_atan2_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> 
         Value::Integer(i) => i as f64, // TODO: potentially unsafe
         Value::Float(value::Float(f)) => f,
         Value::BigInt(..) => unimplemented!(),
-        _ => return Err("argument error".to_string()),
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     let arg = match args[1] {
         Value::Integer(i) => i as f64, // TODO: potentially unsafe
         Value::Float(value::Float(f)) => f,
         Value::BigInt(..) => unimplemented!(),
-        _ => return Err("argument error".to_string()),
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     Ok(Value::Float(value::Float(res.atan2(arg))))
 }
@@ -362,9 +364,18 @@ fn bif_math_atan2_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> 
 fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     let res = match &args[0] {
         Value::Binary(str) => str.len(),
-        _ => return Err("argument error".to_string()),
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     Ok(Value::Integer(res as i64)) // TODO: cast potentially unsafe
+}
+
+#[inline]
+fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    Err(Exception {
+        reason: Reason::EXC_THROWN,
+        value: args[0].clone(),
+        trace: Value::Nil(),
+    })
 }
 
 // Process dictionary
@@ -466,7 +477,7 @@ fn bif_lists_member_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) ->
     if args[1].is_nil() {
         return Ok(Value::Atom(atom::FALSE));
     } else if !args[1].is_list() {
-        return Err("badarg".to_string()); // TODO
+        return Err(Exception::new(Reason::EXC_BADARG));
     }
 
     let term = &args[0];
@@ -495,7 +506,7 @@ fn bif_lists_member_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) ->
 
     if !list.is_list() {
         // BUMP_REDS(BIF_P, reds_left - max_iter/16);
-        return Err("badarg".to_string()); // TODO
+        return Err(Exception::new(Reason::EXC_BADARG));
     }
     Ok(Value::Atom(atom::FALSE)) // , reds_left - max_iter/16
 }
@@ -607,7 +618,7 @@ fn bif_lists_reverse_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -
     if args[0].is_nil() {
         return Ok(args[1].clone());
     } else if !args[1].is_list() {
-        return Err("badarg".to_string()); // TODO
+        return Err(Exception::new(Reason::EXC_BADARG));
     }
 
     /* We build the reversal on the unused part of the heap if possible to save
@@ -658,7 +669,7 @@ fn bif_erlang_hd_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> B
     if let Value::List(cons) = args[0] {
         unsafe { return Ok((*cons).head.clone()) }
     }
-    Err("badarg".to_string())
+    Err(Exception::new(Reason::EXC_BADARG))
 }
 
 /* returns the tails of a list - same comment as above */
@@ -666,7 +677,7 @@ fn bif_erlang_tl_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> B
     if let Value::List(cons) = args[0] {
         unsafe { return Ok((*cons).tail.clone()) }
     }
-    Err("badarg".to_string())
+    Err(Exception::new(Reason::EXC_BADARG))
 }
 
 fn bif_erlang_trunc_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
@@ -674,7 +685,7 @@ fn bif_erlang_trunc_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -
         Value::Integer(i) => Ok(Value::Integer(*i)),
         Value::Float(value::Float(f)) => Ok(Value::Float(value::Float(f.trunc()))),
         Value::BigInt(v) => Ok(Value::BigInt(v.clone())),
-        _ => Err("badarg".to_string()),
+        _ => Err(Exception::new(Reason::EXC_BADARG)),
     }
 }
 

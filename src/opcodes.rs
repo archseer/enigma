@@ -723,6 +723,15 @@ pub static ARITY_MAP: &'static [usize] = &[
     3, // opcode: 157 (has_map_fields)
     3, // opcode: 158 (get_map_elements)
     4, // opcode: 159 (is_tagged_tuple)
+    0, // opcode: 160 (build_stacktrace)
+    0, // opcode: 161 (raw_raise)
+    2, // opcode: 162 (get_hd)
+    2, // opcode: 163 (get_tl)
+    2, // opcode: 164 (put_tuple_2)
+    3, // opcode: 165 (bs_get_tail)
+    4, // opcode: 166 (bs_start_match_3)
+    3, // opcode: 167 (bs_get_position)
+    2, // opcode: 168 (bs_set_position)
 ];
 
 #[inline]

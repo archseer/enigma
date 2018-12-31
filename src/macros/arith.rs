@@ -81,7 +81,7 @@ macro_rules! integer_overflow_op {
                 // $heap.allocate(object_value::bigint(bigint))
             }
             _ => {
-                return Err("Integer instructions can only be performed using integers".to_string());
+                return Err(Exception::new(Reason::EXC_BADARG));
             }
         }
     }};

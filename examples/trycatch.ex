@@ -1,4 +1,9 @@
 defmodule Try do
+
+  # def start do
+  #   throw :ok
+  # end
+
   def start do
     try do
       x = 1

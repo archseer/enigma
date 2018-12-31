@@ -1,4 +1,4 @@
-use crate::exception::Exception;
+use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
 use crate::mailbox::Mailbox;
 use crate::module::{Module, MFA};
@@ -37,7 +37,7 @@ pub struct ExecutionContext {
     /// Continuation pointer
     pub cp: Option<InstrPtr>,
     /// Current function
-    pub current: MFA,
+    //pub current: MFA,
     pub live: usize,
     /// binary construction state
     pub bs: *mut String,
@@ -45,7 +45,7 @@ pub struct ExecutionContext {
     pub exc: Option<Exception>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Hash, Debug)]
 pub struct InstrPtr {
     /// Module containing the instruction set.
     pub module: *const Module,
@@ -68,13 +68,14 @@ impl ExecutionContext {
                 stack: Vec::new(),
                 heap: Heap::new(),
                 catches: 0,
-                ip: 0,
+                ip: InstrPtr { ptr: 0, module },
                 cp: None,
                 live: 0,
 
+                exc: None,
+
                 // register: Register::new(block.code.registers as usize),
                 // binding: Binding::with_rc(block.locals(), block.receiver),
-                module,
                 // line: block.code.line,
 
                 // TODO: not great
@@ -188,12 +189,12 @@ impl Process {
     }
 }
 
-pub fn allocate(state: &RcState, module: *const Module) -> Result<RcProcess, String> {
+pub fn allocate(state: &RcState, module: *const Module) -> Result<RcProcess, Exception> {
     let mut process_table = state.process_table.lock().unwrap();
 
     let pid = process_table
         .reserve()
-        .ok_or_else(|| "No PID could be reserved".to_string())?;
+        .ok_or_else(|| Exception::new(Reason::EXC_SYSTEM_LIMIT))?;
 
     let process = Process::from_block(
         pid, module, /*, state.global_allocator.clone(), &state.config*/
@@ -209,7 +210,7 @@ pub fn spawn(
     module: *const Module,
     func: usize,
     args: Value,
-) -> Result<Value, String> {
+) -> Result<Value, Exception> {
     println!("Spawning..");
     // let block_obj = block_ptr.block_value()?;
     let new_proc = allocate(state, module)?;
@@ -225,7 +226,7 @@ pub fn spawn(
             .expect("process::spawn could not locate func")
     };
     let context = new_proc.context_mut();
-    context.ip = *func;
+    context.ip.ptr = *func;
 
     // arglist to process registers,
     // TODO: it also needs to deep clone all the vals (for example lists etc)

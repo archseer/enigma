@@ -1,7 +1,7 @@
 use crate::arc_without_weak::ArcWithoutWeak;
 use crate::atom;
 use crate::bif;
-use crate::exception::Exception;
+use crate::exception::{self, Exception, Reason};
 use crate::module;
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
 use crate::opcodes::Opcode;
@@ -13,7 +13,6 @@ use std::panic;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time;
-use crate::process::InstrPtr;
 
 /// A reference counted State.
 pub type RcState = Arc<State>;
@@ -61,7 +60,7 @@ macro_rules! expand_float {
     ($context:expr, $value:expr) => {{
         match $value {
             &Value::ExtendedLiteral(i) => unsafe {
-                if let Value::Float(value::Float(f)) = (*$context.module).literals[i] {
+                if let Value::Float(value::Float(f)) = (*$context.ip.module).literals[i] {
                     f
                 } else {
                     unreachable!()
@@ -102,7 +101,7 @@ macro_rules! op_deallocate {
 
 macro_rules! op_call_ext {
     ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr) => {{
-        let mfa = unsafe { &(*$context.module).imports[*$dest] };
+        let mfa = unsafe { &(*$context.ip.module).imports[*$dest] };
 
         // TODO: precompute which exports are bifs
         // also precompute the bif lookup
@@ -111,9 +110,13 @@ macro_rules! op_call_ext {
         if bif::is_bif(mfa) {
             // make a slice out of arity x registers
             let args = &$context.x[0..*$arity];
-            let val = bif::apply($vm, $process, mfa, args).unwrap(); // TODO handle fail
-            set_register!($context, &Value::X(0), val); // HAXX
-            op_return!($context);
+            match bif::apply($vm, $process, mfa, args) {
+                Ok(val) => {
+                    set_register!($context, &Value::X(0), val); // HAXX
+                    op_return!($context);
+                }
+                Err(exc) => return Err(exc),
+            }
         } else {
             unimplemented!()
         }
@@ -123,7 +126,7 @@ macro_rules! op_call_ext {
 macro_rules! op_return {
     ($context:expr) => {{
         if let Some(i) = $context.cp {
-            op_jump!($context, i);
+            op_jump_ptr!($context, i);
             $context.cp = None;
         } else {
             println!("Process exited with normal, x0: {}", $context.x[0]);
@@ -134,7 +137,13 @@ macro_rules! op_return {
 
 macro_rules! op_jump {
     ($context:expr, $label:expr) => {{
-        $context.ip = $label;
+        $context.ip.ptr = $label;
+    }};
+}
+
+macro_rules! op_jump_ptr {
+    ($context:expr, $ptr:expr) => {{
+        $context.ip = $ptr;
     }};
 }
 
@@ -256,7 +265,7 @@ impl Machine {
         // context.x[0] = Value::Integer(23); // 28
         let fun = atom::from_str("start");
         let arity = 0;
-        unsafe { op_jump!(context, (*context.module).funs[&(fun, arity)]) }
+        unsafe { op_jump!(context, (*context.ip.module).funs[&(fun, arity)]) }
         // unsafe { println!("ins: {:?}", (*context.module).instructions) };
         /* TEMP */
 
@@ -268,7 +277,7 @@ impl Machine {
     fn expand_arg<'a>(&'a self, context: &'a ExecutionContext, arg: &'a Value) -> &Value {
         match arg {
             // TODO: optimize away into a reference somehow at load time
-            Value::ExtendedLiteral(i) => unsafe { &(*context.module).literals[*i] },
+            Value::ExtendedLiteral(i) => unsafe { &(*context.ip.module).literals[*i] },
             Value::X(i) => &context.x[*i],
             Value::Y(i) => &context.stack[context.stack.len() - (*i + 2)],
             value => value,
@@ -282,8 +291,9 @@ impl Machine {
         // safe, so take care when capturing new variables.
         let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
             if let Err(message) = self.run(process) {
+                exception::handle_error(process, message);
                 //self.panic(worker, process, &message);
-                panic!(message);
+                panic!("error handling");
             }
         }));
 
@@ -313,13 +323,13 @@ impl Machine {
         //     process.pid, context.ip
         // );
         loop {
-            let ins = unsafe { &(*context.module).instructions[context.ip.ptr] };
+            let ins = unsafe { &(*context.ip.module).instructions[context.ip.ptr] };
             context.ip.ptr += 1;
 
-            // println!(
-            //     "running proc pid {:?}, ins {:?}, args: {:?}",
-            //     process.pid, ins.op, ins.args, context.f
-            // );
+            println!(
+                "running proc pid {:?}, ins {:?}, args: {:?}",
+                process.pid, ins.op, ins.args
+            );
 
             match &ins.op {
                 Opcode::FuncInfo => {
@@ -327,7 +337,7 @@ impl Machine {
                     // coming out of nowhere, probably, needed for NIFs.
 
                     // happens if no other clause matches
-                    return Err(Exception::Error{ reason: atom::FUNCTION_CLAUSE, value: Value::Nil() });
+                    return Err(Exception::new(Reason::EXC_FUNCTION_CLAUSE));
                 }//println!("Running a function..."),
                 Opcode::Return => {
                     op_return!(context);
@@ -463,7 +473,7 @@ impl Machine {
                 Opcode::Bif0 => {
                     // literal export, x reg
                     if let [Value::Literal(dest), reg] = &ins.args[..] {
-                        let mfa = unsafe { &(*context.module).imports[*dest] };
+                        let mfa = unsafe { &(*context.ip.module).imports[*dest] };
                         let val = bif::apply(self, process, mfa, &[]).unwrap(); // TODO handle fail
                         set_register!(context, reg, val); // HAXX
                         // TODO: no fail label means this is not a func header call,
@@ -690,57 +700,18 @@ impl Machine {
                     // followed by multiple put() ops (put val [potentially regX/Y])
                     unimplemented!()
                 }
-                // Eterm fvalue;		/* Exit & Throw value (failure reason) */
-                // Uint freason;		/* Reason for detected failure */
-                // Eterm ftrace;		/* Latest exception stack trace dump */
-
                 Opcode::Badmatch => {
                     let value = self.expand_arg(context, &ins.args[0]).clone();
-                    return Err(Exception::Error{ reason: atom::BADMATCH, value });
-
-                    // #define SWAPOUT            \
-                    //     HEAP_TOP(c_p) = HTOP;  \ clear the heap
-                    //     c_p->stop = E
-                    //
-                    //    /* Stack pointer.  Grows downwards; points
-                    // * to last item pushed (normally a saved
-                    // * continuation pointer).
-                    // */
-                    // register Eterm* E REG_stop = NULL;
-
-                    // find_func_info being:
-                    //  SWAPOUT;
-                    // I = handle_error(c_p, I, reg, NULL);
-                    // goto post_error_handling;
-
-                    /*
-                    * To fully understand the error handling, one must keep in mind that
-                    * when an exception is thrown, the search for a handler can jump back
-                    * and forth between Beam and native code. Upon each mode switch, a
-                    * dummy handler is inserted so that if an exception reaches that point,
-                    * the handler is invoked (like any handler) and transfers control so
-                    * that the search for a real handler is continued in the other mode.
-                    * Therefore, c_p->freason and c_p->fvalue must still hold the exception
-                    * info when the handler is executed, but normalized so that creation of
-                    * error terms and saving of the stack trace is only done once, even if
-                    * we pass through the error handling code several times.
-                    *
-                    * When a new exception is raised, the current stack trace information
-                    * is quick-saved in a small structure allocated on the heap. Depending
-                    * on how the exception is eventually caught (perhaps by causing the
-                    * current process to terminate), the saved information may be used to
-                    * create a symbolic (human-readable) representation of the stack trace
-                    * at the point of the original exception.
-                    */
+                    return Err(Exception::with_value(Reason::EXC_BADMATCH, value));
                 }
                 Opcode::IfEnd => {
                     // Raises the if_clause exception.
-                    return Err(Exception::Error{ reason: atom::IF_CLAUSE, value: Value::Nil() });
+                    return Err(Exception::new(Reason::EXC_IF_CLAUSE));
                 }
                 Opcode::CaseEnd => {
                     // Raises the case_clause exception with the value of Arg0
                     let value = self.expand_arg(context, &ins.args[0]).clone();
-                    return Err(Exception::Error{ reason: atom::CASE_CLAUSE, value });
+                    return Err(Exception::with_value(Reason::EXC_CASE_CLAUSE, value));
                 }
                 Opcode::Try => { // TODO: try is identical to catch, and is remapped in the OTP loader
                     // y f
@@ -771,7 +742,7 @@ impl Machine {
                 Opcode::TryCaseEnd => {
                     // Raises a try_clause exception with the value read from Arg0.
                     let value = self.expand_arg(context, &ins.args[0]).clone();
-                    return Err(Exception::Error{ reason: atom::TRY_CLAUSE, value });
+                    return Err(Exception::with_value(Reason::EXC_TRY_CLAUSE, value));
                 }
                 Opcode::Catch => {
                     // create a catch context that wraps f - fail label, and stores to y - reg.
@@ -801,7 +772,7 @@ impl Machine {
                         let args = &[
                             self.expand_arg(context, &ins.args[3]).clone(),
                         ];
-                        let val = unsafe { bif::apply(self, process, &(*context.module).imports[*i], &args[..]).unwrap() }; // TODO: handle fail
+                        let val = unsafe { bif::apply(self, process, &(*context.ip.module).imports[*i], &args[..]).unwrap() }; // TODO: handle fail
 
                         // TODO: consume fail label if not 0
 
@@ -995,7 +966,7 @@ impl Machine {
                             self.expand_arg(context, &ins.args[3]).clone(),
                             self.expand_arg(context, &ins.args[4]).clone(),
                         ];
-                        let val = unsafe { bif::apply(self, process, &(*context.module).imports[*i], &args[..]).unwrap() }; // TODO: handle fail
+                        let val = unsafe { bif::apply(self, process, &(*context.ip.module).imports[*i], &args[..]).unwrap() }; // TODO: handle fail
 
                         // TODO: consume fail label if not 0
 
@@ -1013,7 +984,7 @@ impl Machine {
                             self.expand_arg(context, &ins.args[4]).clone(),
                             self.expand_arg(context, &ins.args[5]).clone(),
                         ];
-                        let val = unsafe { bif::apply(self, process, &(*context.module).imports[*i], &args[..]).unwrap() }; // TODO: handle fail
+                        let val = unsafe { bif::apply(self, process, &(*context.ip.module).imports[*i], &args[..]).unwrap() }; // TODO: handle fail
 
                         // TODO: consume fail label if not 0
 
@@ -1034,7 +1005,7 @@ impl Machine {
                     // literal n -> points to lambda
                     // nfree means capture N x-registers into the closure
                     let i = ins.args[0].to_usize();
-                    let lambda = unsafe { &(*context.module).lambdas[i] };
+                    let lambda = unsafe { &(*context.ip.module).lambdas[i] };
                     println!("make_fun2 args: {:?}", lambda);
 
                     let binding = if lambda.nfree != 0 {

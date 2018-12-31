@@ -211,7 +211,7 @@ impl<'a> Loader<'a> {
                     // don't skip so we can apply tracing during runtime
                     if let [_module, Value::Atom(f), Value::Literal(a)] = &instruction.args[..] {
                         let f = self.atom_map[&(*f - 1)]; // necessary because atoms weren't remapped yet
-                        self.funs.insert((f, *a as usize), self.instructions.len());
+                        self.funs.insert((f, *a as usize), self.instructions.len() + 1); // need to point after func_info
                     } else {
                         panic!("Bad argument to {:?}", instruction.op)
                     }
