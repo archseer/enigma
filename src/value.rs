@@ -1,9 +1,11 @@
 use crate::arc_without_weak::ArcWithoutWeak;
 use crate::atom;
+use crate::exception;
 use crate::immix::Heap;
 use crate::module;
-use crate::process::{self,InstrPtr};
+use crate::process::{self, InstrPtr};
 use allocator_api::Layout;
+use core::marker::PhantomData;
 use num::bigint::BigInt;
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
@@ -65,11 +67,61 @@ pub struct Cons {
     pub tail: Value,
 }
 
+pub struct Iter<'a> {
+    head: Option<NonNull<Cons>>,
+    //len: usize,
+    marker: PhantomData<&'a Cons>,
+}
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = &'a Value;
+
+    #[inline]
+    fn next(&mut self) -> Option<&'a Value> {
+        self.head.map(|node| unsafe {
+            // Need an unbound lifetime to get 'a
+            let node = &*node.as_ptr();
+            if let Value::List(cons) = node.tail {
+                self.head = unsafe { Some(NonNull::new_unchecked(cons as *mut Cons)) };
+            } else {
+                // TODO match badly formed lists
+                self.head = None;
+            }
+            &node.head
+        })
+    }
+}
+
+impl Cons {
+    pub fn iter(&self) -> Iter {
+        Iter {
+            head: unsafe { Some(NonNull::new_unchecked(self as *const Cons as *mut Cons)) },
+            //len: self.len,
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a Cons {
+    type Item = &'a Value;
+    type IntoIter = Iter<'a>;
+
+    fn into_iter(self) -> Iter<'a> {
+        self.iter()
+    }
+}
+
 #[derive(Debug)]
 pub struct Tuple {
     /// Number of elements following the header.
     pub len: usize,
     pub ptr: NonNull<Value>,
+}
+
+impl Tuple {
+    pub fn as_slice(&self) -> &[Value] {
+        &self[..]
+    }
 }
 
 #[derive(Debug)]
@@ -239,6 +291,61 @@ impl Value {
         }
         Value::Atom(atom::FALSE)
     }
+
+    fn erl_eq(&self, other: &Value) -> bool {
+        match (self, other) {
+            (Value::Nil, Value::Nil) => true,
+            (Value::Integer(i1), Value::Integer(i2)) => i1 == i2,
+            (Value::Character(c1), Value::Character(c2)) => c1 == c2,
+            (Value::Float(f1), Value::Float(f2)) => f1 == f2,
+            (Value::BigInt(b1), Value::BigInt(b2)) => b1 == b2,
+            (Value::Integer(_), Value::Float(_)) => unimplemented!(),
+            (Value::Float(_), Value::Integer(_)) => unimplemented!(),
+
+            (Value::Atom(a1), Value::Atom(a2)) => a1 == a2,
+            (Value::Pid(p1), Value::Pid(p2)) => p1 == p2,
+            (Value::Port(p1), Value::Port(p2)) => p1 == p2,
+            (Value::Ref(r1), Value::Ref(r2)) => r1 == r2,
+
+            (Value::List(l1), Value::List(l2)) => unsafe {
+                (**l1)
+                    .iter()
+                    .zip((**l2).iter())
+                    .all(|(e1, e2)| e1.erl_eq(e2))
+            },
+            (Value::Tuple(v1), Value::Tuple(v2)) => unsafe {
+                if (**v1).len == (**v2).len {
+                    (**v1)
+                        .as_slice()
+                        .iter()
+                        .zip((**v2).as_slice())
+                        .all(|(e1, e2)| e1.erl_eq(e2))
+                } else {
+                    false
+                }
+            },
+            (Value::Binary(b1), Value::Binary(b2)) => b1 == b2,
+            (Value::Literal(l1), Value::Literal(l2)) => l1 == l2,
+            (Value::X(l1), Value::X(l2)) => l1 == l2,
+            (Value::Y(l1), Value::Y(l2)) => l1 == l2,
+            (Value::FloatReg(l1), Value::FloatReg(l2)) => l1 == l2,
+            (Value::Label(l1), Value::Label(l2)) => l1 == l2,
+            (Value::Closure(c1), Value::Closure(c2)) => unsafe { (**c1).mfa == (**c2).mfa },
+            (Value::CP(l1), Value::CP(l2)) => l1 == l2,
+            (Value::Catch(l1), Value::Catch(l2)) => l1 == l2,
+            (Value::Closure { .. }, _) => unreachable!(), // There should never happen
+            (_, Value::Closure { .. }) => unreachable!(),
+            (Value::ExtendedList { .. }, _) => unreachable!(),
+            (_, Value::ExtendedList { .. }) => unreachable!(),
+            (Value::AllocList(..), _) => unreachable!(),
+            (_, Value::AllocList(..)) => unreachable!(),
+            (Value::ExtendedLiteral(..), _) => unreachable!(),
+            (_, Value::ExtendedLiteral(..)) => unreachable!(),
+            (Value::StackTrace(..), _) => unreachable!(),
+            (_, Value::StackTrace(..)) => unreachable!(),
+            _ => false,
+        }
+    }
 }
 
 impl std::fmt::Display for Value {
@@ -299,6 +406,51 @@ pub fn tuple(heap: &Heap, len: usize) -> &mut Tuple {
 
 pub fn cons(heap: &Heap, head: Value, tail: Value) -> Value {
     Value::List(heap.alloc(self::Cons { head, tail }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::value;
+
+    #[test]
+    fn test_list_equality() {
+        let heap = &Heap::new();
+        let v1 = cons!(
+            heap,
+            Value::Integer(1),
+            cons!(heap, Value::Integer(2), Value::Nil)
+        );
+        let v2 = cons!(
+            heap,
+            Value::Integer(1),
+            cons!(heap, Value::Integer(2), Value::Nil)
+        );
+        assert!(v1.erl_eq(&v2));
+
+        let v3 = cons!(
+            heap,
+            Value::Integer(1),
+            cons!(heap, Value::Integer(3), Value::Nil)
+        );
+        assert!(!v1.erl_eq(&v3));
+    }
+
+    #[test]
+    fn test_tuple_equality() {
+        let heap = &Heap::new();
+        let v1 = tup2!(heap, Value::Integer(1), Value::Integer(2));
+        let v2 = tup2!(heap, Value::Integer(1), Value::Integer(2));
+        assert!(v1.erl_eq(&v2));
+
+        let v3 = tup3!(
+            heap,
+            Value::Integer(1),
+            Value::Integer(1),
+            Value::Integer(1)
+        );
+        assert!(!v1.erl_eq(&v3));
+    }
 }
 
 // /// A pointer to a value managed by the GC.
