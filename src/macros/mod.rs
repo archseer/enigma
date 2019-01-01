@@ -24,6 +24,6 @@ macro_rules! tup3 {
 #[macro_export]
 macro_rules! cons {
     ($heap:expr, $head:expr, $tail:expr) => {{
-        value::cons($heap, $head, $tail);
+        value::cons($heap, $head, $tail)
     }};
 }

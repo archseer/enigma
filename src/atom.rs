@@ -146,6 +146,10 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("bad_key");
 
     atoms.register_atom("nocatch");
+
+    atoms.register_atom("exit");
+    atoms.register_atom("error");
+    atoms.register_atom("throw");
     atoms
 };
 
@@ -175,6 +179,10 @@ pub const BAD_MAP:         usize = 23;
 pub const BAD_KEY:         usize = 24;
 
 pub const NOCATCH:         usize = 25;
+
+pub const EXIT:          usize = 26;
+pub const ERROR:         usize = 27;
+pub const THROW:         usize = 28;
 
 pub fn from_str(val: &str) -> usize {
     ATOMS.from_str(val)

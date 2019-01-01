@@ -63,7 +63,7 @@ impl ExecutionContext {
     pub fn new(module: *const Module) -> ExecutionContext {
         unsafe {
             let mut ctx = ExecutionContext {
-                x: std::mem::uninitialized(), //[Value::Nil(); 16],
+                x: std::mem::uninitialized(), //[Value::Nil; 16],
                 f: [0.0f64; 16],
                 stack: Vec::new(),
                 heap: Heap::new(),
@@ -84,7 +84,7 @@ impl ExecutionContext {
             for (_i, el) in ctx.x.iter_mut().enumerate() {
                 // Overwrite `element` without running the destructor of the old value.
                 // Since Value does not implement Copy, it is moved.
-                std::ptr::write(el, Value::Nil());
+                std::ptr::write(el, Value::Nil);
             }
             ctx
         }

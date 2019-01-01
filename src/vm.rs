@@ -6,7 +6,7 @@ use crate::module;
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
 use crate::opcodes::Opcode;
 use crate::pool::{Job, JoinGuard as PoolJoinGuard, Pool, Worker};
-use crate::process::{self, ExecutionContext, RcProcess};
+use crate::process::{self, ExecutionContext, InstrPtr, RcProcess};
 use crate::process_table::ProcessTable;
 use crate::value::{self, Value};
 use std::panic;
@@ -291,9 +291,13 @@ impl Machine {
         // safe, so take care when capturing new variables.
         let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
             if let Err(message) = self.run(process) {
-                exception::handle_error(process, message);
-                //self.panic(worker, process, &message);
-                panic!("error handling");
+                if let Some(new_pc) = exception::handle_error(process, message) {
+                    let context = process.context_mut();
+                    context.ip = new_pc;
+                    self.state
+                        .process_pool
+                        .schedule(Job::normal(process.clone()));
+                }
             }
         }));
 
@@ -486,7 +490,7 @@ impl Machine {
                     // stackneed, live
                     if let [Value::Literal(stackneed), Value::Literal(_live)] = &ins.args[..] {
                         for _ in 0..*stackneed {
-                            context.stack.push(Value::Nil())
+                            context.stack.push(Value::Nil)
                         }
                         context.stack.push(Value::CP(context.cp));
                     } else {
@@ -502,7 +506,7 @@ impl Machine {
                     // num of X regs. save CP on stack.
                     if let [Value::Literal(stackneed), Value::Literal(_heapneed), Value::Literal(_live)] = &ins.args[..] {
                         for _ in 0..*stackneed {
-                            context.stack.push(Value::Nil())
+                            context.stack.push(Value::Nil)
                         }
                         // TODO: check heap for heapneed space!
                         context.stack.push(Value::CP(context.cp));
@@ -514,7 +518,7 @@ impl Machine {
                     // literal stackneed, literal live
                     if let [Value::Literal(need), Value::Literal(_live)] = &ins.args[..] {
                         for _ in 0..*need {
-                            context.stack.push(Value::Nil())
+                            context.stack.push(Value::Nil)
                         }
                         context.stack.push(Value::CP(context.cp));
                     } else {
@@ -527,7 +531,7 @@ impl Machine {
                     // num of X regs. save CP on stack.
                     if let [Value::Literal(stackneed), Value::Literal(_heapneed), Value::Literal(_live)] = &ins.args[..] {
                         for _ in 0..*stackneed {
-                            context.stack.push(Value::Nil())
+                            context.stack.push(Value::Nil)
                         }
                         // TODO: check heap for heapneed space!
                         context.stack.push(Value::CP(context.cp));
@@ -538,7 +542,7 @@ impl Machine {
                 // TestHeap
                 Opcode::Init => {
                     debug_assert_eq!(ins.args.len(), 3);
-                    set_register!(context, &ins.args[0], Value::Nil())
+                    set_register!(context, &ins.args[0], Value::Nil)
                 }
                 Opcode::Deallocate => {
                     // literal nwords
@@ -718,26 +722,29 @@ impl Machine {
                     // create a catch context that wraps f - fail label, and stores to y - reg.
                     context.catches += 1;
                     let fail = ins.args[1].to_usize();
-                    set_register!(context, &ins.args[0], Value::Catch(fail));
+                    set_register!(context, &ins.args[0], Value::Catch(InstrPtr{
+                        ptr: fail,
+                        module: context.ip.module
+                    }));
                 }
                 Opcode::TryEnd => {
                     // y
                     context.catches -= 1;
-                    set_register!(context, &ins.args[0], Value::Nil()) // TODO: make_blank macro
-
+                    set_register!(context, &ins.args[0], Value::Nil) // TODO: make_blank macro
                 }
                 Opcode::TryCase => {
                     // pops a catch context in y  Erases the label saved in the Arg0 slot. Noval in R0 indicate that something is caught. If so, R0 is set to R1, R1 — to R2, R2 — to R3.
 
                     // TODO: this initial part is identical to TryEnd
                     context.catches -= 1;
-                    set_register!(context, &ins.args[0], Value::Nil()); // TODO: make_blank macro
+                    set_register!(context, &ins.args[0], Value::Nil); // TODO: make_blank macro
 
                     // ASSERT(is_non_value(r(0)));
                     // c_p->fvalue = NIL;
-                    // r(0) = x(1);
-                    // x(1) = x(2);
-                    // x(2) = x(3);
+                    // TODO: make more efficient
+                    context.x[0] = context.x[1].clone();
+                    context.x[1] = context.x[2].clone();
+                    context.x[2] = context.x[3].clone();
                 }
                 Opcode::TryCaseEnd => {
                     // Raises a try_clause exception with the value read from Arg0.
@@ -748,7 +755,10 @@ impl Machine {
                     // create a catch context that wraps f - fail label, and stores to y - reg.
                     context.catches += 1;
                     let fail = ins.args[1].to_usize();
-                    set_register!(context, &ins.args[0], Value::Catch(fail));
+                    set_register!(context, &ins.args[0], Value::Catch(InstrPtr{
+                        ptr: fail,
+                        module: context.ip.module
+                    }));
                 }
                 Opcode::CatchEnd => {
                     // y
@@ -764,6 +774,24 @@ impl Machine {
                     // Raises the exception. The instruction is garbled by backward compatibility. Arg0 is a stack trace
                     // and Arg1 is the value accompanying the exception. The reason of the raised exception is dug up
                     // from the stack trace
+                    let trace = self.expand_arg(context, &ins.args[0]);
+                    let value = self.expand_arg(context, &ins.args[1]);
+
+                    //s = get_trace_from_exc(raise_trace);
+                    // TODO: duplicated
+                    let reason = match trace {
+                        Value::Nil => Reason::EXC_ERROR,
+                        // ASSERT(is_list(exc));
+                        // return (struct StackTrace *) big_val(CDR(list_val(exc)));
+                        Value::List(cons) => unsafe {
+                            if let Value::StackTrace(s) = (**cons).tail {
+                                primary_exception!((*s).reason)
+                            } else { unreachable!() }
+                        },
+                        _ => unreachable!()
+                    };
+                    return Err(Exception{ reason, value: value.clone(), trace: trace.clone() });
+
                 }
                 Opcode::GcBif1 => {
                     // fail label, live, bif, arg1, dest

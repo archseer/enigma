@@ -5,7 +5,7 @@ use crate::value::{self, Value};
 use crate::module::MFA;
 
 /// http://erlang.org/doc/reference_manual/errors.html#exceptions
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Exception {
     pub reason: Reason, // bitflags
     pub value: Value,
@@ -13,19 +13,21 @@ pub struct Exception {
 }
 
 impl Exception {
+    #[inline]
     pub fn new(reason: Reason) -> Self {
         Exception {
             reason,
-            value: Value::Nil(),
-            trace: Value::Nil()
+            value: Value::Nil,
+            trace: Value::Nil
         }
     }
 
+    #[inline]
     pub fn with_value(reason: Reason, value: Value) -> Self {
         Exception {
             reason,
             value,
-            trace: Value::Nil()
+            trace: Value::Nil
         }
     }
 }
@@ -33,12 +35,12 @@ impl Exception {
 bitflags! {
     pub struct Reason: u32 {
         /// There are three primary exception classes:
-        /// 
+        ///
         ///      - exit			Process termination - not an error.
         ///      - error			Error (adds stacktrace; will be logged).
         ///      - thrown		Nonlocal return (turns into a 'nocatch'
         ///      			error if not caught by the process).
-        /// 
+        ///
         /// In addition, we define a number of exit codes as a convenient
         /// short-hand: instead of building the error descriptor term at the time
         /// the exception is raised, it is built as necessary when the exception
@@ -188,6 +190,12 @@ macro_rules! exception_code {
 const MAX_BACKTRACE_SIZE: usize = 64;
 const DEFAULT_BACKTRACE_SIZE: usize = 8;
 
+const EXIT_TAGS: [usize; 3] = [
+    atom::EXIT,
+    atom::ERROR,
+    atom::THROW,
+];
+
 /// Mapping from error code 'index' to atoms.
 const EXIT_CODES: [usize; 20] = [
     atom::INTERNAL_ERROR, // 0
@@ -234,9 +242,10 @@ const EXIT_CODES: [usize; 20] = [
 ];
 
 /// The quick-saved stack trace structure
-struct StackTrace {
+#[derive(Debug)]
+pub struct StackTrace {
     /// original exception reason is saved in the struct
-    reason: Reason, // bitflags
+    pub reason: Reason, // bitflags
     ///
     pc: InstrPtr,
     current: MFA,
@@ -308,8 +317,7 @@ pub fn handle_error(process: &RcProcess, mut exc: Exception, /*, bif_mfa: &MFA*/
        // }
 
        // Throws that are not caught are turned into 'nocatch' errors
-       //
-        if exc.reason.contains(Reason::EXC_THROWN) && context.catches <= 0 {
+        if exc.reason.contains(Reason::EXF_THROWN) && context.catches <= 0 {
             exc.value = tup2!(heap, Value::Atom(atom::NOCATCH), exc.value);
             exc.reason = Reason::EXC_ERROR;
         }
@@ -330,7 +338,7 @@ pub fn handle_error(process: &RcProcess, mut exc: Exception, /*, bif_mfa: &MFA*/
            // handler is just a trap to native code, these registers will
            // be ignored.) */
            // reg[0] = THE_NON_VALUE;
-           // reg[1] = exception_tag[GET_EXC_CLASS(c_p->freason)];
+           context.x[1] = Value::Atom(EXIT_TAGS[exception_class!(exc.reason).bits as usize]);
            context.x[2] = exc.value.clone();
            context.x[3] = exc.trace.clone();
            if let Some(new_pc) = next_catch(process) {
@@ -362,13 +370,14 @@ fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
 
        while ptr > 0 {
            match &context.stack[ptr-1] {
-               &Value::Catch(..) => {
+               &Value::Catch(ptr) => {
                     // ASSERT(ptr < STACK_START(c_p));
                     // Unwind the stack up to the current frame.
                     context.stack.truncate(prev);
                     // context.stack.shrink_to_fit();
                     // TODO: tracing handling here
                     // return catch_pc(*ptr);
+                    return Some(ptr);
                }
                &Value::CP(cp) => {
                    prev = ptr;
@@ -483,10 +492,10 @@ fn expand_error_value(process: &RcProcess, reason: Reason, value: Value) -> Valu
 
 // save_stacktrace(Process* c_p, BeamInstr* pc, Eterm* reg,
 // 		ErtsCodeMFA *bif_mfa, Eterm args) {
-fn save_stacktrace(process: &RcProcess, exc: &mut Exception/*, bif_mfa: &MFA, args: Value*/) {
+fn save_stacktrace(process: &RcProcess, exc: &mut Exception, /*bif_mfa: &MFA,*/ args: Value) {
        let context = process.context_mut();
-       // pc = context.i
-       let depth = 8;
+       // let pc = context.ip;
+       let mut depth = 8;
         // int depth = erts_backtrace_depth;    /* max depth (never negative) */
        if depth > 0 {
            // There will always be a current function
@@ -496,11 +505,11 @@ fn save_stacktrace(process: &RcProcess, exc: &mut Exception/*, bif_mfa: &MFA, ar
        let heap = &process.context_mut().heap;
        // Create a container for the exception data
        let s = heap.alloc(StackTrace {
-           reason: context.exc.unwrap().reason,
+           reason: exc.reason,
            trace: Vec::new(),
             // TODO: bad
-           current: std::mem::uninitialized(),
-           pc: std::mem::uninitialized(),
+           current: unsafe { std::mem::uninitialized() },
+           pc: unsafe { std::mem::uninitialized() },
        });
 
        /*
@@ -565,27 +574,26 @@ fn save_stacktrace(process: &RcProcess, exc: &mut Exception/*, bif_mfa: &MFA, ar
     } else {
         if let Some(cp) = &context.cp {
             if depth > 0 /* != None && cp != pc*/ {
-                s.trace.push(context.cp - 1);
+                s.trace.push(cp.clone()); // -1
                 depth -= 1;
             }
         }
-        // s->pc = pc;
+        s.pc = context.ip.clone();
     }
     // }
 
     // Package args and stack trace
     // c_p->ftrace = CONS(hp, args, make_big((Eterm *) s));
-    context.exc.trace = cons!(heap, args, s); // TODO: need to cast S into something
+    exc.trace = cons!(heap, args, Value::StackTrace(s)); // TODO: need to cast S into something
 
     // Save the actual stack trace
     erts_save_stacktrace(process, s, depth)
 }
 
-fn erts_save_stacktrace(process: &RcProcess, s: &StackTrace, depth: usize) {
+fn erts_save_stacktrace(process: &RcProcess, s: &mut StackTrace, mut depth: usize) {
     let context = process.context_mut();
     if depth <= 0 { return }
     let mut ptr = context.stack.len();
-    //  BeamInstr *prev = s->depth ? s->trace[s->depth-1] : NULL;
 
     /*
      * Traverse the stack backwards and add all unique continuation
@@ -594,21 +602,18 @@ fn erts_save_stacktrace(process: &RcProcess, s: &StackTrace, depth: usize) {
      * Skip trace stack frames.
      */
     while ptr > 0 && depth > 0 {
-        if let Value::CP(cp) = &context.stack[ptr-1] {
-            if cp != prev {
+        if let Value::CP(Some(cp)) = &context.stack[ptr-1] {
+            if Some(cp) != s.trace.last() {
                 // Record non-duplicates only
-                prev = cp;
-                s.trace.push(cp - 1);
+                s.trace.push(cp.clone());// -1
                 depth -= 1;
             }
         }
         ptr -= 1
     }
-}*/
+}
 
-// /*
-//  * Getting the relevant fields from the term pointed to by ftrace
-//  */
+//  Getting the relevant fields from the term pointed to by ftrace
 // static struct StackTrace *get_trace_from_exc(Eterm exc) {
 //     if (exc == NIL) {
 // 	return NULL;

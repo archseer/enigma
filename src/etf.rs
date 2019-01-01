@@ -84,7 +84,7 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value>
         // SmallAtomU8
         Tag::List => decode_list(rest, heap),
         Tag::Atom => decode_atom(rest),
-        Tag::Nil => Ok((rest, Value::Nil())),
+        Tag::Nil => Ok((rest, Value::Nil)),
         Tag::SmallTuple => {
             let (rest, size) = be_u8(rest)?;
             decode_tuple(rest, size as usize, heap)
@@ -135,7 +135,7 @@ pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> 
 
         let start = heap.alloc(value::Cons {
             head: val,
-            tail: Value::Nil(),
+            tail: Value::Nil,
         });
 
         let (tail, rest) =
@@ -144,7 +144,7 @@ pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> 
                 let (rest, val) = decode_value(rest, heap).unwrap();
                 let new_cons = heap.alloc(value::Cons {
                     head: val,
-                    tail: Value::Nil(),
+                    tail: Value::Nil,
                 });
                 std::mem::replace(&mut *tail, Value::List(new_cons));
                 (new_cons as *mut value::Cons, rest)
@@ -163,7 +163,7 @@ pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> 
 pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> {
     let (rest, len) = be_u16(rest)?;
     if len == 0 {
-        return Ok((rest, Value::Nil()));
+        return Ok((rest, Value::Nil));
     }
 
     unsafe {
@@ -171,7 +171,7 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value
 
         let start = heap.alloc(value::Cons {
             head: Value::Character(elem),
-            tail: Value::Nil(),
+            tail: Value::Nil,
         });
 
         let (tail, rest) =
@@ -181,7 +181,7 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value
 
                 let new_cons = heap.alloc(value::Cons {
                     head: Value::Character(elem),
-                    tail: Value::Nil(),
+                    tail: Value::Nil,
                 });
 
                 std::mem::replace(&mut *tail, Value::List(new_cons as *const value::Cons));
@@ -189,7 +189,7 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value
             });
 
         // set the tail
-        (*tail).tail = Value::Nil();
+        (*tail).tail = Value::Nil;
 
         Ok((rest, Value::List(start)))
     }

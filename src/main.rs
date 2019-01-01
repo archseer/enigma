@@ -1,10 +1,11 @@
 #[macro_use]
 mod macros;
+#[macro_use]
+mod exception;
 mod arc_without_weak;
 mod atom;
 mod bif;
 mod etf;
-mod exception;
 mod immix;
 mod loader;
 mod mailbox;

@@ -247,7 +247,7 @@ impl<'a> Loader<'a> {
                 .map(|arg| match arg {
                     Value::Atom(i) => {
                         if *i == 0 {
-                            return Value::Nil();
+                            return Value::Nil;
                         }
                         Value::Atom(atom_map[&(i - 1)])
                     }
@@ -264,7 +264,7 @@ impl<'a> Loader<'a> {
                             .map(|arg| match arg {
                                 Value::Atom(i) => {
                                     if *i == 0 {
-                                        return Value::Nil();
+                                        return Value::Nil;
                                     }
                                     Value::Atom(atom_map[&(i - 1)])
                                 }

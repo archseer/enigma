@@ -23,13 +23,13 @@ impl Hash for Float {
 #[derive(Debug, Eq, PartialEq, PartialOrd, Clone, Hash)]
 pub enum Value {
     // Immediate values
-    Nil(), // also known as nil
+    Nil, // also known as nil
     Integer(i64),
     Character(u8),
     Atom(usize),
     Pid(process::PID),
-    Port(),
-    Ref(),
+    Port(usize),
+    Ref(usize),
     Float(self::Float),
     // Extended values (on heap)
     List(*const self::Cons),
@@ -54,8 +54,9 @@ pub enum Value {
     FloatReg(usize),
     AllocList(Vec<(u8, usize)>),
     ExtendedLiteral(usize), // TODO; replace at load time
-    CP(Option<InstrPtr>),      // continuation pointer
-    Catch(usize) // catch context
+    CP(Option<InstrPtr>),   // continuation pointer
+    Catch(InstrPtr),        // catch context
+    StackTrace(*const exception::StackTrace),
 }
 
 #[derive(Debug)]
@@ -166,7 +167,7 @@ impl Value {
 
     pub fn is_nil(&self) -> bool {
         match *self {
-            Value::Nil(..) => true,
+            Value::Nil => true,
             _ => false,
         }
     }
@@ -181,14 +182,14 @@ impl Value {
     pub fn is_list(&self) -> bool {
         match *self {
             Value::List { .. } => true,
-            Value::Nil(..) => true, // apparently also valid
+            Value::Nil => true, // apparently also valid
             _ => false,
         }
     }
 
     pub fn is_non_empty_list(&self) -> bool {
         match *self {
-            Value::List(ptr) => unsafe { !(*ptr).head.is_nil() }
+            Value::List(ptr) => unsafe { !(*ptr).head.is_nil() },
             _ => false,
         }
     }
@@ -243,7 +244,7 @@ impl Value {
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Value::Nil() => write!(f, "nil"),
+            Value::Nil => write!(f, "nil"),
             Value::Integer(i) => write!(f, "{}", i),
             Value::Character(i) => write!(f, "{}", i),
             Value::Atom(i) => write!(f, ":{}", atom::to_str(&Value::Atom(*i)).unwrap()),
@@ -260,7 +261,7 @@ impl std::fmt::Display for Value {
                     write!(f, "{}", (*cons).head)?;
                     match &(*cons).tail {
                         // Proper list ends here, do not show the tail
-                        Value::Nil() => break,
+                        Value::Nil => break,
                         // List continues, print a comma and follow the tail
                         Value::List(c) => {
                             write!(f, ", ")?;

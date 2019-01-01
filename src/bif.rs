@@ -374,7 +374,7 @@ fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -
     Err(Exception {
         reason: Reason::EXC_THROWN,
         value: args[0].clone(),
-        trace: Value::Nil(),
+        trace: Value::Nil,
     })
 }
 
@@ -385,7 +385,7 @@ fn bif_erlang_get_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Value]) -> 
     let pdict = &process.local_data_mut().dictionary;
     let heap = &process.context_mut().heap;
 
-    let result: Value = pdict.iter().fold(Value::Nil(), |res, (key, val)| {
+    let result: Value = pdict.iter().fold(Value::Nil, |res, (key, val)| {
         // make tuple
         let tuple = value::tuple(heap, 2);
         tuple[0] = key.clone();
@@ -413,7 +413,7 @@ fn bif_erlang_get_keys_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Value]
 
     let result: Value = pdict
         .keys()
-        .fold(Value::Nil(), |res, key| value::cons(heap, key.clone(), res));
+        .fold(Value::Nil, |res, key| value::cons(heap, key.clone(), res));
     Ok(result)
 }
 
@@ -422,7 +422,7 @@ fn bif_erlang_get_keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Value])
     let pdict = &process.local_data_mut().dictionary;
     let heap = &process.context_mut().heap;
 
-    let result: Value = pdict.iter().fold(Value::Nil(), |res, (key, val)| {
+    let result: Value = pdict.iter().fold(Value::Nil, |res, (key, val)| {
         if args[1] == *val {
             value::cons(heap, key.clone(), res)
         } else {
@@ -447,7 +447,7 @@ fn bif_erlang_erase_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Value]) -
     let heap = &process.context_mut().heap;
 
     // we use drain since it means we do a move instead of a copy
-    let result: Value = pdict.drain().fold(Value::Nil(), |res, (key, val)| {
+    let result: Value = pdict.drain().fold(Value::Nil, |res, (key, val)| {
         // make tuple
         let tuple = value::tuple(heap, 2);
         tuple[0] = key;
@@ -751,7 +751,7 @@ mod tests {
     fn from_vec(heap: &Heap, vec: Vec<Value>) -> Value {
         vec.into_iter()
             .rev()
-            .fold(Value::Nil(), |res, val| value::cons(heap, val, res))
+            .fold(Value::Nil, |res, val| value::cons(heap, val, res))
     }
 
     macro_rules! atom {
