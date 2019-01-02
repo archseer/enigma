@@ -1,5 +1,5 @@
-use crate::atom::{self, ATOMS};
 use crate::arc_without_weak::ArcWithoutWeak;
+use crate::atom::{self, ATOMS};
 use crate::etf;
 use crate::immix::Heap;
 use crate::module::{Lambda, Module, MFA};
@@ -22,6 +22,8 @@ pub struct Loader<'a> {
     atom_map: HashMap<usize, usize>, // TODO: remove this; local id -> global id
     funs: FnvHashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
     labels: FnvHashMap<usize, usize>, // label -> offset
+    lines: Vec<(usize, usize)>,      // (filename_index, loc)
+    file_names: Vec<&'a str>,
     code: &'a [u8],
     literal_heap: Heap,
     instructions: Vec<Instruction>,
@@ -40,6 +42,8 @@ impl<'a> Loader<'a> {
             atom_map: HashMap::new(),
             labels: FnvHashMap::default(),
             funs: FnvHashMap::default(),
+            lines: Vec::new(),
+            file_names: Vec::new(),
             code: &[],
             instructions: Vec::new(),
         }
@@ -65,6 +69,9 @@ impl<'a> Loader<'a> {
         }
         if let Some(chunk) = chunks.remove("LitT") {
             self.load_literals_table(chunk);
+        }
+        if let Some(chunk) = chunks.remove("Line") {
+            self.load_lines_table(chunk);
         }
         if let Some(chunk) = chunks.remove("FunT") {
             self.load_lambdas_table(chunk);
@@ -169,6 +176,27 @@ impl<'a> Loader<'a> {
         self.literals = literals;
     }
 
+    fn load_lines_table(&mut self, chunk: Chunk<'a>) {
+        // If the emulator flag ignoring the line information was given, return immediately.
+
+        // if (erts_no_line_info) { return (); }
+
+        let (_, (lines, file_names)) = decode_lines(chunk).unwrap();
+        self.lines = lines;
+        self.file_names = file_names;
+
+        // /*
+        //  * Allocate the arrays to be filled while code is being loaded.
+        //  */
+        // stp->line_instr = (LineInstr *) erts_alloc(ERTS_ALC_T_PREPARED_CODE,
+        // stp->num_line_instrs *
+        // sizeof(LineInstr));
+        // stp->current_li = 0;
+        // stp->func_line = (unsigned int *)  erts_alloc(ERTS_ALC_T_PREPARED_CODE,
+        // stp->num_functions *
+        // sizeof(int));
+    }
+
     fn load_lambdas_table(&mut self, chunk: Chunk) {
         let (_, data) = funt_chunk(chunk).unwrap();
         // TODO: convert at load time, if nfree == 0, then allocate as a literal --> move instruction,
@@ -211,7 +239,8 @@ impl<'a> Loader<'a> {
                     // don't skip so we can apply tracing during runtime
                     if let [_module, Value::Atom(f), Value::Literal(a)] = &instruction.args[..] {
                         let f = self.atom_map[&(*f - 1)]; // necessary because atoms weren't remapped yet
-                        self.funs.insert((f, *a as usize), self.instructions.len() + 1); // need to point after func_info
+                        self.funs
+                            .insert((f, *a as usize), self.instructions.len() + 1); // need to point after func_info
                     } else {
                         panic!("Bad argument to {:?}", instruction.op)
                     }
@@ -225,13 +254,15 @@ impl<'a> Loader<'a> {
                     if let [Value::Literal(len), Value::Literal(offset)] = instruction.args[..] {
                         // TODO: ideally use a single string that we slice into for these interned strings
                         // but need to tie them to the string heap lifetime
-                        let bytes = &self.strings[offset..offset+len];
+                        let bytes = &self.strings[offset..offset + len];
                         let string = bytes.to_string();
                         instruction.args = vec![Value::Binary(ArcWithoutWeak::new(string))];
                         instruction
-                    } else { unreachable!() }
+                    } else {
+                        unreachable!()
+                    }
                 }
-                _ => instruction
+                _ => instruction,
             };
 
             self.instructions.push(instruction);
@@ -298,6 +329,58 @@ fn decode_literals<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Vec<Val
                 )))
             >> (literals)
     )
+}
+
+fn decode_lines<'a>(rest: &'a [u8]) -> IResult<&'a [u8], (Vec<(usize, usize)>, Vec<&str>)> {
+    // Check version of line table.
+
+    let (rest, version) = be_u32(rest)?;
+    if version != 0 {
+        // Wrong version. Silently ignore the line number chunk.
+        return Ok((rest, (Vec::new(), Vec::new()))); // TODO: use option maybe
+    }
+
+    do_parse!(
+        rest,
+        _flags: be_u32 >> // reserved for future use
+        num_line_instrs: be_u32 >>
+        num_line_items: be_u32 >>
+        num_fnames: be_u32 >>
+        line_items: call!(decode_line_items, num_line_items) >>
+        file_names: count!(map_res!(length_bytes!(be_u16), std::str::from_utf8), num_fnames as usize) >>
+            ((line_items, file_names))
+    )
+}
+
+fn decode_line_items<'a>(rest: &'a [u8], count: u32) -> IResult<&'a [u8], Vec<(usize, usize)>> {
+    let mut vec = Vec::with_capacity(count as usize);
+    vec.push((0, 0)); // 0th index = undefined location
+    let mut fname_index = 0;
+
+    let mut new_rest = rest;
+
+    for _i in 0..(count + 1) {
+        let (rest, term) = compact_term(new_rest)?;
+        new_rest = rest;
+        match term {
+            Value::Integer(n) => {
+                // TODO: validate
+                vec.push((fname_index, n as usize));
+                // Too many files or huge line number. Silently invalidate the location.
+                // loc = LINE_INVALID_LOCATION;
+            }
+            Value::Atom(i) => {
+                fname_index = i;
+                // if (val > stp->num_fnames) {
+                // LoadError2(stp, "file index overflow (%u/%u)",
+                // val, stp->num_fnames);
+                // }
+            }
+            _ => unreachable!(),
+        }
+    }
+    println!("after: {:?}", new_rest);
+    Ok((new_rest, vec))
 }
 
 // #[derive(Debug, PartialEq)]

@@ -158,8 +158,8 @@ bitflags! {
         const EXC_BADKEY          = ((19 << Self::EXC_OFFSET.bits) | Self::EXC_ERROR.bits);
 
         /*
-        * Internal pseudo-error codes.
-        */
+         * Internal pseudo-error codes.
+         */
 
         /// BIF Trap to erlang code
         const TRAP = (1 << Self::EXC_OFFSET.bits);
