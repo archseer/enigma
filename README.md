@@ -1,17 +1,21 @@
 # Enigma
 
-Another VM, Why? So I decided to dig into BEAM internals because I wanted to
-start contributing to Erlang development, and I learn best by building. That,
-plus writing this in Rust has been tons of fun (I also trust my Rust code a lot
-more than my C code).
+A clean and simple implementation of the Erlang VM in Rust. Initially, we value
+correctness over performance, (current aim is to be OTP 22 compatible, sans the
+distributed bits for now).
 
-Current aim is to be OTP 22 compatible, (sans the distributed bits for now).
-Performance? My TotallyLegit™ fibonacci benchmarks are currently on-par with OTP
+Although my TotallyLegit™ fibonacci benchmarks are currently on-par with OTP
 (albeit I'm missing 99% of the runtime).
 
 Plan: implement all the instructions -> implement enough BIFs to get preloaded
 bootstrap to load -> implement enough to get the full system to boot -> OTP
 tests to run.
+
+# Why?
+
+Because it's fun and I've been learning a lot. A small and compact
+implementation also makes it easier for new people to learn OTP internals, as
+well as quickly iterate on experiments.
 
 # Installation
 
@@ -39,6 +43,7 @@ crashes, but a basic spawn + send multi-process model already works.
 - Process as a generator function (yield to suspend/on reduce)
 - Use Commentz-Walter for binary matching. ["Commentz-Walter is an algorithm that combines Aho-Corasick with Boyer-Moore. (Only implementation I know of is in GNU grep.)"](https://github.com/rust-lang/regex/issues/197))
     https://en.wikipedia.org/wiki/Commentz-Walter_algorithm
+- Cross-compile to WebAssembly ([threading](https://rustwasm.github.io/2018/10/24/multithreading-rust-and-wasm.html) is coming)
 
 # TODO
 
@@ -78,10 +83,10 @@ Focus on getting preloaded modules to load: {:preLoaded,
      :erts_literal_area_collector, :init, :persistent_term, :prim_buffer,
      :prim_eval, :prim_file, :prim_inet, :prim_zip, :zlib]},
 
-# Special thanks
+# Acknowledgements & Special thanks
 
 - [Yorick Peterse's Inko](https://gitlab.com/inko-lang/inko/), from which I've stolen the process scheduling code.
 - @kvaks for [ErlangRT](https://github.com/kvakvs/ErlangRT) which I've used for an extensive reference, along with his [BEAM
     Wisdoms](http://beam-wisdoms.clau.se/en/latest/) website.
 - [The BEAM Book](https://github.com/happi/theBeamBook)
-- bumpalo for the basis of bump allocation
+- [bumpalo](https://github.com/fitzgen/bumpalo) for the basis of bump allocation

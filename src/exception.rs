@@ -218,27 +218,6 @@ const EXIT_CODES: [usize; 20] = [
     atom::NOT_SUP,
     atom::BAD_MAP,
     atom::BAD_KEY // 19
-    // Eterm error_atom[NUMBER_EXIT_CODES] = {
-    //   am_internal_error,	/* 0 */
-    //   am_normal,		/* 1 */
-    //   am_internal_error,	/* 2 */
-    //   am_badarg,		/* 3 */
-    //   am_badarith,		/* 4 */
-    //   am_badmatch,		/* 5 */
-    //   am_function_clause,	/* 6 */
-    //   am_case_clause,	/* 7 */
-    //   am_if_clause,		/* 8 */
-    //   am_undef,		/* 9 */
-    //   am_badfun,		/* 10 */
-    //   am_badarity,		/* 11 */
-    //   am_timeout_value,	/* 12 */
-    //   am_noproc,		/* 13 */
-    //   am_notalive,		/* 14 */
-    //   am_system_limit,	/* 15 */
-    //   am_try_clause,	/* 16 */
-    //   am_notsup,		/* 17 */
-    //   am_badmap,		/* 18 */
-    //   am_badkey,		/* 19 */
 ];
 
 /// The quick-saved stack trace structure

@@ -27,6 +27,7 @@ allocator_api = "0.5.0"
 time = "0.1.40"
 chrono = "0.4.6"
 bitflags = "1.0.4"
+getopts = "0.2.18"
 
 [profile.release]
 debug = true
