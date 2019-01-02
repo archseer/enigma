@@ -18,18 +18,10 @@ mod process;
 mod process_table;
 mod queue;
 mod value;
-mod vm;
+pub mod vm;
 
 #[macro_use]
 extern crate once_cell;
 
 #[macro_use]
 extern crate bitflags;
-
-fn main() {
-    let vm = vm::Machine::new();
-
-    vm.start("./examples/Elixir.Try.beam");
-
-    println!("execution time: {:?}", vm.elapsed_time())
-}

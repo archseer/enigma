@@ -270,42 +270,35 @@ impl<'a> Loader<'a> {
 
         let atom_map = &self.atom_map;
         let labels = &self.labels;
+        let postprocess_value = |arg: &Value| -> Value {
+            match arg {
+                Value::Atom(i) => {
+                    if *i == 0 {
+                        return Value::Nil;
+                    }
+                    Value::Atom(atom_map[&(i - 1)])
+                }
+                Value::Label(l) => {
+                    if *l == 0 {
+                        return Value::Label(0);
+                    }
+                    Value::Label(labels[l])
+                }
+                val => val.clone(),
+            }
+        };
+
         self.instructions.iter_mut().for_each(|instruction| {
             // patch local atoms into global
             instruction.args = instruction
                 .args
                 .iter()
                 .map(|arg| match arg {
-                    Value::Atom(i) => {
-                        if *i == 0 {
-                            return Value::Nil;
-                        }
-                        Value::Atom(atom_map[&(i - 1)])
-                    }
-                    Value::Label(l) => {
-                        if *l == 0 {
-                            return Value::Label(0);
-                        }
-                        Value::Label(labels[l])
-                    }
-                    // HAXX: do the same remap on extended list
                     Value::ExtendedList(vec) => {
-                        let vec = vec
-                            .iter()
-                            .map(|arg| match arg {
-                                Value::Atom(i) => {
-                                    if *i == 0 {
-                                        return Value::Nil;
-                                    }
-                                    Value::Atom(atom_map[&(i - 1)])
-                                }
-                                Value::Label(l) => Value::Label(labels[l]),
-                                val => val.clone(),
-                            })
-                            .collect();
+                        let vec = vec.iter().map(|arg| postprocess_value(arg)).collect();
                         Value::ExtendedList(vec)
                     }
-                    val => val.clone(),
+                    _ => postprocess_value(arg),
                 })
                 .collect();
         })
@@ -379,15 +372,8 @@ fn decode_line_items<'a>(rest: &'a [u8], count: u32) -> IResult<&'a [u8], Vec<(u
             _ => unreachable!(),
         }
     }
-    println!("after: {:?}", new_rest);
     Ok((new_rest, vec))
 }
-
-// #[derive(Debug, PartialEq)]
-// pub struct Chunk<'a> {
-//     pub name: &'a str,
-//     pub data: &'a [u8],
-// }
 
 type Chunk<'a> = &'a [u8];
 
