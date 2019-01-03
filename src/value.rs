@@ -40,6 +40,7 @@ pub enum Value {
     /// Strings use an Arc so they can be sent to other processes without
     /// requiring a full copy of the data.
     Binary(ArcWithoutWeak<String>),
+    Map(),
 
     /// An interned string is a string allocated on the permanent space. For
     /// every unique interned string there is only one object allocated.
@@ -266,6 +267,14 @@ impl Value {
             _ => false,
         }
     }
+
+    pub fn is_map(&self) -> bool {
+        match *self {
+            Value::Map(..) => true,
+            _ => false,
+        }
+    }
+
 
     pub fn is_cp(&self) -> bool {
         match *self {

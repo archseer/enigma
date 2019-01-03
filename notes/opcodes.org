@@ -1,4 +1,4 @@
-* Opcodes [73/138]
+* Opcodes [77/138]
 - [X] Label = 1
 - [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -45,7 +45,7 @@
 - [X] IsTuple = 57
 - [X] TestArity = 58
 - [X] SelectVal = 59
-- [ ] SelectTupleArity = 60
+- [X] SelectTupleArity = 60
 - [X] Jump = 61
 - [X] Catch = 62
 - [ ] CatchEnd = 63
@@ -80,7 +80,7 @@
 - [X] TryEnd = 105
 - [ ] TryCase = 106
 - [X] TryCaseEnd = 107
-- [ ] Raise = 108
+- [X] Raise = 108
 - [X] BsInit2 = 109
 - [X] BsAdd = 111
 - [ ] Apply = 112
@@ -124,11 +124,11 @@
 - [X] Line = 153
 - [ ] PutMapAssoc = 154
 - [ ] PutMapExact = 155
-- [ ] IsMap = 156
+- [X] IsMap = 156
 - [ ] HasMapFields = 157
 - [ ] GetMapElements = 158
 - [ ] IsTaggedTuple = 159
-- [ ] BuildStacktrace = 160
+- [X] BuildStacktrace = 160
 - [ ] RawRaise = 161
 - [X] GetHd = 162
 - [X] GetTl = 163

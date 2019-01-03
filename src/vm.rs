@@ -259,14 +259,9 @@ impl Machine {
 
         /* TEMP */
         let context = process.context_mut();
-
-        // let fun = atom::from_str("fib");
-        // let arity = 1;
-        // context.x[0] = Value::Integer(23); // 28
         let fun = atom::from_str("start");
         let arity = 0;
         unsafe { op_jump!(context, (*context.ip.module).funs[&(fun, arity)]) }
-        // unsafe { println!("ins: {:?}", (*context.module).instructions) };
         /* TEMP */
 
         let process = Job::normal(process);
@@ -328,6 +323,7 @@ impl Machine {
         // );
         loop {
             let ins = unsafe { &(*context.ip.module).instructions[context.ip.ptr] };
+            let module = unsafe { &(*context.ip.module) };
             context.ip.ptr += 1;
 
             println!(
@@ -416,7 +412,7 @@ impl Machine {
                         context.cp = Some(context.ip);
                         op_jump!(context, *i);
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                     safepoint_and_reduce!(self, process, reductions);
                 }
@@ -428,7 +424,7 @@ impl Machine {
 
                         op_jump!(context, *i);
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                     safepoint_and_reduce!(self, process, reductions);
                 }
@@ -438,7 +434,7 @@ impl Machine {
                     if let [Value::Literal(_a), Value::Label(i)] = &ins.args[..] {
                         op_jump!(context, *i);
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                     safepoint_and_reduce!(self, process, reductions);
                 }
@@ -450,7 +446,7 @@ impl Machine {
 
                         op_call_ext!(self, context, process, arity, dest);
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                     safepoint_and_reduce!(self, process, reductions);
                 }
@@ -459,7 +455,7 @@ impl Machine {
                     if let [Value::Literal(arity), Value::Literal(dest)] = &ins.args[..] {
                         op_call_ext!(self, context, process, arity, dest);
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                     safepoint_and_reduce!(self, process, reductions);
                 }
@@ -470,20 +466,20 @@ impl Machine {
 
                         op_call_ext!(self, context, process, arity, dest);
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                     safepoint_and_reduce!(self, process, reductions);
                 }
                 Opcode::Bif0 => {
                     // literal export, x reg
                     if let [Value::Literal(dest), reg] = &ins.args[..] {
-                        let mfa = unsafe { &(*context.ip.module).imports[*dest] };
+                        let mfa = &module.imports[*dest];
                         let val = bif::apply(self, process, mfa, &[]).unwrap(); // TODO handle fail
                         set_register!(context, reg, val); // HAXX
                         // TODO: no fail label means this is not a func header call,
                         // but body, run the handle_error routine
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                 }
                 Opcode::Allocate => {
@@ -494,7 +490,7 @@ impl Machine {
                         }
                         context.stack.push(Value::CP(context.cp));
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                 }
                 Opcode::AllocateHeap => {
@@ -511,7 +507,7 @@ impl Machine {
                         // TODO: check heap for heapneed space!
                         context.stack.push(Value::CP(context.cp));
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                 }
                 Opcode::AllocateZero => {
@@ -522,7 +518,7 @@ impl Machine {
                         }
                         context.stack.push(Value::CP(context.cp));
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                 }
                 Opcode::AllocateHeapZero => {
@@ -536,7 +532,7 @@ impl Machine {
                         // TODO: check heap for heapneed space!
                         context.stack.push(Value::CP(context.cp));
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                 }
                 // TestHeap
@@ -549,7 +545,7 @@ impl Machine {
                     if let [Value::Literal(nwords)] = &ins.args[..] {
                         op_deallocate!(context, nwords)
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                 }
                 Opcode::IsLt => {
@@ -616,6 +612,7 @@ impl Machine {
                 Opcode::IsTuple        => { op_is_type!(self, context, ins.args, is_tuple) }
                 Opcode::IsFunction     => { op_is_type!(self, context, ins.args, is_function) }
                 Opcode::IsBoolean      => { op_is_type!(self, context, ins.args, is_boolean) }
+                Opcode::IsMap          => { op_is_type!(self, context, ins.args, is_map) }
                 Opcode::IsFunction2    => {
                     if let Value::Closure(closure) = self.expand_arg(context, &ins.args[0]) {
                         let arity = self.expand_arg(context, &ins.args[1]).to_usize();
@@ -642,7 +639,7 @@ impl Machine {
                         }
 
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                 }
                 Opcode::SelectVal => {
@@ -666,6 +663,33 @@ impl Machine {
                                 op_jump!(context, *fail);
                                 break;
                             }
+                        }
+                    }
+                }
+                Opcode::SelectTupleArity => {
+                    // tuple fail dests
+                    if let [arg, Value::Label(fail), Value::ExtendedList(vec)] = &ins.args[..] {
+                        if let Value::Tuple(tup) = self.expand_arg(context, arg) {
+                            let len = Value::Integer(unsafe { (**tup).len as i64 });
+                            let mut i = 0;
+                            loop {
+                                // if key matches, jump to the following label
+                                if vec[i] == len {
+                                    let label = vec[i+1].to_usize();
+                                    op_jump!(context, label);
+                                    break;
+                                }
+
+                                i += 2;
+
+                                // if we ran out of options, jump to fail
+                                if i >= vec.len() {
+                                    op_jump!(context, *fail);
+                                    break;
+                                }
+                            }
+                        } else {
+                            op_jump!(context, *fail);
                         }
                     }
                 }
@@ -805,13 +829,14 @@ impl Machine {
                         let args = &[
                             self.expand_arg(context, &ins.args[3]).clone(),
                         ];
-                        let val = unsafe { bif::apply(self, process, &(*context.ip.module).imports[*i], &args[..]).unwrap() }; // TODO: handle fail
+                        let mfa = &module.imports[*i];
+                        let val = bif::apply(self, process, mfa, &args[..]).unwrap(); // TODO: handle fail
 
                         // TODO: consume fail label if not 0
 
                         set_register!(context, &ins.args[4], val)
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                 }
                 Opcode::BsAdd => {
@@ -833,7 +858,7 @@ impl Machine {
                         let res = Value::Integer(((s1 + s2) * (*unit)) as i64);
                         set_register!(context, dest, res)
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
 
                 }
@@ -861,7 +886,7 @@ impl Machine {
                         context.bs = &mut (*arc); // TODO: this feels a bit off
                         set_register!(context, dest, Value::Binary(arc));
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                 }
                 Opcode::BsPutString => {
@@ -871,7 +896,7 @@ impl Machine {
                     if let Value::Binary(str) = &ins.args[0] {
                         unsafe { (*context.bs).push_str(&*str); }
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                 }
                 Opcode::BsPutBinary => {
@@ -890,7 +915,7 @@ impl Machine {
                             panic!("Bad argument to {:?}", ins.op)
                         }
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                 }
                 Opcode::BsPutFloat => {
@@ -970,7 +995,8 @@ impl Machine {
                     let val: f64 = match self.expand_arg(context, &ins.args[0]) {
                         Value::Float(value::Float(f)) => *f,
                         Value::Integer(i) => *i as f64, // TODO: i64 -> f64 is unsafe
-                        _ => unimplemented!()
+                        // TODO: bignum if it fits into float
+                        _ => return Err(Exception::new(Reason::EXC_BADARITH))
                     };
 
                     if let Value::FloatReg(dest) = ins.args[1] {
@@ -999,13 +1025,14 @@ impl Machine {
                             self.expand_arg(context, &ins.args[3]).clone(),
                             self.expand_arg(context, &ins.args[4]).clone(),
                         ];
-                        let val = unsafe { bif::apply(self, process, &(*context.ip.module).imports[*i], &args[..]).unwrap() }; // TODO: handle fail
+                        let mfa = &module.imports[*i];
+                        let val = bif::apply(self, process, mfa, &args[..]).unwrap(); // TODO: handle fail
 
-                        // TODO: consume fail label if not 0
+                        // TODO: consume fail label if not 0, else return error
 
                         set_register!(context, &ins.args[5], val)
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                 }
                 Opcode::GcBif3 => {
@@ -1017,13 +1044,14 @@ impl Machine {
                             self.expand_arg(context, &ins.args[4]).clone(),
                             self.expand_arg(context, &ins.args[5]).clone(),
                         ];
-                        let val = unsafe { bif::apply(self, process, &(*context.ip.module).imports[*i], &args[..]).unwrap() }; // TODO: handle fail
+                        let mfa = &module.imports[*i];
+                        let val = bif::apply(self, process, mfa, &args[..]).unwrap(); // TODO: handle fail
 
-                        // TODO: consume fail label if not 0
+                        // TODO: consume fail label if not 0, else return error
 
                         set_register!(context, &ins.args[6], val)
                     } else {
-                        panic!("Bad argument to {:?}", ins.op)
+                        unreachable!()
                     }
                 }
                 Opcode::Trim => {
@@ -1038,8 +1066,7 @@ impl Machine {
                     // literal n -> points to lambda
                     // nfree means capture N x-registers into the closure
                     let i = ins.args[0].to_usize();
-                    let lambda = unsafe { &(*context.ip.module).lambdas[i] };
-                    println!("make_fun2 args: {:?}", lambda);
+                    let lambda = &module.lambdas[i];
 
                     let binding = if lambda.nfree != 0 {
                         Some(context.x[0..(lambda.nfree as usize)].to_vec())
@@ -1048,7 +1075,7 @@ impl Machine {
                     };
 
                     let closure = context.heap.alloc(value::Closure {
-                        mfa: (0, lambda.name as usize, lambda.arity as usize), // TODO: module_id
+                        mfa: (module.name, lambda.name as usize, lambda.arity as usize), // TODO: use module id instead later
                         ptr: lambda.offset,
                         binding
                     });
@@ -1073,7 +1100,7 @@ impl Machine {
                             op_jump!(context, (*closure).ptr);
                         }
                     } else {
-                        panic!("badarg to CallFun")
+                        unreachable!()
                     }
                 }
                 Opcode::GetHd => {
@@ -1082,7 +1109,7 @@ impl Machine {
                         let val = unsafe { (**cons).head.clone() };
                         set_register!(context, &ins.args[1], val);
                     } else {
-                        panic!("badarg to GetHd")
+                        unreachable!()
                     }
                 }
                 Opcode::GetTl => {
@@ -1091,8 +1118,11 @@ impl Machine {
                         let val = unsafe { (**cons).tail.clone() };
                         set_register!(context, &ins.args[1], val);
                     } else {
-                        panic!("badarg to GetHd")
+                        unreachable!()
                     }
+                }
+                Opcode::BuildStacktrace => {
+                    context.x[0] = exception::build_stacktrace(process, &context.x[0]);
                 }
                 opcode => println!("Unimplemented opcode {:?}: {:?}", opcode, ins),
             }

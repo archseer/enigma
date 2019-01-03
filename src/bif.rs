@@ -47,6 +47,7 @@ static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::from_str("is_binary"), 1), Box::new(bif_erlang_is_binary_1));
     bifs.insert((erlang, atom::from_str("is_function"), 1), Box::new(bif_erlang_is_function_1));
     bifs.insert((erlang, atom::from_str("is_boolean"), 1), Box::new(bif_erlang_is_boolean_1));
+    bifs.insert((erlang, atom::from_str("is_map"), 1), Box::new(bif_erlang_is_map_1));
     bifs.insert((erlang, atom::from_str("hd"), 1), Box::new(bif_erlang_hd_1));
     bifs.insert((erlang, atom::from_str("tl"), 1), Box::new(bif_erlang_tl_1));
     bifs.insert((erlang, atom::from_str("trunc"), 1), Box::new(bif_erlang_trunc_1));
@@ -117,7 +118,6 @@ pub fn apply(
 //     .collect();
 
 /// Bif implementations
-#[inline]
 fn bif_erlang_spawn_3(vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     // parent: TODO: track parent of process
     // arg[0] = atom for module
@@ -134,7 +134,6 @@ fn bif_erlang_spawn_3(vm: &vm::Machine, _process: &RcProcess, args: &[Value]) ->
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
-#[inline]
 fn bif_erlang_abs_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     match &args[0] {
         Value::Integer(i) => Ok(Value::Integer(i.abs())),
@@ -144,22 +143,18 @@ fn bif_erlang_abs_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> 
     }
 }
 
-#[inline]
 fn bif_erlang_add_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Ok(integer_overflow_op!(None, args, add, overflowing_add))
 }
 
-#[inline]
 fn bif_erlang_sub_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Ok(integer_overflow_op!(None, args, sub, overflowing_sub))
 }
 
-#[inline]
 fn bif_erlang_mult_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Ok(integer_overflow_op!(None, args, mul, overflowing_mul))
 }
 
-#[inline]
 fn bif_erlang_intdiv_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Ok(integer_overflow_op!(
         None,
@@ -169,18 +164,15 @@ fn bif_erlang_intdiv_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) 
     ))
 }
 
-#[inline]
 fn bif_erlang_mod_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     // TODO: should be rem but it's mod
     Ok(integer_overflow_op!(None, args, modulo, overflowing_modulo))
 }
 
-#[inline]
 fn bif_erlang_self_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Value]) -> BifResult {
     Ok(Value::Pid(process.pid))
 }
 
-#[inline]
 fn bif_erlang_send_2(vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
     // args: dest <pid>, msg <term>
     let pid = &args[0];
@@ -191,61 +183,54 @@ fn bif_erlang_send_2(vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> B
     Ok(res)
 }
 
-#[inline]
 fn bif_erlang_is_atom_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Ok(Value::boolean(args[0].is_atom()))
 }
 
-#[inline]
 fn bif_erlang_is_list_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Ok(Value::boolean(args[0].is_list()))
 }
 
-#[inline]
 fn bif_erlang_is_tuple_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Ok(Value::boolean(args[0].is_tuple()))
 }
 
-#[inline]
 fn bif_erlang_is_float_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Ok(Value::boolean(args[0].is_float()))
 }
 
-#[inline]
 fn bif_erlang_is_integer_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Ok(Value::boolean(args[0].is_integer()))
 }
 
-#[inline]
 fn bif_erlang_is_number_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Ok(Value::boolean(args[0].is_number()))
 }
 
-#[inline]
 fn bif_erlang_is_port_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Ok(Value::boolean(args[0].is_port()))
 }
 
-#[inline]
 fn bif_erlang_is_reference_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Ok(Value::boolean(args[0].is_ref()))
 }
 
-#[inline]
 fn bif_erlang_is_binary_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Ok(Value::boolean(args[0].is_binary()))
 }
 
-#[inline]
 fn bif_erlang_is_function_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Ok(Value::boolean(args[0].is_function()))
 }
 
 // TODO: is_function_2, is_record
 
-#[inline]
 fn bif_erlang_is_boolean_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Ok(Value::boolean(args[0].is_boolean()))
+}
+
+fn bif_erlang_is_map_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    Ok(Value::boolean(args[0].is_map()))
 }
 
 macro_rules! trig_func {
@@ -263,87 +248,70 @@ macro_rules! trig_func {
     }};
 }
 
-#[inline]
 fn bif_math_cos_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     trig_func!(args[0], cos)
 }
 
-#[inline]
 fn bif_math_cosh_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     trig_func!(args[0], cosh)
 }
 
-#[inline]
 fn bif_math_sin_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     trig_func!(args[0], sin)
 }
 
-#[inline]
 fn bif_math_sinh_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     trig_func!(args[0], sinh)
 }
 
-#[inline]
 fn bif_math_tan_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     trig_func!(args[0], tan)
 }
 
-#[inline]
 fn bif_math_tanh_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     trig_func!(args[0], tanh)
 }
 
-#[inline]
 fn bif_math_acos_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     trig_func!(args[0], acos)
 }
 
-#[inline]
 fn bif_math_acosh_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     trig_func!(args[0], acosh)
 }
 
-#[inline]
 fn bif_math_asin_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     trig_func!(args[0], asin)
 }
 
-#[inline]
 fn bif_math_asinh_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     trig_func!(args[0], asinh)
 }
 
-#[inline]
 fn bif_math_atan_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     trig_func!(args[0], atan)
 }
 
-#[inline]
 fn bif_math_atanh_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     trig_func!(args[0], atanh)
 }
 
-#[inline]
 fn bif_math_log_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     trig_func!(args[0], ln)
 }
 
-#[inline]
 fn bif_math_log2_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     trig_func!(args[0], log2)
 }
 
-#[inline]
 fn bif_math_log10_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     trig_func!(args[0], log10)
 }
 
-#[inline]
 fn bif_math_sqrt_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     trig_func!(args[0], sqrt)
 }
 
-#[inline]
 fn bif_math_atan2_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     let res = match args[0] {
         Value::Integer(i) => i as f64, // TODO: potentially unsafe
@@ -360,7 +328,6 @@ fn bif_math_atan2_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> 
     Ok(Value::Float(value::Float(res.atan2(arg))))
 }
 
-#[inline]
 fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     let res = match &args[0] {
         Value::Binary(str) => str.len(),
@@ -369,7 +336,6 @@ fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value
     Ok(Value::Integer(res as i64)) // TODO: cast potentially unsafe
 }
 
-#[inline]
 fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     Err(Exception {
         reason: Reason::EXC_THROWN,
