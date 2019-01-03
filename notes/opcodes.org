@@ -1,4 +1,4 @@
-* Opcodes [72/138]
+* Opcodes [73/138]
 - [X] Label = 1
 - [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -121,7 +121,7 @@
 - [ ] RecvMark = 150
 - [ ] RecvSet = 151
 - [X] GcBif3 = 152
-- [ ] Line = 153
+- [X] Line = 153
 - [ ] PutMapAssoc = 154
 - [ ] PutMapExact = 155
 - [ ] IsMap = 156

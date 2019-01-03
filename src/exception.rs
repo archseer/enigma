@@ -2,7 +2,7 @@ use crate::process::RcProcess;
 use crate::atom;
 use crate::immix::Heap;
 use crate::process::InstrPtr;
-use crate::loader::{LINE_INVALID_LOCATION, FuncInfo};
+use crate::loader::{FuncInfo};
 use crate::value::{self, Value};
 use crate::module::MFA;
 
@@ -38,10 +38,9 @@ bitflags! {
     pub struct Reason: u32 {
         /// There are three primary exception classes:
         ///
-        ///      - exit			Process termination - not an error.
-        ///      - error			Error (adds stacktrace; will be logged).
-        ///      - thrown		Nonlocal return (turns into a 'nocatch'
-        ///      			error if not caught by the process).
+        /// - exit Process termination - not an error.
+        /// - error Error (adds stacktrace; will be logged).
+        /// - thrown Nonlocal return (turns into a "nocatch" error if not caught by the process).
         ///
         /// In addition, we define a number of exit codes as a convenient
         /// short-hand: instead of building the error descriptor term at the time
@@ -108,7 +107,7 @@ bitflags! {
         /// Default value on boot.
         const EXC_NULL = 0;
 
-        const EXC_PRIMARY = (0 | Self::EXF_SAVETRACE.bits);
+        const EXC_PRIMARY = Self::EXF_SAVETRACE.bits;
 
         /// Generic error (exit term in p->fvalue)
         const EXC_ERROR  = (Self::EXC_PRIMARY.bits | Self::EXT_ERROR.bits | Self::EXF_LOG.bits);
@@ -299,7 +298,7 @@ pub fn handle_error(process: &RcProcess, mut exc: Exception, /*, bif_mfa: &MFA*/
     }
 
     // Throws that are not caught are turned into 'nocatch' errors
-    if exc.reason.contains(Reason::EXF_THROWN) && context.catches <= 0 {
+    if exc.reason.contains(Reason::EXF_THROWN) && context.catches == 0 {
         exc.value = tup2!(heap, Value::Atom(atom::NOCATCH), exc.value);
         exc.reason = Reason::EXC_ERROR;
     }
@@ -340,7 +339,6 @@ pub fn handle_error(process: &RcProcess, mut exc: Exception, /*, bif_mfa: &MFA*/
 /// TODO: return is instr pointer
 fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
     let context = process.context_mut();
-    let active_catches = context.catches > 0;
     let mut prev = 0;
     let mut ptr = context.stack.len();
 
@@ -351,8 +349,8 @@ fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
     // TODO: tracing instr handling here
 
     while ptr > 0 {
-        match &context.stack[ptr-1] {
-            &Value::Catch(ptr) => {
+        match context.stack[ptr-1] {
+            Value::Catch(ptr) => {
                 // ASSERT(ptr < STACK_START(c_p));
                 // Unwind the stack up to the current frame.
                 context.stack.truncate(prev);
@@ -361,7 +359,7 @@ fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
                 // return catch_pc(*ptr);
                 return Some(ptr);
             }
-            &Value::CP(cp) => {
+            Value::CP(_cp) => {
                 prev = ptr;
                 // TODO: OTP does tracing instr handling here
             }
@@ -369,12 +367,12 @@ fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
         }
         ptr -= 1;
     }
-    return None
+    None
 }
 
 /// Terminating the process when an exception is not caught
 fn terminate_process(process: &RcProcess, mut exc: Exception) {
-    let heap = &process.context_mut().heap;
+    // let heap = &process.context_mut().heap;
 
     // Add a stacktrace if this is an error.
     if exception_class!(exc.reason) == Reason::EXT_ERROR {
@@ -475,7 +473,7 @@ fn expand_error_value(process: &RcProcess, reason: Reason, value: Value) -> Valu
 fn save_stacktrace(process: &RcProcess, exc: &mut Exception, /*bif_mfa: &MFA,*/ mut args: Value) {
     let context = process.context_mut();
     // let pc = context.ip;
-    let mut depth = 8;
+    let mut depth = DEFAULT_BACKTRACE_SIZE;
     // int depth = erts_backtrace_depth;    /* max depth (never negative) */
     if depth > 0 {
         // There will always be a current function
@@ -558,7 +556,7 @@ fn save_stacktrace(process: &RcProcess, exc: &mut Exception, /*bif_mfa: &MFA,*/ 
                 depth -= 1;
             }
         }
-        s.pc = Some(context.ip.clone());
+        s.pc = Some(context.ip);
     }
     // }
 
@@ -572,7 +570,7 @@ fn save_stacktrace(process: &RcProcess, exc: &mut Exception, /*bif_mfa: &MFA,*/ 
 
 fn erts_save_stacktrace(process: &RcProcess, s: &mut StackTrace, mut depth: usize) {
     let context = process.context_mut();
-    if depth <= 0 { return }
+    if depth == 0 { return }
     let mut ptr = context.stack.len();
 
     /*
@@ -652,7 +650,7 @@ pub fn build_stacktrace(process: &RcProcess, exc: &Value) -> Value {
 
     // TODO: awkward
     let s = get_trace_from_exc(exc);
-    if let None = s {
+    if s.is_none() {
         return Value::Nil
     }
     let s = s.unwrap();
@@ -680,10 +678,10 @@ pub fn build_stacktrace(process: &RcProcess, exc: &Value) -> Value {
      * stack at all, default to the initial function
      * (e.g. spawn_link(erlang, abs, [1])).
      */
-    let args = if let Some(_) = fi {
+    let args = if fi.is_some() {
         get_args_from_exc(exc).clone()
     } else {
-        if depth <= 0 {
+        if depth == 0 {
             // erts_set_current_function(&fi, &c_p->u.initial); loc = LINE_INVALID_LOCATION
         }
         Value::Atom(atom::TRUE) // Just in case

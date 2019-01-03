@@ -10,10 +10,8 @@ use crate::vm::RcState;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::panic::RefUnwindSafe;
-use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-
-use core::cmp::Ordering::{self, Less, Equal, Greater};
 
 /// Heavily inspired by inko
 
@@ -248,11 +246,11 @@ impl Process {
     }
 
     pub fn set_waiting_for_message(&self, value: bool) {
-        self.waiting_for_message.store(value, AtomicOrdering::Relaxed);
+        self.waiting_for_message.store(value, Ordering::Relaxed);
     }
 
     pub fn is_waiting_for_message(&self) -> bool {
-        self.waiting_for_message.load(AtomicOrdering::Relaxed)
+        self.waiting_for_message.load(Ordering::Relaxed)
     }
 }
 

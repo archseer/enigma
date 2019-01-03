@@ -140,7 +140,7 @@ fn bif_erlang_abs_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> 
         Value::Integer(i) => Ok(Value::Integer(i.abs())),
         Value::Float(value::Float(f)) => Ok(Value::Float(value::Float(f.abs()))),
         Value::BigInt(i) => Ok(Value::BigInt(Box::new((**i).abs()))),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(Exception::new(Reason::EXC_BADARG)),
     }
 }
 

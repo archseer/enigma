@@ -2,6 +2,7 @@ use crate::value::Value;
 use parking_lot::Mutex;
 use std::collections::VecDeque;
 
+#[derive(Default)]
 pub struct Mailbox {
     /// Internal mailbox from which the process is safe to read.
     internal: VecDeque<*const Value>,

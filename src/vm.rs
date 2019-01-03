@@ -968,12 +968,12 @@ impl Machine {
                 Opcode::Fconv => {
                     // reg (x), dest (float reg)
                     let val: f64 = match self.expand_arg(context, &ins.args[0]) {
-                        &Value::Float(value::Float(f)) => f,
-                        &Value::Integer(i) => i as f64, // TODO: i64 -> f64 is unsafe
+                        Value::Float(value::Float(f)) => *f,
+                        Value::Integer(i) => *i as f64, // TODO: i64 -> f64 is unsafe
                         _ => unimplemented!()
                     };
 
-                    if let &Value::FloatReg(dest) = &ins.args[1] {
+                    if let Value::FloatReg(dest) = ins.args[1] {
                         context.f[dest] = val;
                     } else {
                         unreachable!()
@@ -1108,5 +1108,11 @@ impl Machine {
 
     pub fn elapsed_time(&self) -> time::Duration {
         self.state.start_time.elapsed()
+    }
+}
+
+impl Default for Machine {
+    fn default() -> Self {
+        Self::new()
     }
 }

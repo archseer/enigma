@@ -224,7 +224,7 @@ impl<'a> Loader<'a> {
             let instruction = match &instruction.op {
                 Opcode::Line => {
                     // args: [Literal(4)]
-                    if self.lines.len() > 0 {
+                    if !self.lines.is_empty() {
                         // BeamInstr item = code[ci-1];
                         // BeamInstr loc;
                         // unsigned int li;
@@ -389,7 +389,7 @@ fn decode_line_items<'a>(rest: &'a [u8], count: u32) -> IResult<&'a [u8], Vec<(u
 
     let mut new_rest = rest;
 
-    for _i in 0..(count + 1) {
+    for _i in 0..=count {
         let (rest, term) = compact_term(new_rest)?;
         new_rest = rest;
         match term {

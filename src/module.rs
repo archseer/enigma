@@ -3,7 +3,6 @@ use crate::loader::{FuncInfo, Instruction};
 use crate::module_registry::RcModuleRegistry;
 use crate::value::Value;
 use fnv::FnvHashMap;
-use std::collections::HashMap;
 
 pub type MFA = (usize, usize, usize); // function, arity, label
 

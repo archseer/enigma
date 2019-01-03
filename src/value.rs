@@ -82,7 +82,7 @@ impl<'a> Iterator for Iter<'a> {
             // Need an unbound lifetime to get 'a
             let node = &*node.as_ptr();
             if let Value::List(cons) = node.tail {
-                self.head = unsafe { Some(NonNull::new_unchecked(cons as *mut Cons)) };
+                self.head = Some(NonNull::new_unchecked(cons as *mut Cons));
             } else {
                 // TODO match badly formed lists
                 self.head = None;
@@ -361,7 +361,7 @@ impl std::fmt::Display for Value {
                 let mut iter = slice.iter().peekable();
                 while let Some(val) = iter.next() {
                     write!(f, "{}", val)?;
-                    if let Some(_) = iter.peek() {
+                    if iter.peek().is_some() {
                         write!(f, ", ")?;
                     }
                 };
