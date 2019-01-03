@@ -41,7 +41,7 @@ pub struct ExecutionContext {
     pub current: MFA,
     pub live: usize,
     /// binary construction state
-    pub bs: *mut String,
+    pub bs: *mut Vec<u8>,
     ///
     pub exc: Option<Exception>,
 }

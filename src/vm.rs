@@ -882,7 +882,7 @@ impl Machine {
                         // alternatively, loop through the instrs until we hit a non bs_ instr.
                         // that way, no unsafe ptrs!
                         let size = self.expand_arg(context, s1).to_usize();
-                        let mut arc = ArcWithoutWeak::new(String::with_capacity(size));
+                        let mut arc = ArcWithoutWeak::new(Vec::with_capacity(size));
                         context.bs = &mut (*arc); // TODO: this feels a bit off
                         set_register!(context, dest, Value::Binary(arc));
                     } else {
@@ -894,7 +894,7 @@ impl Machine {
 
                     // needs a build context
                     if let Value::Binary(str) = &ins.args[0] {
-                        unsafe { (*context.bs).push_str(&*str); }
+                        unsafe { (*context.bs).extend_from_slice(&*str); }
                     } else {
                         unreachable!()
                     }
@@ -907,7 +907,7 @@ impl Machine {
                         if let Value::Binary(str) = self.expand_arg(context, src) {
                             match size {
                                 Value::Atom(atom::ALL) => {
-                                    unsafe { (*context.bs).push_str(&*str); }
+                                    unsafe { (*context.bs).extend_from_slice(&*str); }
                                 }
                                 _ => unimplemented!()
                             }

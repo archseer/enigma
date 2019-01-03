@@ -39,7 +39,7 @@ pub enum Value {
     /// Boxed values
     /// Strings use an Arc so they can be sent to other processes without
     /// requiring a full copy of the data.
-    Binary(ArcWithoutWeak<String>),
+    Binary(ArcWithoutWeak<Vec<u8>>),
     Map(),
 
     /// An interned string is a string allocated on the permanent space. For
