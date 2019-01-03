@@ -2,6 +2,7 @@ use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
 use crate::mailbox::Mailbox;
 use crate::module::{Module, MFA};
+use crate::loader::{FuncInfo, LINE_INVALID_LOCATION};
 use crate::pool::Job;
 pub use crate::process_table::PID;
 use crate::value::Value;
@@ -9,8 +10,10 @@ use crate::vm::RcState;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::panic::RefUnwindSafe;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use std::sync::Arc;
+
+use core::cmp::Ordering::{self, Less, Equal, Greater};
 
 /// Heavily inspired by inko
 
@@ -37,7 +40,7 @@ pub struct ExecutionContext {
     /// Continuation pointer
     pub cp: Option<InstrPtr>,
     /// Current function
-    //pub current: MFA,
+    pub current: MFA,
     pub live: usize,
     /// binary construction state
     pub bs: *mut String,
@@ -57,6 +60,68 @@ impl InstrPtr {
     pub fn new(module: *const Module, ptr: usize) -> Self {
         InstrPtr { module, ptr }
     }
+
+    // typedef struct {
+    //     ErtsCodeMFA* mfa;		/* Pointer to: Mod, Name, Arity */
+    //     Uint needed;		/* Heap space needed for entire tuple */
+    //     Uint32 loc;			/* Location in source code */
+    //     Eterm* fname_ptr;		/* Pointer to fname table */
+    // } FunctionInfo;
+
+    /// Find a function from the given pc and fill information in
+    /// the FunctionInfo struct. If the full_info is non-zero, fill
+    /// in all available information (including location in the
+    /// source code).
+    pub fn lookup_func_info(&self) -> Option<(MFA, Option<FuncInfo>)> {
+        let module = unsafe { &(*self.module) };
+
+        let mut vec: Vec<(&(usize, usize), &usize)> = module.funs.iter().collect();
+        vec.sort_by(|(_, v1), (_, v2)| { v1.cmp(v2) });
+
+        let mut low = 0;
+        let mut high = vec.len() - 1;
+
+        while high > low {
+            let mid = low + (high-low) / 2;
+            if self.ptr < *vec[mid].1 {
+                high = mid;
+            } else if self.ptr < *vec[mid+1].1 {
+                let ((f, a), fun_offset) = vec[mid];
+                let mfa = (module.name, *f, *a);
+                let func_info = self.lookup_loc();
+                return Some((mfa, func_info));
+            } else {
+                low = mid + 1;
+            }
+        }
+        None
+    }
+
+    pub fn lookup_loc(&self) -> Option<FuncInfo> {
+        // TODO limit search scope in the future by searching between (current func, currentfunc+1);
+        let module = unsafe { &(*self.module) };
+
+        let mut low = 0;
+        let mut high = module.lines.len() - 1;
+
+        while high > low {
+            let mid = low + (high-low) / 2;
+            if self.ptr < module.lines[mid].1 {
+                high = mid;
+            } else if self.ptr < module.lines[mid+1].1 {
+                let res = module.lines[mid];
+
+                if res == LINE_INVALID_LOCATION {
+                    return None;
+                }
+
+                return Some(res);
+            } else {
+                low = mid + 1;
+            }
+        }
+        None
+    }
 }
 
 impl ExecutionContext {
@@ -73,6 +138,8 @@ impl ExecutionContext {
                 live: 0,
 
                 exc: None,
+
+                current: (0,0,0),
 
                 // register: Register::new(block.code.registers as usize),
                 // binding: Binding::with_rc(block.locals(), block.receiver),
@@ -181,11 +248,11 @@ impl Process {
     }
 
     pub fn set_waiting_for_message(&self, value: bool) {
-        self.waiting_for_message.store(value, Ordering::Relaxed);
+        self.waiting_for_message.store(value, AtomicOrdering::Relaxed);
     }
 
     pub fn is_waiting_for_message(&self) -> bool {
-        self.waiting_for_message.load(Ordering::Relaxed)
+        self.waiting_for_message.load(AtomicOrdering::Relaxed)
     }
 }
 

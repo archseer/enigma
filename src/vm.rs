@@ -342,7 +342,7 @@ impl Machine {
 
                     // happens if no other clause matches
                     return Err(Exception::new(Reason::EXC_FUNCTION_CLAUSE));
-                }//println!("Running a function..."),
+                }
                 Opcode::Return => {
                     op_return!(context);
                 }
@@ -414,7 +414,7 @@ impl Machine {
                     // store arity as live
                     if let [Value::Literal(_a), Value::Label(i)] = &ins.args[..] {
                         context.cp = Some(context.ip);
-                        op_jump!(context, *i - 1);
+                        op_jump!(context, *i);
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
@@ -426,7 +426,7 @@ impl Machine {
                     if let [Value::Literal(_a), Value::Label(i), Value::Literal(nwords)] = &ins.args[..] {
                         op_deallocate!(context, nwords);
 
-                        op_jump!(context, *i - 1);
+                        op_jump!(context, *i);
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
@@ -436,7 +436,7 @@ impl Machine {
                     //literal arity, label jmp
                     // store arity as live
                     if let [Value::Literal(_a), Value::Label(i)] = &ins.args[..] {
-                        op_jump!(context, *i - 1);
+                        op_jump!(context, *i);
                     } else {
                         panic!("Bad argument to {:?}", ins.op)
                     }
@@ -585,6 +585,19 @@ impl Machine {
                     let v2 = self.expand_arg(context, &ins.args[2]);
 
                     if let Some(std::cmp::Ordering::Equal) = v1.partial_cmp(v2) {
+                        let fail = self.expand_arg(context, &ins.args[0]).to_usize();
+                        op_jump!(context, fail);
+                    }
+                }
+                Opcode::IsEqExact => {
+                    debug_assert_eq!(ins.args.len(), 3);
+
+                    let v1 = self.expand_arg(context, &ins.args[1]);
+                    let v2 = self.expand_arg(context, &ins.args[2]);
+
+                    if v1.erl_eq(v2) {
+                        // ok
+                    } else {
                         let fail = self.expand_arg(context, &ins.args[0]).to_usize();
                         op_jump!(context, fail);
                     }
@@ -777,18 +790,10 @@ impl Machine {
                     let trace = self.expand_arg(context, &ins.args[0]);
                     let value = self.expand_arg(context, &ins.args[1]);
 
-                    //s = get_trace_from_exc(raise_trace);
-                    // TODO: duplicated
-                    let reason = match trace {
-                        Value::Nil => Reason::EXC_ERROR,
-                        // ASSERT(is_list(exc));
-                        // return (struct StackTrace *) big_val(CDR(list_val(exc)));
-                        Value::List(cons) => unsafe {
-                            if let Value::StackTrace(s) = (**cons).tail {
-                                primary_exception!((*s).reason)
-                            } else { unreachable!() }
-                        },
-                        _ => unreachable!()
+                    let reason = if let Some(s) = exception::get_trace_from_exc(trace) {
+                        primary_exception!(s.reason)
+                    } else {
+                        Reason::EXC_ERROR
                     };
                     return Err(Exception{ reason, value: value.clone(), trace: trace.clone() });
 

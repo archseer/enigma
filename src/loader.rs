@@ -12,6 +12,12 @@ use num_bigint::{BigInt, Sign};
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
+// (filename_index, loc)
+pub type FuncInfo = (usize, usize);
+
+/// Declares a location as invalid.
+pub const LINE_INVALID_LOCATION: FuncInfo = (0, 0);
+
 pub struct Loader<'a> {
     atoms: Vec<&'a str>,
     imports: Vec<MFA>,
@@ -22,7 +28,7 @@ pub struct Loader<'a> {
     atom_map: HashMap<usize, usize>, // TODO: remove this; local id -> global id
     funs: FnvHashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
     labels: FnvHashMap<usize, usize>, // label -> offset
-    lines: Vec<(usize, usize)>,      // (filename_index, loc)
+    lines: Vec<FuncInfo>,
     file_names: Vec<&'a str>,
     code: &'a [u8],
     literal_heap: Heap,
@@ -56,7 +62,7 @@ impl<'a> Loader<'a> {
             chunks.insert(name, chunk);
         }
 
-        // parse all the chunks
+        // parse all the chunks:
 
         // build atoms table first
         self.load_atoms(chunks.remove("AtU8").expect("Atom AtU8 chunk not found!"));
@@ -86,7 +92,6 @@ impl<'a> Loader<'a> {
         self.prepare();
 
         Ok(Module {
-            atoms: self.atom_map,
             imports: self.imports,
             exports: self.exports,
             literals: self.literals,
@@ -94,6 +99,8 @@ impl<'a> Loader<'a> {
             lambdas: self.lambdas,
             funs: self.funs,
             instructions: self.instructions,
+            lines: self.lines,
+            name: self.atom_map[&0], // atom 0 is module name
         })
     }
 
@@ -121,12 +128,7 @@ impl<'a> Loader<'a> {
         // Contains two parts: a proplist of module attributes, encoded as External Term Format,
         // and a compiler info (options and version) encoded similarly.
         let (_rest, val) = etf::decode(chunk, &self.literal_heap).unwrap();
-        println!("attrs: {}", val);
     }
-
-    // fn load_strings_table(&mut self, chunk: Chunk<'a>) {
-    //     // println!("StrT {:?}", data);
-    // }
 
     fn load_local_fun_table(&mut self, chunk: Chunk) {
         let (_, _data) = loct_chunk(chunk).unwrap();
@@ -184,10 +186,9 @@ impl<'a> Loader<'a> {
         let (_, (lines, file_names)) = decode_lines(chunk).unwrap();
         self.lines = lines;
         self.file_names = file_names;
+        // TODO: insert file names into atom table, remap lines to point to atoms
 
-        // /*
-        //  * Allocate the arrays to be filled while code is being loaded.
-        //  */
+        // Allocate the arrays to be filled while code is being loaded.
         // stp->line_instr = (LineInstr *) erts_alloc(ERTS_ALC_T_PREPARED_CODE,
         // stp->num_line_instrs *
         // sizeof(LineInstr));
@@ -221,15 +222,52 @@ impl<'a> Loader<'a> {
 
         for mut instruction in code {
             let instruction = match &instruction.op {
-                Opcode::Line => continue, // skip for now
+                Opcode::Line => {
+                    // args: [Literal(4)]
+                    if self.lines.len() > 0 {
+                        // BeamInstr item = code[ci-1];
+                        // BeamInstr loc;
+                        // unsigned int li;
+
+                        // if (item >= stp->num_line_items) {
+                        // LoadError2(stp, "line instruction index overflow (%u/%u)",
+                        // item, stp->num_line_items);
+                        // }
+                        // li = stp->current_li;
+                        // if (li >= stp->num_line_instrs) {
+                        // LoadError2(stp, "line instruction table overflow (%u/%u)",
+                        // li, stp->num_line_instrs);
+                        // }
+                        // loc = stp->line_item[item];
+                        // TODO: map as loc => offset 
+
+                        // if (ci - 2 == last_func_start) {
+                            // /*
+                            // * This line instruction directly follows the func_info
+                            // * instruction. Its address must be adjusted to point to
+                            // * func_info instruction.
+                            // */
+                            // stp->line_instr[li].pos = last_func_start - FUNC_INFO_SZ;
+                            // stp->line_instr[li].loc = stp->line_item[item];
+                            // stp->current_li++;
+                            // } else if (li <= stp->func_line[function_number-1] ||
+                            // stp->line_instr[li-1].loc != loc) {
+                            // /*
+                            // * Only store the location if it is different
+                            // * from the previous location in the same function.
+                            // */
+                            // stp->line_instr[li].pos = ci - 2;
+                            // stp->line_instr[li].loc = stp->line_item[item];
+                            // stp->current_li++;
+                        // }
+                    }
+                    continue;
+                }
                 Opcode::Label => {
                     // one operand, Integer
                     if let Value::Literal(i) = instruction.args[0] {
-                        // Store weak ptr to function and code offset to this label
-                        // let floc = self.code.len(); // current byte length
                         self.labels.insert(i as usize, self.instructions.len());
                     } else {
-                        // op_badarg_panic(op, &args, 0);
                         panic!("Bad argument to {:?}", instruction.op)
                     }
                     continue;
@@ -324,9 +362,8 @@ fn decode_literals<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Vec<Val
     )
 }
 
-fn decode_lines<'a>(rest: &'a [u8]) -> IResult<&'a [u8], (Vec<(usize, usize)>, Vec<&str>)> {
+fn decode_lines<'a>(rest: &'a [u8]) -> IResult<&'a [u8], (Vec<FuncInfo>, Vec<&str>)> {
     // Check version of line table.
-
     let (rest, version) = be_u32(rest)?;
     if version != 0 {
         // Wrong version. Silently ignore the line number chunk.
@@ -347,7 +384,7 @@ fn decode_lines<'a>(rest: &'a [u8]) -> IResult<&'a [u8], (Vec<(usize, usize)>, V
 
 fn decode_line_items<'a>(rest: &'a [u8], count: u32) -> IResult<&'a [u8], Vec<(usize, usize)>> {
     let mut vec = Vec::with_capacity(count as usize);
-    vec.push((0, 0)); // 0th index = undefined location
+    vec.push(LINE_INVALID_LOCATION); // 0th index = undefined location
     let mut fname_index = 0;
 
     let mut new_rest = rest;
@@ -357,8 +394,8 @@ fn decode_line_items<'a>(rest: &'a [u8], count: u32) -> IResult<&'a [u8], Vec<(u
         new_rest = rest;
         match term {
             Value::Integer(n) => {
-                // TODO: validate
                 vec.push((fname_index, n as usize));
+                // TODO: validate
                 // Too many files or huge line number. Silently invalidate the location.
                 // loc = LINE_INVALID_LOCATION;
             }

@@ -35,7 +35,7 @@ pub enum Value {
     Float(self::Float),
     // Extended values (on heap)
     List(*const self::Cons),
-    Tuple(*const self::Tuple), // TODO: allocate on custom heap
+    Tuple(*const self::Tuple),
     /// Boxed values
     /// Strings use an Arc so they can be sent to other processes without
     /// requiring a full copy of the data.
@@ -292,7 +292,7 @@ impl Value {
         Value::Atom(atom::FALSE)
     }
 
-    fn erl_eq(&self, other: &Value) -> bool {
+    pub fn erl_eq(&self, other: &Value) -> bool {
         match (self, other) {
             (Value::Nil, Value::Nil) => true,
             (Value::Integer(i1), Value::Integer(i2)) => i1 == i2,
@@ -358,7 +358,13 @@ impl std::fmt::Display for Value {
             Value::Tuple(t) => unsafe {
                 write!(f, "{{")?;
                 let slice: &[Value] = &(**t);
-                slice.iter().for_each(|val| write!(f, "{}, ", val).unwrap());
+                let mut iter = slice.iter().peekable();
+                while let Some(val) = iter.next() {
+                    write!(f, "{}", val)?;
+                    if let Some(_) = iter.peek() {
+                        write!(f, ", ")?;
+                    }
+                };
                 write!(f, "}}")
             },
             Value::List(c) => unsafe {

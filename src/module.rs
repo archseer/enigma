@@ -1,5 +1,5 @@
 use crate::immix::Heap;
-use crate::loader::Instruction;
+use crate::loader::{FuncInfo, Instruction};
 use crate::module_registry::RcModuleRegistry;
 use crate::value::Value;
 use fnv::FnvHashMap;
@@ -20,7 +20,6 @@ pub struct Lambda {
 // TODO: add new, remove pub for all these fields
 #[derive(Debug)]
 pub struct Module {
-    pub atoms: HashMap<usize, usize>, // local -> global mapping
     pub imports: Vec<MFA>,
     pub exports: Vec<MFA>,
     pub literals: Vec<Value>,
@@ -28,6 +27,10 @@ pub struct Module {
     pub lambdas: Vec<Lambda>,
     pub funs: FnvHashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
     pub instructions: Vec<Instruction>,
+    // debugging info
+    pub lines: Vec<FuncInfo>,
+    /// Atom name of the module.
+    pub name: usize,
 }
 
 pub fn load_module(

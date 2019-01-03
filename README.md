@@ -57,7 +57,8 @@ x => done, - => partial
 - [ ] Timers
 - [ ] Precalculate Bif0/1/2,GcBif1/2/3 as vals that reference a bif ptr directly (no more imports+bifs hash lookups)
 - [x] Cross-module calls (need to store module in ip/cp)
-- [ ] try/catch/raise/etc.
+- [x] try/catch/raise/etc.
+    - [x] Stack traces
 - [ ] Binaries (SIMD: https://github.com/AdamNiederer/faster / https://doc.rust-lang.org/1.26.0/std/simd/index.html<Paste>)
 - [ ] Binary matching (multi: https://github.com/BurntSushi/aho-corasick
 + single: https://github.com/killerswan/boyer-moore-search / https://docs.rs/needle/0.1.1/needle/ / https://github.com/ethanpailes/regex/commit/d2e28f959ac384db62f7cbeba1576cf39a75b294)

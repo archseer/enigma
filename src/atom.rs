@@ -10,7 +10,7 @@ pub struct Atom {
     /// Length of utf8-encoded atom name.
     pub len: u16,
     /// First 4 bytes used for comparisons
-    pub ord0: u32,
+    pub ord0: u32, // TODO: use ord for comparison
     // TODO: Allocate these on atom heap or as a sequence of static blocks
     pub name: String,
 }
@@ -150,39 +150,45 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("exit");
     atoms.register_atom("error");
     atoms.register_atom("throw");
+
+    atoms.register_atom("file");
+    atoms.register_atom("line");
     atoms
 };
 
-pub const TRUE:            usize = 1;
-pub const FALSE:           usize = 2;
-pub const UNDEFINED:       usize = 3;
-pub const VALUE:           usize = 4;
-pub const ALL:             usize = 5;
-pub const NORMAL:          usize = 6;
-pub const INTERNAL_ERROR:  usize = 7;
-pub const BADARG:          usize = 8;
-pub const BADARITH:        usize = 9;
-pub const BADMATCH:        usize = 10;
+pub const TRUE: usize = 1;
+pub const FALSE: usize = 2;
+pub const UNDEFINED: usize = 3;
+pub const VALUE: usize = 4;
+pub const ALL: usize = 5;
+pub const NORMAL: usize = 6;
+pub const INTERNAL_ERROR: usize = 7;
+pub const BADARG: usize = 8;
+pub const BADARITH: usize = 9;
+pub const BADMATCH: usize = 10;
 pub const FUNCTION_CLAUSE: usize = 11;
-pub const CASE_CLAUSE:     usize = 12;
-pub const IF_CLAUSE:       usize = 13;
-pub const UNDEF:           usize = 14;
-pub const BADFUN:          usize = 15;
-pub const BADARITY:        usize = 16;
-pub const TIMEOUT_VALUE:   usize = 17;
-pub const NO_PROC:         usize = 18;
-pub const NOT_ALIVE:       usize = 19;
-pub const SYSTEM_LIMIT:    usize = 20;
-pub const TRY_CLAUSE:      usize = 21;
-pub const NOT_SUP:         usize = 22;
-pub const BAD_MAP:         usize = 23;
-pub const BAD_KEY:         usize = 24;
+pub const CASE_CLAUSE: usize = 12;
+pub const IF_CLAUSE: usize = 13;
+pub const UNDEF: usize = 14;
+pub const BADFUN: usize = 15;
+pub const BADARITY: usize = 16;
+pub const TIMEOUT_VALUE: usize = 17;
+pub const NO_PROC: usize = 18;
+pub const NOT_ALIVE: usize = 19;
+pub const SYSTEM_LIMIT: usize = 20;
+pub const TRY_CLAUSE: usize = 21;
+pub const NOT_SUP: usize = 22;
+pub const BAD_MAP: usize = 23;
+pub const BAD_KEY: usize = 24;
 
-pub const NOCATCH:         usize = 25;
+pub const NOCATCH: usize = 25;
 
-pub const EXIT:          usize = 26;
-pub const ERROR:         usize = 27;
-pub const THROW:         usize = 28;
+pub const EXIT: usize = 26;
+pub const ERROR: usize = 27;
+pub const THROW: usize = 28;
+
+pub const FILE: usize = 29;
+pub const LINE: usize = 30;
 
 pub fn from_str(val: &str) -> usize {
     ATOMS.from_str(val)

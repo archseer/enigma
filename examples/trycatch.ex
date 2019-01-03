@@ -5,6 +5,31 @@ defmodule Try do
   # end
 
   def start do
+    a
+    1
+  end
+
+  def a do
+    b
+    1
+  end
+
+  def b do
+    c
+    1
+  end
+
+  def c do
+    try do
+      x = 1
+      throw(x + 1)
+    catch
+      1 -> 1
+      3 -> 2
+    end
+  end
+
+  def start2 do
     try do
       x = 1
       throw(x + 1)

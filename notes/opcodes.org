@@ -1,4 +1,4 @@
-* Opcodes [71/138]
+* Opcodes [72/138]
 - [X] Label = 1
 - [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -29,7 +29,7 @@
 - [ ] IsGe = 40
 - [X] IsEq = 41
 - [X] IsNe = 42
-- [ ] IsEqExact = 43
+- [X] IsEqExact = 43
 - [ ] IsNeExact = 44
 - [X] IsInteger = 45
 - [X] IsFloat = 46
