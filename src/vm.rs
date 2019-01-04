@@ -9,6 +9,7 @@ use crate::pool::{Job, JoinGuard as PoolJoinGuard, Pool, Worker};
 use crate::process::{self, ExecutionContext, InstrPtr, RcProcess};
 use crate::process_table::ProcessTable;
 use crate::value::{self, Value};
+use std::mem::transmute;
 use std::panic;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -359,17 +360,21 @@ impl Machine {
                     process.local_data_mut().mailbox.reset();
                     // TODO: clear timeout
                 }
-                Opcode::LoopRec => { // label, source
+                Opcode::LoopRec => {
+                    // label, source
                     // grab message from queue, put to x0, if no message, jump to fail label
                     if let Some(msg) = process.local_data_mut().mailbox.receive() {
                         // TODO: this is very hacky
-                        unsafe { context.x[0] = (**msg).clone(); }
+                        unsafe {
+                            context.x[0] = (**msg).clone();
+                        }
                     } else {
                         let fail = self.expand_arg(context, &ins.args[0]).to_usize();
                         op_jump!(context, fail);
                     }
                 }
-                Opcode::LoopRecEnd => { // label
+                Opcode::LoopRecEnd => {
+                    // label
                     // Advance the save pointer to the next message and jump back to Label.
                     debug_assert_eq!(ins.args.len(), 1);
 
@@ -378,7 +383,8 @@ impl Machine {
                     let label = self.expand_arg(context, &ins.args[0]).to_usize();
                     op_jump!(context, label);
                 }
-                Opcode::Wait => { // label
+                Opcode::Wait => {
+                    // label
                     // jump to label, set wait flag on process
                     debug_assert_eq!(ins.args.len(), 1);
 
@@ -392,7 +398,6 @@ impl Machine {
                     process.set_waiting_for_message(true);
                     // return (suspend process)
                     return Ok(());
-
                 }
                 Opcode::WaitTimeout => {
                     // @spec wait_timeout Lable Time
@@ -419,7 +424,9 @@ impl Machine {
                 Opcode::CallLast => {
                     //literal arity, label jmp, nwords
                     // store arity as live
-                    if let [Value::Literal(_a), Value::Label(i), Value::Literal(nwords)] = &ins.args[..] {
+                    if let [Value::Literal(_a), Value::Label(i), Value::Literal(nwords)] =
+                        &ins.args[..]
+                    {
                         op_deallocate!(context, nwords);
 
                         op_jump!(context, *i);
@@ -461,7 +468,9 @@ impl Machine {
                 }
                 Opcode::CallExtLast => {
                     //literal arity, literal destination (module.imports index), literal deallocate
-                    if let [Value::Literal(arity), Value::Literal(dest), Value::Literal(nwords)] = &ins.args[..] {
+                    if let [Value::Literal(arity), Value::Literal(dest), Value::Literal(nwords)] =
+                        &ins.args[..]
+                    {
                         op_deallocate!(context, nwords);
 
                         op_call_ext!(self, context, process, arity, dest);
@@ -476,8 +485,8 @@ impl Machine {
                         let mfa = &module.imports[*dest];
                         let val = bif::apply(self, process, mfa, &[]).unwrap(); // TODO handle fail
                         set_register!(context, reg, val); // HAXX
-                        // TODO: no fail label means this is not a func header call,
-                        // but body, run the handle_error routine
+                                                          // TODO: no fail label means this is not a func header call,
+                                                          // but body, run the handle_error routine
                     } else {
                         unreachable!()
                     }
@@ -500,7 +509,9 @@ impl Machine {
                     // literal stackneed, literal heapneed, literal live
                     // allocate stackneed space on stack, ensure heapneed on heap, if gc, keep live
                     // num of X regs. save CP on stack.
-                    if let [Value::Literal(stackneed), Value::Literal(_heapneed), Value::Literal(_live)] = &ins.args[..] {
+                    if let [Value::Literal(stackneed), Value::Literal(_heapneed), Value::Literal(_live)] =
+                        &ins.args[..]
+                    {
                         for _ in 0..*stackneed {
                             context.stack.push(Value::Nil)
                         }
@@ -525,7 +536,9 @@ impl Machine {
                     // literal stackneed, literal heapneed, literal live
                     // allocate stackneed space on stack, ensure heapneed on heap, if gc, keep live
                     // num of X regs. save CP on stack.
-                    if let [Value::Literal(stackneed), Value::Literal(_heapneed), Value::Literal(_live)] = &ins.args[..] {
+                    if let [Value::Literal(stackneed), Value::Literal(_heapneed), Value::Literal(_live)] =
+                        &ins.args[..]
+                    {
                         for _ in 0..*stackneed {
                             context.stack.push(Value::Nil)
                         }
@@ -637,7 +650,6 @@ impl Machine {
                         } else {
                             panic!("Bad argument to {:?}", ins.op)
                         }
-
                     } else {
                         unreachable!()
                     }
@@ -651,7 +663,7 @@ impl Machine {
                         loop {
                             // if key matches, jump to the following label
                             if vec[i] == *arg {
-                                let label = vec[i+1].to_usize();
+                                let label = vec[i + 1].to_usize();
                                 op_jump!(context, label);
                                 break;
                             }
@@ -675,7 +687,7 @@ impl Machine {
                             loop {
                                 // if key matches, jump to the following label
                                 if vec[i] == len {
-                                    let label = vec[i+1].to_usize();
+                                    let label = vec[i + 1].to_usize();
                                     op_jump!(context, label);
                                     break;
                                 }
@@ -860,7 +872,6 @@ impl Machine {
                     } else {
                         unreachable!()
                     }
-
                 }
                 Opcode::BsInit2 => {
                     // optimize when init is with empty size
@@ -877,7 +888,9 @@ impl Machine {
                     //   allocate binary + procbin
                     //   set as non writable initially??
 
-                    if let [Value::Label(_fail), s1, Value::Literal(_words), Value::Literal(_live), _flags, dest] = &ins.args[..] {
+                    if let [Value::Label(_fail), s1, Value::Literal(_words), Value::Literal(_live), _flags, dest] =
+                        &ins.args[..]
+                    {
                         // TODO: use a current_string ptr to be able to write to the Arc wrapped str
                         // alternatively, loop through the instrs until we hit a non bs_ instr.
                         // that way, no unsafe ptrs!
@@ -891,25 +904,29 @@ impl Machine {
                 }
                 Opcode::BsPutString => {
                     // BsPutString uses the StrT strings table! needs to be patched in loader
-
-                    // needs a build context
                     if let Value::Binary(str) = &ins.args[0] {
-                        unsafe { (*context.bs).extend_from_slice(&*str); }
+                        unsafe {
+                            (*context.bs).extend_from_slice(&*str);
+                        }
                     } else {
                         unreachable!()
                     }
                 }
                 Opcode::BsPutBinary => {
-                    if let [Value::Label(fail), size, Value::Literal(unit), _flags, src] = &ins.args[..] {
+                    if let [Value::Label(fail), size, Value::Literal(unit), _flags, src] =
+                        &ins.args[..]
+                    {
                         // TODO: fail label
-                        if *unit != 8 { unimplemented!() }
+                        if *unit != 8 {
+                            unimplemented!()
+                        }
 
                         if let Value::Binary(str) = self.expand_arg(context, src) {
                             match size {
-                                Value::Atom(atom::ALL) => {
-                                    unsafe { (*context.bs).extend_from_slice(&*str); }
-                                }
-                                _ => unimplemented!()
+                                Value::Atom(atom::ALL) => unsafe {
+                                    (*context.bs).extend_from_slice(&*str);
+                                },
+                                _ => unimplemented!(),
                             }
                         } else {
                             panic!("Bad argument to {:?}", ins.op)
@@ -921,7 +938,28 @@ impl Machine {
                 Opcode::BsPutFloat => {
                     // gen_put_float(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
                     // Size can be atom all
-                    unimplemented!()
+                    if let [Value::Label(fail), size, Value::Literal(unit), _flags, src] =
+                        &ins.args[..]
+                    {
+                        // TODO: fail label
+                        if *unit != 8 {
+                            unimplemented!()
+                        }
+
+                        if let Value::Float(value::Float(f)) = self.expand_arg(context, src) {
+                            match size {
+                                Value::Atom(atom::ALL) => unsafe {
+                                    let bytes: [u8; 8] = transmute(*f);
+                                    (*context.bs).extend_from_slice(&bytes);
+                                },
+                                _ => unimplemented!(),
+                            }
+                        } else {
+                            panic!("Bad argument to {:?}", ins.op)
+                        }
+                    } else {
+                        unreachable!()
+                    }
                 }
                 Opcode::BsPutInteger => {
                     // gen_put_integer(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
@@ -930,12 +968,15 @@ impl Machine {
                 }
                 // BsGet and BsSkip should be implemented over an Iterator inside a match context (.skip/take)
                 // maybe we can even use nom for this
-                Opcode::BsAppend => { // append and init also sets the string as current (state.current_binary) [seems to be used to copy string literals too]
+                Opcode::BsAppend => {
+                    // append and init also sets the string as current (state.current_binary) [seems to be used to copy string literals too]
 
                     // bs_append Fail Size Extra Live Unit Bin Flags Dst => \
                     //   move Bin x | i_bs_append Fail Extra Live Unit Size Dst
 
-                    if let [Value::Label(fail), Value::Integer(size), Value::Literal(extra_heap), Value::Literal(live), Value::Literal(unit), src, _flags, dest] = &ins.args[..] {
+                    if let [Value::Label(fail), Value::Integer(size), Value::Literal(extra_heap), Value::Literal(live), Value::Literal(unit), src, _flags, dest] =
+                        &ins.args[..]
+                    {
                         // TODO: execute fail if non zero
                         // unit: byte alignment (8 for binary)
                         //
@@ -956,7 +997,6 @@ impl Machine {
                     // a new shared data, a new ProcBin, and a new subbinary. For all heap
                     // allocation, a space for more Arg1 words are requested. Arg2 is Live. Arg3 is
                     // unit. Saves the resultant subbinary to Arg4.
-
                 }
                 Opcode::Fclearerror => {
                     // src, dest
@@ -996,7 +1036,7 @@ impl Machine {
                         Value::Float(value::Float(f)) => *f,
                         Value::Integer(i) => *i as f64, // TODO: i64 -> f64 is unsafe
                         // TODO: bignum if it fits into float
-                        _ => return Err(Exception::new(Reason::EXC_BADARITH))
+                        _ => return Err(Exception::new(Reason::EXC_BADARITH)),
                     };
 
                     if let Value::FloatReg(dest) = ins.args[1] {
@@ -1005,10 +1045,10 @@ impl Machine {
                         unreachable!()
                     }
                 }
-                Opcode::Fadd => { op_float!(context, &ins.args[..], +) }
-                Opcode::Fsub => { op_float!(context, &ins.args[..], -) }
-                Opcode::Fmul => { op_float!(context, &ins.args[..], *) }
-                Opcode::Fdiv => { op_float!(context, &ins.args[..], /) }
+                Opcode::Fadd => op_float!(context, &ins.args[..], +),
+                Opcode::Fsub => op_float!(context, &ins.args[..], -),
+                Opcode::Fmul => op_float!(context, &ins.args[..], *),
+                Opcode::Fdiv => op_float!(context, &ins.args[..], /),
                 Opcode::Fnegate => {
                     debug_assert_eq!(ins.args.len(), 2);
                     if let [Value::FloatReg(a), Value::FloatReg(dest)] = ins.args[..] {
@@ -1077,7 +1117,7 @@ impl Machine {
                     let closure = context.heap.alloc(value::Closure {
                         mfa: (module.name, lambda.name as usize, lambda.arity as usize), // TODO: use module id instead later
                         ptr: lambda.offset,
-                        binding
+                        binding,
                     });
                     context.x[0] = Value::Closure(closure);
                 }

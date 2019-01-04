@@ -10,7 +10,7 @@ name = "libenigma"
 doctest = false
 
 [[bin]]
-name = "eng"
+name = "enigma"
 test = false
 
 [dependencies]

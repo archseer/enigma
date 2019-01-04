@@ -293,7 +293,7 @@ impl<'a> Loader<'a> {
                         // TODO: ideally use a single string that we slice into for these interned strings
                         // but need to tie them to the string heap lifetime
                         let bytes = &self.strings[offset..offset + len];
-                        let string = bytes.to_string();
+                        let string = bytes.as_bytes().to_vec(); // TODO: check if most efficient
                         instruction.args = vec![Value::Binary(ArcWithoutWeak::new(string))];
                         instruction
                     } else {

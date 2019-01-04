@@ -373,7 +373,7 @@ impl std::fmt::Display for Value {
                     if iter.peek().is_some() {
                         write!(f, ", ")?;
                     }
-                };
+                }
                 write!(f, "}}")
             },
             Value::List(c) => unsafe {

@@ -9,7 +9,8 @@ fn run() -> i32 {
 
     let vm = vm::Machine::new();
 
-    vm.start("./examples/Elixir.Try.beam");
+    vm.preload_modules();
+    vm.start("./examples/Elixir.Lambda.beam");
 
     println!("execution time: {:?}", vm.elapsed_time());
     0

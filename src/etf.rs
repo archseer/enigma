@@ -198,12 +198,11 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value
 pub fn decode_binary<'a>(rest: &'a [u8], _heap: &Heap) -> IResult<&'a [u8], Value> {
     let (rest, len) = be_u32(rest)?;
     if len == 0 {
-        return Ok((rest, Value::Binary(ArcWithoutWeak::new(String::new()))));
+        return Ok((rest, Value::Binary(ArcWithoutWeak::new(Vec::new()))));
     }
 
     let (rest, bytes) = take!(rest, len)?;
-    let string = unsafe { std::str::from_utf8_unchecked(bytes).to_string() };
-    Ok((rest, Value::Binary(ArcWithoutWeak::new(string))))
+    Ok((rest, Value::Binary(ArcWithoutWeak::new(bytes.to_vec()))))
 }
 
 #[cfg(target_pointer_width = "32")]
