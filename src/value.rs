@@ -49,6 +49,8 @@ pub enum Value {
     Closure(*const self::Closure),
     /// Special values (invalid in runtime)
     // Import(), Export(),
+    /// An internal placeholder signifying "THE_NON_VALUE".
+    None,
     Literal(usize),
     X(usize),
     Y(usize),
@@ -274,7 +276,6 @@ impl Value {
             _ => false,
         }
     }
-
 
     pub fn is_cp(&self) -> bool {
         match *self {

@@ -318,7 +318,7 @@ pub fn handle_error(process: &RcProcess, mut exc: Exception, /*, bif_mfa: &MFA*/
         // exception class, term and trace, respectively. (If the
         // handler is just a trap to native code, these registers will
         // be ignored.) */
-        // reg[0] = THE_NON_VALUE;
+        context.x[0] = Value::None;
         context.x[1] = Value::Atom(EXIT_TAGS[exception_class!(exc.reason).bits as usize]);
         context.x[2] = exc.value.clone();
         context.x[3] = exc.trace.clone();
