@@ -6,7 +6,9 @@ use crate::module;
 use crate::process::{self, InstrPtr};
 use allocator_api::Layout;
 use core::marker::PhantomData;
+use hamt_rs::HamtMap;
 use num::bigint::BigInt;
+use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
@@ -17,7 +19,31 @@ pub struct Float(pub f64);
 impl Eq for Float {}
 impl Hash for Float {
     fn hash<H: Hasher>(&self, _state: &mut H) {
-        panic!("Don't use floats as hash keys")
+        unimplemented!()
+    }
+}
+
+pub type HAMT = HamtMap<Value, Value>;
+
+#[derive(PartialEq, Eq, Clone)]
+pub struct Map(pub ArcWithoutWeak<HamtMap<Value, Value>>);
+
+impl Hash for Map {
+    fn hash<H: Hasher>(&self, _state: &mut H) {
+        unimplemented!()
+    }
+}
+
+impl PartialOrd for Map {
+    fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
+        // Some(self.cmp(other))
+        unimplemented!()
+    }
+}
+
+impl std::fmt::Debug for Map {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "#{{map}}")
     }
 }
 
@@ -40,17 +66,17 @@ pub enum Value {
     /// Strings use an Arc so they can be sent to other processes without
     /// requiring a full copy of the data.
     Binary(ArcWithoutWeak<Vec<u8>>),
-    Map(),
+    Map(self::Map),
 
     /// An interned string is a string allocated on the permanent space. For
     /// every unique interned string there is only one object allocated.
     // InternedBinary(ArcWithoutWeak<String>),
     BigInt(Box<BigInt>), // ArcWithoutWeak<BigInt>
     Closure(*const self::Closure),
-    /// Special values (invalid in runtime)
+
+    /// Special loader values (invalid in user runtime)
     // Import(), Export(),
     /// An internal placeholder signifying "THE_NON_VALUE".
-    None,
     Literal(usize),
     X(usize),
     Y(usize),
@@ -59,8 +85,11 @@ pub enum Value {
     FloatReg(usize),
     AllocList(Vec<(u8, usize)>),
     ExtendedLiteral(usize), // TODO; replace at load time
-    CP(Option<InstrPtr>),   // continuation pointer
-    Catch(InstrPtr),        // catch context
+
+    /// Special emulator values
+    None,
+    CP(Option<InstrPtr>), // continuation pointer
+    Catch(InstrPtr),      // catch context
     StackTrace(*const exception::StackTrace),
 }
 

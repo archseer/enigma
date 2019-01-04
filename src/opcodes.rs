@@ -546,11 +546,12 @@ pub enum Opcode {
     PutTuple2 = 164,
 
     /// @spec bs_get_tail Ctx Dst Live
-    /// @doc  Sets Dst to the tail of Ctx at the current position
+    /// @doc  Sets Dst to the tail of Ctx at the current position (similar to bs_context_to_binary
+    ///       but non-destructive.)
     BsGetTail = 165,
 
     /// @spec bs_start_match3 Fail Bin Live Dst
-    /// @doc  Starts a binary match sequence
+    /// @doc  Starts a binary match sequence (but without "position slots")
     BsStartMatch3 = 166,
 
     /// @spec bs_get_position Ctx Dst Live

@@ -286,7 +286,7 @@ impl<'a> Loader<'a> {
                     instruction
                 }
                 Opcode::IntCodeEnd => {
-                    println!("Finished processing instructions");
+                    // println!("Finished processing instructions");
                     break;
                 }
                 Opcode::BsPutString => {

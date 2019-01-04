@@ -28,6 +28,7 @@ time = "0.1.40"
 chrono = "0.4.6"
 bitflags = "1.0.4"
 getopts = "0.2.18"
+hamt-rs = { git = "https://github.com/michaelwoerister/hamt-rs/" }
 
-[profile.release]
-debug = true
+# [profile.release]
+# debug = true

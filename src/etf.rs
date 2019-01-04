@@ -1,7 +1,7 @@
 use crate::arc_without_weak::ArcWithoutWeak;
 use crate::atom;
 use crate::immix::Heap;
-use crate::value::{self, Value};
+use crate::value::{self, Value, HAMT};
 use nom::*;
 use num::traits::ToPrimitive;
 use num_bigint::{BigInt, Sign};
@@ -78,7 +78,7 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value>
         // Export
         // NewReference
         // SmallAtom (deprecated?)
-        // Map
+        Tag::Map => decode_map(rest, heap),
         // Fun
         // AtomU8
         // SmallAtomU8
@@ -156,6 +156,22 @@ pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> 
 
         Ok((rest, Value::List(start)))
     }
+}
+
+pub fn decode_map<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> {
+    let (mut new_rest, len) = be_u32(rest)?;
+    let mut map = HAMT::new();
+
+    for _i in 0..len {
+        let (rest, key) = decode_value(new_rest, heap)?;
+        println!("{:?}", key);
+        let (rest, val) = decode_value(rest, heap)?;
+        println!("{:?}", val);
+
+        map = map.plus(key, val);
+        new_rest = rest;
+    }
+    Ok((new_rest, Value::Map(value::Map(ArcWithoutWeak::new(map)))))
 }
 
 /// A string of bytes encoded as tag 107 (String) with 16-bit length.

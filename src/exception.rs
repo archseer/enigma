@@ -1,17 +1,17 @@
-use crate::process::RcProcess;
 use crate::atom;
 use crate::immix::Heap;
-use crate::process::InstrPtr;
-use crate::loader::{FuncInfo};
-use crate::value::{self, Value};
+use crate::loader::FuncInfo;
 use crate::module::MFA;
+use crate::process::InstrPtr;
+use crate::process::RcProcess;
+use crate::value::{self, Value};
 
 /// http://erlang.org/doc/reference_manual/errors.html#exceptions
 #[derive(Debug, PartialEq, Eq)]
 pub struct Exception {
     pub reason: Reason, // bitflags
     pub value: Value,
-    pub trace: Value
+    pub trace: Value,
 }
 
 impl Exception {
@@ -20,7 +20,7 @@ impl Exception {
         Exception {
             reason,
             value: Value::Nil,
-            trace: Value::Nil
+            trace: Value::Nil,
         }
     }
 
@@ -29,7 +29,7 @@ impl Exception {
         Exception {
             reason,
             value,
-            trace: Value::Nil
+            trace: Value::Nil,
         }
     }
 }
