@@ -28,15 +28,16 @@ impl ModuleRegistry {
         let loader = Loader::new();
         let module = loader.load_file(&bytes[..]).unwrap();
 
-        self.add_module(0, module);
-        Ok(&self.modules[&0])
+        let name = module.name;
+        self.add_module(name, module);
+        Ok(&self.modules[&name])
     }
 
     pub fn add_module(&mut self, atom: usize, module: Module) {
         self.modules.insert(atom, module);
     }
 
-    pub fn lookup(&self, atom: usize) -> Result<&Module, String> {
-        Ok(&self.modules[&atom])
+    pub fn lookup(&self, atom: usize) -> Option<&Module> {
+        self.modules.get(&atom)
     }
 }
