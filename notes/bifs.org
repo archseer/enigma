@@ -426,7 +426,7 @@
 ** New Bifs in R13B04 [0/1]
 - [ ] bif erlang:binary_to_term/2
 
-** The binary match bifs (New in R14A - EEP9) [0/24]
+** The binary match bifs (New in R14A - EEP9) [2/24]
 The searching/splitting/substituting thingies
 - [ ] ubif erlang:binary_part/2
 - [ ] ubif erlang:binary_part/3
@@ -450,8 +450,8 @@ The searching/splitting/substituting thingies
 - [ ] bif binary:encode_unsigned/2
 - [ ] bif binary:decode_unsigned/1
 - [ ] bif binary:decode_unsigned/2
-- [ ] bif erlang:nif_error/1
-- [ ] bif erlang:nif_error/2
+- [X] bif erlang:nif_error/1
+- [X] bif erlang:nif_error/2
 
 ** Helpers for unicode filenames [0/5]
 - [ ] bif prim_file:internal_name2native/1

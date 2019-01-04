@@ -328,8 +328,8 @@ impl Machine {
             context.ip.ptr += 1;
 
             println!(
-                "running proc pid {:?}, ins {:?}, args: {:?}",
-                process.pid, ins.op, ins.args
+                "running proc pid {:?} reds: {:?}, mod: {:?}, ins {:?}, args: {:?}",
+                process.pid, reductions, atom::from_index(module.name).unwrap(), ins.op, ins.args
             );
 
             match &ins.op {

@@ -52,7 +52,13 @@ static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::from_str("tl"), 1), Box::new(bif_erlang_tl_1));
     bifs.insert((erlang, atom::from_str("trunc"), 1), Box::new(bif_erlang_trunc_1));
     bifs.insert((erlang, atom::from_str("byte_size"), 1), Box::new(bif_erlang_byte_size_1));
+    bifs.insert((erlang, atom::from_str("error"), 1), Box::new(bif_erlang_error_1));
+    bifs.insert((erlang, atom::from_str("error"), 2), Box::new(bif_erlang_error_2));
+    //bifs.insert((erlang, atom::from_str("raise"), 3), Box::new(bif_erlang_raise_3));
     bifs.insert((erlang, atom::from_str("throw"), 1), Box::new(bif_erlang_throw_1));
+    bifs.insert((erlang, atom::from_str("exit"), 1), Box::new(bif_erlang_exit_1));
+    bifs.insert((erlang, atom::from_str("nif_error"), 1), Box::new(bif_erlang_nif_error_1));
+    bifs.insert((erlang, atom::from_str("nif_error"), 2), Box::new(bif_erlang_nif_error_2));
     // math
     let math = atom::from_str("math");
     bifs.insert((math, atom::from_str("cos"), 1), Box::new(bif_math_cos_1));
@@ -337,11 +343,49 @@ fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value
 }
 
 fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    Err(Exception {
-        reason: Reason::EXC_THROWN,
-        value: args[0].clone(),
-        trace: Value::Nil,
-    })
+    Err(Exception::with_value(
+        Reason::EXC_THROWN,
+        args[0].clone(),
+    ))
+}
+
+fn bif_erlang_exit_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    Err(Exception::with_value(
+        Reason::EXC_EXIT,
+        args[0].clone(),
+    ))
+}
+
+fn bif_erlang_error_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    Err(Exception::with_value(
+        Reason::EXC_ERROR,
+        args[0].clone(),
+    ))
+}
+
+fn bif_erlang_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
+    let heap = &process.context_mut().heap;
+
+    Err(Exception::with_value(
+        Reason::EXC_ERROR_2,
+        tup2!(heap, args[0].clone(), args[1].clone()),
+    ))
+}
+
+fn bif_erlang_nif_error_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    Err(Exception::with_value(
+        Reason::EXC_ERROR,
+        args[0].clone(),
+    ))
+}
+
+fn bif_erlang_nif_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
+    let heap = &process.context_mut().heap;
+
+    Err(Exception::with_value(
+        Reason::EXC_ERROR_2,
+        tup2!(heap, args[0].clone(), args[1].clone()),
+    ))
 }
 
 // Process dictionary
