@@ -118,9 +118,11 @@ pub fn decode_tuple<'a>(rest: &'a [u8], len: usize, heap: &Heap) -> IResult<&'a 
     // alloc space for elements
     let tuple = value::tuple(heap, len);
 
+    // TODO: nested tuples are dropped and then segfault, prevent that!
     let rest = (0..len).fold(rest, |rest, i| {
         let (rest, el) = decode_value(rest, heap).unwrap();
-        tuple[i] = el;
+        // use ptr write to avoid dropping uninitialized values!
+        unsafe { std::ptr::write(&mut tuple[i], el); }
         rest
     });
 
