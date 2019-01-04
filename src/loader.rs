@@ -184,6 +184,7 @@ impl<'a> Loader<'a> {
         // if (erts_no_line_info) { return (); }
 
         let (_, (lines, file_names)) = decode_lines(chunk).unwrap();
+
         self.lines = lines;
         self.file_names = file_names;
         // TODO: insert file names into atom table, remap lines to point to atoms
@@ -382,14 +383,15 @@ fn decode_lines<'a>(rest: &'a [u8]) -> IResult<&'a [u8], (Vec<FuncInfo>, Vec<&st
     )
 }
 
-fn decode_line_items<'a>(rest: &'a [u8], count: u32) -> IResult<&'a [u8], Vec<(usize, usize)>> {
+fn decode_line_items<'a>(rest: &'a [u8], mut count: u32) -> IResult<&'a [u8], Vec<(usize, usize)>> {
     let mut vec = Vec::with_capacity(count as usize);
     vec.push(LINE_INVALID_LOCATION); // 0th index = undefined location
     let mut fname_index = 0;
 
     let mut new_rest = rest;
 
-    for _i in 0..=count {
+    while count > 0 {
+        count -= 1;
         let (rest, term) = compact_term(new_rest)?;
         new_rest = rest;
         match term {
@@ -405,6 +407,7 @@ fn decode_line_items<'a>(rest: &'a [u8], count: u32) -> IResult<&'a [u8], Vec<(u
                 // LoadError2(stp, "file index overflow (%u/%u)",
                 // val, stp->num_fnames);
                 // }
+                count += 1;
             }
             _ => unreachable!(),
         }
