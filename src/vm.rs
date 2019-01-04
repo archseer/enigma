@@ -611,22 +611,22 @@ impl Machine {
                         op_jump!(context, fail);
                     }
                 }
-                Opcode::IsInteger      => { op_is_type!(self, context, ins.args, is_integer) }
-                Opcode::IsFloat        => { op_is_type!(self, context, ins.args, is_float) }
-                Opcode::IsNumber       => { op_is_type!(self, context, ins.args, is_number) }
-                Opcode::IsAtom         => { op_is_type!(self, context, ins.args, is_atom) }
-                Opcode::IsPid          => { op_is_type!(self, context, ins.args, is_pid) }
-                Opcode::IsReference    => { op_is_type!(self, context, ins.args, is_ref) }
-                Opcode::IsPort         => { op_is_type!(self, context, ins.args, is_port) }
-                Opcode::IsNil          => { op_is_type!(self, context, ins.args, is_nil) }
-                Opcode::IsBinary       => { op_is_type!(self, context, ins.args, is_binary) }
-                Opcode::IsList         => { op_is_type!(self, context, ins.args, is_list) }
-                Opcode::IsNonemptyList => { op_is_type!(self, context, ins.args, is_non_empty_list) }
-                Opcode::IsTuple        => { op_is_type!(self, context, ins.args, is_tuple) }
-                Opcode::IsFunction     => { op_is_type!(self, context, ins.args, is_function) }
-                Opcode::IsBoolean      => { op_is_type!(self, context, ins.args, is_boolean) }
-                Opcode::IsMap          => { op_is_type!(self, context, ins.args, is_map) }
-                Opcode::IsFunction2    => {
+                Opcode::IsInteger => op_is_type!(self, context, ins.args, is_integer),
+                Opcode::IsFloat => op_is_type!(self, context, ins.args, is_float),
+                Opcode::IsNumber => op_is_type!(self, context, ins.args, is_number),
+                Opcode::IsAtom => op_is_type!(self, context, ins.args, is_atom),
+                Opcode::IsPid => op_is_type!(self, context, ins.args, is_pid),
+                Opcode::IsReference => op_is_type!(self, context, ins.args, is_ref),
+                Opcode::IsPort => op_is_type!(self, context, ins.args, is_port),
+                Opcode::IsNil => op_is_type!(self, context, ins.args, is_nil),
+                Opcode::IsBinary => op_is_type!(self, context, ins.args, is_binary),
+                Opcode::IsList => op_is_type!(self, context, ins.args, is_list),
+                Opcode::IsNonemptyList => op_is_type!(self, context, ins.args, is_non_empty_list),
+                Opcode::IsTuple => op_is_type!(self, context, ins.args, is_tuple),
+                Opcode::IsFunction => op_is_type!(self, context, ins.args, is_function),
+                Opcode::IsBoolean => op_is_type!(self, context, ins.args, is_boolean),
+                Opcode::IsMap => op_is_type!(self, context, ins.args, is_map),
+                Opcode::IsFunction2 => {
                     if let Value::Closure(closure) = self.expand_arg(context, &ins.args[0]) {
                         let arity = self.expand_arg(context, &ins.args[1]).to_usize();
                         unsafe {
@@ -766,15 +766,20 @@ impl Machine {
                     let value = self.expand_arg(context, &ins.args[0]).clone();
                     return Err(Exception::with_value(Reason::EXC_CASE_CLAUSE, value));
                 }
-                Opcode::Try => { // TODO: try is identical to catch, and is remapped in the OTP loader
+                Opcode::Try => {
+                    // TODO: try is identical to catch, and is remapped in the OTP loader
                     // y f
                     // create a catch context that wraps f - fail label, and stores to y - reg.
                     context.catches += 1;
                     let fail = ins.args[1].to_usize();
-                    set_register!(context, &ins.args[0], Value::Catch(InstrPtr{
-                        ptr: fail,
-                        module: context.ip.module
-                    }));
+                    set_register!(
+                        context,
+                        &ins.args[0],
+                        Value::Catch(InstrPtr {
+                            ptr: fail,
+                            module: context.ip.module
+                        })
+                    );
                 }
                 Opcode::TryEnd => {
                     // y
@@ -804,10 +809,14 @@ impl Machine {
                     // create a catch context that wraps f - fail label, and stores to y - reg.
                     context.catches += 1;
                     let fail = ins.args[1].to_usize();
-                    set_register!(context, &ins.args[0], Value::Catch(InstrPtr{
-                        ptr: fail,
-                        module: context.ip.module
-                    }));
+                    set_register!(
+                        context,
+                        &ins.args[0],
+                        Value::Catch(InstrPtr {
+                            ptr: fail,
+                            module: context.ip.module
+                        })
+                    );
                 }
                 Opcode::CatchEnd => {
                     // y
@@ -831,16 +840,17 @@ impl Machine {
                     } else {
                         Reason::EXC_ERROR
                     };
-                    return Err(Exception{ reason, value: value.clone(), trace: trace.clone() });
-
+                    return Err(Exception {
+                        reason,
+                        value: value.clone(),
+                        trace: trace.clone(),
+                    });
                 }
                 Opcode::GcBif1 => {
                     // fail label, live, bif, arg1, dest
                     if let Value::Literal(i) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
-                        let args = &[
-                            self.expand_arg(context, &ins.args[3]).clone(),
-                        ];
+                        let args = &[self.expand_arg(context, &ins.args[3]).clone()];
                         let mfa = &module.imports[*i];
                         let val = bif::apply(self, process, mfa, &args[..]).unwrap(); // TODO: handle fail
 
@@ -852,17 +862,18 @@ impl Machine {
                     }
                 }
                 Opcode::BsAdd => {
-                     // Calculates the total of the number of bits in Src1 and the number of units in Src2. Stores the result to Dst.
-                     // bs_add(Fail, Src1, Src2, Unit, Dst)
-                     // dst = (src1 + src2) * unit
+                    // Calculates the total of the number of bits in Src1 and the number of units in Src2. Stores the result to Dst.
+                    // bs_add(Fail, Src1, Src2, Unit, Dst)
+                    // dst = (src1 + src2) * unit
 
-                     // TODO: trickier since we need to check both nums are positive and can fit
-                     // into int/bigint
+                    // TODO: trickier since we need to check both nums are positive and can fit
+                    // into int/bigint
 
-                     // optimize when one append is 0 and unit is 1, it's just a move
-                     // bs_add Fail S1=i==0 S2 Unit=u==1 D => move S2 D
+                    // optimize when one append is 0 and unit is 1, it's just a move
+                    // bs_add Fail S1=i==0 S2 Unit=u==1 D => move S2 D
 
-                    if let [Value::Label(_fail), s1, s2, Value::Literal(unit), dest] = &ins.args[..] {
+                    if let [Value::Label(_fail), s1, s2, Value::Literal(unit), dest] = &ins.args[..]
+                    {
                         // TODO use fail label
                         let s1 = self.expand_arg(context, s1).to_usize();
                         let s2 = self.expand_arg(context, s2).to_usize();
@@ -1134,7 +1145,8 @@ impl Machine {
                             let closure = *closure;
                             if let Some(binding) = &(*closure).binding {
                                 // TODO: maybe we can copy_from_slice in the future
-                                context.x[arity..arity+binding.len()].clone_from_slice(&binding[..]);
+                                context.x[arity..arity + binding.len()]
+                                    .clone_from_slice(&binding[..]);
                             }
 
                             op_jump!(context, (*closure).ptr);

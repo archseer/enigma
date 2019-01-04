@@ -1,8 +1,8 @@
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
+use crate::loader::{FuncInfo, LINE_INVALID_LOCATION};
 use crate::mailbox::Mailbox;
 use crate::module::{Module, MFA};
-use crate::loader::{FuncInfo, LINE_INVALID_LOCATION};
 use crate::pool::Job;
 pub use crate::process_table::PID;
 use crate::value::Value;
@@ -74,16 +74,16 @@ impl InstrPtr {
         let module = unsafe { &(*self.module) };
 
         let mut vec: Vec<(&(usize, usize), &usize)> = module.funs.iter().collect();
-        vec.sort_by(|(_, v1), (_, v2)| { v1.cmp(v2) });
+        vec.sort_by(|(_, v1), (_, v2)| v1.cmp(v2));
 
         let mut low = 0;
         let mut high = vec.len() - 1;
 
         while high > low {
-            let mid = low + (high-low) / 2;
+            let mid = low + (high - low) / 2;
             if self.ptr < *vec[mid].1 {
                 high = mid;
-            } else if self.ptr < *vec[mid+1].1 {
+            } else if self.ptr < *vec[mid + 1].1 {
                 let ((f, a), fun_offset) = vec[mid];
                 let mfa = (module.name, *f, *a);
                 let func_info = self.lookup_loc();
@@ -103,10 +103,10 @@ impl InstrPtr {
         let mut high = module.lines.len() - 1;
 
         while high > low {
-            let mid = low + (high-low) / 2;
+            let mid = low + (high - low) / 2;
             if self.ptr < module.lines[mid].1 {
                 high = mid;
-            } else if self.ptr < module.lines[mid+1].1 {
+            } else if self.ptr < module.lines[mid + 1].1 {
                 let res = module.lines[mid];
 
                 if res == LINE_INVALID_LOCATION {
@@ -137,7 +137,7 @@ impl ExecutionContext {
 
                 exc: None,
 
-                current: (0,0,0),
+                current: (0, 0, 0),
 
                 // register: Register::new(block.code.registers as usize),
                 // binding: Binding::with_rc(block.locals(), block.receiver),
