@@ -119,7 +119,19 @@ macro_rules! op_call_ext {
                 Err(exc) => return Err(exc),
             }
         } else {
-            unimplemented!()
+            // lookup module
+            // resolve into fun+arity ptr offset, set ip
+            // TODO: ^ precompute these two steps into a InstrPtr to avoid locks?
+            // how will that affect code reloading though
+            let (m, fun, arity) = mfa;
+            println!("call_ext mfa: {:?}", (atom::from_index(*m), atom::from_index(*fun), arity));
+            let ptr = {
+                let registry = $vm.modules.lock().unwrap();
+                let module = registry.lookup(*m).unwrap();
+                let ptr = unsafe { (*module).funs[&(*fun, *arity)] };
+                InstrPtr { module, ptr }
+            };
+            op_jump_ptr!($context, ptr);
         }
     }};
 }
