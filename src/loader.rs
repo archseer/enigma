@@ -8,6 +8,7 @@ use crate::value::Value;
 use compress::zlib;
 use fnv::FnvHashMap;
 use nom::*;
+use num::ToPrimitive;
 use num_bigint::{BigInt, Sign};
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
@@ -240,26 +241,26 @@ impl<'a> Loader<'a> {
                         // li, stp->num_line_instrs);
                         // }
                         // loc = stp->line_item[item];
-                        // TODO: map as loc => offset 
+                        // TODO: map as loc => offset
 
                         // if (ci - 2 == last_func_start) {
-                            // /*
-                            // * This line instruction directly follows the func_info
-                            // * instruction. Its address must be adjusted to point to
-                            // * func_info instruction.
-                            // */
-                            // stp->line_instr[li].pos = last_func_start - FUNC_INFO_SZ;
-                            // stp->line_instr[li].loc = stp->line_item[item];
-                            // stp->current_li++;
-                            // } else if (li <= stp->func_line[function_number-1] ||
-                            // stp->line_instr[li-1].loc != loc) {
-                            // /*
-                            // * Only store the location if it is different
-                            // * from the previous location in the same function.
-                            // */
-                            // stp->line_instr[li].pos = ci - 2;
-                            // stp->line_instr[li].loc = stp->line_item[item];
-                            // stp->current_li++;
+                        // /*
+                        // * This line instruction directly follows the func_info
+                        // * instruction. Its address must be adjusted to point to
+                        // * func_info instruction.
+                        // */
+                        // stp->line_instr[li].pos = last_func_start - FUNC_INFO_SZ;
+                        // stp->line_instr[li].loc = stp->line_item[item];
+                        // stp->current_li++;
+                        // } else if (li <= stp->func_line[function_number-1] ||
+                        // stp->line_instr[li-1].loc != loc) {
+                        // /*
+                        // * Only store the location if it is different
+                        // * from the previous location in the same function.
+                        // */
+                        // stp->line_instr[li].pos = ci - 2;
+                        // stp->line_instr[li].loc = stp->line_item[item];
+                        // stp->current_li++;
                         // }
                     }
                     continue;
@@ -537,11 +538,22 @@ named!(
 // If the base tag was Extended=7, then bits 4-5-6-7 PLUS 7 will become the extended tag.
 // It can have values Float=8, List=9, FloatReg=10, AllocList=11, Literal=12.
 
-fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], u64> {
+// basically read_int, but returns an integer and never bignum to use elsewhere in loader.
+// TODO: deduplicate.
+fn read_smallint(b: u8, rest: &[u8]) -> IResult<&[u8], i64> {
+    let (rest, val) = read_int(b, rest)?;
+
+    if let Value::Integer(i) = val {
+        return Ok((rest, i));
+    }
+    unreachable!()
+}
+
+fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], Value> {
     // it's not extended
     if 0 == (b & 0b1000) {
         // Bit 3 is 0 marks that 4 following bits contain the value
-        return Ok((rest, u64::from(b >> 4)));
+        return Ok((rest, Value::Integer(i64::from(b >> 4))));
     }
 
     // Bit 3 is 1, but...
@@ -549,13 +561,16 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], u64> {
         // Bit 4 is 0, marks that the following 3 bits (most significant) and
         // the following byte (least significant) will contain the 11-bit value
         let (rest, r) = be_u8(rest)?;
-        Ok((rest, u64::from((b & 0b1110_0000) << 3 | r)))
+        Ok((
+            rest,
+            Value::Integer((((b as usize) & 0b1110_0000) << 3 | (r as usize)) as i64),
+        )) // upcasting to i64 from usize not safe
     } else {
         // Bit 4 is 1 means that bits 5-6-7 contain amount of bytes+2 to store
         // the value
         let mut n_bytes = (b >> 5) + 2;
         if n_bytes == 9 {
-            println!("more than 9!")
+            println!("more than 9!");
             //     // bytes=9 means upper 5 bits were set to 1, special case 0b11111xxx
             //     // which means that following nested tagged value encodes size,
             //     // followed by the bytes (Size+9)
@@ -565,6 +580,7 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], u64> {
             //     } else {
             //       panic!("{}read word encountered a wrong byte length", module())
             //     }
+            unimplemented!()
         }
 
         // Read the remaining big endian bytes and convert to int
@@ -576,9 +592,13 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], u64> {
         };
 
         let r = BigInt::from_bytes_be(sign, long_bytes);
-        println!("{}", r);
-        //Ok((rest, Value::BigInt(Arc::new(r))))
-        unimplemented!()
+
+        if let Some(i) = r.to_i64() {
+            // fits in a regular int
+            return Ok((rest, Value::Integer(i)));
+        }
+
+        Ok((rest, Value::BigInt(Box::new(r))))
     } // if larger than 11 bits
 }
 
@@ -586,8 +606,15 @@ fn compact_term(i: &[u8]) -> IResult<&[u8], Value> {
     let (rest, b) = be_u8(i)?;
     let tag = b & 0b111;
 
+    if b & 0b0001_1001 == 0b001_1001 {
+        // bigint scenario TODO: triple check
+        let (rest, val) = read_int(b, rest)?;
+        return Ok((rest, val));
+    }
+
     if tag < 0b111 {
-        let (rest, val) = read_int(b, rest).unwrap();
+        //println!("b is {:?}, tag is {:?}", b, tag);
+        let (rest, val) = read_smallint(b, rest)?;
 
         return match tag {
             0 => Ok((rest, Value::Literal(val as usize))),
@@ -617,7 +644,7 @@ fn parse_extended_term(b: u8, rest: &[u8]) -> IResult<&[u8], Value> {
 fn parse_list(rest: &[u8]) -> IResult<&[u8], Value> {
     // The stream now contains a smallint size, then size/2 pairs of values
     let (rest, b) = be_u8(rest)?;
-    let (mut rest, n) = read_int(b, rest)?;
+    let (mut rest, n) = read_smallint(b, rest)?;
     let mut els = Vec::with_capacity(n as usize);
 
     // TODO: create tuple of size n, then read n/2 pairs of key/label
@@ -634,24 +661,24 @@ fn parse_list(rest: &[u8]) -> IResult<&[u8], Value> {
 
 fn parse_float_reg(rest: &[u8]) -> IResult<&[u8], Value> {
     let (rest, b) = be_u8(rest)?;
-    let (rest, n) = read_int(b, rest).unwrap();
+    let (rest, n) = read_smallint(b, rest)?;
 
     Ok((rest, Value::FloatReg(n as usize)))
 }
 
 fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], Value> {
     let (rest, b) = be_u8(rest)?;
-    let (mut rest, n) = read_int(b, rest).unwrap();
+    let (mut rest, n) = read_smallint(b, rest)?;
     let mut els = Vec::with_capacity(n as usize);
 
     for _i in 0..n {
         // decode int Type (0 = words, 1 = floats, 2 = literal)
         let (new_rest, b) = be_u8(rest)?;
-        let (new_rest, typ) = read_int(b, new_rest).unwrap();
+        let (new_rest, typ) = read_smallint(b, new_rest)?;
         // decode int Val as is, except  type = 2, get(literals, val)
         // TODO: decide how to handle literals 2
         let (new_rest, b) = be_u8(new_rest)?;
-        let (new_rest, val) = read_int(b, new_rest).unwrap();
+        let (new_rest, val) = read_smallint(b, new_rest)?;
 
         els.push((typ as u8, val as usize));
         rest = new_rest;
@@ -662,7 +689,7 @@ fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], Value> {
 
 fn parse_extended_literal(rest: &[u8]) -> IResult<&[u8], Value> {
     let (rest, b) = be_u8(rest)?;
-    let (rest, val) = read_int(b, rest).unwrap();
+    let (rest, val) = read_smallint(b, rest)?;
     Ok((rest, Value::ExtendedLiteral(val as usize)))
 }
 

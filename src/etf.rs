@@ -131,7 +131,7 @@ pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> 
     let (rest, len) = be_u32(rest)?;
 
     unsafe {
-        let (rest, val) = decode_value(rest, heap).unwrap();
+        let (rest, val) = decode_value(rest, heap)?;
 
         let start = heap.alloc(value::Cons {
             head: val,
@@ -183,7 +183,7 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value
     }
 
     unsafe {
-        let (rest, elem) = be_u8(rest).unwrap();
+        let (rest, elem) = be_u8(rest)?;
 
         let start = heap.alloc(value::Cons {
             head: Value::Character(elem),
