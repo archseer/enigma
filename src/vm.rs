@@ -9,11 +9,13 @@ use crate::pool::{Job, JoinGuard as PoolJoinGuard, Pool, Worker};
 use crate::process::{self, ExecutionContext, InstrPtr, RcProcess};
 use crate::process_table::ProcessTable;
 use crate::value::{self, Value};
+use log::debug;
 use std::mem::transmute;
 use std::panic;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time;
+use hashbrown::HashMap;
 
 /// A reference counted State.
 pub type RcState = Arc<State>;
@@ -124,10 +126,14 @@ macro_rules! op_call_ext {
             // TODO: ^ precompute these two steps into a InstrPtr to avoid locks?
             // how will that affect code reloading though
             let (m, fun, arity) = mfa;
-            println!("call_ext mfa: {:?}", (atom::from_index(*m), atom::from_index(*fun), arity));
+            debug!(
+                "call_ext mfa: {:?}",
+                (atom::from_index(*m), atom::from_index(*fun), arity)
+            );
             let ptr = {
                 let registry = $vm.modules.lock().unwrap();
                 let module = registry.lookup(*m).unwrap();
+                // TODO: use exports instead
                 let ptr = unsafe { (*module).funs[&(*fun, *arity)] };
                 InstrPtr { module, ptr }
             };
@@ -831,6 +837,7 @@ impl Machine {
                     );
                 }
                 Opcode::CatchEnd => {
+                    unimplemented!()
                     // y
                     // Pops a “catch” context. Erases the label saved in the Arg0 slot. Noval in R0
                     // indicates that something is caught. If R1 contains atom throw then R0 is set

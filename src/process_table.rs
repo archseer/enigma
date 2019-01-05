@@ -30,7 +30,7 @@
 //! It's possible (though very unlikely) for a ProcessTable to run out of
 //! available PIDs. This can happen when many processes are added and kept
 //! around. Callers should ensure they can handle such a scenario.
-use fnv::FnvHashMap;
+use hashbrown::HashMap;
 use std::usize;
 
 /// The type of a PID.
@@ -51,7 +51,7 @@ pub struct ProcessTable<T: Clone> {
     ///
     /// An entry's value may be set to None, indicating that the PID has been
     /// reserved but a process has yet to be inserted.
-    processes: FnvHashMap<PID, Option<T>>,
+    processes: HashMap<PID, Option<T>>,
 }
 
 impl<T: Clone> ProcessTable<T> {
@@ -59,7 +59,7 @@ impl<T: Clone> ProcessTable<T> {
         ProcessTable {
             next_pid: 0,
             recycle: false,
-            processes: FnvHashMap::default(),
+            processes: HashMap::new(),
         }
     }
 

@@ -6,11 +6,10 @@ use crate::module::{Lambda, Module, MFA};
 use crate::opcodes::*;
 use crate::value::Value;
 use compress::zlib;
-use fnv::FnvHashMap;
+use hashbrown::HashMap;
 use nom::*;
 use num::ToPrimitive;
 use num_bigint::{BigInt, Sign};
-use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
 // (filename_index, loc)
@@ -27,8 +26,8 @@ pub struct Loader<'a> {
     strings: String,
     lambdas: Vec<Lambda>,
     atom_map: HashMap<usize, usize>, // TODO: remove this; local id -> global id
-    funs: FnvHashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
-    labels: FnvHashMap<usize, usize>, // label -> offset
+    funs: HashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
+    labels: HashMap<usize, usize>,   // label -> offset
     lines: Vec<FuncInfo>,
     file_names: Vec<&'a str>,
     code: &'a [u8],
@@ -47,8 +46,8 @@ impl<'a> Loader<'a> {
             strings: String::new(),
             lambdas: Vec::new(),
             atom_map: HashMap::new(),
-            labels: FnvHashMap::default(),
-            funs: FnvHashMap::default(),
+            labels: HashMap::new(),
+            funs: HashMap::new(),
             lines: Vec::new(),
             file_names: Vec::new(),
             code: &[],

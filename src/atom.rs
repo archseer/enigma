@@ -1,8 +1,8 @@
 //use std::ptr;
 use crate::value::Value;
+use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use std::collections::BTreeMap; // TODO: maybe HashMap
 use std::u16;
 
 #[derive(Debug)]
@@ -49,7 +49,7 @@ impl Atom {
 #[derive(Debug)]
 pub struct AtomTable {
     /// Direct mapping string to atom index
-    index: RwLock<BTreeMap<String, usize>>,
+    index: RwLock<HashMap<String, usize>>,
 
     /// Reverse mapping atom index to string (sorted by index)
     index_r: RwLock<Vec<Atom>>,
@@ -59,7 +59,7 @@ pub struct AtomTable {
 impl AtomTable {
     pub fn new() -> AtomTable {
         AtomTable {
-            index: RwLock::new(BTreeMap::new()),
+            index: RwLock::new(HashMap::new()),
             index_r: RwLock::new(Vec::new()),
         }
     }

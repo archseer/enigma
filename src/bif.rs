@@ -6,7 +6,7 @@ use crate::numeric::modulo::{Modulo, OverflowingModulo};
 use crate::process::{self, RcProcess};
 use crate::value::{self, Value};
 use crate::vm;
-use fnv::FnvHashMap;
+use hashbrown::HashMap;
 use num::bigint::BigInt;
 use num::traits::Signed;
 use once_cell::sync::Lazy;
@@ -17,10 +17,10 @@ mod chrono;
 
 type BifResult = Result<Value, Exception>;
 type BifFn = fn(&vm::Machine, &RcProcess, &[Value]) -> BifResult;
-type BifTable = FnvHashMap<(usize, usize, usize), Box<BifFn>>;
+type BifTable = HashMap<(usize, usize, usize), Box<BifFn>>;
 
 static BIFS: Lazy<BifTable> = sync_lazy! {
-    let mut bifs: BifTable = FnvHashMap::default();
+    let mut bifs: BifTable = HashMap::new();
     let erlang = atom::from_str("erlang");
     bifs.insert((erlang, atom::from_str("abs"), 1), Box::new(bif_erlang_abs_1));
     bifs.insert((erlang, atom::from_str("date"), 0), Box::new(chrono::bif_erlang_date_0));
@@ -343,24 +343,15 @@ fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value
 }
 
 fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    Err(Exception::with_value(
-        Reason::EXC_THROWN,
-        args[0].clone(),
-    ))
+    Err(Exception::with_value(Reason::EXC_THROWN, args[0].clone()))
 }
 
 fn bif_erlang_exit_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    Err(Exception::with_value(
-        Reason::EXC_EXIT,
-        args[0].clone(),
-    ))
+    Err(Exception::with_value(Reason::EXC_EXIT, args[0].clone()))
 }
 
 fn bif_erlang_error_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    Err(Exception::with_value(
-        Reason::EXC_ERROR,
-        args[0].clone(),
-    ))
+    Err(Exception::with_value(Reason::EXC_ERROR, args[0].clone()))
 }
 
 fn bif_erlang_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
@@ -373,10 +364,7 @@ fn bif_erlang_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) ->
 }
 
 fn bif_erlang_nif_error_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    Err(Exception::with_value(
-        Reason::EXC_ERROR,
-        args[0].clone(),
-    ))
+    Err(Exception::with_value(Reason::EXC_ERROR, args[0].clone()))
 }
 
 fn bif_erlang_nif_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {

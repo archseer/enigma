@@ -2,7 +2,7 @@ use crate::immix::Heap;
 use crate::loader::{FuncInfo, Instruction};
 use crate::module_registry::RcModuleRegistry;
 use crate::value::Value;
-use fnv::FnvHashMap;
+use hashbrown::HashMap;
 
 pub type MFA = (usize, usize, usize); // function, arity, label
 
@@ -24,7 +24,7 @@ pub struct Module {
     pub literals: Vec<Value>,
     pub literal_heap: Heap,
     pub lambdas: Vec<Lambda>,
-    pub funs: FnvHashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
+    pub funs: HashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
     pub instructions: Vec<Instruction>,
     // debugging info
     pub lines: Vec<FuncInfo>,

@@ -1,6 +1,6 @@
 use crate::loader::Loader;
 use crate::module::Module;
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::sync::Arc;
