@@ -1,9 +1,9 @@
-use crate::arc_without_weak::ArcWithoutWeak;
 use crate::atom::{self, ATOMS};
 use crate::etf;
 use crate::immix::Heap;
 use crate::module::{Lambda, Module, MFA};
 use crate::opcodes::*;
+use crate::servo_arc::Arc;
 use crate::value::Value;
 use compress::zlib;
 use hashbrown::HashMap;
@@ -295,7 +295,7 @@ impl<'a> Loader<'a> {
                         // but need to tie them to the string heap lifetime
                         let bytes = &self.strings[offset..offset + len];
                         let string = bytes.as_bytes().to_vec(); // TODO: check if most efficient
-                        instruction.args = vec![Value::Binary(ArcWithoutWeak::new(string))];
+                        instruction.args = vec![Value::Binary(Arc::new(string))];
                         instruction
                     } else {
                         unreachable!()

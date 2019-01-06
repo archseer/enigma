@@ -6,7 +6,7 @@
 //! a value in the queue.
 //!
 //! Values are processed in FIFO order.
-use crate::arc_without_weak::ArcWithoutWeak;
+use crate::servo_arc::Arc;
 use parking_lot::{Condvar, Mutex};
 use std::collections::VecDeque;
 
@@ -20,7 +20,7 @@ pub struct Queue<T> {
     signaler: Condvar,
 }
 
-pub type RcQueue<T> = ArcWithoutWeak<Queue<T>>;
+pub type RcQueue<T> = Arc<Queue<T>>;
 
 #[allow(clippy::len_without_is_empty)]
 impl<T> Queue<T> {
@@ -36,8 +36,8 @@ impl<T> Queue<T> {
     }
 
     /// Returns a new queue that can be shared between threads.
-    pub fn with_rc() -> ArcWithoutWeak<Self> {
-        ArcWithoutWeak::new(Self::new())
+    pub fn with_rc() -> Arc<Self> {
+        Arc::new(Self::new())
     }
 
     pub fn terminate_queue(&self) {
@@ -216,7 +216,7 @@ mod tests {
     #[test]
     fn test_pop_terminating_queue() {
         let queue: RcQueue<()> = Queue::with_rc();
-        let started = ArcWithoutWeak::new(AtomicBool::new(false));
+        let started = Arc::new(AtomicBool::new(false));
 
         let queue_clone = queue.clone();
         let started_clone = started.clone();

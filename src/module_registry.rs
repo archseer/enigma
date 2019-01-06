@@ -1,9 +1,9 @@
 use crate::loader::Loader;
 use crate::module::Module;
+use crate::servo_arc::Arc;
 use hashbrown::HashMap;
 use std::fs::File;
 use std::io::Read;
-use std::sync::Arc;
 use std::sync::Mutex;
 
 pub type RcModuleRegistry = Arc<Mutex<ModuleRegistry>>;

@@ -64,8 +64,8 @@
 //!     // Wait for threads to terminate
 //!     guard.join().unwrap();
 
-use crate::arc_without_weak::ArcWithoutWeak;
 use crate::queue::{Queue, RcQueue};
+use crate::servo_arc::Arc;
 use std::collections::VecDeque;
 use std::thread::{self, Builder, JoinHandle};
 
@@ -153,7 +153,7 @@ pub struct PoolInner<T: Send + 'static> {
 /// A pool of threads, each processing jobs of a given type.
 pub struct Pool<T: Send + 'static> {
     /// The part of a pool that is shared between scheduler threads.
-    pub inner: ArcWithoutWeak<PoolInner<T>>,
+    pub inner: Arc<PoolInner<T>>,
 
     /// The name of this pool, if any.
     pub name: Option<String>,
@@ -168,7 +168,7 @@ impl<T: Send + 'static> Pool<T> {
     /// Returns a new Pool with the given amount of queues.
     pub fn new(amount: u8, name: Option<String>) -> Self {
         Pool {
-            inner: ArcWithoutWeak::new(PoolInner::new(amount)),
+            inner: Arc::new(PoolInner::new(amount)),
             name,
         }
     }
@@ -179,7 +179,7 @@ impl<T: Send + 'static> Pool<T> {
     where
         F: Fn(&mut Worker, T) + Sync + Send + 'static,
     {
-        let arc_closure = ArcWithoutWeak::new(closure);
+        let arc_closure = Arc::new(closure);
         let amount = self.inner.queues.len();
         let mut handles = Vec::with_capacity(amount);
 
@@ -241,7 +241,7 @@ impl<T: Send + 'static> PoolInner<T> {
     }
 
     /// Processes jobs from a queue.
-    pub fn process<F>(&self, worker: &mut Worker, closure: &ArcWithoutWeak<F>)
+    pub fn process<F>(&self, worker: &mut Worker, closure: &Arc<F>)
     where
         F: Fn(&mut Worker, T) + Sync + Send + 'static,
     {
@@ -375,7 +375,7 @@ mod tests {
     #[test]
     fn test_pool_run() {
         let pool = Pool::new(2, None);
-        let counter = ArcWithoutWeak::new(AtomicUsize::new(0));
+        let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = counter.clone();
 
         pool.schedule(Job::normal(1));
@@ -441,15 +441,15 @@ mod tests {
 
     #[test]
     fn test_pool_inner_process() {
-        let inner = ArcWithoutWeak::new(PoolInner::new(1));
-        let counter = ArcWithoutWeak::new(AtomicUsize::new(0));
-        let started = ArcWithoutWeak::new(AtomicBool::new(false));
+        let inner = Arc::new(PoolInner::new(1));
+        let counter = Arc::new(AtomicUsize::new(0));
+        let started = Arc::new(AtomicBool::new(false));
 
         let t_inner = inner.clone();
         let t_counter = counter.clone();
         let t_started = started.clone();
 
-        let closure = ArcWithoutWeak::new(move |_: &mut Worker, number| {
+        let closure = Arc::new(move |_: &mut Worker, number| {
             t_started.store(true, Ordering::Release);
             t_counter.fetch_add(number, Ordering::Relaxed);
         });
@@ -471,15 +471,15 @@ mod tests {
 
     #[test]
     fn test_pool_inner_process_pinned_worker_with_pinned_job() {
-        let inner = ArcWithoutWeak::new(PoolInner::new(1));
-        let counter = ArcWithoutWeak::new(AtomicUsize::new(0));
-        let started = ArcWithoutWeak::new(AtomicBool::new(false));
+        let inner = Arc::new(PoolInner::new(1));
+        let counter = Arc::new(AtomicUsize::new(0));
+        let started = Arc::new(AtomicBool::new(false));
 
         let t_inner = inner.clone();
         let t_counter = counter.clone();
         let t_started = started.clone();
 
-        let closure = ArcWithoutWeak::new(move |_: &mut Worker, number| {
+        let closure = Arc::new(move |_: &mut Worker, number| {
             t_started.store(true, Ordering::Release);
             t_counter.fetch_add(number, Ordering::Relaxed);
         });
@@ -505,15 +505,15 @@ mod tests {
 
     #[test]
     fn test_pool_inner_process_pinned_worker_with_regular_job() {
-        let inner = ArcWithoutWeak::new(PoolInner::new(1));
-        let counter = ArcWithoutWeak::new(AtomicUsize::new(0));
-        let started = ArcWithoutWeak::new(AtomicBool::new(false));
+        let inner = Arc::new(PoolInner::new(1));
+        let counter = Arc::new(AtomicUsize::new(0));
+        let started = Arc::new(AtomicBool::new(false));
 
         let t_inner = inner.clone();
         let t_counter = counter.clone();
         let t_started = started.clone();
 
-        let closure = ArcWithoutWeak::new(move |_: &mut Worker, number| {
+        let closure = Arc::new(move |_: &mut Worker, number| {
             t_counter.fetch_add(number, Ordering::Relaxed);
         });
 

@@ -2,10 +2,10 @@
 mod macros;
 #[macro_use]
 pub mod exception;
-mod arc_without_weak;
 mod atom;
 mod bif;
 mod etf;
+pub mod exports_table;
 mod immix;
 pub mod loader;
 pub mod mailbox;
@@ -17,6 +17,7 @@ mod pool;
 pub mod process;
 pub mod process_table;
 mod queue;
+mod servo_arc;
 pub mod value;
 pub mod vm;
 

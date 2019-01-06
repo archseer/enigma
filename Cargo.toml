@@ -31,6 +31,7 @@ getopts = "0.2.18"
 hamt-rs = { git = "https://github.com/michaelwoerister/hamt-rs/" }
 log = "0.4"
 hashbrown = "0.1.7"
+nodrop = "0.1.13"
 
 # [profile.release]
 # debug = true

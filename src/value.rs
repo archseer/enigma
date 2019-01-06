@@ -1,13 +1,15 @@
-use crate::arc_without_weak::ArcWithoutWeak;
 use crate::atom;
+use crate::bitstring;
 use crate::exception;
 use crate::immix::Heap;
 use crate::module;
 use crate::process::{self, InstrPtr};
+use crate::servo_arc::Arc;
 use allocator_api::Layout;
 use core::marker::PhantomData;
 use hamt_rs::HamtMap;
 use num::bigint::BigInt;
+use parking_lot::RwLock;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
@@ -26,7 +28,7 @@ impl Hash for Float {
 pub type HAMT = HamtMap<Value, Value>;
 
 #[derive(PartialEq, Eq, Clone)]
-pub struct Map(pub ArcWithoutWeak<HamtMap<Value, Value>>);
+pub struct Map(pub Arc<HamtMap<Value, Value>>);
 
 impl Hash for Map {
     fn hash<H: Hasher>(&self, _state: &mut H) {
@@ -65,13 +67,13 @@ pub enum Value {
     /// Boxed values
     /// Strings use an Arc so they can be sent to other processes without
     /// requiring a full copy of the data.
-    Binary(ArcWithoutWeak<Vec<u8>>),
+    Binary(Arc<bitstring::Binary>),
     Map(self::Map),
 
     /// An interned string is a string allocated on the permanent space. For
     /// every unique interned string there is only one object allocated.
-    // InternedBinary(ArcWithoutWeak<String>),
-    BigInt(Box<BigInt>), // ArcWithoutWeak<BigInt>
+    // InternedBinary(Arc<String>),
+    BigInt(Box<BigInt>), // Arc<BigInt>
     Closure(*const self::Closure),
 
     /// Special loader values (invalid in user runtime)
@@ -183,7 +185,7 @@ unsafe impl Sync for Cons {}
 
 // Stores data on the process heap. Small, but expensive to copy.
 // HeapBin(len + ptr)
-// Stores data off the process heap, in an ArcWithoutWeak<>. Cheap to copy around.
+// Stores data off the process heap, in an Arc<>. Cheap to copy around.
 // RefBin(Arc<String/Vec<u8?>>)
 // ^^ start with just RefBin since Rust already will do the String management for us
 // SubBin(len (original?), offset, bitsize,bitoffset,is_writable, orig_ptr -> Bin/RefBin)

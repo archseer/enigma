@@ -1,6 +1,6 @@
-use crate::arc_without_weak::ArcWithoutWeak;
 use crate::atom;
 use crate::immix::Heap;
+use crate::servo_arc::Arc;
 use crate::value::{self, Value, HAMT};
 use nom::*;
 use num::traits::ToPrimitive;
@@ -173,7 +173,7 @@ pub fn decode_map<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> {
         map = map.plus(key, val);
         new_rest = rest;
     }
-    Ok((new_rest, Value::Map(value::Map(ArcWithoutWeak::new(map)))))
+    Ok((new_rest, Value::Map(value::Map(Arc::new(map)))))
 }
 
 /// A string of bytes encoded as tag 107 (String) with 16-bit length.
@@ -216,11 +216,11 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value
 pub fn decode_binary<'a>(rest: &'a [u8], _heap: &Heap) -> IResult<&'a [u8], Value> {
     let (rest, len) = be_u32(rest)?;
     if len == 0 {
-        return Ok((rest, Value::Binary(ArcWithoutWeak::new(Vec::new()))));
+        return Ok((rest, Value::Binary(Arc::new(Vec::new()))));
     }
 
     let (rest, bytes) = take!(rest, len)?;
-    Ok((rest, Value::Binary(ArcWithoutWeak::new(bytes.to_vec()))))
+    Ok((rest, Value::Binary(Arc::new(bytes.to_vec()))))
 }
 
 #[cfg(target_pointer_width = "32")]

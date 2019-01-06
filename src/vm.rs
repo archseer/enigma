@@ -1,25 +1,23 @@
-use crate::arc_without_weak::ArcWithoutWeak;
 use crate::atom;
 use crate::bif;
 use crate::exception::{self, Exception, Reason};
+use crate::exports_table::{ExportsTable, RcExportsTable};
 use crate::module;
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
 use crate::opcodes::Opcode;
 use crate::pool::{Job, JoinGuard as PoolJoinGuard, Pool, Worker};
 use crate::process::{self, ExecutionContext, InstrPtr, RcProcess};
 use crate::process_table::ProcessTable;
+use crate::servo_arc::Arc;
 use crate::value::{self, Value};
 use log::debug;
 use std::mem::transmute;
 use std::panic;
-use std::sync::Arc;
 use std::sync::Mutex;
 use std::time;
-use hashbrown::HashMap;
 
 /// A reference counted State.
 pub type RcState = Arc<State>;
-/// Reference counted ModuleRegistry.
 
 pub struct State {
     /// Table containing all processes.
@@ -925,8 +923,8 @@ impl Machine {
                         // alternatively, loop through the instrs until we hit a non bs_ instr.
                         // that way, no unsafe ptrs!
                         let size = self.expand_arg(context, s1).to_usize();
-                        let mut arc = ArcWithoutWeak::new(Vec::with_capacity(size));
-                        context.bs = &mut (*arc); // TODO: this feels a bit off
+                        let arc = Arc::new(Vec::with_capacity(size));
+                        context.bs = unsafe { &((*arc.p.as_ptr()).data) as *const _ }; // TODO: this feels a bit off
                         set_register!(context, dest, Value::Binary(arc));
                     } else {
                         unreachable!()
