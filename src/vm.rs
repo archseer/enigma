@@ -162,6 +162,48 @@ macro_rules! op_jump_ptr {
     }};
 }
 
+macro_rules! op_fixed_apply {
+    ($context:expr, $arity:expr) => {{
+        let module = $context.x[$arity].clone();
+        let func = $context.x[$arity + 1].clone();
+
+        if !func.is_atom() || !module.is_atom() {
+            $context.x[0] = module;
+            $context.x[1] = func;
+            $context.x[2] = Value::Nil;
+
+            return Err(Exception::new(
+                Reason::EXC_BADARG,
+                // value.clone(), TODO: with value?
+            ));
+        }
+
+        // Handle apply of apply/3...
+        if module.to_usize() == atom::ERLANG && func.to_usize() == atom::APPLY && $arity == 3 {
+            unimplemented!()
+            // return apply(p, reg, I, stack_offset);
+        }
+        unimplemented!()
+
+        /*
+         * Get the index into the export table, or failing that the export
+         * entry for the error handler module.
+         *
+         * Note: All BIFs have export entries; thus, no special case is needed.
+         */
+
+        //    if ((ep = erts_active_export_entry(module, function, arity)) == NULL) {
+        //      if ((ep = apply_setup_error_handler(p, module, function, arity, reg)) == NULL)
+        //        goto error;
+        //    } else if (ERTS_PROC_GET_SAVED_CALLS_BUF(p)) {
+        //      save_calls(p, ep);
+        //    }
+        //    apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
+
+        // op_jump_ptr!($context, ptr)
+    }};
+}
+
 macro_rules! op_is_type {
     ($vm:expr, $context:expr, $args:expr, $op:ident) => {{
         debug_assert_eq!($args.len(), 2);
@@ -231,6 +273,35 @@ impl Machine {
             exports: ExportsTable::with_rc(),
             modules: ModuleRegistry::with_rc(),
         }
+    }
+
+    pub fn preload_modules(&self) {
+        module::load_module(&self, "examples/preloaded/ebin/erts_code_purger.beam").unwrap();
+        module::load_module(&self, "examples/preloaded/ebin/erl_init.beam").unwrap();
+        module::load_module(&self, "examples/preloaded/ebin/init.beam").unwrap();
+        module::load_module(&self, "examples/preloaded/ebin/prim_buffer.beam").unwrap();
+        module::load_module(&self, "examples/preloaded/ebin/prim_eval.beam").unwrap();
+        module::load_module(&self, "examples/preloaded/ebin/prim_inet.beam").unwrap();
+        module::load_module(&self, "examples/preloaded/ebin/prim_file.beam").unwrap();
+        module::load_module(&self, "examples/preloaded/ebin/zlib.beam").unwrap();
+        module::load_module(&self, "examples/preloaded/ebin/prim_zip.beam").unwrap();
+        module::load_module(&self, "examples/preloaded/ebin/erl_prim_loader.beam").unwrap();
+        module::load_module(&self, "examples/preloaded/ebin/erlang.beam").unwrap();
+        module::load_module(&self, "examples/preloaded/ebin/erts_internal.beam").unwrap();
+        module::load_module(&self, "examples/preloaded/ebin/erl_tracer.beam").unwrap();
+        module::load_module(
+            &self,
+            "examples/preloaded/ebin/erts_literal_area_collector.beam",
+        )
+        .unwrap();
+        module::load_module(
+            &self,
+            "examples/preloaded/ebin/erts_dirty_process_signal_handler.beam",
+        )
+        .unwrap();
+        module::load_module(&self, "examples/preloaded/ebin/atomics.beam").unwrap();
+        module::load_module(&self, "examples/preloaded/ebin/counters.beam").unwrap();
+        module::load_module(&self, "examples/preloaded/ebin/persistent_term.beam").unwrap();
     }
 
     /// Starts the VM
@@ -305,18 +376,19 @@ impl Machine {
         // We are using AssertUnwindSafe here so we can pass a &mut Worker to
         // run()/panic(). This might be risky if values captured are not unwind
         // safe, so take care when capturing new variables.
-        let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            if let Err(message) = self.run(process) {
-                if let Some(new_pc) = exception::handle_error(process, message) {
-                    let context = process.context_mut();
-                    context.ip = new_pc;
-                    self.state
-                        .process_pool
-                        .schedule(Job::normal(process.clone()));
-                }
+        //let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        if let Err(message) = self.run(process) {
+            if let Some(new_pc) = exception::handle_error(process, message) {
+                let context = process.context_mut();
+                context.ip = new_pc;
+                self.state
+                    .process_pool
+                    .schedule(Job::normal(process.clone()));
             }
-        }));
+        }
+        // }));
 
+        /*
         if let Err(error) = result {
             if let Ok(message) = error.downcast::<String>() {
                 //self.panic(worker, process, &message);
@@ -329,8 +401,8 @@ impl Machine {
                     process,
                     &"The VM panicked with an unknown error",
                 );*/
-            };
-        }
+        };
+        }*/
     }
 
     #[allow(clippy::cyclomatic_complexity)]
@@ -850,6 +922,33 @@ impl Machine {
                     //
                     // difference fron try is, try will exhaust all the options then fail, whereas
                     // catch will keep going upwards.
+                    //
+
+                    // $try_end($Y);
+                    // if (is_non_value(r(0))) {
+                    //     c_p->fvalue = NIL;
+                    //     if (x(1) == am_throw) {
+                    //         r(0) = x(2);
+                    //     } else {
+                    //         if (x(1) == am_error) {
+                    //             SWAPOUT;
+                    //             x(2) = add_stacktrace(c_p, x(2), x(3));
+                    //             SWAPIN;
+                    //         }
+                    //         /* only x(2) is included in the rootset here */
+                    //         if (E - HTOP < 3) {
+                    //             SWAPOUT;
+                    //             PROCESS_MAIN_CHK_LOCKS(c_p);
+                    //             FCALLS -= erts_garbage_collect_nobump(c_p, 3, reg+2, 1, FCALLS);
+                    //             ERTS_VERIFY_UNUSED_TEMP_ALLOC(c_p);
+                    //             PROCESS_MAIN_CHK_LOCKS(c_p);
+                    //             SWAPIN;
+                    //         }
+                    //         r(0) = TUPLE2(HTOP, am_EXIT, x(2));
+                    //         HTOP += 3;
+                    //     }
+                    // }
+                    // CHECK_TERM(r(0));
                 }
                 Opcode::Raise => {
                     // Raises the exception. The instruction is garbled by backward compatibility. Arg0 is a stack trace
@@ -868,6 +967,28 @@ impl Machine {
                         value: value.clone(),
                         trace: trace.clone(),
                     });
+                }
+                Opcode::Apply => {
+                    //literal arity
+
+                    if let [Value::Literal(arity)] = &ins.args[..] {
+                        context.cp = Some(context.ip);
+
+                        op_fixed_apply!(context, *arity)
+                    // call this fixed_apply, used for ops (apply, apply_last).
+                    // apply is the func that's equivalent to erlang:apply/3 (and instrs)
+                    } else {
+                        unreachable!()
+                    }
+                    safepoint_and_reduce!(self, process, reductions);
+                }
+                Opcode::Apply => {
+                    //literal arity, nwords (dealloc)
+                    // op_deallocate!(context, nwords);
+
+                    // op_apply!()
+
+                    // safepoint_and_reduce!(self, process, reductions);
                 }
                 Opcode::GcBif1 => {
                     // fail label, live, bif, arg1, dest
@@ -1198,6 +1319,31 @@ impl Machine {
                 }
                 Opcode::BuildStacktrace => {
                     context.x[0] = exception::build_stacktrace(process, &context.x[0]);
+                }
+                Opcode::RawRaise => {
+                    //Eterm class = x(0);
+                    //Eterm value = x(1);
+                    //Eterm stacktrace = x(2);
+
+                    //if (class == am_error) {
+                    //    c_p->freason = EXC_ERROR & ~EXF_SAVETRACE;
+                    //    c_p->fvalue = value;
+                    //    c_p->ftrace = stacktrace;
+                    //    goto find_func_info;
+                    //} else if (class == am_exit) {
+                    //    c_p->freason = EXC_EXIT & ~EXF_SAVETRACE;
+                    //    c_p->fvalue = value;
+                    //    c_p->ftrace = stacktrace;
+                    //    goto find_func_info;
+                    //} else if (class == am_throw) {
+                    //    c_p->freason = EXC_THROWN & ~EXF_SAVETRACE;
+                    //    c_p->fvalue = value;
+                    //    c_p->ftrace = stacktrace;
+                    //    goto find_func_info;
+                    //} else {
+                    //    x(0) = am_badarg;
+                    //}
+                    unimplemented!()
                 }
                 opcode => println!("Unimplemented opcode {:?}: {:?}", opcode, ins),
             }

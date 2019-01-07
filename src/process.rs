@@ -286,20 +286,12 @@ pub fn spawn(
     // let pid_ptr = new_proc.allocate_usize(new_pid, state.integer_prototype);
     let pid_ptr = Value::Pid(new_pid);
 
-    // TODO: func to ip offset
-    let func = unsafe {
-        (*module)
-            .funs
-            .get(&(func, 1)) // TODO: figure out arity from arglist?
-            .expect("process::spawn could not locate func")
-    };
     let context = new_proc.context_mut();
-    context.ip.ptr = *func;
 
     // arglist to process registers,
     // TODO: it also needs to deep clone all the vals (for example lists etc)
+    let mut i = 0;
     unsafe {
-        let mut i = 0;
         let mut cons = &args;
         while let Value::List(ptr) = *cons {
             context.x[i] = (*ptr).head.clone();
@@ -309,6 +301,15 @@ pub fn spawn(
         // lastly, the tail
         context.x[i] = (*cons).clone();
     }
+
+    // TODO: func to ip offset
+    let func = unsafe {
+        (*module)
+            .funs
+            .get(&(func, i)) // arglist arity
+            .expect("process::spawn could not locate func")
+    };
+    context.ip.ptr = *func;
 
     state.process_pool.schedule(Job::normal(new_proc));
 

@@ -153,6 +153,11 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
 
     atoms.register_atom("file");
     atoms.register_atom("line");
+
+    atoms.register_atom("ok");
+
+    atoms.register_atom("erlang");
+    atoms.register_atom("apply");
     atoms
 };
 
@@ -189,6 +194,11 @@ pub const THROW: usize = 28;
 
 pub const FILE: usize = 29;
 pub const LINE: usize = 30;
+
+pub const OK: usize = 31;
+
+pub const ERLANG: usize = 32;
+pub const APPLY: usize = 33;
 
 pub fn from_str(val: &str) -> usize {
     ATOMS.from_str(val)
