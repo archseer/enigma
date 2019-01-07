@@ -54,6 +54,9 @@ pub struct InstrPtr {
     pub ptr: usize,
 }
 
+unsafe impl Send for InstrPtr {}
+unsafe impl Sync for InstrPtr {}
+
 impl InstrPtr {
     pub fn new(module: *const Module, ptr: usize) -> Self {
         InstrPtr { module, ptr }

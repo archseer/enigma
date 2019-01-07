@@ -1,7 +1,8 @@
 use crate::atom;
 use crate::bif;
+use crate::bitstring;
 use crate::exception::{self, Exception, Reason};
-use crate::exports_table::{ExportsTable, RcExportsTable};
+use crate::exports_table::{Export, ExportsTable, RcExportsTable};
 use crate::module;
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
 use crate::opcodes::Opcode;
@@ -37,7 +38,9 @@ pub struct Machine {
     // env config, arguments, panic handler
 
     // atom table is accessible globally as ATOMS
-    // export table
+    /// export table
+    pub exports: RcExportsTable,
+
     /// Module registry
     pub modules: RcModuleRegistry,
 }
@@ -104,38 +107,33 @@ macro_rules! op_call_ext {
     ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr) => {{
         let mfa = unsafe { &(*$context.ip.module).imports[*$dest] };
 
-        // TODO: precompute which exports are bifs
-        // also precompute the bif lookup
-        // call_ext_only Ar=u Bif=u$is_bif => \
-        // allocate u Ar | call_bif Bif | deallocate_return u
-        if bif::is_bif(mfa) {
-            // make a slice out of arity x registers
-            let args = &$context.x[0..*$arity];
-            match bif::apply($vm, $process, mfa, args) {
-                Ok(val) => {
-                    set_register!($context, &Value::X(0), val); // HAXX
-                    op_return!($context);
+        println!(
+            "call_ext mfa: {:?}",
+            (atom::from_index(mfa.0), atom::from_index(mfa.1), mfa.2)
+        );
+
+        match $vm.exports.read().lookup(mfa) {
+            Some(Export::Fun(ptr)) => {
+                println!("ptr found!{:?}", unsafe { (*ptr.module).name });
+                op_jump_ptr!($context, *ptr)}
+            ,
+            Some(Export::Bif(bif)) => {
+                // TODO: precompute which exports are bifs
+                // also precompute the bif lookup
+                // call_ext_only Ar=u Bif=u$is_bif => \
+                // allocate u Ar | call_bif Bif | deallocate_return u
+
+                // make a slice out of arity x registers
+                let args = &$context.x[0..*$arity];
+                match bif($vm, $process, args) {
+                    Ok(val) => {
+                        set_register!($context, &Value::X(0), val); // HAXX
+                        op_return!($context);
+                    }
+                    Err(exc) => return Err(exc),
                 }
-                Err(exc) => return Err(exc),
             }
-        } else {
-            // lookup module
-            // resolve into fun+arity ptr offset, set ip
-            // TODO: ^ precompute these two steps into a InstrPtr to avoid locks?
-            // how will that affect code reloading though
-            let (m, fun, arity) = mfa;
-            debug!(
-                "call_ext mfa: {:?}",
-                (atom::from_index(*m), atom::from_index(*fun), arity)
-            );
-            let ptr = {
-                let registry = $vm.modules.lock().unwrap();
-                let module = registry.lookup(*m).unwrap();
-                // TODO: use exports instead
-                let ptr = unsafe { (*module).funs[&(*fun, *arity)] };
-                InstrPtr { module, ptr }
-            };
-            op_jump_ptr!($context, ptr);
+            None => return Err(Exception::new(Reason::EXC_UNDEF)),
         }
     }};
 }
@@ -230,6 +228,7 @@ impl Machine {
 
         Machine {
             state: Arc::new(state),
+            exports: ExportsTable::with_rc(),
             modules: ModuleRegistry::with_rc(),
         }
     }
@@ -268,8 +267,11 @@ impl Machine {
 
     /// Starts the main process
     pub fn start_main_process(&self, path: &str) {
+        println!("Starting main process...");
         let process = {
-            let module = module::load_module(&self.modules, path).unwrap();
+            let registry = self.modules.lock();
+            // let module = module::load_module(&self.modules, path).unwrap();
+            let module = registry.lookup(atom::from_str("erl_init")).unwrap();
 
             process::allocate(&self.state, module).unwrap()
         };
@@ -277,7 +279,9 @@ impl Machine {
         /* TEMP */
         let context = process.context_mut();
         let fun = atom::from_str("start");
-        let arity = 0;
+        let arity = 2;
+        context.x[0] = Value::Atom(atom::from_str("init"));
+        context.x[1] = Value::Binary(Arc::new(bitstring::Binary::new()));
         unsafe { op_jump!(context, (*context.ip.module).funs[&(fun, arity)]) }
         /* TEMP */
 
@@ -334,18 +338,20 @@ impl Machine {
         let mut reductions = 2000; // self.state.config.reductions;
         let context = process.context_mut();
 
-        // println!(
-        //     "running proc pid {:?}, offset {:?}",
-        //     process.pid, context.ip
-        // );
         loop {
             let ins = unsafe { &(*context.ip.module).instructions[context.ip.ptr] };
             let module = unsafe { &(*context.ip.module) };
             context.ip.ptr += 1;
 
+            println!("ptr now: {:?}", context.ip.module);
+
             println!(
                 "running proc pid {:?} reds: {:?}, mod: {:?}, ins {:?}, args: {:?}",
-                process.pid, reductions, atom::from_index(module.name).unwrap(), ins.op, ins.args
+                process.pid,
+                reductions,
+                atom::from_index(module.name).unwrap(),
+                ins.op,
+                ins.args
             );
 
             match &ins.op {

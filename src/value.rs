@@ -9,7 +9,6 @@ use allocator_api::Layout;
 use core::marker::PhantomData;
 use hamt_rs::HamtMap;
 use num::bigint::BigInt;
-use parking_lot::RwLock;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};

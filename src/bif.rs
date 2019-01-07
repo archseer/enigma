@@ -16,10 +16,10 @@ use std::ops::{Add, Mul, Sub};
 mod chrono;
 
 type BifResult = Result<Value, Exception>;
-type BifFn = fn(&vm::Machine, &RcProcess, &[Value]) -> BifResult;
+pub type BifFn = fn(&vm::Machine, &RcProcess, &[Value]) -> BifResult;
 type BifTable = HashMap<(usize, usize, usize), BifFn>;
 
-static BIFS: Lazy<BifTable> = sync_lazy! {
+pub static BIFS: Lazy<BifTable> = sync_lazy! {
     let mut bifs: BifTable = HashMap::new();
     let erlang = atom::from_str("erlang");
     bifs.insert((erlang, atom::from_str("abs"), 1), bif_erlang_abs_1);
@@ -134,7 +134,7 @@ fn bif_erlang_spawn_3(vm: &vm::Machine, _process: &RcProcess, args: &[Value]) ->
     // opts, options for spawn
 
     if let [Value::Atom(module), Value::Atom(func), arglist] = &args[..] {
-        let registry = vm.modules.lock().unwrap();
+        let registry = vm.modules.lock();
         let module = registry.lookup(*module).unwrap();
         // TODO: avoid the clone here since we copy later
         return process::spawn(&vm.state, module, *func, arglist.clone());

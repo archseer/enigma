@@ -122,7 +122,9 @@ pub fn decode_tuple<'a>(rest: &'a [u8], len: usize, heap: &Heap) -> IResult<&'a 
     let rest = (0..len).fold(rest, |rest, i| {
         let (rest, el) = decode_value(rest, heap).unwrap();
         // use ptr write to avoid dropping uninitialized values!
-        unsafe { std::ptr::write(&mut tuple[i], el); }
+        unsafe {
+            std::ptr::write(&mut tuple[i], el);
+        }
         rest
     });
 
@@ -166,9 +168,7 @@ pub fn decode_map<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value> {
 
     for _i in 0..len {
         let (rest, key) = decode_value(new_rest, heap)?;
-        println!("{:?}", key);
         let (rest, val) = decode_value(rest, heap)?;
-        println!("{:?}", val);
 
         map = map.plus(key, val);
         new_rest = rest;

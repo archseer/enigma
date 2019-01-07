@@ -55,7 +55,7 @@ impl<'a> Loader<'a> {
         }
     }
 
-    pub fn load_file(mut self, bytes: &'a [u8]) -> Result<Module, nom::Err<&[u8]>> {
+    pub fn load_file(mut self, bytes: &'a [u8]) -> Result<Module, nom::Err<&'a [u8]>> {
         let (_, data) = scan_beam(bytes).unwrap();
         let mut chunks = HashMap::new();
         for (name, chunk) in data {
@@ -150,7 +150,16 @@ impl<'a> Loader<'a> {
 
     fn load_exports_table(&mut self, chunk: Chunk) {
         let (_, data) = loct_chunk(chunk).unwrap();
-        self.exports = data;
+        self.exports = data
+            .into_iter()
+            .map(|mfa| {
+                (
+                    self.atom_map[&(mfa.0 as usize - 1)],
+                    mfa.1,
+                    mfa.2, // TODO: translate these offsets instead of using funs[]
+                )
+            })
+            .collect();
     }
 
     fn load_strings_table(&mut self, chunk: Chunk) {
