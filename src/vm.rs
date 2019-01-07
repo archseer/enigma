@@ -929,8 +929,8 @@ impl Machine {
                         // alternatively, loop through the instrs until we hit a non bs_ instr.
                         // that way, no unsafe ptrs!
                         let size = self.expand_arg(context, s1).to_usize();
-                        let arc = Arc::new(Vec::with_capacity(size));
-                        context.bs = unsafe { &((*arc.p.as_ptr()).data) as *const _ }; // TODO: this feels a bit off
+                        let arc = Arc::new(bitstring::Binary::with_capacity(size));
+                        context.bs = &arc.data as *const Vec<u8> as *mut Vec<u8>; // nasty, point to arc instead
                         set_register!(context, dest, Value::Binary(arc));
                     } else {
                         unreachable!()
@@ -940,7 +940,7 @@ impl Machine {
                     // BsPutString uses the StrT strings table! needs to be patched in loader
                     if let Value::Binary(str) = &ins.args[0] {
                         unsafe {
-                            (*context.bs).extend_from_slice(&*str);
+                            (*context.bs).extend_from_slice(&str.data);
                         }
                     } else {
                         unreachable!()
@@ -958,7 +958,7 @@ impl Machine {
                         if let Value::Binary(str) = self.expand_arg(context, src) {
                             match size {
                                 Value::Atom(atom::ALL) => unsafe {
-                                    (*context.bs).extend_from_slice(&*str);
+                                    (*context.bs).extend_from_slice(&str.data);
                                 },
                                 _ => unimplemented!(),
                             }

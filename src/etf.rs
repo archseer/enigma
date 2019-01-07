@@ -1,4 +1,5 @@
 use crate::atom;
+use crate::bitstring;
 use crate::immix::Heap;
 use crate::servo_arc::Arc;
 use crate::value::{self, Value, HAMT};
@@ -216,11 +217,14 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value
 pub fn decode_binary<'a>(rest: &'a [u8], _heap: &Heap) -> IResult<&'a [u8], Value> {
     let (rest, len) = be_u32(rest)?;
     if len == 0 {
-        return Ok((rest, Value::Binary(Arc::new(Vec::new()))));
+        return Ok((rest, Value::Binary(Arc::new(bitstring::Binary::new()))));
     }
 
     let (rest, bytes) = take!(rest, len)?;
-    Ok((rest, Value::Binary(Arc::new(bytes.to_vec()))))
+    Ok((
+        rest,
+        Value::Binary(Arc::new(bitstring::Binary::from_vec(bytes.to_vec()))),
+    ))
 }
 
 #[cfg(target_pointer_width = "32")]

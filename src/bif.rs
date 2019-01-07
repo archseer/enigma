@@ -338,7 +338,7 @@ fn bif_math_atan2_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> 
 
 fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     let res = match &args[0] {
-        Value::Binary(str) => str.len(),
+        Value::Binary(str) => str.data.len(),
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     Ok(Value::Integer(res as i64)) // TODO: cast potentially unsafe

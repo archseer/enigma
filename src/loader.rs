@@ -1,4 +1,5 @@
 use crate::atom::{self, ATOMS};
+use crate::bitstring;
 use crate::etf;
 use crate::immix::Heap;
 use crate::module::{Lambda, Module, MFA};
@@ -304,7 +305,8 @@ impl<'a> Loader<'a> {
                         // but need to tie them to the string heap lifetime
                         let bytes = &self.strings[offset..offset + len];
                         let string = bytes.as_bytes().to_vec(); // TODO: check if most efficient
-                        instruction.args = vec![Value::Binary(Arc::new(string))];
+                        instruction.args =
+                            vec![Value::Binary(Arc::new(bitstring::Binary::from_vec(string)))];
                         instruction
                     } else {
                         unreachable!()

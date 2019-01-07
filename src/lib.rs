@@ -4,6 +4,7 @@ mod macros;
 pub mod exception;
 mod atom;
 mod bif;
+mod bitstring;
 mod etf;
 pub mod exports_table;
 mod immix;
