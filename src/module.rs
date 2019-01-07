@@ -66,7 +66,5 @@ pub fn load_module(vm: &Machine, path: &str) -> Result<*const Module, std::io::E
         .map(|module| {
             module.process_exports(&mut *exports);
             module as *const Module
-            // TODO: what happens is hashmap reallocates and ptr becomes invalid. use Arc<mod> instead
-            // either that, or store ref to module and allocate manually
         })
 }

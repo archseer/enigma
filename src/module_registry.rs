@@ -9,7 +9,7 @@ use std::io::Read;
 pub type RcModuleRegistry = Arc<Mutex<ModuleRegistry>>;
 
 pub struct ModuleRegistry {
-    modules: HashMap<usize, Module>,
+    modules: HashMap<usize, Box<Module>>,
 }
 
 impl ModuleRegistry {
@@ -34,10 +34,10 @@ impl ModuleRegistry {
     }
 
     pub fn add_module(&mut self, atom: usize, module: Module) {
-        self.modules.insert(atom, module);
+        self.modules.insert(atom, Box::new(module));
     }
 
     pub fn lookup(&self, atom: usize) -> Option<&Module> {
-        self.modules.get(&atom)
+        self.modules.get(&atom).map(|module| &(**module))
     }
 }
