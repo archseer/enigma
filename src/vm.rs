@@ -104,21 +104,27 @@ macro_rules! op_deallocate {
 }
 
 const APPLY_2: bif::BifFn = bif::bif_erlang_apply_2;
+const APPLY_3: bif::BifFn = bif::bif_erlang_apply_3;
 
 macro_rules! op_call_ext {
     ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr) => {{
         let mfa = unsafe { &(*$context.ip.module).imports[*$dest] };
 
         println!(
-            "call_ext mfa: {:?}",
-            (atom::from_index(mfa.0), atom::from_index(mfa.1), mfa.2)
+            "call_ext mfa: {:?}, pid: {:?}",
+            (atom::from_index(mfa.0), atom::from_index(mfa.1), mfa.2),
+            $process.pid
         );
 
         match $vm.exports.read().lookup(mfa) {
             Some(Export::Fun(ptr)) => op_jump_ptr!($context, *ptr),
             Some(Export::Bif(APPLY_2)) => {
                 // I'm cheating here, *shrug*
-                op_apply_fun!($context)
+                op_apply_fun!($vm, $context)
+            }
+            Some(Export::Bif(APPLY_3)) => {
+                // I'm cheating here, *shrug*
+                unreachable!()
             }
             Some(Export::Bif(bif)) => {
                 // TODO: precompute which exports are bifs
@@ -142,7 +148,7 @@ macro_rules! op_call_ext {
 }
 
 macro_rules! op_call_fun {
-    ($context:expr, $closure:expr, $arity:expr) => {{
+    ($vm:expr, $context:expr, $closure:expr, $arity:expr) => {{
         // store ip in cp
         $context.cp = Some($context.ip);
         // keep X regs set based on arity
@@ -155,13 +161,28 @@ macro_rules! op_call_fun {
                 $context.x[$arity..$arity + binding.len()].clone_from_slice(&binding[..]);
             }
 
-            op_jump!($context, (*closure).ptr);
+            println!("call_fun closure {:?}", *closure);
+
+            // TODO: closure needs to jump_ptr to the correct module.
+            let ptr = {
+                // temporary HAXX
+                let registry = $vm.modules.lock();
+                // let module = module::load_module(&self.modules, path).unwrap();
+                let module = registry.lookup((*closure).mfa.0).unwrap();
+
+                InstrPtr {
+                    module,
+                    ptr: (*closure).ptr,
+                }
+            };
+
+            op_jump_ptr!($context, ptr);
         }
     }};
 }
 
 macro_rules! op_apply_fun {
-    ($context:expr) => {{
+    ($vm:expr, $context:expr) => {{
         // Walk down the 3rd parameter of apply (the argument list) and copy
         // the parameters to the x registers (reg[]).
 
@@ -186,7 +207,7 @@ macro_rules! op_apply_fun {
         //context.x[arity] = fun.clone();
 
         if let Value::Closure(closure) = fun {
-            op_call_fun!($context, &closure, arity);
+            op_call_fun!($vm, $context, &closure, arity);
         } else {
             // TODO raise error
             unimplemented!()
@@ -1366,7 +1387,7 @@ impl Machine {
                     // literal arity
                     let arity = ins.args[0].to_usize();
                     if let Value::Closure(closure) = &context.x[arity] {
-                        op_call_fun!(context, closure, arity)
+                        op_call_fun!(self, context, closure, arity)
                     } else {
                         unreachable!()
                     }

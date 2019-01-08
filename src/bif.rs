@@ -15,6 +15,8 @@ use std::ops::{Add, Mul, Sub};
 
 mod chrono;
 
+// maybe use https://github.com/sfackler/rust-phf
+
 type BifResult = Result<Value, Exception>;
 pub type BifFn = fn(&vm::Machine, &RcProcess, &[Value]) -> BifResult;
 type BifTable = HashMap<(usize, usize, usize), BifFn>;
@@ -393,8 +395,9 @@ pub fn bif_erlang_apply_2(_vm: &vm::Machine, _process: &RcProcess, _args: &[Valu
     unreachable!("apply/2 called without macro override")
 }
 
-fn bif_erlang_apply_3(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+pub fn bif_erlang_apply_3(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     // module, function (atom), args
+    unreachable!("apply/3 called without macro override");
     println!(
         "TODO: implement as mapping to instr in loader: Tried loading apply/3: {} with args {}",
         args[0], args[1]
