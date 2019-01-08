@@ -62,6 +62,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
 
     bifs.insert((erlang, atom::from_str("load_nif"), 2), bif_erlang_load_nif_2);
     bifs.insert((erlang, atom::from_str("apply"), 2), bif_erlang_apply_2);
+    bifs.insert((erlang, atom::from_str("apply"), 3), bif_erlang_apply_3);
     // math
     let math = atom::from_str("math");
     bifs.insert((math, atom::from_str("cos"), 1), bif_math_cos_1);
@@ -385,8 +386,21 @@ fn bif_erlang_load_nif_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]
     Ok(Value::Atom(atom::OK))
 }
 
-fn bif_erlang_apply_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    println!("TODO: implement as mapping to instr in loader: Tried loading apply/3: {} with args {}", args[0], args[1]);
+pub fn bif_erlang_apply_2(_vm: &vm::Machine, _process: &RcProcess, _args: &[Value]) -> BifResult {
+    // fun (closure), args
+    // maps to i_apply_fun
+
+    unreachable!("apply/2 called without macro override")
+}
+
+fn bif_erlang_apply_3(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    // module, function (atom), args
+    println!(
+        "TODO: implement as mapping to instr in loader: Tried loading apply/3: {} with args {}",
+        args[0], args[1]
+    );
+
+    // maps to i_apply
 
     unimplemented!()
 }

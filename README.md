@@ -51,6 +51,7 @@ x => done, - => partial
 
 - [x] Process Dictionary
 - [ ] PutTuple
+- [ ] error_handler system hooks (export stubs)
 - [-] lists module
 - [-] Date/Time (non monotonic) via https://github.com/chronotope/chrono
 - [ ] Equality ops

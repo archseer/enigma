@@ -23,11 +23,13 @@ pub type RcProcess = Arc<Process>;
 // ---> sched should have it's own ExecutionContext
 // also this way, regs could be a &mut [] slice with no clone?
 
+pub const MAX_REG: usize = 16;
+
 pub struct ExecutionContext {
     /// X registers.
-    pub x: [Value; 16],
+    pub x: [Value; MAX_REG],
     /// Floating point registers.
-    pub f: [f64; 16],
+    pub f: [f64; MAX_REG],
     /// Stack (accessible through Y registers).
     pub stack: Vec<Value>,
     pub heap: Heap,

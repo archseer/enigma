@@ -382,7 +382,7 @@ fn terminate_process(process: &RcProcess, mut exc: Exception) {
 
     // Add a stacktrace if this is an error.
     if exception_class!(exc.reason) == Reason::EXT_ERROR {
-        exc.value = add_stacktrace(process, &exc);
+        exc.value = add_stacktrace(process, &exc.value, &exc.trace);
     }
     // EXF_LOG is a primary exception flag
     if exc.reason.contains(Reason::EXF_LOG) {
@@ -414,10 +414,10 @@ fn terminate_process(process: &RcProcess, mut exc: Exception) {
 }
 
 /// Build and add a symbolic stack trace to the error value.
-fn add_stacktrace(process: &RcProcess, exc: &Exception) -> Value {
+pub fn add_stacktrace(process: &RcProcess, value: &Value, trace: &Value) -> Value {
     let heap = &process.context_mut().heap;
-    let origin = build_stacktrace(process, &exc.trace);
-    tup2!(heap, exc.value.clone(), origin)
+    let origin = build_stacktrace(process, trace);
+    tup2!(heap, value.clone(), origin)
 }
 
 /// Forming the correct error value from the internal error code.

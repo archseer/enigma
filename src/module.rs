@@ -1,10 +1,10 @@
+use crate::bif;
+use crate::exports_table::{ExportsTable, RcExportsTable};
 use crate::immix::Heap;
 use crate::loader::{FuncInfo, Instruction};
 use crate::process::InstrPtr;
 use crate::value::Value;
 use crate::vm::Machine;
-use crate::bif;
-use crate::exports_table::{ExportsTable, RcExportsTable};
 use hashbrown::HashMap;
 
 pub type MFA = (usize, usize, usize); // function, arity, label
@@ -45,7 +45,8 @@ impl Module {
             // a bit awkward, export is (func, arity, label),
             // we need (module, func, arity).
             let mfa = (self.name, export.0, export.1);
-            if !bif::is_bif(&mfa) { // only export if there's no bif override
+            if !bif::is_bif(&mfa) {
+                // only export if there's no bif override
                 let ptr = InstrPtr {
                     module,
                     ptr: funs[&(export.0, export.1)],
@@ -61,10 +62,8 @@ pub fn load_module(vm: &Machine, path: &str) -> Result<*const Module, std::io::E
     let mut exports = vm.exports.write();
 
     println!("Loading file: {}", path);
-    registry
-        .parse_module(path)
-        .map(|module| {
-            module.process_exports(&mut *exports);
-            module as *const Module
-        })
+    registry.parse_module(path).map(|module| {
+        module.process_exports(&mut *exports);
+        module as *const Module
+    })
 }

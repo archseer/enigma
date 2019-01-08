@@ -2,6 +2,8 @@
 mod macros;
 #[macro_use]
 pub mod exception;
+#[macro_use]
+pub mod vm;
 mod atom;
 mod bif;
 mod bitstring;
@@ -20,7 +22,6 @@ pub mod process_table;
 mod queue;
 mod servo_arc;
 pub mod value;
-pub mod vm;
 
 #[macro_use]
 extern crate once_cell;

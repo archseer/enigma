@@ -103,6 +103,8 @@ macro_rules! op_deallocate {
     }};
 }
 
+const APPLY_2: bif::BifFn = bif::bif_erlang_apply_2;
+
 macro_rules! op_call_ext {
     ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr) => {{
         let mfa = unsafe { &(*$context.ip.module).imports[*$dest] };
@@ -113,10 +115,11 @@ macro_rules! op_call_ext {
         );
 
         match $vm.exports.read().lookup(mfa) {
-            Some(Export::Fun(ptr)) => {
-                println!("ptr found!{:?}", unsafe { (*ptr.module).name });
-                op_jump_ptr!($context, *ptr)}
-            ,
+            Some(Export::Fun(ptr)) => op_jump_ptr!($context, *ptr),
+            Some(Export::Bif(APPLY_2)) => {
+                // I'm cheating here, *shrug*
+                op_apply_fun!($context)
+            }
             Some(Export::Bif(bif)) => {
                 // TODO: precompute which exports are bifs
                 // also precompute the bif lookup
@@ -134,6 +137,59 @@ macro_rules! op_call_ext {
                 }
             }
             None => return Err(Exception::new(Reason::EXC_UNDEF)),
+        }
+    }};
+}
+
+macro_rules! op_call_fun {
+    ($context:expr, $closure:expr, $arity:expr) => {{
+        // store ip in cp
+        $context.cp = Some($context.ip);
+        // keep X regs set based on arity
+        // set additional X regs based on lambda.binding
+        // set x from 1 + arity (x0 is func, followed by call params) onwards to binding
+        unsafe {
+            let closure = *$closure;
+            if let Some(binding) = &(*closure).binding {
+                // TODO: maybe we can copy_from_slice in the future
+                $context.x[$arity..$arity + binding.len()].clone_from_slice(&binding[..]);
+            }
+
+            op_jump!($context, (*closure).ptr);
+        }
+    }};
+}
+
+macro_rules! op_apply_fun {
+    ($context:expr) => {{
+        // Walk down the 3rd parameter of apply (the argument list) and copy
+        // the parameters to the x registers (reg[]).
+
+        let fun = $context.x[0].clone();
+        let mut tmp = &$context.x[1];
+        let mut arity = 0;
+
+        while let Value::List(ptr) = *tmp {
+            if arity < process::MAX_REG - 1 {
+                $context.x[arity] = unsafe { (*ptr).head.clone() };
+                arity += 1;
+                tmp = unsafe { &(*ptr).tail }
+            } else {
+                return Err(Exception::new(Reason::EXC_SYSTEM_LIMIT));
+            }
+        }
+
+        if !tmp.is_nil() {
+            /* Must be well-formed list */
+            return Err(Exception::new(Reason::EXC_BADARG));
+        }
+        //context.x[arity] = fun.clone();
+
+        if let Value::Closure(closure) = fun {
+            op_call_fun!($context, &closure, arity);
+        } else {
+            // TODO raise error
+            unimplemented!()
         }
     }};
 }
@@ -163,7 +219,7 @@ macro_rules! op_jump_ptr {
 }
 
 macro_rules! op_fixed_apply {
-    ($context:expr, $arity:expr) => {{
+    ($vm:expr, $context:expr, $process:expr, $arity:expr) => {{
         let module = $context.x[$arity].clone();
         let func = $context.x[$arity + 1].clone();
 
@@ -183,7 +239,6 @@ macro_rules! op_fixed_apply {
             unimplemented!()
             // return apply(p, reg, I, stack_offset);
         }
-        unimplemented!()
 
         /*
          * Get the index into the export table, or failing that the export
@@ -192,12 +247,39 @@ macro_rules! op_fixed_apply {
          * Note: All BIFs have export entries; thus, no special case is needed.
          */
 
+        let mfa = (module.to_usize(), func.to_usize(), $arity);
+
+        match $vm.exports.read().lookup(&mfa) {
+            Some(Export::Fun(ptr)) => op_jump_ptr!($context, *ptr),
+            Some(Export::Bif(bif)) => {
+                // TODO: apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
+                // ^ only happens in apply/fixed_apply
+
+                // precompute export lookup. once Pin<> is a thing we can be sure that
+                // a ptr into the hashmap will always point to a module.
+                // call_ext_only Ar=u Bif=u$is_bif => \
+                // allocate u Ar | call_bif Bif | deallocate_return u
+
+                // make a slice out of arity x registers
+                let args = &$context.x[0..$arity];
+                match bif($vm, $process, args) {
+                    Ok(val) => {
+                        set_register!($context, &Value::X(0), val); // HAXX
+                        op_return!($context);
+                    }
+                    Err(exc) => return Err(exc),
+                }
+            }
+            None => {
+                unimplemented!()
+                // apply_setup_error_handler
+            }
+        }
         //    if ((ep = erts_active_export_entry(module, function, arity)) == NULL) {
         //      if ((ep = apply_setup_error_handler(p, module, function, arity, reg)) == NULL)
         //        goto error;
-        //    } else if (ERTS_PROC_GET_SAVED_CALLS_BUF(p)) {
-        //      save_calls(p, ep);
         //    }
+        //    TODO: runs on apply and fixed apply
         //    apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
 
         // op_jump_ptr!($context, ptr)
@@ -414,8 +496,6 @@ impl Machine {
             let ins = unsafe { &(*context.ip.module).instructions[context.ip.ptr] };
             let module = unsafe { &(*context.ip.module) };
             context.ip.ptr += 1;
-
-            println!("ptr now: {:?}", context.ip.module);
 
             println!(
                 "running proc pid {:?} reds: {:?}, mod: {:?}, ins {:?}, args: {:?}",
@@ -846,6 +926,9 @@ impl Machine {
                     // put_tuple dest size
                     // followed by multiple put() ops (put val [potentially regX/Y])
                     unimplemented!()
+
+                    // Code compiled with OTP 22 and later uses put_tuple2 to to construct a tuple.
+                    // PutTuple + Put is before OTP 22 and we should transform in loader to put_tuple2
                 }
                 Opcode::Badmatch => {
                     let value = self.expand_arg(context, &ins.args[0]).clone();
@@ -887,8 +970,8 @@ impl Machine {
                     context.catches -= 1;
                     set_register!(context, &ins.args[0], Value::Nil); // TODO: make_blank macro
 
-                    // ASSERT(is_non_value(r(0)));
-                    // c_p->fvalue = NIL;
+                    assert!(context.x[0].is_none());
+                    // TODO: c_p->fvalue = NIL;
                     // TODO: make more efficient
                     context.x[0] = context.x[1].clone();
                     context.x[1] = context.x[2].clone();
@@ -913,7 +996,6 @@ impl Machine {
                     );
                 }
                 Opcode::CatchEnd => {
-                    unimplemented!()
                     // y
                     // Pops a “catch” context. Erases the label saved in the Arg0 slot. Noval in R0
                     // indicates that something is caught. If R1 contains atom throw then R0 is set
@@ -924,31 +1006,32 @@ impl Machine {
                     // catch will keep going upwards.
                     //
 
-                    // $try_end($Y);
-                    // if (is_non_value(r(0))) {
-                    //     c_p->fvalue = NIL;
-                    //     if (x(1) == am_throw) {
-                    //         r(0) = x(2);
-                    //     } else {
-                    //         if (x(1) == am_error) {
-                    //             SWAPOUT;
-                    //             x(2) = add_stacktrace(c_p, x(2), x(3));
-                    //             SWAPIN;
-                    //         }
-                    //         /* only x(2) is included in the rootset here */
-                    //         if (E - HTOP < 3) {
-                    //             SWAPOUT;
-                    //             PROCESS_MAIN_CHK_LOCKS(c_p);
-                    //             FCALLS -= erts_garbage_collect_nobump(c_p, 3, reg+2, 1, FCALLS);
-                    //             ERTS_VERIFY_UNUSED_TEMP_ALLOC(c_p);
-                    //             PROCESS_MAIN_CHK_LOCKS(c_p);
-                    //             SWAPIN;
-                    //         }
-                    //         r(0) = TUPLE2(HTOP, am_EXIT, x(2));
-                    //         HTOP += 3;
-                    //     }
-                    // }
-                    // CHECK_TERM(r(0));
+                    // TODO: this initial part is identical to TryEnd
+                    context.catches -= 1; // TODO: this is overflowing
+                    set_register!(context, &ins.args[0], Value::Nil); // TODO: make_blank macro
+
+                    if context.x[0].is_none() {
+                        // c_p->fvalue = NIL;
+                        if context.x[1] == Value::Atom(atom::THROW) {
+                            context.x[0] = context.x[2].clone()
+                        } else {
+                            if context.x[1] == Value::Atom(atom::ERROR) {
+                                context.x[2] = exception::add_stacktrace(
+                                    process,
+                                    &context.x[2],
+                                    &context.x[3],
+                                );
+                            }
+                            // only x(2) is included in the rootset here
+                            // if (E - HTOP < 3) { check for heap space, otherwise garbage collect
+                            // ..
+                            //     FCALLS -= erts_garbage_collect_nobump(c_p, 3, reg+2, 1, FCALLS);
+                            // }
+                            context.x[0] =
+                                tup2!(&context.heap, Value::Atom(atom::EXIT), context.x[2].clone());
+                        }
+                    }
+                    unimplemented!();
                 }
                 Opcode::Raise => {
                     // Raises the exception. The instruction is garbled by backward compatibility. Arg0 is a stack trace
@@ -974,7 +1057,7 @@ impl Machine {
                     if let [Value::Literal(arity)] = &ins.args[..] {
                         context.cp = Some(context.ip);
 
-                        op_fixed_apply!(context, *arity)
+                        op_fixed_apply!(self, context, process, *arity)
                     // call this fixed_apply, used for ops (apply, apply_last).
                     // apply is the func that's equivalent to erlang:apply/3 (and instrs)
                     } else {
@@ -982,13 +1065,16 @@ impl Machine {
                     }
                     safepoint_and_reduce!(self, process, reductions);
                 }
-                Opcode::Apply => {
+                Opcode::ApplyLast => {
                     //literal arity, nwords (dealloc)
-                    // op_deallocate!(context, nwords);
+                    if let [Value::Literal(arity), Value::Literal(nwords)] = &ins.args[..] {
+                        op_deallocate!(context, nwords);
 
-                    // op_apply!()
-
-                    // safepoint_and_reduce!(self, process, reductions);
+                        op_fixed_apply!(self, context, process, *arity)
+                    } else {
+                        unreachable!()
+                    }
+                    safepoint_and_reduce!(self, process, reductions);
                 }
                 Opcode::GcBif1 => {
                     // fail label, live, bif, arg1, dest
@@ -1280,21 +1366,7 @@ impl Machine {
                     // literal arity
                     let arity = ins.args[0].to_usize();
                     if let Value::Closure(closure) = &context.x[arity] {
-                        // store ip in cp
-                        context.cp = Some(context.ip);
-                        // keep X regs set based on arity
-                        // set additional X regs based on lambda.binding
-                        // set x from 1 + arity (x0 is func, followed by call params) onwards to binding
-                        unsafe {
-                            let closure = *closure;
-                            if let Some(binding) = &(*closure).binding {
-                                // TODO: maybe we can copy_from_slice in the future
-                                context.x[arity..arity + binding.len()]
-                                    .clone_from_slice(&binding[..]);
-                            }
-
-                            op_jump!(context, (*closure).ptr);
-                        }
+                        op_call_fun!(context, closure, arity)
                     } else {
                         unreachable!()
                     }
@@ -1321,28 +1393,31 @@ impl Machine {
                     context.x[0] = exception::build_stacktrace(process, &context.x[0]);
                 }
                 Opcode::RawRaise => {
-                    //Eterm class = x(0);
-                    //Eterm value = x(1);
-                    //Eterm stacktrace = x(2);
+                    let class = &context.x[0];
+                    let value = &context.x[1];
+                    let stacktrace = &context.x[2];
 
-                    //if (class == am_error) {
-                    //    c_p->freason = EXC_ERROR & ~EXF_SAVETRACE;
-                    //    c_p->fvalue = value;
-                    //    c_p->ftrace = stacktrace;
-                    //    goto find_func_info;
-                    //} else if (class == am_exit) {
-                    //    c_p->freason = EXC_EXIT & ~EXF_SAVETRACE;
-                    //    c_p->fvalue = value;
-                    //    c_p->ftrace = stacktrace;
-                    //    goto find_func_info;
-                    //} else if (class == am_throw) {
-                    //    c_p->freason = EXC_THROWN & ~EXF_SAVETRACE;
-                    //    c_p->fvalue = value;
-                    //    c_p->ftrace = stacktrace;
-                    //    goto find_func_info;
-                    //} else {
-                    //    x(0) = am_badarg;
-                    //}
+                    match class {
+                        Value::Atom(atom::ERROR) => {
+                            // c_p->freason = EXC_ERROR & ~EXF_SAVETRACE;
+                            // c_p->fvalue = value;
+                            // c_p->ftrace = stacktrace;
+                            // goto find_func_info;
+                        }
+                        Value::Atom(atom::EXIT) => {
+                            // c_p->freason = EXC_EXIT & ~EXF_SAVETRACE;
+                            // c_p->fvalue = value;
+                            // c_p->ftrace = stacktrace;
+                            // goto find_func_info;
+                        }
+                        Value::Atom(atom::THROW) => {
+                            // c_p->freason = EXC_THROWN & ~EXF_SAVETRACE;
+                            // c_p->fvalue = value;
+                            // c_p->ftrace = stacktrace;
+                            // goto find_func_info;
+                        }
+                        _ => context.x[0] = Value::Atom(atom::BADARG),
+                    }
                     unimplemented!()
                 }
                 opcode => println!("Unimplemented opcode {:?}: {:?}", opcode, ins),

@@ -198,6 +198,13 @@ unsafe impl Sync for Cons {}
 // https://docs.rs/bitstring/0.1.1/bitstring/bit_string/trait.BitString.html
 
 impl Value {
+    pub fn is_none(&self) -> bool {
+        match *self {
+            Value::None => true,
+            _ => false,
+        }
+    }
+
     pub fn is_integer(&self) -> bool {
         match *self {
             Value::BigInt(..) => true,

@@ -1,4 +1,4 @@
-* Opcodes [77/138]
+* Opcodes [81/138]
 - [X] Label = 1
 - [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -48,7 +48,7 @@
 - [X] SelectTupleArity = 60
 - [X] Jump = 61
 - [X] Catch = 62
-- [ ] CatchEnd = 63
+- [X] CatchEnd = 63
 - [X] Move = 64
 - [X] GetList = 65
 - [X] GetTupleElement = 66
@@ -78,13 +78,13 @@
 - [X] MakeFun2 = 103
 - [X] Try = 104
 - [X] TryEnd = 105
-- [ ] TryCase = 106
+- [X] TryCase = 106
 - [X] TryCaseEnd = 107
 - [X] Raise = 108
 - [X] BsInit2 = 109
 - [X] BsAdd = 111
-- [ ] Apply = 112
-- [ ] ApplyLast = 113
+- [X] Apply = 112
+- [X] ApplyLast = 113
 - [X] IsBoolean = 114
 - [X] IsFunction2 = 115
 - [ ] BsStartMatch2 = 116
