@@ -1,94 +1,117 @@
-# Enigma
 
-A clean and simple implementation of the Erlang VM in Rust. Initially, we value
-correctness over performance, (current aim is to be OTP 22 compatible, sans the
-distributed bits for now).
+![Enigma](/enigma.png) Enigma VM
+=========
 
-Although my TotallyLegit™ fibonacci benchmarks are currently on-par with OTP
-(albeit I'm missing 99% of the runtime).
+An implementation of the Erlang VM in Rust. We aim to be complete, correct and fast (in that order of importance). However my TotallySerious™ fibonacci microbenchmarks are currently on-par with OTP (but I'm missing 99% of the runtime :)
 
-Plan: implement all the instructions -> implement enough BIFs to get preloaded
-bootstrap to load -> implement enough to get the full system to boot -> OTP
-tests to run.
+We aim to be OTP 22+ compatible (sans the
+distributed bits for now) &mdash; all your code should eventually run on Enigma unchanged. Deprecated opcodes won't be supported.
 
 # Why?
 
-Because it's fun and I've been learning a lot. A small and compact
-implementation also makes it easier for new people to learn OTP internals, as
-well as quickly iterate on experiments.
+Because it's fun and I've been learning a lot. BEAM and HiPE are awesome, but they're massive (~300k SLOC). A small implementation makes it easier for new people to learn Erlang internals. We also get a platform to quickly iterate on ideas for inclusion into BEAM.
+
+##### Why Rust?
+
+I read the BEAM book followed by the Rust book. Two birds with one stone?
 
 # Installation
 
-[rustup](https://rustup.rs/) to install latest rust (minimum version is 2018 edition).
+Only prerequisite to building Enigma is Rust. Use [rustup](https://rustup.rs/) (or your preferred package manager) to install latest rust (minimum version is the 2018 edition / ‎1.31, and stable is supported).
 
-`cargo install` to install the dependencies, `cargo run` to build. Expect heavy
+Run `cargo install` to install the dependencies, `cargo run` to build and run the VM. Expect heavy
 crashes, but a basic spawn + send multi-process model already works.
 
-# Goals
+A CI & release build system will be set up to distribute binaries for various platforms, once we reach a certain level of usability.
 
-- Explore using immix as a GC for Erlang
-- Be able to run the Erlang bootstrap
+# Goals / ideas / experiments
+
+- Be able to run the Erlang bootstrap (and all OTP)
 - Be able to run Elixir
+- Write more documentation about more sparsely documented BEAM aspects (binary matching, time wheel, process monitors, etc).
 - Ideally one day, feature parity with OTP
-- Write more documentation about more sparsely documented BEAM aspects (binary
-    matching, time wheel, process monitors, etc).
-
-# (Initial?) non-goals
-
-- Distributed Erlang nodes
-- NIFs
-
-# Ideas/Experiments
-
+- Explore using immix as a GC for Erlang
+- Explore using RocksDB / Sled / embedded DB equivalent for the ETS implementation.
 - Process as a generator function (yield to suspend/on reduce)
 - Use Commentz-Walter for binary matching. ["Commentz-Walter is an algorithm that combines Aho-Corasick with Boyer-Moore. (Only implementation I know of is in GNU grep.)"](https://github.com/rust-lang/regex/issues/197))
-    https://en.wikipedia.org/wiki/Commentz-Walter_algorithm
 - Cross-compile to WebAssembly ([threading](https://rustwasm.github.io/2018/10/24/multithreading-rust-and-wasm.html) is coming)
 
-# TODO
+# Initial non-goals
 
-x => done, - => partial
+Until we can run a large subset of OTP code, it doesn't make sense to consider these.
 
+- Distributed Erlang nodes
+- Tracing / debugging support
+- NIFs / FFI
+
+Note: NIF/FFI compatibility with OTP is going to be quite some work. At the moment I plan to trick the inet & file implementations by fake-loading the internal NIFs, then re-implementing those via a compatible Rust / BIF interface.
+
+# Feature status
+
+This section is a quick overview of what's supported, and what's the next general features that will be worked on.
+
+You can view a detailed breakdown on [opcode](/notes/opcodes.org) or [BIF](/notes/bifs.org) progress.
+
+Plan:
+
+- [ ] implement all the instructions
+- [x] implement enough BIFs to get preloaded
+bootstrap to load
+- [ ] implement enough to get the full system to boot (`init:start`)
+- [ ] get OTP tests to run
+
+Features:
+
+- [x] Floating point math ([float registers](https://pdfs.semanticscholar.org/7347/354eaaad96d40e12ea4373178b784fc39bfc.pdf))
+- [x] Spawn & message sending
+- [x] Lambdas / anonymous functions
+- [x] Stack traces
+- [x] Exceptions
 - [x] Process Dictionary
-- [ ] PutTuple
+- [ ] Monitors ([rbtree](https://crates.io/crates/intrusive-collections))
 - [ ] error_handler system hooks (export stubs)
-- [-] lists module
-- [-] Date/Time (non monotonic) via https://github.com/chronotope/chrono
-- [ ] Equality ops
+- [ ] Deep term comparison (lists, tuples, maps)
 - [ ] Timers
-- [ ] Precalculate Bif0/1/2,GcBif1/2/3 as vals that reference a bif ptr directly (no more imports+bifs hash lookups)
-- [x] Cross-module calls (need to store module in ip/cp)
-- [x] try/catch/raise/etc.
-    - [x] Stack traces
-- [ ] Binaries (SIMD: https://github.com/AdamNiederer/faster / https://doc.rust-lang.org/1.26.0/std/simd/index.html<Paste>)
-- [ ] Binary matching (multi: https://github.com/BurntSushi/aho-corasick
-+ single: https://github.com/killerswan/boyer-moore-search / https://docs.rs/needle/0.1.1/needle/ / https://github.com/ethanpailes/regex/commit/d2e28f959ac384db62f7cbeba1576cf39a75b294)
-- [x] float registers (https://pdfs.semanticscholar.org/7347/354eaaad96d40e12ea4373178b784fc39bfc.pdf)
+- [ ] Maps
+  - [x] Basic type implementation
+  - [ ] BIF functions
+  - [ ] Map specific opcodes
+- [ ] Binaries
+  - [x] Basic type implementation
+  - [ ] Binary building
+  - [ ] Binary matching
+    - multi pattern via [aho-corasick](https://github.com/BurntSushi/aho-corasick)
+    - single pattern via [boyer-moore](https://github.com/killerswan/boyer-moore-search) | [needle booyer-moore](https://docs.rs/needle/0.1.1/needle/) | [regex - booyer-moore](https://github.com/ethanpailes/regex/commit/d2e28f959ac384db62f7cbeba1576cf39a75b294)
+  - [ ] Bitstring (bit-level) matching
+- [ ] File IO
+- [ ] [NIF](http://erlang.org/doc/man/erl_nif.html)
 - [ ] Ports
     - [ ] inet_drv
     - [ ] ram_file_drv
-- [ ] Monitors (rbtree: https://crates.io/crates/intrusive-collections)
-- [ ] Maps (small maps: tuples, large maps: https://github.com/michaelwoerister/hamt-rs)
-- [ ] File IO base NIF http://erlang.org/doc/man/erl_nif.html
-- [ ] Full External Term Representation
-- [ ] Optimize select_val with a jump table
+- [ ] External Term representation
+  - [x] Most of decoding
+  - [ ] Encoding
 - [ ] ETS
-- [ ] deep term comparison
 - [ ] GC!
+- [ ] Code reloading
 - [ ] Tracing/debugging support
-- [ ] exports global table? that way we can call any method
-- [ ] directly embed imports as some form of a pointer reference
+- [ ] beam_makeops compatible load-time opcode transformer
+- [ ] Optimize select_val with a jump table
+- [ ] Directly embed imports as some form of a pointer reference
 
-Focus on getting preloaded modules to load: {:preLoaded,
-    [:atomics, :counters, :erl_init, :erl_prim_loader, :erl_tracer, :erlang,
-     :erts_code_purger, :erts_dirty_process_signal_handler, :erts_internal,
-     :erts_literal_area_collector, :init, :persistent_term, :prim_buffer,
-     :prim_eval, :prim_file, :prim_inet, :prim_zip, :zlib]},
+# Contributing
 
-# Acknowledgements & Special thanks
+Contributors are very welcome!
 
-- [Yorick Peterse's Inko](https://gitlab.com/inko-lang/inko/), from which I've stolen the process scheduling code.
-- @kvaks for [ErlangRT](https://github.com/kvakvs/ErlangRT) which I've used for an extensive reference, along with his [BEAM
-    Wisdoms](http://beam-wisdoms.clau.se/en/latest/) website.
-- [The BEAM Book](https://github.com/happi/theBeamBook)
-- [bumpalo](https://github.com/fitzgen/bumpalo) for the basis of bump allocation
+The easiest way to get started is to look at the `notes` folder and pick a BIF or an opcode to implement. Take a look at `src/bif.rs` and the `bif` folder on how other BIFs are implemented.
+
+Test coverage is currently lacking, and there's varying levels of documentation; I will be addressing these as soon as I solidify the core data structures.
+
+I'm also relying on a few external rust crates for various parts of implementation, I'd like to bring the dependency count down once I'm able to run the OTP emulator tests.
+
+# Acknowledgements
+
+- [Yorick Peterse's Inko](https://gitlab.com/inko-lang/inko/), from which I've stolen the process scheduling code and a lot of the VM design.
+- @kvaks for [ErlangRT](https://github.com/kvakvs/ErlangRT) which I've used for an extensive reference, along with his [BEAM Wisdoms](http://beam-wisdoms.clau.se/en/latest/) website.
+- [The BEAM Book](https://github.com/happi/theBeamBook), which spurred this interest in the first place.
+- [bumpalo](https://github.com/fitzgen/bumpalo) for the basis of bump allocation.
