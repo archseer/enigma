@@ -19,7 +19,7 @@ mod chrono;
 
 type BifResult = Result<Value, Exception>;
 pub type BifFn = fn(&vm::Machine, &RcProcess, &[Value]) -> BifResult;
-type BifTable = HashMap<(usize, usize, usize), BifFn>;
+type BifTable = HashMap<(u32, u32, u32), BifFn>;
 
 pub static BIFS: Lazy<BifTable> = sync_lazy! {
     let mut bifs: BifTable = HashMap::new();
@@ -729,7 +729,7 @@ fn keyfind(_func: BifFn, _process: &RcProcess, args: &[Value]) -> BifResult {
     let pos_val = &args[1];
     let mut list = &args[2];
 
-    let pos = pos_val.to_usize();
+    let pos = pos_val.to_u32() as usize;
 
     // OTP does 3 different loops based on key type (simple, immed, boxed), but luckily in rust we
     // just rely on Eq/PartialEq.
@@ -745,7 +745,7 @@ fn keyfind(_func: BifFn, _process: &RcProcess, args: &[Value]) -> BifResult {
         list = unsafe { &(*ptr).tail };
         if let Value::Tuple(ptr) = term {
             let tuple = unsafe { &**ptr };
-            if pos <= tuple.len && *key == tuple[pos] {
+            if pos <= (tuple.len as usize) && *key == tuple[pos] {
                 return Ok(term.clone());
             }
         }

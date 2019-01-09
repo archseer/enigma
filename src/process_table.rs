@@ -31,13 +31,13 @@
 //! available PIDs. This can happen when many processes are added and kept
 //! around. Callers should ensure they can handle such a scenario.
 use hashbrown::HashMap;
-use std::usize;
+use std::u32;
 
 /// The type of a PID.
-pub type PID = usize;
+pub type PID = u32;
 
 /// The maximum PID value.
-pub const MAX_PID: PID = usize::MAX;
+pub const MAX_PID: PID = u32::MAX;
 
 #[derive(Debug)]
 pub struct ProcessTable<T: Clone> {
@@ -67,7 +67,7 @@ impl<T: Clone> ProcessTable<T> {
     ///
     /// If no PID could be reserved a None value is returned.
     pub fn reserve(&mut self) -> Option<PID> {
-        while self.processes.len() < MAX_PID {
+        while (self.processes.len() as u32) < MAX_PID {
             let pid = self.next_pid();
 
             if self.recycle && self.processes.contains_key(&pid) {

@@ -49,7 +49,7 @@ impl Atom {
 #[derive(Debug)]
 pub struct AtomTable {
     /// Direct mapping string to atom index
-    index: RwLock<HashMap<String, usize>>,
+    index: RwLock<HashMap<String, u32>>,
 
     /// Reverse mapping atom index to string (sorted by index)
     index_r: RwLock<Vec<Atom>>,
@@ -64,18 +64,18 @@ impl AtomTable {
         }
     }
 
-    pub fn reserve(&self, _len: usize) {}
+    pub fn reserve(&self, _len: u32) {}
 
-    pub fn register_atom(&self, s: &str) -> usize {
+    pub fn register_atom(&self, s: &str) -> u32 {
         let mut index_r = self.index_r.write();
-        let index = index_r.len();
+        let index = index_r.len() as u32;
         self.index.write().insert(s.to_string(), index);
         index_r.push(Atom::new(s));
         index
     }
 
     /// Allocate new atom in the atom table or find existing.
-    pub fn from_str(&self, val: &str) -> usize {
+    pub fn from_str(&self, val: &str) -> u32 {
         {
             let atoms = self.index.read();
 
@@ -100,19 +100,19 @@ impl AtomTable {
     pub fn lookup(&self, a: &Value) -> Option<*const Atom> {
         if let Value::Atom(index) = a {
             let index_r = self.index_r.read();
-            if *index >= index_r.len() {
+            if *index >= index_r.len() as u32 {
                 return None;
             }
-            return Some(&index_r[*index] as *const Atom);
+            return Some(&index_r[*index as usize] as *const Atom);
         }
         panic!("Value is not an atom!")
     }
-    pub fn lookup_index(&self, index: usize) -> Option<*const Atom> {
+    pub fn lookup_index(&self, index: u32) -> Option<*const Atom> {
         let index_r = self.index_r.read();
-        if index >= index_r.len() {
+        if index >= index_r.len() as u32 {
             return None;
         }
-        Some(&index_r[index] as *const Atom)
+        Some(&index_r[index as usize] as *const Atom)
     }
 }
 
@@ -161,46 +161,46 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms
 };
 
-pub const TRUE: usize = 1;
-pub const FALSE: usize = 2;
-pub const UNDEFINED: usize = 3;
-pub const VALUE: usize = 4;
-pub const ALL: usize = 5;
-pub const NORMAL: usize = 6;
-pub const INTERNAL_ERROR: usize = 7;
-pub const BADARG: usize = 8;
-pub const BADARITH: usize = 9;
-pub const BADMATCH: usize = 10;
-pub const FUNCTION_CLAUSE: usize = 11;
-pub const CASE_CLAUSE: usize = 12;
-pub const IF_CLAUSE: usize = 13;
-pub const UNDEF: usize = 14;
-pub const BADFUN: usize = 15;
-pub const BADARITY: usize = 16;
-pub const TIMEOUT_VALUE: usize = 17;
-pub const NO_PROC: usize = 18;
-pub const NOT_ALIVE: usize = 19;
-pub const SYSTEM_LIMIT: usize = 20;
-pub const TRY_CLAUSE: usize = 21;
-pub const NOT_SUP: usize = 22;
-pub const BAD_MAP: usize = 23;
-pub const BAD_KEY: usize = 24;
+pub const TRUE: u32 = 1;
+pub const FALSE: u32 = 2;
+pub const UNDEFINED: u32 = 3;
+pub const VALUE: u32 = 4;
+pub const ALL: u32 = 5;
+pub const NORMAL: u32 = 6;
+pub const INTERNAL_ERROR: u32 = 7;
+pub const BADARG: u32 = 8;
+pub const BADARITH: u32 = 9;
+pub const BADMATCH: u32 = 10;
+pub const FUNCTION_CLAUSE: u32 = 11;
+pub const CASE_CLAUSE: u32 = 12;
+pub const IF_CLAUSE: u32 = 13;
+pub const UNDEF: u32 = 14;
+pub const BADFUN: u32 = 15;
+pub const BADARITY: u32 = 16;
+pub const TIMEOUT_VALUE: u32 = 17;
+pub const NO_PROC: u32 = 18;
+pub const NOT_ALIVE: u32 = 19;
+pub const SYSTEM_LIMIT: u32 = 20;
+pub const TRY_CLAUSE: u32 = 21;
+pub const NOT_SUP: u32 = 22;
+pub const BAD_MAP: u32 = 23;
+pub const BAD_KEY: u32 = 24;
 
-pub const NOCATCH: usize = 25;
+pub const NOCATCH: u32 = 25;
 
-pub const EXIT: usize = 26;
-pub const ERROR: usize = 27;
-pub const THROW: usize = 28;
+pub const EXIT: u32 = 26;
+pub const ERROR: u32 = 27;
+pub const THROW: u32 = 28;
 
-pub const FILE: usize = 29;
-pub const LINE: usize = 30;
+pub const FILE: u32 = 29;
+pub const LINE: u32 = 30;
 
-pub const OK: usize = 31;
+pub const OK: u32 = 31;
 
-pub const ERLANG: usize = 32;
-pub const APPLY: usize = 33;
+pub const ERLANG: u32 = 32;
+pub const APPLY: u32 = 33;
 
-pub fn from_str(val: &str) -> usize {
+pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)
 }
 
@@ -208,7 +208,7 @@ pub fn to_str(a: &Value) -> Result<String, String> {
     ATOMS.to_str(a)
 }
 
-pub fn from_index(index: usize) -> Result<String, String> {
+pub fn from_index(index: u32) -> Result<String, String> {
     if let Some(p) = ATOMS.lookup_index(index) {
         return Ok(unsafe { (*p).name.clone() });
     }

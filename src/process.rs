@@ -53,14 +53,14 @@ pub struct InstrPtr {
     /// Module containing the instruction set.
     pub module: *const Module,
     /// Offset to the current instruction.
-    pub ptr: usize,
+    pub ptr: u32,
 }
 
 unsafe impl Send for InstrPtr {}
 unsafe impl Sync for InstrPtr {}
 
 impl InstrPtr {
-    pub fn new(module: *const Module, ptr: usize) -> Self {
+    pub fn new(module: *const Module, ptr: u32) -> Self {
         InstrPtr { module, ptr }
     }
 
@@ -78,18 +78,18 @@ impl InstrPtr {
     pub fn lookup_func_info(&self) -> Option<(MFA, Option<FuncInfo>)> {
         let module = unsafe { &(*self.module) };
 
-        let mut vec: Vec<(&(usize, usize), &usize)> = module.funs.iter().collect();
+        let mut vec: Vec<(&(u32, u32), &u32)> = module.funs.iter().collect();
         vec.sort_by(|(_, v1), (_, v2)| v1.cmp(v2));
 
-        let mut low = 0;
-        let mut high = vec.len() - 1;
+        let mut low: u32 = 0;
+        let mut high = (vec.len() - 1) as u32;
 
         while low < high {
             let mid = low + (high - low) / 2;
-            if self.ptr < *vec[mid].1 {
+            if self.ptr < *vec[mid as usize].1 {
                 high = mid;
-            } else if self.ptr < *vec[mid + 1].1 {
-                let ((f, a), fun_offset) = vec[mid];
+            } else if self.ptr < *vec[(mid + 1) as usize].1 {
+                let ((f, a), fun_offset) = vec[mid as usize];
                 let mfa = (module.name, *f, *a);
                 let func_info = self.lookup_loc();
                 return Some((mfa, func_info));
@@ -278,7 +278,7 @@ pub fn allocate(state: &RcState, module: *const Module) -> Result<RcProcess, Exc
 pub fn spawn(
     state: &RcState,
     module: *const Module,
-    func: usize,
+    func: u32,
     args: Value,
 ) -> Result<Value, Exception> {
     println!("Spawning..");
@@ -308,7 +308,7 @@ pub fn spawn(
     let func = unsafe {
         (*module)
             .funs
-            .get(&(func, i)) // arglist arity
+            .get(&(func, i as u32)) // arglist arity
             .expect("process::spawn could not locate func")
     };
     context.ip.ptr = *func;
@@ -325,7 +325,7 @@ pub fn send_message<'a>(
     pid: &Value,
     msg: &'a Value,
 ) -> Result<&'a Value, Exception> {
-    let pid = pid.to_usize();
+    let pid = pid.to_u32();
 
     if let Some(receiver) = state.process_table.lock().unwrap().get(pid) {
         receiver.send_message(process, msg);

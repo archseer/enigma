@@ -48,17 +48,16 @@ impl std::fmt::Debug for Map {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Eq, PartialEq, PartialOrd, Clone, Hash)]
 pub enum Value {
     // Immediate values
     Nil, // also known as nil
     Integer(i64),
     Character(u8),
-    Atom(usize),
+    Atom(u32),
     Pid(process::PID),
-    Port(usize),
-    Ref(usize),
+    Port(u32),
+    Ref(u32),
     Float(self::Float),
     // Extended values (on heap)
     List(*const self::Cons),
@@ -77,20 +76,24 @@ pub enum Value {
 
     /// Special loader values (invalid in user runtime)
     // Import(), Export(),
-    /// An internal placeholder signifying "THE_NON_VALUE".
-    Literal(usize),
-    X(usize),
-    Y(usize),
-    Label(usize),
-    ExtendedList(Vec<Value>),
-    FloatReg(usize),
-    AllocList(Vec<(u8, usize)>),
-    ExtendedLiteral(usize), // TODO; replace at load time
+    Literal(u32),
+    X(u32),
+    Y(u32),
+    Label(u32),
+    ExtendedList(Box<Vec<Value>>),
+    FloatReg(u32),
+    AllocList(Box<Vec<(u8, u32)>>),
+    ExtendedLiteral(u32), // TODO; replace at load time
 
     /// Special emulator values
+
+    /// An internal placeholder signifying "THE_NON_VALUE".
     None,
-    CP(Option<InstrPtr>), // continuation pointer
-    Catch(InstrPtr),      // catch context
+    /// continuation pointer
+    CP(Box<Option<InstrPtr>>),
+    /// Catch context
+    Catch(Box<InstrPtr>),
+    /// Stack trace
     StackTrace(*const exception::StackTrace),
 }
 
@@ -147,7 +150,7 @@ impl<'a> IntoIterator for &'a Cons {
 #[derive(Debug)]
 pub struct Tuple {
     /// Number of elements following the header.
-    pub len: usize,
+    pub len: u32,
     pub ptr: NonNull<Value>,
 }
 
@@ -160,20 +163,20 @@ impl Tuple {
 #[derive(Debug)]
 pub struct Closure {
     pub mfa: module::MFA,
-    pub ptr: usize,
+    pub ptr: u32,
     pub binding: Option<Vec<Value>>,
 }
 
 impl Deref for Tuple {
     type Target = [Value];
     fn deref(&self) -> &[Value] {
-        unsafe { ::std::slice::from_raw_parts(self.ptr.as_ptr(), self.len) }
+        unsafe { ::std::slice::from_raw_parts(self.ptr.as_ptr(), self.len as usize) }
     }
 }
 
 impl DerefMut for Tuple {
     fn deref_mut(&mut self) -> &mut [Value] {
-        unsafe { ::std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len) }
+        unsafe { ::std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len as usize) }
     }
 }
 
@@ -321,14 +324,14 @@ impl Value {
         }
     }
 
-    pub fn to_usize(&self) -> usize {
+    pub fn to_u32(&self) -> u32 {
         match *self {
             Value::Literal(i) => i,
             Value::Atom(i) => i,
             Value::Label(i) => i,
             Value::Pid(i) => i,
-            Value::Integer(i) => i as usize,
-            _ => unimplemented!("to_usize for {:?}", self),
+            Value::Integer(i) => i as u32,
+            _ => unimplemented!("to_u32 for {:?}", self),
         }
     }
 
@@ -447,8 +450,8 @@ impl std::fmt::Display for Value {
 }
 
 #[allow(clippy::mut_from_ref)]
-pub fn tuple(heap: &Heap, len: usize) -> &mut Tuple {
-    let layout = Layout::new::<Value>().repeat(len).unwrap().0;
+pub fn tuple(heap: &Heap, len: u32) -> &mut Tuple {
+    let layout = Layout::new::<Value>().repeat(len as usize).unwrap().0;
     let tuple = heap.alloc(self::Tuple {
         len,
         ptr: NonNull::dangling(),

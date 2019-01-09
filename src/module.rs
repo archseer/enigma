@@ -7,13 +7,13 @@ use crate::value::Value;
 use crate::vm::Machine;
 use hashbrown::HashMap;
 
-pub type MFA = (usize, usize, usize); // function, arity, label
+pub type MFA = (u32, u32, u32); // function, arity, label
 
 #[derive(Debug, PartialEq)]
 pub struct Lambda {
     pub name: u32,
     pub arity: u32,
-    pub offset: usize,
+    pub offset: u32,
     pub index: u32,
     pub nfree: u32, // frozen values for closures
     pub ouniq: u32, // ?
@@ -27,12 +27,12 @@ pub struct Module {
     pub literals: Vec<Value>,
     pub literal_heap: Heap,
     pub lambdas: Vec<Lambda>,
-    pub funs: HashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
+    pub funs: HashMap<(u32, u32), u32>, // (fun name as atom, arity) -> offset
     pub instructions: Vec<Instruction>,
     // debugging info
     pub lines: Vec<FuncInfo>,
     /// Atom name of the module.
-    pub name: usize,
+    pub name: u32,
 }
 
 impl Module {
@@ -40,7 +40,6 @@ impl Module {
         // process_exports
         let funs = &self.funs;
         let module = self as *const Module;
-        println!("ptr: {:?}", module);
         self.exports.iter().for_each(|export| {
             // a bit awkward, export is (func, arity, label),
             // we need (module, func, arity).

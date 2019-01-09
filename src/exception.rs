@@ -194,13 +194,13 @@ macro_rules! exception_code {
     };
 }
 
-const MAX_BACKTRACE_SIZE: usize = 64;
-const DEFAULT_BACKTRACE_SIZE: usize = 8;
+const MAX_BACKTRACE_SIZE: u32 = 64;
+const DEFAULT_BACKTRACE_SIZE: u32 = 8;
 
-const EXIT_TAGS: [usize; 3] = [atom::EXIT, atom::ERROR, atom::THROW];
+const EXIT_TAGS: [u32; 3] = [atom::EXIT, atom::ERROR, atom::THROW];
 
 /// Mapping from error code 'index' to atoms.
-const EXIT_CODES: [usize; 20] = [
+const EXIT_CODES: [u32; 20] = [
     atom::INTERNAL_ERROR, // 0
     atom::NORMAL,
     atom::INTERNAL_ERROR,
@@ -256,7 +256,7 @@ pub struct StackTrace {
 /// create a symbolic (human-readable) representation of the stack trace
 /// at the point of the original exception.
 // TODO: pc could be &Instruction
-// return val is another pc pointer (usize + module)
+// return val is another pc pointer (u32 + module)
 
 // static BeamInstr*
 // handle_error(Process* c_p, BeamInstr* pc, ErtsCodeMFA *bif_mfa)
@@ -355,7 +355,7 @@ fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
     // TODO: tracing instr handling here
 
     while ptr > 0 {
-        match context.stack[ptr - 1] {
+        match context.stack[ptr - 1].clone() {
             Value::Catch(ptr) => {
                 // ASSERT(ptr < STACK_START(c_p));
                 // Unwind the stack up to the current frame.
@@ -363,9 +363,9 @@ fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
                 // context.stack.shrink_to_fit();
                 // TODO: tracing handling here
                 // return catch_pc(*ptr);
-                return Some(ptr);
+                return Some(*ptr);
             }
-            Value::CP(_cp) => {
+            Value::CP(ref _cp) => {
                 prev = ptr;
                 // TODO: OTP does tracing instr handling here
             }
@@ -553,14 +553,14 @@ fn save_stacktrace(
     if s.reason.contains(Reason::EXC_FUNCTION_CLAUSE) {
         // ASSERT(s->current);
         let a = s.current.2;
-        args = make_arglist(process, a); // Overwrite CAR(c_p->ftrace)
-                                         // Save first stack entry
-                                         // ASSERT(c_p->cp);
-                                         // if (depth > 0) {
-                                         //     s->trace[s->depth++] = c_p->cp - 1;
-                                         //     depth--;
-                                         // }
-                                         // s->pc = NULL; /* Ignore pc */
+        args = make_arglist(process, a as usize); // Overwrite CAR(c_p->ftrace)
+                                                  // Save first stack entry
+                                                  // ASSERT(c_p->cp);
+                                                  // if (depth > 0) {
+                                                  //     s->trace[s->depth++] = c_p->cp - 1;
+                                                  //     depth--;
+                                                  // }
+                                                  // s->pc = NULL; /* Ignore pc */
     } else {
         if let Some(cp) = &context.cp {
             if depth > 0
@@ -582,7 +582,7 @@ fn save_stacktrace(
     erts_save_stacktrace(process, s, depth)
 }
 
-fn erts_save_stacktrace(process: &RcProcess, s: &mut StackTrace, mut depth: usize) {
+fn erts_save_stacktrace(process: &RcProcess, s: &mut StackTrace, mut depth: u32) {
     let context = process.context_mut();
     if depth == 0 {
         return;
@@ -596,11 +596,13 @@ fn erts_save_stacktrace(process: &RcProcess, s: &mut StackTrace, mut depth: usiz
      * Skip trace stack frames.
      */
     while ptr > 0 && depth > 0 {
-        if let Value::CP(Some(cp)) = &context.stack[ptr - 1] {
-            if Some(cp) != s.trace.last() {
-                // Record non-duplicates only
-                s.trace.push(cp.clone()); // -1
-                depth -= 1;
+        if let Value::CP(boxed_cp) = &context.stack[ptr - 1] {
+            if let Some(cp) = **boxed_cp {
+                if Some(&cp) != s.trace.last() {
+                    // Record non-duplicates only
+                    s.trace.push(cp.clone()); // -1
+                    depth -= 1;
+                }
             }
         }
         ptr -= 1

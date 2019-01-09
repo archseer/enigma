@@ -88,19 +88,19 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Value>
         Tag::Nil => Ok((rest, Value::Nil)),
         Tag::SmallTuple => {
             let (rest, size) = be_u8(rest)?;
-            decode_tuple(rest, size as usize, heap)
+            decode_tuple(rest, size as u32, heap)
         }
         Tag::LargeTuple => {
             let (rest, size) = be_u32(rest)?;
-            decode_tuple(rest, size as usize, heap)
+            decode_tuple(rest, size, heap)
         }
         Tag::SmallBig => {
             let (rest, size) = be_u8(rest)?;
-            decode_bignum(rest, size as usize)
+            decode_bignum(rest, size.into())
         }
         Tag::LargeBig => {
             let (rest, size) = be_u32(rest)?;
-            decode_bignum(rest, size as usize)
+            decode_bignum(rest, size)
         }
 
         _ => unimplemented!("etf: {:?}", tag),
@@ -115,7 +115,7 @@ pub fn decode_atom(rest: &[u8]) -> IResult<&[u8], Value> {
     Ok((rest, Value::Atom(atom::from_str(string))))
 }
 
-pub fn decode_tuple<'a>(rest: &'a [u8], len: usize, heap: &Heap) -> IResult<&'a [u8], Value> {
+pub fn decode_tuple<'a>(rest: &'a [u8], len: u32, heap: &Heap) -> IResult<&'a [u8], Value> {
     // alloc space for elements
     let tuple = value::tuple(heap, len);
 
@@ -124,7 +124,7 @@ pub fn decode_tuple<'a>(rest: &'a [u8], len: usize, heap: &Heap) -> IResult<&'a 
         let (rest, el) = decode_value(rest, heap).unwrap();
         // use ptr write to avoid dropping uninitialized values!
         unsafe {
-            std::ptr::write(&mut tuple[i], el);
+            std::ptr::write(&mut tuple[i as usize], el);
         }
         rest
     });
@@ -233,7 +233,7 @@ pub const WORD_BITS: usize = 32;
 #[cfg(target_pointer_width = "64")]
 pub const WORD_BITS: usize = 64;
 
-pub fn decode_bignum(rest: &[u8], size: usize) -> IResult<&[u8], Value> {
+pub fn decode_bignum(rest: &[u8], size: u32) -> IResult<&[u8], Value> {
     let (rest, sign) = be_u8(rest)?;
 
     let sign = if sign == 0 { Sign::Plus } else { Sign::Minus };

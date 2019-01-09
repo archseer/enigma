@@ -14,7 +14,7 @@ use num_bigint::{BigInt, Sign};
 use std::io::{Cursor, Read};
 
 // (filename_index, loc)
-pub type FuncInfo = (usize, usize);
+pub type FuncInfo = (u32, u32);
 
 /// Declares a location as invalid.
 pub const LINE_INVALID_LOCATION: FuncInfo = (0, 0);
@@ -26,9 +26,9 @@ pub struct Loader<'a> {
     literals: Vec<Value>,
     strings: String,
     lambdas: Vec<Lambda>,
-    atom_map: HashMap<usize, usize>, // TODO: remove this; local id -> global id
-    funs: HashMap<(usize, usize), usize>, // (fun name as atom, arity) -> offset
-    labels: HashMap<usize, usize>,   // label -> offset
+    atom_map: HashMap<u32, u32>, // TODO: remove this; local id -> global id
+    funs: HashMap<(u32, u32), u32>, // (fun name as atom, arity) -> offset
+    labels: HashMap<u32, u32>,   // label -> offset
     lines: Vec<FuncInfo>,
     file_names: Vec<&'a str>,
     code: &'a [u8],
@@ -113,12 +113,12 @@ impl<'a> Loader<'a> {
     fn load_atoms(&mut self, chunk: Chunk<'a>) {
         let (_, atoms) = atom_chunk(chunk).unwrap();
         self.atoms = atoms;
-        ATOMS.reserve(self.atoms.len());
+        ATOMS.reserve(self.atoms.len() as u32);
 
         for (index, a) in self.atoms.iter().enumerate() {
             let g_index = atom::from_str(a);
             // keep a mapping of these to patch the instrs
-            self.atom_map.insert(index, g_index);
+            self.atom_map.insert(index as u32, g_index);
         }
 
         // Create a new version number for this module and fill self.mod_id
@@ -141,8 +141,8 @@ impl<'a> Loader<'a> {
             .into_iter()
             .map(|mfa| {
                 (
-                    self.atom_map[&(mfa.0 as usize - 1)],
-                    self.atom_map[&(mfa.1 as usize - 1)],
+                    self.atom_map[&(mfa.0 as u32 - 1)],
+                    self.atom_map[&(mfa.1 as u32 - 1)],
                     mfa.2,
                 )
             })
@@ -155,7 +155,7 @@ impl<'a> Loader<'a> {
             .into_iter()
             .map(|mfa| {
                 (
-                    self.atom_map[&(mfa.0 as usize - 1)],
+                    self.atom_map[&(mfa.0 as u32 - 1)],
                     mfa.1,
                     mfa.2, // TODO: translate these offsets instead of using funs[]
                 )
@@ -178,7 +178,7 @@ impl<'a> Loader<'a> {
 
         assert_eq!(data.len(), size as usize, "LitT inflate failed");
 
-        // self.literals.reserve(count as usize);
+        // self.literals.reserve(count as u32);
 
         // Decode literals into literal heap
         // pass in an allocator that allocates to a permanent non GC heap
@@ -277,7 +277,7 @@ impl<'a> Loader<'a> {
                 Opcode::Label => {
                     // one operand, Integer
                     if let Value::Literal(i) = instruction.args[0] {
-                        self.labels.insert(i as usize, self.instructions.len());
+                        self.labels.insert(i as u32, self.instructions.len() as u32);
                     } else {
                         panic!("Bad argument to {:?}", instruction.op)
                     }
@@ -289,7 +289,7 @@ impl<'a> Loader<'a> {
                     if let [_module, Value::Atom(f), Value::Literal(a)] = &instruction.args[..] {
                         let f = self.atom_map[&(*f - 1)]; // necessary because atoms weren't remapped yet
                         self.funs
-                            .insert((f, *a as usize), self.instructions.len() + 1); // need to point after func_info
+                            .insert((f, *a as u32), (self.instructions.len() as u32) + 1); // need to point after func_info
                     } else {
                         panic!("Bad argument to {:?}", instruction.op)
                     }
@@ -298,14 +298,15 @@ impl<'a> Loader<'a> {
                 Opcode::IntCodeEnd => {
                     // push a pointer to the end of instructions
                     self.funs
-                        .insert(LINE_INVALID_LOCATION, self.instructions.len());
+                        .insert(LINE_INVALID_LOCATION, self.instructions.len() as u32);
                     break;
                 }
                 Opcode::BsPutString => {
                     if let [Value::Literal(len), Value::Literal(offset)] = instruction.args[..] {
                         // TODO: ideally use a single string that we slice into for these interned strings
                         // but need to tie them to the string heap lifetime
-                        let bytes = &self.strings[offset..offset + len];
+                        let offset = offset as usize;
+                        let bytes = &self.strings[offset..offset + len as usize];
                         let string = bytes.as_bytes().to_vec(); // TODO: check if most efficient
                         instruction.args =
                             vec![Value::Binary(Arc::new(bitstring::Binary::from_vec(string)))];
@@ -347,8 +348,8 @@ impl<'a> Loader<'a> {
                 .iter()
                 .map(|arg| match arg {
                     Value::ExtendedList(vec) => {
-                        let vec = vec.iter().map(|arg| postprocess_value(arg)).collect();
-                        Value::ExtendedList(vec)
+                        let vec = (*vec).iter().map(|arg| postprocess_value(arg)).collect();
+                        Value::ExtendedList(Box::new(vec))
                     }
                     _ => postprocess_value(arg),
                 })
@@ -396,7 +397,7 @@ fn decode_lines<'a>(rest: &'a [u8]) -> IResult<&'a [u8], (Vec<FuncInfo>, Vec<&st
     )
 }
 
-fn decode_line_items<'a>(rest: &'a [u8], mut count: u32) -> IResult<&'a [u8], Vec<(usize, usize)>> {
+fn decode_line_items<'a>(rest: &'a [u8], mut count: u32) -> IResult<&'a [u8], Vec<(u32, u32)>> {
     let mut vec = Vec::with_capacity(count as usize);
     vec.push(LINE_INVALID_LOCATION); // 0th index = undefined location
     let mut fname_index = 0;
@@ -409,7 +410,7 @@ fn decode_line_items<'a>(rest: &'a [u8], mut count: u32) -> IResult<&'a [u8], Ve
         new_rest = rest;
         match term {
             Value::Integer(n) => {
-                vec.push((fname_index, n as usize));
+                vec.push((fname_index, n as u32));
                 // TODO: validate
                 // Too many files or huge line number. Silently invalidate the location.
                 // loc = LINE_INVALID_LOCATION;
@@ -506,7 +507,7 @@ named!(
         function: be_u32 >>
         arity: be_u32 >>
         label: be_u32 >>
-        (function as usize, arity as usize, label as usize)
+        (function, arity, label)
     )
 );
 
@@ -539,7 +540,7 @@ named!(
             index: be_u32 >>
             nfree: be_u32 >>
             ouniq: be_u32 >>
-            (Lambda { name, arity, offset: offset as usize, index, nfree, ouniq })
+            (Lambda { name, arity, offset: offset, index, nfree, ouniq })
             )
         , count as usize) >>
         (entries)
@@ -629,12 +630,12 @@ fn compact_term(i: &[u8]) -> IResult<&[u8], Value> {
         let (rest, val) = read_smallint(b, rest)?;
 
         return match tag {
-            0 => Ok((rest, Value::Literal(val as usize))),
-            1 => Ok((rest, Value::Integer(val as i64))), // TODO: this cast is unsafe
-            2 => Ok((rest, Value::Atom(val as usize))),
-            3 => Ok((rest, Value::X(val as usize))),
-            4 => Ok((rest, Value::Y(val as usize))),
-            5 => Ok((rest, Value::Label(val as usize))),
+            0 => Ok((rest, Value::Literal(val as u32))),
+            1 => Ok((rest, Value::Integer(val))), // TODO: this cast is unsafe
+            2 => Ok((rest, Value::Atom(val as u32))),
+            3 => Ok((rest, Value::X(val as u32))),
+            4 => Ok((rest, Value::Y(val as u32))),
+            5 => Ok((rest, Value::Label(val as u32))),
             6 => Ok((rest, Value::Character(val as u8))),
             _ => unreachable!(),
         };
@@ -668,14 +669,14 @@ fn parse_list(rest: &[u8]) -> IResult<&[u8], Value> {
         rest = new_rest;
     }
 
-    Ok((rest, Value::ExtendedList(els)))
+    Ok((rest, Value::ExtendedList(Box::new(els))))
 }
 
 fn parse_float_reg(rest: &[u8]) -> IResult<&[u8], Value> {
     let (rest, b) = be_u8(rest)?;
     let (rest, n) = read_smallint(b, rest)?;
 
-    Ok((rest, Value::FloatReg(n as usize)))
+    Ok((rest, Value::FloatReg(n as u32)))
 }
 
 fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], Value> {
@@ -692,17 +693,17 @@ fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], Value> {
         let (new_rest, b) = be_u8(new_rest)?;
         let (new_rest, val) = read_smallint(b, new_rest)?;
 
-        els.push((typ as u8, val as usize));
+        els.push((typ as u8, val as u32));
         rest = new_rest;
     }
 
-    Ok((rest, Value::AllocList(els)))
+    Ok((rest, Value::AllocList(Box::new(els))))
 }
 
 fn parse_extended_literal(rest: &[u8]) -> IResult<&[u8], Value> {
     let (rest, b) = be_u8(rest)?;
     let (rest, val) = read_smallint(b, rest)?;
-    Ok((rest, Value::ExtendedLiteral(val as usize)))
+    Ok((rest, Value::ExtendedLiteral(val as u32)))
 }
 
 // ---------------------------------------------------
