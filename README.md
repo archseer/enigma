@@ -112,6 +112,6 @@ I'm also relying on a few external rust crates for various parts of implementati
 # Acknowledgements
 
 - [Yorick Peterse's Inko](https://gitlab.com/inko-lang/inko/), from which I've stolen the process scheduling code and a lot of the VM design.
-- @kvaks for [ErlangRT](https://github.com/kvakvs/ErlangRT) which I've used for an extensive reference, along with his [BEAM Wisdoms](http://beam-wisdoms.clau.se/en/latest/) website.
+- @kvakvs for [ErlangRT](https://github.com/kvakvs/ErlangRT) which I've used for an extensive reference, along with his [BEAM Wisdoms](http://beam-wisdoms.clau.se/en/latest/) website.
 - [The BEAM Book](https://github.com/happi/theBeamBook), which spurred this interest in the first place.
 - [bumpalo](https://github.com/fitzgen/bumpalo) for the basis of bump allocation.
