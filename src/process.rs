@@ -84,7 +84,7 @@ impl InstrPtr {
         let mut low = 0;
         let mut high = vec.len() - 1;
 
-        while high > low {
+        while low < high {
             let mid = low + (high - low) / 2;
             if self.ptr < *vec[mid].1 {
                 high = mid;

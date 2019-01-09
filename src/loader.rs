@@ -296,7 +296,9 @@ impl<'a> Loader<'a> {
                     instruction
                 }
                 Opcode::IntCodeEnd => {
-                    // println!("Finished processing instructions");
+                    // push a pointer to the end of instructions
+                    self.funs
+                        .insert(LINE_INVALID_LOCATION, self.instructions.len());
                     break;
                 }
                 Opcode::BsPutString => {
