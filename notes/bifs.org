@@ -1,4 +1,4 @@
-* BIFs [19/117]
+* BIFs [20/117]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
@@ -64,7 +64,7 @@
 - [ ] bif erlang:md5_update/2
 - [ ] bif erlang:md5_final/1
 - [ ] bif erlang:module_loaded/1
-- [ ] bif erlang:function_exported/3
+- [X] bif erlang:function_exported/3
 - [ ] bif erlang:monitor_node/2
 - [ ] bif erlang:monitor_node/3
 - [ ] ubif erlang:node/1

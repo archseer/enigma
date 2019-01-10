@@ -208,6 +208,13 @@ impl Value {
         }
     }
 
+    pub fn is_smallint(&self) -> bool {
+        match *self {
+            Value::Integer(..) => true,
+            _ => false,
+        }
+    }
+
     pub fn is_integer(&self) -> bool {
         match *self {
             Value::BigInt(..) => true,

@@ -6,6 +6,7 @@ use crate::numeric::modulo::{Modulo, OverflowingModulo};
 use crate::process::{self, RcProcess};
 use crate::value::{self, Value};
 use crate::vm;
+use crate::bif;
 use hashbrown::HashMap;
 use num::bigint::BigInt;
 use num::traits::Signed;
@@ -66,6 +67,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::from_str("apply"), 2), bif_erlang_apply_2);
     bifs.insert((erlang, atom::from_str("apply"), 3), bif_erlang_apply_3);
     bifs.insert((erlang, atom::from_str("register"), 2), bif_erlang_register_2);
+    bifs.insert((erlang, atom::from_str("function_exported"), 3), bif_erlang_function_exported_3);
     // math
     let math = atom::from_str("math");
     bifs.insert((math, atom::from_str("cos"), 1), bif_math_cos_1);
@@ -418,6 +420,20 @@ fn bif_erlang_register_2(vm: &vm::Machine, process: &RcProcess, args: &[Value]) 
         return Ok(Value::Atom(atom::TRUE))
     }
     Err(Exception::new(Reason::EXC_BADARG))
+}
+
+fn bif_erlang_function_exported_3(vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
+    if !args[0].is_atom() || !args[1].is_atom() || !args[2].is_smallint() {
+        return Err(Exception::new(Reason::EXC_BADARG))
+    }
+
+    let arity = args[2].to_u32();
+    let mfa = (args[0].to_u32(), args[1].to_u32(), arity);
+
+    if vm.exports.read().lookup(&mfa).is_some() || bif::is_bif(&mfa) {
+        return Ok(Value::Atom(atom::TRUE));
+    }
+    Ok(Value::Atom(atom::FALSE))
 }
 
 // Process dictionary
