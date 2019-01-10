@@ -1,13 +1,16 @@
 use crate::atom;
 use crate::exception::{Exception, Reason};
 use crate::module;
+use crate::bitstring;
 use crate::numeric::division::{FlooredDiv, OverflowingFlooredDiv};
 use crate::numeric::modulo::{Modulo, OverflowingModulo};
 use crate::process::{self, RcProcess};
 use crate::value::{self, Value};
 use crate::vm;
 use crate::bif;
+use crate::servo_arc::Arc;
 use hashbrown::HashMap;
+use hamt_rs::HamtMap;
 use num::bigint::BigInt;
 use num::traits::Signed;
 use num::bigint::ToBigInt;
@@ -1017,6 +1020,67 @@ mod tests {
 
         let args = vec![Value::Atom(3)];
         let res = bif_erlang_is_reference_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(FALSE)));
+    }
+
+    #[test]
+    fn test_bif_erlang_is_binary_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let arc = Arc::new(bitstring::Binary::new());
+        let args = vec![Value::Binary(arc)];
+        let res = bif_erlang_is_binary_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(TRUE)));
+
+        let args = vec![Value::Atom(3)];
+        let res = bif_erlang_is_binary_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(FALSE)));
+    }
+    #[test]
+    fn test_bif_erlang_is_function_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let func: *const value::Closure = std::ptr::null();
+        let args = vec![Value::Closure(func)];
+        let res = bif_erlang_is_function_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(TRUE)));
+
+        let args = vec![Value::Atom(3)];
+        let res = bif_erlang_is_function_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(FALSE)));
+    }
+    #[test]
+    fn test_bif_erlang_is_boolean_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let args = vec![Value::Atom(atom::TRUE)];
+        let res = bif_erlang_is_boolean_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(TRUE)));
+
+        let args = vec![Value::Atom(3)];
+        let res = bif_erlang_is_boolean_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(FALSE)));
+    }
+
+    #[test]
+    fn test_bif_erlang_is_map_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let arc = Arc::new(HamtMap::new());
+        let args = vec![Value::Map(value::Map(arc))];
+        let res = bif_erlang_is_map_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(TRUE)));
+
+        let args = vec![Value::Atom(3)];
+        let res = bif_erlang_is_map_1(&vm, &process, &args);
         assert_eq!(res, Ok(atom!(FALSE)));
     }
 
