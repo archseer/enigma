@@ -10,6 +10,7 @@ use crate::bif;
 use hashbrown::HashMap;
 use num::bigint::BigInt;
 use num::traits::Signed;
+use num::bigint::ToBigInt;
 use once_cell::sync::Lazy;
 use std::i32;
 use std::ops::{Add, Mul, Sub};
@@ -818,7 +819,15 @@ mod tests {
         };
     }
 
-    // TODO: test erlang_abs_1
+    #[test]
+    fn test_bif_erlang_abs_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+        let args = vec![Value::Integer(-1)];
+        let res = bif_erlang_abs_1(&vm, &process, &args);
+        assert_eq!(res, Ok(Value::Integer(1)));
+    }
 
     #[test]
     fn test_bif_erlang_add_2() {
@@ -887,6 +896,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+
         let args = vec![Value::Atom(3)];
         let res = bif_erlang_is_atom_1(&vm, &process, &args);
         assert_eq!(res, Ok(atom!(TRUE)));
@@ -896,7 +906,119 @@ mod tests {
         assert_eq!(res, Ok(atom!(FALSE)));
     }
 
-    // TODO: test rest of is_type funcs
+    #[test]
+    fn test_bif_erlang_is_list_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let heap = &Heap::new();
+        let args = vec![tup2!(heap, Value::Integer(1), Value::Integer(2))];
+        let res = bif_erlang_is_tuple_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(TRUE)));
+
+        let args = vec![Value::Integer(3)];
+        let res = bif_erlang_is_tuple_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(FALSE)));
+    }
+
+    #[test]
+    fn test_bif_erlang_is_tuple_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let heap = &Heap::new();
+        let args = vec![value::cons(heap, Value::Integer(1), Value::Integer(2))];
+        let res = bif_erlang_is_list_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(TRUE)));
+
+        let args = vec![Value::Integer(3)];
+        let res = bif_erlang_is_list_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(FALSE)));
+    }
+    #[test]
+    fn test_bif_erlang_is_float_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let args = vec![Value::Float(value::Float(3.00))];
+        let res = bif_erlang_is_float_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(TRUE)));
+
+        let args = vec![Value::Integer(3)];
+        let res = bif_erlang_is_float_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(FALSE)));
+    }
+
+    #[test]
+    fn test_bif_erlang_is_integer_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let args = vec![Value::Integer(3)];
+        let res = bif_erlang_is_integer_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(TRUE)));
+
+        let args = vec![Value::Atom(3)];
+        let res = bif_erlang_is_integer_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(FALSE)));
+    }
+
+    #[test]
+    fn test_bif_erlang_is_number_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let args = vec![Value::Integer(3)];
+        let res = bif_erlang_is_number_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(TRUE)));
+
+        let args = vec![Value::Float(value::Float(3.0))];
+        let res = bif_erlang_is_number_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(TRUE)));
+
+        let args = vec![Value::BigInt(Box::new(10000_i32.to_bigint().unwrap()))];
+        let res = bif_erlang_is_number_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(TRUE)));
+
+        let args = vec![Value::Atom(3)];
+        let res = bif_erlang_is_number_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(FALSE)));
+    }
+
+    #[test]
+    fn test_bif_erlang_is_port_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let args = vec![Value::Port(80)];
+        let res = bif_erlang_is_port_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(TRUE)));
+
+        let args = vec![Value::Atom(3)];
+        let res = bif_erlang_is_port_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(FALSE)));
+    }
+
+    #[test]
+    fn test_bif_erlang_is_reference_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let args = vec![Value::Ref(197)];
+        let res = bif_erlang_is_reference_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(TRUE)));
+
+        let args = vec![Value::Atom(3)];
+        let res = bif_erlang_is_reference_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(FALSE)));
+    }
 
     #[test]
     fn test_bif_math_cos_1() {
