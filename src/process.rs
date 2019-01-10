@@ -260,7 +260,7 @@ impl Process {
 }
 
 pub fn allocate(state: &RcState, module: *const Module) -> Result<RcProcess, Exception> {
-    let mut process_table = state.process_table.lock().unwrap();
+    let mut process_table = state.process_table.lock();
 
     let pid = process_table
         .reserve()
@@ -327,7 +327,7 @@ pub fn send_message<'a>(
 ) -> Result<&'a Value, Exception> {
     let pid = pid.to_u32();
 
-    if let Some(receiver) = state.process_table.lock().unwrap().get(pid) {
+    if let Some(receiver) = state.process_table.lock().get(pid) {
         receiver.send_message(process, msg);
 
         if receiver.is_waiting_for_message() {

@@ -18,6 +18,7 @@ mod numeric;
 pub mod opcodes;
 mod pool;
 pub mod process;
+pub mod process_registry;
 pub mod process_table;
 mod queue;
 mod servo_arc;

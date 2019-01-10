@@ -65,6 +65,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::from_str("load_nif"), 2), bif_erlang_load_nif_2);
     bifs.insert((erlang, atom::from_str("apply"), 2), bif_erlang_apply_2);
     bifs.insert((erlang, atom::from_str("apply"), 3), bif_erlang_apply_3);
+    bifs.insert((erlang, atom::from_str("register"), 2), bif_erlang_register_2);
     // math
     let math = atom::from_str("math");
     bifs.insert((math, atom::from_str("cos"), 1), bif_math_cos_1);
@@ -406,6 +407,17 @@ pub fn bif_erlang_apply_3(_vm: &vm::Machine, _process: &RcProcess, args: &[Value
     // maps to i_apply
 
     unimplemented!()
+}
+
+
+/// register(atom, Process|Port) registers a global process or port (for this node)
+fn bif_erlang_register_2(vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
+    /* (Atom, Pid|Port)   */
+    if let Value::Atom(name) = args[0] {
+        vm.state.process_registry.lock().register(name, process.clone());
+        return Ok(Value::Atom(atom::TRUE))
+    }
+    Err(Exception::new(Reason::EXC_BADARG))
 }
 
 // Process dictionary

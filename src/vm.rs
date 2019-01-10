@@ -5,6 +5,7 @@ use crate::exception::{self, Exception, Reason};
 use crate::exports_table::{Export, ExportsTable, RcExportsTable};
 use crate::module;
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
+use crate::process_registry::{ProcessRegistry};
 use crate::opcodes::Opcode;
 use crate::pool::{Job, JoinGuard as PoolJoinGuard, Pool, Worker};
 use crate::process::{self, ExecutionContext, InstrPtr, RcProcess};
@@ -14,7 +15,7 @@ use crate::value::{self, Value};
 use log::debug;
 use std::mem::transmute;
 use std::panic;
-use std::sync::Mutex;
+use parking_lot::Mutex;
 use std::time;
 
 /// A reference counted State.
@@ -23,6 +24,7 @@ pub type RcState = Arc<State>;
 pub struct State {
     /// Table containing all processes.
     pub process_table: Mutex<ProcessTable<RcProcess>>,
+    pub process_registry: Mutex<ProcessRegistry<RcProcess>>,
     /// TODO: Use priorities later on
     pub process_pool: Pool<RcProcess>,
 
@@ -373,6 +375,7 @@ impl Machine {
 
         let state = State {
             process_table: Mutex::new(ProcessTable::new()),
+            process_registry: Mutex::new(ProcessRegistry::new()),
             process_pool,
             start_time: time::Instant::now(),
         };
