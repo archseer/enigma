@@ -46,3 +46,14 @@ macro_rules! cons {
         value::cons($heap, $head, $tail)
     }};
 }
+
+#[macro_export]
+macro_rules! bitstring {
+    ($heap:expr, $str:expr) => {{
+        let mut list = Value::Nil;
+        for char in $str.bytes().rev() {
+            list = cons!($heap, Value::Character(char), list);
+        }
+        list
+    }};
+}

@@ -464,7 +464,7 @@ impl Machine {
         let fun = atom::from_str("start");
         let arity = 2;
         context.x[0] = Value::Atom(atom::from_str("init"));
-        context.x[1] = Value::Binary(Arc::new(bitstring::Binary::new()));
+        context.x[1] = bitstring!(&context.heap, "");
         unsafe { op_jump!(context, (*context.ip.module).funs[&(fun, arity)]) }
         /* TEMP */
 
