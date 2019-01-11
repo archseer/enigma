@@ -472,12 +472,10 @@ fn bif_erlang_get_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Value]) -> 
 
     let result: Value = pdict.iter().fold(Value::Nil, |res, (key, val)| {
         // make tuple
-        let tuple = value::tuple(heap, 2);
-        tuple[0] = key.clone();
-        tuple[1] = val.clone();
+        let tuple = tup2!(heap, key.clone(), val.clone());
 
         // make cons
-        value::cons(heap, Value::Tuple(tuple), res)
+        value::cons(heap, tuple, res)
     });
     Ok(result)
 }
@@ -534,12 +532,10 @@ fn bif_erlang_erase_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Value]) -
     // we use drain since it means we do a move instead of a copy
     let result: Value = pdict.drain().fold(Value::Nil, |res, (key, val)| {
         // make tuple
-        let tuple = value::tuple(heap, 2);
-        tuple[0] = key;
-        tuple[1] = val;
+        let tuple = tup2!(heap, key, val);
 
         // make cons
-        value::cons(heap, Value::Tuple(tuple), res)
+        value::cons(heap, tuple, res)
     });
     Ok(result)
 }
@@ -732,13 +728,8 @@ fn bif_lists_keysearch_3(_vm: &vm::Machine, process: &RcProcess, args: &[Value])
 
     if let Ok(Value::Tuple(t)) = res {
         let heap = &process.context_mut().heap;
-        let tuple = value::tuple(heap, 2);
-        tuple[0] = Value::Atom(atom::VALUE);
-        // TODO: this is awkward
-        tuple[1] = Value::Tuple(t);
-        // Eterm* hp = HAlloc(BIF_P, 3);
-        // return TUPLE2(hp, am_value, res);
-        return Ok(Value::Tuple(tuple));
+        let tuple = tup2!(heap, Value::Atom(atom::VALUE), Value::Tuple(t));
+        return Ok(tuple);
     }
     res
 }
