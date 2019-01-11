@@ -754,7 +754,7 @@ impl Machine {
                 }
                 // TestHeap
                 Opcode::Init => {
-                    debug_assert_eq!(ins.args.len(), 3);
+                    debug_assert_eq!(ins.args.len(), 1);
                     set_register!(context, &ins.args[0], Value::Nil)
                 }
                 Opcode::Deallocate => {
