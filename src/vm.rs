@@ -5,17 +5,17 @@ use crate::exception::{self, Exception, Reason};
 use crate::exports_table::{Export, ExportsTable, RcExportsTable};
 use crate::module;
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
-use crate::process_registry::{ProcessRegistry};
 use crate::opcodes::Opcode;
 use crate::pool::{Job, JoinGuard as PoolJoinGuard, Pool, Worker};
 use crate::process::{self, ExecutionContext, InstrPtr, RcProcess};
+use crate::process_registry::ProcessRegistry;
 use crate::process_table::ProcessTable;
 use crate::servo_arc::Arc;
 use crate::value::{self, Value};
 use log::debug;
+use parking_lot::Mutex;
 use std::mem::transmute;
 use std::panic;
-use parking_lot::Mutex;
 use std::time;
 
 /// A reference counted State.
@@ -752,7 +752,7 @@ impl Machine {
                         unreachable!()
                     }
                 }
-                // TestHeap
+                Opcode::TestHeap => println!("TODO: TestHeap unimplemented!"),
                 Opcode::Init => {
                     debug_assert_eq!(ins.args.len(), 1);
                     set_register!(context, &ins.args[0], Value::Nil)
@@ -959,6 +959,23 @@ impl Machine {
 
                     // Code compiled with OTP 22 and later uses put_tuple2 to to construct a tuple.
                     // PutTuple + Put is before OTP 22 and we should transform in loader to put_tuple2
+                }
+                Opcode::PutTuple2 => {
+                    // op: PutTuple2, args: [X(0), ExtendedList([Y(1), Y(0), X(0)])] }
+                    if let Value::ExtendedList(list) = &ins.args[1] {
+                        let arity = list.len();
+
+                        let tuple = value::tuple(&context.heap, arity as u32);
+                        for i in 0..arity {
+                            unsafe {
+                                std::ptr::write(
+                                    &mut tuple[i],
+                                    self.expand_arg(context, &list[i]).clone(),
+                                );
+                            }
+                        }
+                        set_register!(context, &ins.args[0], Value::Tuple(tuple))
+                    }
                 }
                 Opcode::Badmatch => {
                     let value = self.expand_arg(context, &ins.args[0]).clone();
@@ -1370,7 +1387,9 @@ impl Machine {
                     // drop N words from stack, (but keeping the CP). Second arg unused?
                     let nwords = ins.args[0].to_u32();
                     let cp = context.stack.pop().unwrap();
-                    context.stack.truncate(context.stack.len() - nwords as usize);
+                    context
+                        .stack
+                        .truncate(context.stack.len() - nwords as usize);
                     context.stack.push(cp);
                 }
                 Opcode::MakeFun2 => {
@@ -1450,7 +1469,7 @@ impl Machine {
                     }
                     unimplemented!()
                 }
-                opcode => println!("Unimplemented opcode {:?}: {:?}", opcode, ins),
+                opcode => unimplemented!("Unimplemented opcode {:?}: {:?}", opcode, ins),
             }
         }
 

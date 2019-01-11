@@ -1,4 +1,4 @@
-* Opcodes [81/138]
+* Opcodes [82/138]
 - [X] Label = 1
 - [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -132,7 +132,7 @@
 - [ ] RawRaise = 161
 - [X] GetHd = 162
 - [X] GetTl = 163
-- [ ] PutTuple2 = 164
+- [X] PutTuple2 = 164
 - [ ] BsGetTail = 165
 - [ ] BsStartMatch3 = 166
 - [ ] BsGetPosition = 167
