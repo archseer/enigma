@@ -19,6 +19,7 @@ use std::i32;
 use std::ops::{Add, Mul, Sub};
 
 mod chrono;
+mod map;
 
 // maybe use https://github.com/sfackler/rust-phf
 
@@ -108,6 +109,18 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((lists, atom::from_str("keymember"), 3), bif_lists_keymember_3);
     bifs.insert((lists, atom::from_str("keysearch"), 3), bif_lists_keysearch_3);
     bifs.insert((lists, atom::from_str("keyfind"), 3), bif_lists_keyfind_3);
+    // maps
+    let maps = atom::from_str("maps");
+    bifs.insert((maps, atom::from_str("find"), 2), bif_maps_find_2);
+    bifs.insert((maps, atom::from_str("get"), 2), bif_maps_get_2);
+    bifs.insert((maps, atom::from_str("from_list"), 1), bif_maps_from_list_1);
+    bifs.insert((maps, atom::from_str("is_key"), 2), bif_maps_is_key_2);
+    bifs.insert((maps, atom::from_str("keys"), 1), bif_maps_keys_1);
+    bifs.insert((maps, atom::from_str("merge"), 2), bif_maps_merge_2);
+    bifs.insert((maps, atom::from_str("put"), 3), bif_maps_put_3);
+    bifs.insert((maps, atom::from_str("remove"), 2), bif_maps_remove_2);
+    bifs.insert((maps, atom::from_str("update"), 3), bif_maps_update_3);
+    bifs.insert((maps, atom::from_str("values"), 1), bif_values_values_1);
     bifs
 };
 
