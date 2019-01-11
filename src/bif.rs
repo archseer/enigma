@@ -1161,16 +1161,17 @@ mod tests {
 
         let elem = Value::Atom(3);
         let pos = Value::Integer(0);
+        let target = tup2!(heap, Value::Atom(3), Value::Integer(2));
         let list = from_vec(
             heap,
             vec![
                 tup2!(heap, Value::Atom(1), Value::Integer(4)),
                 tup2!(heap, Value::Atom(2), Value::Integer(3)),
-                tup2!(heap, Value::Atom(3), Value::Integer(2)),
+                target.clone(),
                 tup2!(heap, Value::Atom(4), Value::Integer(1)),
             ],
         );
         let res = bif_lists_keyfind_3(&vm, &process, &[elem, pos, list]);
-        assert_eq!(res, Ok(atom!(FALSE)));
+        assert_eq!(res, Ok(target));
     }
 }
