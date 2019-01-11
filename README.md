@@ -69,6 +69,7 @@ Features:
 - [x] Exceptions
 - [x] Process Dictionary
 - [ ] Monitors ([rbtree](https://crates.io/crates/intrusive-collections))
+- [ ] Signal queue
 - [ ] error_handler system hooks (export stubs)
 - [ ] Deep term comparison (lists, tuples, maps)
 - [ ] Timers
@@ -80,6 +81,7 @@ Features:
   - [x] Basic type implementation
   - [ ] Binary building
   - [ ] Binary matching
+  - [ ] Binary searching
     - multi pattern via [aho-corasick](https://github.com/BurntSushi/aho-corasick)
     - single pattern via [boyer-moore](https://github.com/killerswan/boyer-moore-search) | [needle booyer-moore](https://docs.rs/needle/0.1.1/needle/) | [regex - booyer-moore](https://github.com/ethanpailes/regex/commit/d2e28f959ac384db62f7cbeba1576cf39a75b294)
   - [ ] Bitstring (bit-level) matching

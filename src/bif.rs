@@ -68,6 +68,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::from_str("apply"), 3), bif_erlang_apply_3);
     bifs.insert((erlang, atom::from_str("register"), 2), bif_erlang_register_2);
     bifs.insert((erlang, atom::from_str("function_exported"), 3), bif_erlang_function_exported_3);
+    bifs.insert((erlang, atom::from_str("process_flag"), 2), bif_erlang_process_flag_2);
     // math
     let math = atom::from_str("math");
     bifs.insert((math, atom::from_str("cos"), 1), bif_math_cos_1);
@@ -409,6 +410,28 @@ pub fn bif_erlang_apply_3(_vm: &vm::Machine, _process: &RcProcess, args: &[Value
     // maps to i_apply
 
     unimplemented!()
+}
+
+/// this sets some process info- trapping exits or the error handler
+pub fn bif_erlang_process_flag_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
+    match &args[0] {
+        Value::Atom(atom::TRAP_EXIT) => {
+            let context = process.context_mut();
+            let old_value = context.flags.contains(process::Flag::TRAP_EXIT);
+            match &args[1] { // TODO atom to_bool, then pass that in as 2 arg
+                Value::Atom(atom::TRUE) => context.flags.set(process::Flag::TRAP_EXIT, true),
+                Value::Atom(atom::FALSE) => context.flags.set(process::Flag::TRAP_EXIT, false),
+                _ => return Err(Exception::new(Reason::EXC_BADARG))
+            }
+            if old_value { // todo helper func From<>
+                return Ok(Value::Atom(atom::TRUE));
+            } else {
+                return Ok(Value::Atom(atom::FALSE));
+            }
+        },
+        Value::Atom(i) => unimplemented!("erlang:process_flag/2 not implemented for {:?}", atom::from_index(*i)),
+        _ => unreachable!()
+    }
 }
 
 

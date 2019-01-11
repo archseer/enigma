@@ -158,6 +158,8 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
 
     atoms.register_atom("erlang");
     atoms.register_atom("apply");
+
+    atoms.register_atom("trap_exit");
     atoms
 };
 
@@ -199,6 +201,8 @@ pub const OK: u32 = 31;
 
 pub const ERLANG: u32 = 32;
 pub const APPLY: u32 = 33;
+
+pub const TRAP_EXIT: u32 = 34;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

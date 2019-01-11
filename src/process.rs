@@ -46,6 +46,14 @@ pub struct ExecutionContext {
     pub bs: *mut Vec<u8>,
     ///
     pub exc: Option<Exception>,
+    pub flags: Flag,
+}
+
+bitflags! {
+    pub struct Flag: u32 {
+        const INITIAL = 0;
+        const TRAP_EXIT = (1 << 0);
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Hash, Debug)]
@@ -150,6 +158,8 @@ impl ExecutionContext {
 
                 // TODO: not great
                 bs: std::mem::uninitialized(),
+
+                flags: Flag::INITIAL
             };
             for (_i, el) in ctx.x.iter_mut().enumerate() {
                 // Overwrite `element` without running the destructor of the old value.
