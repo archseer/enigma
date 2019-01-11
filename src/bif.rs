@@ -58,6 +58,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::from_str("hd"), 1), bif_erlang_hd_1);
     bifs.insert((erlang, atom::from_str("tl"), 1), bif_erlang_tl_1);
     bifs.insert((erlang, atom::from_str("trunc"), 1), bif_erlang_trunc_1);
+    bifs.insert((erlang, atom::from_str("tuple_size"), 1), bif_erlang_tuple_size_1);
     bifs.insert((erlang, atom::from_str("byte_size"), 1), bif_erlang_byte_size_1);
     bifs.insert((erlang, atom::from_str("error"), 1), bif_erlang_error_1);
     bifs.insert((erlang, atom::from_str("error"), 2), bif_erlang_error_2);
@@ -346,6 +347,14 @@ fn bif_math_atan2_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> 
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     Ok(Value::Float(value::Float(res.atan2(arg))))
+}
+
+fn bif_erlang_tuple_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    let res = match &args[0] {
+        Value::Tuple(t) => unsafe { (**t).len },
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    Ok(Value::Integer(res as i64))
 }
 
 fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
@@ -918,7 +927,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_is_list_1() {
+    fn test_bif_erlang_is_tuple_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
@@ -934,7 +943,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_is_tuple_1() {
+    fn test_bif_erlang_is_list_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
@@ -1107,6 +1116,19 @@ mod tests {
     }
 
     // TODO: test rest of math funcs
+
+    #[test]
+    fn test_bif_tuple_size_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let heap = &Heap::new();
+        let args = vec![tup3!(heap, Value::Integer(1), Value::Integer(2), Value::Integer(1))];
+        let res = bif_erlang_tuple_size_1(&vm, &process, &args);
+
+        assert_eq!(res, Ok(Value::Integer(3)));
+    }
 
     #[test]
     fn test_bif_pdict() {
