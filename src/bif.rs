@@ -1082,8 +1082,8 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
 
-        let arc = Arc::new(HamtMap::new());
-        let args = vec![Value::Map(value::Map(arc))];
+        let map = map!(Value::Atom(1) => Value::Integer(1));
+        let args = vec![map];
         let res = bif_erlang_is_map_1(&vm, &process, &args);
         assert_eq!(res, Ok(atom!(TRUE)));
 
