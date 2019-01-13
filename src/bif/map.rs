@@ -90,8 +90,16 @@ pub fn bif_maps_put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) ->
 }
 
 pub fn bif_maps_remove_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    unimplemented!();
+    let map = &args[0];
+    let key = &args[1];
+    if let Value::Map(m) = map {
+        let map = &(*m.0);
+        let new_map = map.clone().minus(&key.clone());
+        return Ok(Value::Map(value::Map(Arc::new(new_map))));
+    }
+    Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
 }
+
 
 pub fn bif_maps_update_3(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     let map = &args[0];
@@ -381,7 +389,39 @@ mod tests {
 
     #[test]
     fn test_maps_remove_2() {
-        unimplemented!();
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let key = str_to_atom!("test");
+        let map = map!(key.clone() => Value::Integer(1));
+        let args = vec![map, key.clone()];
+
+        let res = bif_maps_remove_2(&vm, &process, &args);
+
+        if let Ok(Value::Map(body)) = res {
+            assert_eq!(body.0.find(&key).is_none(), true);
+        } else {
+            panic!();
+        }
+    }
+
+    #[test]
+    fn test_maps_remove_2_bad_map() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let args = vec![Value::Integer(1), Value::Integer(2)];
+
+        let res = bif_maps_remove_2(&vm, &process, &args);
+
+        if let Err(exception) = res {
+            assert_eq!(exception.reason, Reason::EXC_BADMAP);
+            assert_eq!(exception.value, Value::Integer(1));
+        } else {
+            panic!();
+        }
     }
 
     #[test]
