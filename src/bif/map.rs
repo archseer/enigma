@@ -94,7 +94,23 @@ pub fn bif_maps_remove_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]
 }
 
 pub fn bif_maps_update_3(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    unimplemented!();
+    let map = &args[0];
+    let key = &args[1];
+    let value = &args[2];
+    if let Value::Map(m) = map {
+        let map = &(*m.0);
+        match map.find(&key) {
+            Some(_v) => {
+                let new_map = map.clone().plus(key.clone(), value.clone());
+                return Ok(Value::Map(value::Map(Arc::new(new_map))));
+            },
+            _ => {
+                return Err(Exception::with_value(Reason::EXC_BADKEY, key.clone()));
+            }
+        }
+        let new_map = map.clone().plus(key.clone(), value.clone());
+    }
+    Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
 }
 
 pub fn bif_maps_values_1(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
@@ -370,7 +386,65 @@ mod tests {
 
     #[test]
     fn test_maps_update_3() {
-        unimplemented!();
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let key = str_to_atom!("test");
+        let value = Value::Integer(1);
+        let update_value = Value::Integer(2);
+        let map = map!(key.clone() => value.clone());
+        let args = vec![map, key.clone(), update_value.clone()];
+
+        let res = bif_maps_update_3(&vm, &process, &args);
+
+        if let Ok(Value::Map(body)) = res {
+            assert_eq!(body.0.find(&key), Some(&update_value));
+        } else {
+            panic!();
+        }
+    }
+
+    #[test]
+    fn test_maps_update_3_bad_key() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let key = str_to_atom!("test");
+        let value = Value::Integer(2);
+        let map: value::HAMT = HamtMap::new();
+        let args = vec![Value::Map(value::Map(Arc::new(map))), key.clone(), value.clone()];
+
+        let res = bif_maps_update_3(&vm, &process, &args);
+
+        if let Err(exception) = res {
+            assert_eq!(exception.reason, Reason::EXC_BADKEY);
+            assert_eq!(exception.value, str_to_atom!("test"));
+        } else {
+            panic!();
+        }
+    }
+
+    #[test]
+    fn test_maps_update_3_bad_map() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let key = str_to_atom!("test");
+        let value = Value::Integer(2);
+        let bad_map = Value::Integer(3);
+        let args = vec![bad_map.clone(), key.clone(), value.clone()];
+
+        let res = bif_maps_update_3(&vm, &process, &args);
+
+        if let Err(exception) = res {
+            assert_eq!(exception.reason, Reason::EXC_BADMAP);
+            assert_eq!(exception.value, bad_map);
+        } else {
+            panic!();
+        }
     }
 
     #[test]
