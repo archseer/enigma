@@ -1443,31 +1443,39 @@ impl Machine {
                 }
                 Opcode::RawRaise => {
                     let class = &context.x[0];
-                    let value = &context.x[1];
-                    let stacktrace = &context.x[2];
+                    let value = context.x[1].clone();
+                    let trace = context.x[2].clone();
 
                     match class {
                         Value::Atom(atom::ERROR) => {
-                            // c_p->freason = EXC_ERROR & ~EXF_SAVETRACE;
-                            // c_p->fvalue = value;
-                            // c_p->ftrace = stacktrace;
-                            // goto find_func_info;
+                            let mut reason = Reason::EXC_ERROR;
+                            reason.remove(Reason::EXF_SAVETRACE);
+                            return Err(Exception {
+                                reason,
+                                value,
+                                trace,
+                            });
                         }
                         Value::Atom(atom::EXIT) => {
-                            // c_p->freason = EXC_EXIT & ~EXF_SAVETRACE;
-                            // c_p->fvalue = value;
-                            // c_p->ftrace = stacktrace;
-                            // goto find_func_info;
+                            let mut reason = Reason::EXC_EXIT;
+                            reason.remove(Reason::EXF_SAVETRACE);
+                            return Err(Exception {
+                                reason,
+                                value,
+                                trace,
+                            });
                         }
                         Value::Atom(atom::THROW) => {
-                            // c_p->freason = EXC_THROWN & ~EXF_SAVETRACE;
-                            // c_p->fvalue = value;
-                            // c_p->ftrace = stacktrace;
-                            // goto find_func_info;
+                            let mut reason = Reason::EXC_THROWN;
+                            reason.remove(Reason::EXF_SAVETRACE);
+                            return Err(Exception {
+                                reason,
+                                value,
+                                trace,
+                            });
                         }
                         _ => context.x[0] = Value::Atom(atom::BADARG),
                     }
-                    unimplemented!()
                 }
                 opcode => unimplemented!("Unimplemented opcode {:?}: {:?}", opcode, ins),
             }
