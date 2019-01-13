@@ -1464,6 +1464,31 @@ impl Machine {
                         unreachable!()
                     }
                 }
+                Opcode::IsTaggedTuple => {
+                    debug_assert_eq!(ins.args.len(), 4);
+                    let fail = self.expand_arg(context, &ins.args[0]).to_u32();
+                    let reg = self.expand_arg(context, &ins.args[1]);
+                    let n = self.expand_arg(context, &ins.args[2]).to_u32();
+                    let atom = self.expand_arg(context, &ins.args[3]);
+                    if let Value::Tuple(t) = reg {
+                        let arity = unsafe { (**t).len() };
+                        if arity == 0 || arity != (n as usize) {
+                            op_jump!(context, fail);
+                        } else {
+                            let elem = unsafe {
+                                let slice: &[Value] = &(**t);
+                                slice[0].clone()
+                            };
+                            if let Some(std::cmp::Ordering::Equal) = elem.partial_cmp(atom) {
+                                // ok
+                            } else {
+                                op_jump!(context, fail);
+                            }
+                        }
+                    } else {
+                        op_jump!(context, fail);
+                    }
+                }
                 Opcode::BuildStacktrace => {
                     context.x[0] = exception::build_stacktrace(process, &context.x[0]);
                 }
