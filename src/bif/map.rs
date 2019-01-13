@@ -69,8 +69,8 @@ pub fn bif_maps_put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) ->
         return Ok(Value::Map(value::Map(Arc::new(new_map))));
     }
     let heap = &process.context_mut().heap;
-    let tuple = tup2!(&heap, Value::Atom(atom::from_str("badmap")), map.clone());
-    Err(Exception::with_value(Reason::EXC_BADARG, tuple))
+    let tuple = tup2!(&heap, atom!(BADMAP), map.clone());
+    Err(Exception::with_value(Reason::EXC_BADMAP, tuple))
 }
 
 pub fn bif_maps_remove_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
@@ -242,7 +242,8 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
 
-        let key = Value::Integer(1);
+        let key = str_to_atom!("test");
+
         let value = Value::Integer(2);
         let map: value::HAMT = HamtMap::new();
         let args = vec![Value::Map(value::Map(Arc::new(map))), key.clone(), value.clone()];
@@ -262,7 +263,7 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
 
-        let key = Value::Integer(1);
+        let key = str_to_atom!("test");
         let value = Value::Integer(2);
         let bad_map = Value::Integer(3);
         let args = vec![bad_map.clone(), key.clone(), value.clone()];
@@ -270,13 +271,13 @@ mod tests {
         let res = bif_maps_put_3(&vm, &process, &args);
 
         if let Err(exception) = res {
-            assert_eq!(exception.reason, Reason::EXC_BADARG);
+            assert_eq!(exception.reason, Reason::EXC_BADMAP);
             if let Value::Tuple(tuple) = exception.value {
                 unsafe {
                     assert_eq!((*tuple).len, 2);
                     let slice: &[Value] = &(**tuple);
                     let mut iter = slice.iter();
-                    assert_eq!(iter.next(), Some(&Value::Atom(atom::from_str("badmap"))));
+                    assert_eq!(iter.next(), Some(&atom!(BADMAP)));
                     assert_eq!(iter.next(), Some(&bad_map));
                 }
             } else {
