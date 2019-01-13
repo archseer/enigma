@@ -98,8 +98,19 @@ pub fn bif_maps_update_3(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]
     unimplemented!();
 }
 
-pub fn bif_maps_values_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    unimplemented!();
+pub fn bif_maps_values_1(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
+    let map = &args[0];
+    if let Value::Map(m) = map {
+        let hamt_map = &m.0;
+        let heap = &process.context_mut().heap;
+        let mut vec = vec![];
+        for (_, value) in hamt_map.iter() {
+            vec.push(value.clone());
+        }
+        let list = vec_to_list!(heap, vec);
+        return Ok(list);
+    }
+    Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
 }
 
 #[cfg(test)]
@@ -365,6 +376,43 @@ mod tests {
 
     #[test]
     fn test_maps_values_1() {
-        unimplemented!();
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let map = map!(str_to_atom!("test") => Value::Integer(1), str_to_atom!("test2") => Value::Integer(2));
+        let args = vec![map];
+
+        if let Ok(Value::List(cons)) = bif_maps_values_1(&vm, &process, &args) {
+            unsafe {
+                let key1 = &(*cons).head;
+                assert_eq!(key1, &Value::Integer(1));
+                if let Value::List(tail) = (*cons).tail {
+                    let key2 = &(*tail).head;
+                    assert_eq!(key2, &Value::Integer(2));
+                } else {
+                    panic!();
+                }
+            }
+        } else {
+            panic!();
+        }
+    }
+
+    #[test]
+    fn test_maps_values_1_bad_map() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let bad_map = Value::Integer(3);
+        let args = vec![bad_map.clone(), str_to_atom!("test")];
+
+        if let Err(exception) = bif_maps_values_1(&vm, &process, &args) {
+            assert_eq!(exception.reason, Reason::EXC_BADMAP);
+            assert_eq!(exception.value, bad_map);
+        } else {
+            panic!();
+        }
     }
 }
