@@ -92,9 +92,8 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
 
-        let empty_map: value::HAMT = HamtMap::new();
-        let (map, _any) = empty_map.insert(Value::Atom(atom::from_str("test")), Value::Integer(3));
-        let args = vec![Value::Map(value::Map(Arc::new(map))), Value::Atom(atom::from_str("test"))];
+        let map = map!(str_to_atom!("test") => Value::Integer(3));
+        let args = vec![map, str_to_atom!("test")];
 
         let res = bif_maps_get_2(&vm, &process, &args);
 
@@ -167,9 +166,8 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
 
-        let empty_map: value::HAMT = HamtMap::new();
-        let (map, _any) = empty_map.insert(Value::Atom(atom::from_str("test")), Value::Integer(3));
-        let args = vec![Value::Map(value::Map(Arc::new(map))), Value::Atom(atom::from_str("test"))];
+        let map = map!(str_to_atom!("test") => Value::Integer(1));
+        let args = vec![map, str_to_atom!("test")];
 
         let res = bif_maps_is_key_2(&vm, &process, &args);
 
@@ -182,9 +180,8 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
 
-        let empty_map: value::HAMT = HamtMap::new();
-        let (map, _any) = empty_map.insert(Value::Atom(atom::from_str("test")), Value::Integer(3));
-        let args = vec![Value::Map(value::Map(Arc::new(map))), Value::Atom(atom::from_str("no_key"))];
+        let map = map!(str_to_atom!("test") => Value::Integer(3));
+        let args = vec![map, str_to_atom!("false")];
 
         let res = bif_maps_is_key_2(&vm, &process, &args);
 
@@ -197,8 +194,8 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
 
-        let wrong_map = &Value::Integer(3);
-        let args = vec![wrong_map.clone(), Value::Atom(atom::from_str("test"))];
+        let wrong_map = Value::Integer(3);
+        let args = vec![wrong_map.clone(), str_to_atom!("test")];
 
         if let Err(exception) = bif_maps_is_key_2(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
@@ -208,7 +205,7 @@ mod tests {
                     let slice: &[Value] = &(**tuple);
                     let mut iter = slice.iter();
                     assert_eq!(iter.next(), Some(&atom!(BADMAP)));
-                    assert_eq!(iter.next(), Some(wrong_map));
+                    assert_eq!(iter.next(), Some(&wrong_map));
                 }
             } else {
                 panic!();

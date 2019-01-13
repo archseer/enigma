@@ -65,6 +65,13 @@ macro_rules! atom {
     };
 }
 
+#[macro_export]
+macro_rules! str_to_atom {
+    ($str:expr) => {
+        Value::Atom(atom::from_str($str))
+    };
+}
+
 // based off of maplit: https://github.com/bluss/maplit/blob/master/src/lib.rs
 #[macro_export]
 macro_rules! map {
