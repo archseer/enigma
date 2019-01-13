@@ -219,8 +219,8 @@ const EXIT_CODES: [u32; 20] = [
     atom::SYSTEM_LIMIT,
     atom::TRY_CLAUSE,
     atom::NOT_SUP,
-    atom::BAD_MAP,
-    atom::BAD_KEY, // 19
+    atom::BADMAP,
+    atom::BADKEY, // 19
 ];
 
 /// The quick-saved stack trace structure

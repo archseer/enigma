@@ -142,8 +142,8 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("system_limit");
     atoms.register_atom("try_clause");
     atoms.register_atom("not_sup");
-    atoms.register_atom("bad_map");
-    atoms.register_atom("bad_key");
+    atoms.register_atom("badmap");
+    atoms.register_atom("badkey");
 
     atoms.register_atom("nocatch");
 
@@ -185,8 +185,8 @@ pub const NOT_ALIVE: u32 = 19;
 pub const SYSTEM_LIMIT: u32 = 20;
 pub const TRY_CLAUSE: u32 = 21;
 pub const NOT_SUP: u32 = 22;
-pub const BAD_MAP: u32 = 23;
-pub const BAD_KEY: u32 = 24;
+pub const BADMAP: u32 = 23;
+pub const BADKEY: u32 = 24;
 
 pub const NOCATCH: u32 = 25;
 
