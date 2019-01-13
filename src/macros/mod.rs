@@ -57,3 +57,11 @@ macro_rules! bitstring {
         list
     }};
 }
+
+#[macro_export]
+macro_rules! atom {
+    ($const:ident) => {
+        Value::Atom(atom::$const)
+    };
+}
+

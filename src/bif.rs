@@ -830,12 +830,6 @@ mod tests {
             .fold(Value::Nil, |res, val| value::cons(heap, val, res))
     }
 
-    macro_rules! atom {
-        ($const:ident) => {
-            Value::Atom(atom::$const)
-        };
-    }
-
     #[test]
     fn test_bif_erlang_abs_1() {
         let vm = vm::Machine::new();
