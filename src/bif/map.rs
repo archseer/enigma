@@ -227,7 +227,53 @@ mod tests {
 
     #[test]
     fn test_maps_put_3() {
-        unimplemented!();
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let key = Value::Integer(1);
+        let value = Value::Integer(2);
+        let map: value::HAMT = HamtMap::new();
+        let args = vec![Value::Map(value::Map(Arc::new(map))), key.clone(), value.clone()];
+
+        let res = bif_maps_put_3(&vm, &process, &args);
+
+        if let Ok(Value::Map(body)) = res {
+            assert_eq!(body.0.find(&key), Some(&value));
+        } else {
+            panic!();
+        }
+    }
+
+    #[test]
+    fn test_maps_put_3_bad_map() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let key = Value::Integer(1);
+        let value = Value::Integer(2);
+        let bad_map = Value::Integer(3);
+        let args = vec![bad_map.clone(), key.clone(), value.clone()];
+
+        let res = bif_maps_put_3(&vm, &process, &args);
+
+        if let Err(exception) = res {
+            assert_eq!(exception.reason, Reason::EXC_BADARG);
+            if let Value::Tuple(tuple) = exception.value {
+                unsafe {
+                    assert_eq!((*tuple).len, 2);
+                    let slice: &[Value] = &(**tuple);
+                    let mut iter = slice.iter();
+                    assert_eq!(iter.next(), Some(&Value::Atom(atom::from_str("badmap"))));
+                    assert_eq!(iter.next(), Some(&bad_map));
+                }
+            } else {
+                panic!();
+            }
+        } else {
+            panic!();
+        }
     }
 
     #[test]
