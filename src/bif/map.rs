@@ -4,6 +4,7 @@ use crate::bif::BifResult;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
 use crate::value::{self, Value};
+use crate::servo_arc::Arc;
 use crate::vm;
 use hamt_rs::HamtMap;
 
@@ -57,8 +58,19 @@ pub fn bif_maps_merge_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value])
     unimplemented!();
 }
 
-pub fn bif_maps_put_3(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    unimplemented!();
+pub fn bif_maps_put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
+    let map = &args[0];
+    let key = &args[1];
+    let value = &args[2];
+    if let Value::Map(m) = map {
+        let mut hamt_map: value::HAMT = HamtMap::new();
+        hamt_map.clone_from(&m.0);
+        let new_map = hamt_map.plus(key.clone(), value.clone());
+        return Ok(Value::Map(value::Map(Arc::new(new_map))));
+    }
+    let heap = &process.context_mut().heap;
+    let tuple = tup2!(&heap, Value::Atom(atom::from_str("badmap")), map.clone());
+    Err(Exception::with_value(Reason::EXC_BADARG, tuple))
 }
 
 pub fn bif_maps_remove_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
@@ -79,7 +91,6 @@ mod tests {
     use crate::atom;
     use crate::process::{self};
     use crate::module;
-    use crate::servo_arc::Arc;
 
     #[test]
     fn test_maps_find_2() {

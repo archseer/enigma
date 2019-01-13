@@ -493,7 +493,7 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 - [ ] bif erlang:binary_to_float/1
 - [ ] bif io:printable_range/0
 
-** New in 17.0 [3/15]
+** New in 17.0 [4/15]
 - [ ] bif re:inspect/2
 - [X] ubif erlang:is_map/1
 - [ ] ubif erlang:map_size/1
@@ -503,7 +503,7 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 - [X] bif maps:is_key/2
 - [ ] bif maps:keys/1
 - [ ] bif maps:merge/2
-- [ ] bif maps:put/3
+- [X] bif maps:put/3
 - [ ] bif maps:remove/2
 - [ ] bif maps:update/3
 - [ ] bif maps:values/1
