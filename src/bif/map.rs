@@ -23,9 +23,7 @@ pub fn bif_maps_find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -
             }
         };
     }
-    let heap = &process.context_mut().heap;
-    let tuple = tup2!(&heap, atom!(BADMAP), map.clone());
-    Err(Exception::with_value(Reason::EXC_BADMAP, tuple))
+    Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
 }
 
 pub fn bif_maps_get_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
@@ -38,15 +36,11 @@ pub fn bif_maps_get_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) ->
                 return Ok(value.clone());
             },
             _ => {
-                let heap = &process.context_mut().heap;
-                let tuple = tup2!(&heap, atom!(BADKEY), target.clone());
-                return Err(Exception::with_value(Reason::EXC_BADKEY, tuple));
+                return Err(Exception::with_value(Reason::EXC_BADKEY, target.clone()));
             }
         };
     }
-    let heap = &process.context_mut().heap;
-    let tuple = tup2!(&heap, atom!(BADMAP), map.clone());
-    Err(Exception::with_value(Reason::EXC_BADMAP, tuple))
+    Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
 }
 
 pub fn bif_maps_from_list_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
@@ -61,9 +55,7 @@ pub fn bif_maps_is_key_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value])
         let exist = hamt_map.find(target).is_some();
         return Ok(Value::boolean(exist))
     }
-    let heap = &process.context_mut().heap;
-    let tuple = tup2!(&heap, atom!(BADMAP), map.clone());
-    Err(Exception::with_value(Reason::EXC_BADMAP, tuple))
+    Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
 }
 
 pub fn bif_maps_keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
@@ -78,9 +70,7 @@ pub fn bif_maps_keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -
         let list = vec_to_list!(heap, vec);
         return Ok(list);
     }
-    let heap = &process.context_mut().heap;
-    let tuple = tup2!(&heap, atom!(BADMAP), map.clone());
-    Err(Exception::with_value(Reason::EXC_BADMAP, tuple))
+    Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
 }
 
 pub fn bif_maps_merge_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
@@ -97,9 +87,7 @@ pub fn bif_maps_put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) ->
         let new_map = hamt_map.plus(key.clone(), value.clone());
         return Ok(Value::Map(value::Map(Arc::new(new_map))));
     }
-    let heap = &process.context_mut().heap;
-    let tuple = tup2!(&heap, atom!(BADMAP), map.clone());
-    Err(Exception::with_value(Reason::EXC_BADMAP, tuple))
+    Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
 }
 
 pub fn bif_maps_remove_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
@@ -172,17 +160,7 @@ mod tests {
 
         if let Err(exception) = bif_maps_find_2(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
-            if let Value::Tuple(tuple) = exception.value {
-                unsafe {
-                    assert_eq!((*tuple).len, 2);
-                    let slice: &[Value] = &(**tuple);
-                    let mut iter = slice.iter();
-                    assert_eq!(iter.next(), Some(&atom!(BADMAP)));
-                    assert_eq!(iter.next(), Some(&str_to_atom!("test")));
-                }
-            } else {
-                panic!();
-            }
+            assert_eq!(exception.value, str_to_atom!("test"));
         } else {
             panic!();
         }
@@ -208,22 +186,12 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
 
-        let wrong_map = &Value::Integer(3);
-        let args = vec![(*wrong_map).clone(), Value::Atom(atom::from_str("test"))];
+        let bad_map = Value::Integer(3);
+        let args = vec![bad_map.clone(), Value::Atom(atom::from_str("test"))];
 
         if let Err(exception) = bif_maps_get_2(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
-            if let Value::Tuple(tuple) = exception.value {
-                unsafe {
-                    assert_eq!((*tuple).len, 2);
-                    let slice: &[Value] = &(**tuple);
-                    let mut iter = slice.iter();
-                    assert_eq!(iter.next(), Some(&atom!(BADMAP)));
-                    assert_eq!(iter.next(), Some(wrong_map));
-                }
-            } else {
-                panic!();
-            }
+            assert_eq!(exception.value, bad_map);
         } else {
             panic!();
         }
@@ -235,23 +203,12 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
 
-        let empty_map: value::HAMT = HamtMap::new();
-        let (map, _any) = empty_map.insert(Value::Atom(atom::from_str("test")), Value::Integer(3));
-        let args = vec![Value::Map(value::Map(Arc::new(map))), Value::Atom(atom::from_str("fail"))];
+        let map = map!(str_to_atom!("test") => Value::Integer(3));
+        let args = vec![map, str_to_atom!("fail")];
 
         if let Err(exception) = bif_maps_get_2(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADKEY);
-            if let Value::Tuple(tuple) = exception.value {
-                unsafe {
-                    assert_eq!((*tuple).len, 2);
-                    let slice: &[Value] = &(**tuple);
-                    let mut iter = slice.iter().peekable();
-                    assert_eq!(iter.next(), Some(&atom!(BADKEY)));
-                    assert_eq!(iter.next(), Some(&Value::Atom(atom::from_str("fail"))));
-                }
-            } else {
-                panic!();
-            }
+            assert_eq!(exception.value, str_to_atom!("fail"));
         } else {
             panic!();
         }
@@ -296,22 +253,12 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
 
-        let wrong_map = Value::Integer(3);
-        let args = vec![wrong_map.clone(), str_to_atom!("test")];
+        let bad_map = Value::Integer(3);
+        let args = vec![bad_map.clone(), str_to_atom!("test")];
 
         if let Err(exception) = bif_maps_is_key_2(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
-            if let Value::Tuple(tuple) = exception.value {
-                unsafe {
-                    assert_eq!((*tuple).len, 2);
-                    let slice: &[Value] = &(**tuple);
-                    let mut iter = slice.iter();
-                    assert_eq!(iter.next(), Some(&atom!(BADMAP)));
-                    assert_eq!(iter.next(), Some(&wrong_map));
-                }
-            } else {
-                panic!();
-            }
+            assert_eq!(exception.value, bad_map);
         } else {
             panic!();
         }
@@ -348,22 +295,12 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
 
-        let wrong_map = Value::Integer(3);
-        let args = vec![wrong_map.clone(), str_to_atom!("test")];
+        let bad_map = Value::Integer(3);
+        let args = vec![bad_map.clone(), str_to_atom!("test")];
 
         if let Err(exception) = bif_maps_keys_1(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
-            if let Value::Tuple(tuple) = exception.value {
-                unsafe {
-                    assert_eq!((*tuple).len, 2);
-                    let slice: &[Value] = &(**tuple);
-                    let mut iter = slice.iter();
-                    assert_eq!(iter.next(), Some(&atom!(BADMAP)));
-                    assert_eq!(iter.next(), Some(&wrong_map));
-                }
-            } else {
-                panic!();
-            }
+            assert_eq!(exception.value, bad_map);
         } else {
             panic!();
         }
@@ -410,17 +347,7 @@ mod tests {
 
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
-            if let Value::Tuple(tuple) = exception.value {
-                unsafe {
-                    assert_eq!((*tuple).len, 2);
-                    let slice: &[Value] = &(**tuple);
-                    let mut iter = slice.iter();
-                    assert_eq!(iter.next(), Some(&atom!(BADMAP)));
-                    assert_eq!(iter.next(), Some(&bad_map));
-                }
-            } else {
-                panic!();
-            }
+            assert_eq!(exception.value, bad_map);
         } else {
             panic!();
         }
