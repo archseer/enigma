@@ -1,4 +1,4 @@
-* Opcodes [83/138]
+* Opcodes [85/138]
 - [X] Label = 1
 - [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -26,11 +26,11 @@
 - [X] Wait = 25
 - [ ] WaitTimeout = 26
 - [X] IsLt = 39
-- [ ] IsGe = 40
+- [X] IsGe = 40
 - [X] IsEq = 41
 - [X] IsNe = 42
 - [X] IsEqExact = 43
-- [ ] IsNeExact = 44
+- [X] IsNeExact = 44
 - [X] IsInteger = 45
 - [X] IsFloat = 46
 - [X] IsNumber = 47
