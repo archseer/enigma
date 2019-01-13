@@ -19,6 +19,7 @@ use std::i32;
 use std::ops::{Add, Mul, Sub};
 
 mod chrono;
+mod map;
 
 // maybe use https://github.com/sfackler/rust-phf
 
@@ -58,6 +59,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::from_str("hd"), 1), bif_erlang_hd_1);
     bifs.insert((erlang, atom::from_str("tl"), 1), bif_erlang_tl_1);
     bifs.insert((erlang, atom::from_str("trunc"), 1), bif_erlang_trunc_1);
+    bifs.insert((erlang, atom::from_str("tuple_size"), 1), bif_erlang_tuple_size_1);
     bifs.insert((erlang, atom::from_str("byte_size"), 1), bif_erlang_byte_size_1);
     bifs.insert((erlang, atom::from_str("error"), 1), bif_erlang_error_1);
     bifs.insert((erlang, atom::from_str("error"), 2), bif_erlang_error_2);
@@ -107,6 +109,18 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((lists, atom::from_str("keymember"), 3), bif_lists_keymember_3);
     bifs.insert((lists, atom::from_str("keysearch"), 3), bif_lists_keysearch_3);
     bifs.insert((lists, atom::from_str("keyfind"), 3), bif_lists_keyfind_3);
+    // maps
+    let maps = atom::from_str("maps");
+    bifs.insert((maps, atom::from_str("find"), 2), map::bif_maps_find_2);
+    bifs.insert((maps, atom::from_str("get"), 2), map::bif_maps_get_2);
+    bifs.insert((maps, atom::from_str("from_list"), 1), map::bif_maps_from_list_1);
+    bifs.insert((maps, atom::from_str("is_key"), 2), map::bif_maps_is_key_2);
+    bifs.insert((maps, atom::from_str("keys"), 1), map::bif_maps_keys_1);
+    bifs.insert((maps, atom::from_str("merge"), 2), map::bif_maps_merge_2);
+    bifs.insert((maps, atom::from_str("put"), 3), map::bif_maps_put_3);
+    bifs.insert((maps, atom::from_str("remove"), 2), map::bif_maps_remove_2);
+    bifs.insert((maps, atom::from_str("update"), 3), map::bif_maps_update_3);
+    bifs.insert((maps, atom::from_str("values"), 1), map::bif_maps_values_1);
     bifs
 };
 
@@ -346,6 +360,14 @@ fn bif_math_atan2_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> 
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     Ok(Value::Float(value::Float(res.atan2(arg))))
+}
+
+fn bif_erlang_tuple_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    let res = match &args[0] {
+        Value::Tuple(t) => unsafe { (**t).len },
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    Ok(Value::Integer(res as i64))
 }
 
 fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
@@ -918,7 +940,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_is_list_1() {
+    fn test_bif_erlang_is_tuple_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
@@ -934,7 +956,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_is_tuple_1() {
+    fn test_bif_erlang_is_list_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
@@ -1107,6 +1129,19 @@ mod tests {
     }
 
     // TODO: test rest of math funcs
+
+    #[test]
+    fn test_bif_tuple_size_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let heap = &Heap::new();
+        let args = vec![tup3!(heap, Value::Integer(1), Value::Integer(2), Value::Integer(1))];
+        let res = bif_erlang_tuple_size_1(&vm, &process, &args);
+
+        assert_eq!(res, Ok(Value::Integer(3)));
+    }
 
     #[test]
     fn test_bif_pdict() {
