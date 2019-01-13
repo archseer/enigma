@@ -388,32 +388,32 @@ impl Machine {
     }
 
     pub fn preload_modules(&self) {
-        module::load_module(&self, "examples/preloaded/ebin/erts_code_purger.beam").unwrap();
-        module::load_module(&self, "examples/preloaded/ebin/erl_init.beam").unwrap();
-        module::load_module(&self, "examples/preloaded/ebin/init.beam").unwrap();
-        module::load_module(&self, "examples/preloaded/ebin/prim_buffer.beam").unwrap();
-        module::load_module(&self, "examples/preloaded/ebin/prim_eval.beam").unwrap();
-        module::load_module(&self, "examples/preloaded/ebin/prim_inet.beam").unwrap();
-        module::load_module(&self, "examples/preloaded/ebin/prim_file.beam").unwrap();
-        module::load_module(&self, "examples/preloaded/ebin/zlib.beam").unwrap();
-        module::load_module(&self, "examples/preloaded/ebin/prim_zip.beam").unwrap();
-        module::load_module(&self, "examples/preloaded/ebin/erl_prim_loader.beam").unwrap();
-        module::load_module(&self, "examples/preloaded/ebin/erlang.beam").unwrap();
-        module::load_module(&self, "examples/preloaded/ebin/erts_internal.beam").unwrap();
-        module::load_module(&self, "examples/preloaded/ebin/erl_tracer.beam").unwrap();
+        module::load_module(self, "examples/preloaded/ebin/erts_code_purger.beam").unwrap();
+        module::load_module(self, "examples/preloaded/ebin/erl_init.beam").unwrap();
+        module::load_module(self, "examples/preloaded/ebin/init.beam").unwrap();
+        module::load_module(self, "examples/preloaded/ebin/prim_buffer.beam").unwrap();
+        module::load_module(self, "examples/preloaded/ebin/prim_eval.beam").unwrap();
+        module::load_module(self, "examples/preloaded/ebin/prim_inet.beam").unwrap();
+        module::load_module(self, "examples/preloaded/ebin/prim_file.beam").unwrap();
+        module::load_module(self, "examples/preloaded/ebin/zlib.beam").unwrap();
+        module::load_module(self, "examples/preloaded/ebin/prim_zip.beam").unwrap();
+        module::load_module(self, "examples/preloaded/ebin/erl_prim_loader.beam").unwrap();
+        module::load_module(self, "examples/preloaded/ebin/erlang.beam").unwrap();
+        module::load_module(self, "examples/preloaded/ebin/erts_internal.beam").unwrap();
+        module::load_module(self, "examples/preloaded/ebin/erl_tracer.beam").unwrap();
         module::load_module(
-            &self,
+            self,
             "examples/preloaded/ebin/erts_literal_area_collector.beam",
         )
         .unwrap();
         module::load_module(
-            &self,
+            self,
             "examples/preloaded/ebin/erts_dirty_process_signal_handler.beam",
         )
         .unwrap();
-        module::load_module(&self, "examples/preloaded/ebin/atomics.beam").unwrap();
-        module::load_module(&self, "examples/preloaded/ebin/counters.beam").unwrap();
-        module::load_module(&self, "examples/preloaded/ebin/persistent_term.beam").unwrap();
+        module::load_module(self, "examples/preloaded/ebin/atomics.beam").unwrap();
+        module::load_module(self, "examples/preloaded/ebin/counters.beam").unwrap();
+        module::load_module(self, "examples/preloaded/ebin/persistent_term.beam").unwrap();
     }
 
     /// Starts the VM

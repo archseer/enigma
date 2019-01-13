@@ -23,6 +23,8 @@
 // The semantics of `Arc` are alread documented in the Rust docs, so we don't
 // duplicate those here.
 #![allow(missing_docs)]
+#![allow(dead_code)]
+#![allow(clippy::all)]
 
 extern crate nodrop;
 // #[cfg(feature = "servo")]
