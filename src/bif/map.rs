@@ -66,8 +66,21 @@ pub fn bif_maps_is_key_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value])
     Err(Exception::with_value(Reason::EXC_BADMAP, tuple))
 }
 
-pub fn bif_maps_keys_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    unimplemented!();
+pub fn bif_maps_keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
+    let map = &args[0];
+    if let Value::Map(m) = map {
+        let hamt_map = &m.0;
+        let heap = &process.context_mut().heap;
+        let mut vec = vec![];
+        for (key, _) in hamt_map.iter() {
+            vec.push(key.clone());
+        }
+        let list = vec_to_list!(heap, vec);
+        return Ok(list);
+    }
+    let heap = &process.context_mut().heap;
+    let tuple = tup2!(&heap, atom!(BADMAP), map.clone());
+    Err(Exception::with_value(Reason::EXC_BADMAP, tuple))
 }
 
 pub fn bif_maps_merge_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
@@ -306,7 +319,54 @@ mod tests {
 
     #[test]
     fn test_maps_keys_1() {
-        unimplemented!();
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let map = map!(str_to_atom!("test") => Value::Integer(1), str_to_atom!("test2") => Value::Integer(2));
+        let args = vec![map];
+
+        if let Ok(Value::List(cons)) = bif_maps_keys_1(&vm, &process, &args) {
+            unsafe {
+                let key1 = &(*cons).head;
+                assert_eq!(key1, &str_to_atom!("test"));
+                if let Value::List(tail) = (*cons).tail {
+                    let key2 = &(*tail).head;
+                    assert_eq!(key2, &str_to_atom!("test2"));
+                } else {
+                    panic!();
+                }
+            }
+        } else {
+            panic!();
+        }
+    }
+
+    #[test]
+    fn test_maps_keys_1_bad_map() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let wrong_map = Value::Integer(3);
+        let args = vec![wrong_map.clone(), str_to_atom!("test")];
+
+        if let Err(exception) = bif_maps_keys_1(&vm, &process, &args) {
+            assert_eq!(exception.reason, Reason::EXC_BADMAP);
+            if let Value::Tuple(tuple) = exception.value {
+                unsafe {
+                    assert_eq!((*tuple).len, 2);
+                    let slice: &[Value] = &(**tuple);
+                    let mut iter = slice.iter();
+                    assert_eq!(iter.next(), Some(&atom!(BADMAP)));
+                    assert_eq!(iter.next(), Some(&wrong_map));
+                }
+            } else {
+                panic!();
+            }
+        } else {
+            panic!();
+        }
     }
 
     #[test]
