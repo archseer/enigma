@@ -1,4 +1,4 @@
-* Opcodes [85/138]
+* Opcodes [86/138]
 - [X] Label = 1
 - [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -127,7 +127,7 @@
 - [X] IsMap = 156
 - [ ] HasMapFields = 157
 - [ ] GetMapElements = 158
-- [ ] IsTaggedTuple = 159
+- [X] IsTaggedTuple = 159
 - [X] BuildStacktrace = 160
 - [X] RawRaise = 161
 - [X] GetHd = 162
