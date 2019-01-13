@@ -82,9 +82,8 @@ pub fn bif_maps_put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) ->
     let key = &args[1];
     let value = &args[2];
     if let Value::Map(m) = map {
-        let mut hamt_map: value::HAMT = HamtMap::new();
-        hamt_map.clone_from(&m.0);
-        let new_map = hamt_map.plus(key.clone(), value.clone());
+        let map = &(*m.0);
+        let new_map = map.clone().plus(key.clone(), value.clone());
         return Ok(Value::Map(value::Map(Arc::new(new_map))));
     }
     Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
