@@ -11,24 +11,24 @@ pub fn bif_maps_find_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) 
     unimplemented!();
 }
 
-pub fn bif_maps_get_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+pub fn bif_maps_get_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
     let map = &args[0];
     if let Value::Map(m) = map {
         let hamt_map = &m.0;
         let target = &args[1];
         match hamt_map.find(target) {
             Some(value) => {
-                return Ok((*value).clone());
+                return Ok(value.clone());
             },
             _ => {
-                let heap = &Heap::new();
-                let tuple = tup2!(heap, Value::Atom(atom::from_str("badkey")), (*target).clone());
+                let heap = &process.context_mut().heap;
+                let tuple = tup2!(&heap, Value::Atom(atom::from_str("badkey")), target.clone());
                 return Err(Exception::with_value(Reason::EXC_BADARG, tuple));
             }
         };
     }
-    let heap = &Heap::new();
-    let tuple = tup2!(heap, Value::Atom(atom::from_str("badmap")), (*map).clone());
+    let heap = &process.context_mut().heap;
+    let tuple = tup2!(&heap, Value::Atom(atom::from_str("badmap")), map.clone());
     Err(Exception::with_value(Reason::EXC_BADARG, tuple))
 }
 
@@ -36,23 +36,16 @@ pub fn bif_maps_from_list_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Val
     unimplemented!();
 }
 
-pub fn bif_maps_is_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+pub fn bif_maps_is_key_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
     let map = &args[0];
     if let Value::Map(m) = map {
         let hamt_map = &m.0;
         let target = &args[1];
-        match hamt_map.find(target) {
-            Some(value) => {
-                return Ok(Value::boolean(true));
-            },
-            _ => {
-                return Ok(Value::boolean(false));
-            }
-        };
-
+        let exist = hamt_map.find(target).is_some();
+        return Ok(Value::boolean(exist))
     }
-    let heap = &Heap::new();
-    let tuple = tup2!(heap, Value::Atom(atom::from_str("badmap")), (*map).clone());
+    let heap = &process.context_mut().heap;
+    let tuple = tup2!(&heap, Value::Atom(atom::from_str("badmap")), map.clone());
     Err(Exception::with_value(Reason::EXC_BADARG, tuple))
 }
 
@@ -99,7 +92,7 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
 
-        let empty_map: HamtMap<Value, Value> = HamtMap::new();
+        let empty_map: value::HAMT = HamtMap::new();
         let (map, _any) = empty_map.insert(Value::Atom(atom::from_str("test")), Value::Integer(3));
         let args = vec![Value::Map(value::Map(Arc::new(map))), Value::Atom(atom::from_str("test"))];
 
@@ -123,17 +116,9 @@ mod tests {
                 unsafe {
                     assert_eq!((*tuple).len, 2);
                     let slice: &[Value] = &(**tuple);
-                    let mut iter = slice.iter().peekable();
-                    if let Some(val) = iter.next() {
-                        assert_eq!(val, &Value::Atom(atom::from_str("badmap")));
-                    } else {
-                        panic!();
-                    }
-                    if let Some(val) = iter.next() {
-                        assert_eq!(val, wrong_map);
-                    } else {
-                        panic!();
-                    }
+                    let mut iter = slice.iter();
+                    assert_eq!(iter.next(), Some(&Value::Atom(atom::from_str("badmap"))));
+                    assert_eq!(iter.next(), Some(wrong_map));
                 }
             } else {
                 panic!();
@@ -149,7 +134,7 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
 
-        let empty_map: HamtMap<Value, Value> = HamtMap::new();
+        let empty_map: value::HAMT = HamtMap::new();
         let (map, _any) = empty_map.insert(Value::Atom(atom::from_str("test")), Value::Integer(3));
         let args = vec![Value::Map(value::Map(Arc::new(map))), Value::Atom(atom::from_str("fail"))];
 
@@ -160,16 +145,8 @@ mod tests {
                     assert_eq!((*tuple).len, 2);
                     let slice: &[Value] = &(**tuple);
                     let mut iter = slice.iter().peekable();
-                    if let Some(val) = iter.next() {
-                        assert_eq!(val, &Value::Atom(atom::from_str("badkey")));
-                    } else {
-                        panic!();
-                    }
-                    if let Some(val) = iter.next() {
-                        assert_eq!(val, &Value::Atom(atom::from_str("fail")));
-                    } else {
-                        panic!();
-                    }
+                    assert_eq!(iter.next(), Some(&Value::Atom(atom::from_str("badkey"))));
+                    assert_eq!(iter.next(), Some(&Value::Atom(atom::from_str("fail"))));
                 }
             } else {
                 panic!();
@@ -190,7 +167,7 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
 
-        let empty_map: HamtMap<Value, Value> = HamtMap::new();
+        let empty_map: value::HAMT = HamtMap::new();
         let (map, _any) = empty_map.insert(Value::Atom(atom::from_str("test")), Value::Integer(3));
         let args = vec![Value::Map(value::Map(Arc::new(map))), Value::Atom(atom::from_str("test"))];
 
@@ -205,7 +182,7 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
 
-        let empty_map: HamtMap<Value, Value> = HamtMap::new();
+        let empty_map: value::HAMT = HamtMap::new();
         let (map, _any) = empty_map.insert(Value::Atom(atom::from_str("test")), Value::Integer(3));
         let args = vec![Value::Map(value::Map(Arc::new(map))), Value::Atom(atom::from_str("no_key"))];
 
@@ -221,7 +198,7 @@ mod tests {
         let process = process::allocate(&vm.state, module).unwrap();
 
         let wrong_map = &Value::Integer(3);
-        let args = vec![(*wrong_map).clone(), Value::Atom(atom::from_str("test"))];
+        let args = vec![wrong_map.clone(), Value::Atom(atom::from_str("test"))];
 
         if let Err(exception) = bif_maps_is_key_2(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
@@ -229,17 +206,9 @@ mod tests {
                 unsafe {
                     assert_eq!((*tuple).len, 2);
                     let slice: &[Value] = &(**tuple);
-                    let mut iter = slice.iter().peekable();
-                    if let Some(val) = iter.next() {
-                        assert_eq!(val, &Value::Atom(atom::from_str("badmap")));
-                    } else {
-                        panic!();
-                    }
-                    if let Some(val) = iter.next() {
-                        assert_eq!(val, wrong_map);
-                    } else {
-                        panic!();
-                    }
+                    let mut iter = slice.iter();
+                    assert_eq!(iter.next(), Some(&Value::Atom(atom::from_str("badmap"))));
+                    assert_eq!(iter.next(), Some(wrong_map));
                 }
             } else {
                 panic!();
