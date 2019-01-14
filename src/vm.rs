@@ -765,6 +765,19 @@ impl Machine {
                         unreachable!()
                     }
                 }
+                Opcode::IsGe => {
+                    debug_assert_eq!(ins.args.len(), 3);
+
+                    let v1 = self.expand_arg(context, &ins.args[1]);
+                    let v2 = self.expand_arg(context, &ins.args[2]);
+
+                    if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(v2) {
+                        let fail = self.expand_arg(context, &ins.args[0]).to_u32();
+                        op_jump!(context, fail);
+                    } else {
+                        // ok
+                    }
+                }
                 Opcode::IsLt => {
                     debug_assert_eq!(ins.args.len(), 3);
 
@@ -813,6 +826,19 @@ impl Machine {
                     } else {
                         let fail = self.expand_arg(context, &ins.args[0]).to_u32();
                         op_jump!(context, fail);
+                    }
+                }
+                Opcode::IsNeExact => {
+                    debug_assert_eq!(ins.args.len(), 3);
+
+                    let v1 = self.expand_arg(context, &ins.args[1]);
+                    let v2 = self.expand_arg(context, &ins.args[2]);
+
+                    if v1.erl_eq(v2) {
+                        let fail = self.expand_arg(context, &ins.args[0]).to_u32();
+                        op_jump!(context, fail);
+                    } else {
+                        // ok
                     }
                 }
                 Opcode::IsInteger => op_is_type!(self, context, ins.args, is_integer),
@@ -1436,6 +1462,28 @@ impl Machine {
                         set_register!(context, &ins.args[1], val);
                     } else {
                         unreachable!()
+                    }
+                }
+                Opcode::IsTaggedTuple => {
+                    debug_assert_eq!(ins.args.len(), 4);
+                    let fail = self.expand_arg(context, &ins.args[0]).to_u32();
+                    let reg = self.expand_arg(context, &ins.args[1]);
+                    let n = self.expand_arg(context, &ins.args[2]).to_u32();
+                    let atom = self.expand_arg(context, &ins.args[3]);
+                    if let Value::Tuple(t) = reg {
+                        let arity = unsafe { (**t).len() };
+                        if arity == 0 || arity != (n as usize) {
+                            op_jump!(context, fail);
+                        } else {
+                            let elem = unsafe { &(**t)[0] };
+                            if elem.erl_eq(atom) {
+                                // ok
+                            } else {
+                                op_jump!(context, fail);
+                            }
+                        }
+                    } else {
+                        op_jump!(context, fail);
                     }
                 }
                 Opcode::BuildStacktrace => {
