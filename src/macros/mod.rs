@@ -91,3 +91,10 @@ macro_rules! map {
         }
     };
 }
+
+#[macro_export]
+macro_rules! iter_to_list {
+    ($heap: expr, $iter:expr) => {
+        $iter.fold(Value::Nil, |res, val| value::cons($heap, val, res))
+    }
+}

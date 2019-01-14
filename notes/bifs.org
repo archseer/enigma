@@ -493,20 +493,20 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 - [ ] bif erlang:binary_to_float/1
 - [ ] bif io:printable_range/0
 
-** New in 17.0 [3/15]
+** New in 17.0 [9/15]
 - [ ] bif re:inspect/2
 - [X] ubif erlang:is_map/1
 - [ ] ubif erlang:map_size/1
-- [ ] bif maps:find/2
+- [X] bif maps:find/2
 - [X] bif maps:get/2
 - [ ] bif maps:from_list/1
 - [X] bif maps:is_key/2
-- [ ] bif maps:keys/1
+- [X] bif maps:keys/1
 - [ ] bif maps:merge/2
-- [ ] bif maps:put/3
-- [ ] bif maps:remove/2
-- [ ] bif maps:update/3
-- [ ] bif maps:values/1
+- [X] bif maps:put/3
+- [X] bif maps:remove/2
+- [X] bif maps:update/3
+- [X] bif maps:values/1
 - [ ] bif erts_internal:cmp_term/2
 - [ ] bif ets:take/2
 
