@@ -600,7 +600,7 @@ fn erts_save_stacktrace(process: &RcProcess, s: &mut StackTrace, mut depth: u32)
             if let Some(cp) = **boxed_cp {
                 if Some(&cp) != s.trace.last() {
                     // Record non-duplicates only
-                    s.trace.push(cp.clone()); // -1
+                    s.trace.push(cp); // -1
                     depth -= 1;
                 }
             }

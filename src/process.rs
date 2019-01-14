@@ -159,7 +159,7 @@ impl ExecutionContext {
                 // TODO: not great
                 bs: std::mem::uninitialized(),
 
-                flags: Flag::INITIAL
+                flags: Flag::INITIAL,
             };
             for (_i, el) in ctx.x.iter_mut().enumerate() {
                 // Overwrite `element` without running the destructor of the old value.
