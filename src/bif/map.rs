@@ -18,7 +18,7 @@ pub fn bif_maps_find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -
                 let heap = &process.context_mut().heap;
                 return Ok(tup2!(&heap, atom!(OK), value.clone()));
             },
-            _ => {
+            None => {
                 return Ok(atom!(ERROR));
             }
         };
@@ -35,7 +35,7 @@ pub fn bif_maps_get_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) ->
             Some(value) => {
                 return Ok(value.clone());
             },
-            _ => {
+            None => {
                 return Err(Exception::with_value(Reason::EXC_BADKEY, target.clone()));
             }
         };
@@ -63,11 +63,7 @@ pub fn bif_maps_keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -
     if let Value::Map(m) = map {
         let hamt_map = &m.0;
         let heap = &process.context_mut().heap;
-        let mut vec = vec![];
-        for (key, _) in hamt_map.iter() {
-            vec.push(key.clone());
-        }
-        let list = vec_to_list!(heap, vec);
+        let list = iter_to_list!(heap, hamt_map.iter().map(|(k,_)|k).cloned());
         return Ok(list);
     }
     Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
@@ -112,7 +108,7 @@ pub fn bif_maps_update_3(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]
                 let new_map = map.clone().plus(key.clone(), value.clone());
                 return Ok(Value::Map(value::Map(Arc::new(new_map))));
             },
-            _ => {
+            None => {
                 return Err(Exception::with_value(Reason::EXC_BADKEY, key.clone()));
             }
         }
@@ -126,11 +122,7 @@ pub fn bif_maps_values_1(_vm: &vm::Machine, process: &RcProcess, args: &[Value])
     if let Value::Map(m) = map {
         let hamt_map = &m.0;
         let heap = &process.context_mut().heap;
-        let mut vec = vec![];
-        for (_, value) in hamt_map.iter() {
-            vec.push(value.clone());
-        }
-        let list = vec_to_list!(heap, vec);
+        let list = iter_to_list!(heap, hamt_map.iter().map(|(_,v)|v).cloned());
         return Ok(list);
     }
     Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
@@ -310,10 +302,10 @@ mod tests {
         if let Ok(Value::List(cons)) = bif_maps_keys_1(&vm, &process, &args) {
             unsafe {
                 let key1 = &(*cons).head;
-                assert_eq!(key1, &str_to_atom!("test"));
+                assert_eq!(key1, &str_to_atom!("test2"));
                 if let Value::List(tail) = (*cons).tail {
                     let key2 = &(*tail).head;
-                    assert_eq!(key2, &str_to_atom!("test2"));
+                    assert_eq!(key2, &str_to_atom!("test"));
                 } else {
                     panic!();
                 }
@@ -499,10 +491,10 @@ mod tests {
         if let Ok(Value::List(cons)) = bif_maps_values_1(&vm, &process, &args) {
             unsafe {
                 let key1 = &(*cons).head;
-                assert_eq!(key1, &Value::Integer(1));
+                assert_eq!(key1, &Value::Integer(2));
                 if let Value::List(tail) = (*cons).tail {
                     let key2 = &(*tail).head;
-                    assert_eq!(key2, &Value::Integer(2));
+                    assert_eq!(key2, &Value::Integer(1));
                 } else {
                     panic!();
                 }

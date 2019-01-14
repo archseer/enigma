@@ -93,10 +93,8 @@ macro_rules! map {
 }
 
 #[macro_export]
-macro_rules! vec_to_list {
-    ($heap:expr, $vec:expr) => {
-        $vec.into_iter()
-            .rev()
-            .fold(Value::Nil, |res, val| value::cons($heap, val, res))
+macro_rules! iter_to_list {
+    ($heap: expr, $iter:expr) => {
+        $iter.fold(Value::Nil, |res, val| value::cons($heap, val, res))
     }
 }
