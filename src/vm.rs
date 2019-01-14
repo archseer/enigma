@@ -1475,11 +1475,8 @@ impl Machine {
                         if arity == 0 || arity != (n as usize) {
                             op_jump!(context, fail);
                         } else {
-                            let elem = unsafe {
-                                let slice: &[Value] = &(**t);
-                                slice[0].clone()
-                            };
-                            if let Some(std::cmp::Ordering::Equal) = elem.partial_cmp(atom) {
+                            let elem = unsafe { &(**t)[0] };
+                            if elem.erl_eq(atom) {
                                 // ok
                             } else {
                                 op_jump!(context, fail);
