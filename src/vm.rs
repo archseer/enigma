@@ -64,22 +64,22 @@ macro_rules! set_register {
 
 macro_rules! expand_float {
     ($context:expr, $value:expr) => {{
-        match &$value {
-            Value::ExtendedLiteral(i) => unsafe {
-                if let Value::Float(value::Float(f)) = (*$context.ip.module).literals[*i as usize] {
+        match $value {
+            &Value::ExtendedLiteral(i) => unsafe {
+                if let Value::Float(value::Float(f)) = (*$context.ip.module).literals[i as usize] {
                     f
                 } else {
                     unreachable!()
                 }
             },
-            Value::X(reg) => {
-                if let Value::Float(value::Float(f)) = $context.x[*reg as usize] {
+            &Value::X(reg) => {
+                if let Value::Float(value::Float(f)) = $context.x[reg as usize] {
                     f
                 } else {
                     unreachable!()
                 }
             }
-            Value::Y(reg) => {
+            &Value::Y(reg) => {
                 let len = $context.stack.len();
                 if let Value::Float(value::Float(f)) = $context.stack[len - (reg + 2) as usize] {
                     f
@@ -87,7 +87,7 @@ macro_rules! expand_float {
                     unreachable!()
                 }
             }
-            Value::FloatReg(reg) => $context.f[*reg as usize],
+            &Value::FloatReg(reg) => $context.f[reg as usize],
             _ => unreachable!(),
         }
     }};
@@ -159,7 +159,7 @@ macro_rules! op_call_fun {
         // set additional X regs based on lambda.binding
         // set x from 1 + arity (x0 is func, followed by call params) onwards to binding
         unsafe {
-            let closure = $closure;
+            let closure = *$closure;
             if let Some(binding) = &(*closure).binding {
                 // TODO: maybe we can copy_from_slice in the future
                 let arity = $arity as usize;
@@ -212,7 +212,7 @@ macro_rules! op_apply_fun {
         //context.x[arity] = fun.clone();
 
         if let Value::Closure(closure) = fun {
-            op_call_fun!($vm, $context, closure, arity);
+            op_call_fun!($vm, $context, &closure, arity);
         } else {
             // TODO raise error
             unimplemented!()
@@ -1441,7 +1441,7 @@ impl Machine {
                     // literal arity
                     let arity = ins.args[0].to_u32();
                     if let Value::Closure(closure) = &context.x[arity as usize] {
-                        op_call_fun!(self, context, *closure, arity)
+                        op_call_fun!(self, context, closure, arity)
                     } else {
                         unreachable!()
                     }

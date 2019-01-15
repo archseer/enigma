@@ -1,19 +1,19 @@
 use crate::atom;
-use crate::bif;
-use crate::bitstring;
 use crate::exception::{Exception, Reason};
 use crate::module;
+use crate::bitstring;
 use crate::numeric::division::{FlooredDiv, OverflowingFlooredDiv};
 use crate::numeric::modulo::{Modulo, OverflowingModulo};
 use crate::process::{self, RcProcess};
-use crate::servo_arc::Arc;
 use crate::value::{self, Value};
 use crate::vm;
-use hamt_rs::HamtMap;
+use crate::bif;
+use crate::servo_arc::Arc;
 use hashbrown::HashMap;
+use hamt_rs::HamtMap;
 use num::bigint::BigInt;
-use num::bigint::ToBigInt;
 use num::traits::Signed;
+use num::bigint::ToBigInt;
 use once_cell::sync::Lazy;
 use std::i32;
 use std::ops::{Add, Mul, Sub};
@@ -367,7 +367,7 @@ fn bif_erlang_tuple_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Valu
         Value::Tuple(t) => unsafe { (**t).len },
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
-    Ok(Value::Integer(i64::from(res)))
+    Ok(Value::Integer(res as i64))
 }
 
 fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
@@ -428,54 +428,52 @@ pub fn bif_erlang_apply_2(_vm: &vm::Machine, _process: &RcProcess, _args: &[Valu
 pub fn bif_erlang_apply_3(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
     // module, function (atom), args
     unreachable!("apply/3 called without macro override");
+    println!(
+        "TODO: implement as mapping to instr in loader: Tried loading apply/3: {} with args {}",
+        args[0], args[1]
+    );
+
+    // maps to i_apply
+
+    unimplemented!()
 }
 
 /// this sets some process info- trapping exits or the error handler
-pub fn bif_erlang_process_flag_2(
-    _vm: &vm::Machine,
-    process: &RcProcess,
-    args: &[Value],
-) -> BifResult {
+pub fn bif_erlang_process_flag_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
     match &args[0] {
         Value::Atom(atom::TRAP_EXIT) => {
             let context = process.context_mut();
             let old_value = context.flags.contains(process::Flag::TRAP_EXIT);
-            match &args[1] {
-                // TODO atom to_bool, then pass that in as 2 arg
+            match &args[1] { // TODO atom to_bool, then pass that in as 2 arg
                 Value::Atom(atom::TRUE) => context.flags.set(process::Flag::TRAP_EXIT, true),
                 Value::Atom(atom::FALSE) => context.flags.set(process::Flag::TRAP_EXIT, false),
-                _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                _ => return Err(Exception::new(Reason::EXC_BADARG))
             }
-            Ok(Value::boolean(old_value))
-        }
-        Value::Atom(i) => unimplemented!(
-            "erlang:process_flag/2 not implemented for {:?}",
-            atom::from_index(*i)
-        ),
-        _ => unreachable!(),
+            if old_value { // todo helper func From<>
+                return Ok(Value::Atom(atom::TRUE));
+            } else {
+                return Ok(Value::Atom(atom::FALSE));
+            }
+        },
+        Value::Atom(i) => unimplemented!("erlang:process_flag/2 not implemented for {:?}", atom::from_index(*i)),
+        _ => unreachable!()
     }
 }
+
 
 /// register(atom, Process|Port) registers a global process or port (for this node)
 fn bif_erlang_register_2(vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
     /* (Atom, Pid|Port)   */
     if let Value::Atom(name) = args[0] {
-        vm.state
-            .process_registry
-            .lock()
-            .register(name, process.clone());
-        return Ok(Value::Atom(atom::TRUE));
+        vm.state.process_registry.lock().register(name, process.clone());
+        return Ok(Value::Atom(atom::TRUE))
     }
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
-fn bif_erlang_function_exported_3(
-    vm: &vm::Machine,
-    process: &RcProcess,
-    args: &[Value],
-) -> BifResult {
+fn bif_erlang_function_exported_3(vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
     if !args[0].is_atom() || !args[1].is_atom() || !args[2].is_smallint() {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(Exception::new(Reason::EXC_BADARG))
     }
 
     let arity = args[2].to_u32();
@@ -1139,12 +1137,7 @@ mod tests {
         let process = process::allocate(&vm.state, module).unwrap();
 
         let heap = &Heap::new();
-        let args = vec![tup3!(
-            heap,
-            Value::Integer(1),
-            Value::Integer(2),
-            Value::Integer(1)
-        )];
+        let args = vec![tup3!(heap, Value::Integer(1), Value::Integer(2), Value::Integer(1))];
         let res = bif_erlang_tuple_size_1(&vm, &process, &args);
 
         assert_eq!(res, Ok(Value::Integer(3)));
