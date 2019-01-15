@@ -121,6 +121,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((maps, atom::from_str("remove"), 2), map::bif_maps_remove_2);
     bifs.insert((maps, atom::from_str("update"), 3), map::bif_maps_update_3);
     bifs.insert((maps, atom::from_str("values"), 1), map::bif_maps_values_1);
+    bifs.insert((maps, atom::from_str("take"), 2), map::bif_maps_take_2);
     bifs
 };
 
