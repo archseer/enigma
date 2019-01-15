@@ -45,7 +45,28 @@ pub fn bif_maps_get_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) ->
 }
 
 pub fn bif_maps_from_list_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    unimplemented!();
+    if !args[0].is_list() {
+        return Err(Exception::with_value(Reason::EXC_BADARG, args[0].clone()));
+    }
+    let mut list = &args[0];
+    let mut map = HamtMap::new();
+    while let Value::List(l) = *list {
+        unsafe {
+            let item = &(*l).head;
+            if let Value::Tuple(ptr) = item {
+                let tuple = unsafe { &**ptr };
+                if (tuple.len != 2) {
+                    return Err(Exception::with_value(Reason::EXC_BADARG, item.clone()));
+                }
+                let mut iter = tuple.iter();
+                map = map.plus(iter.next().unwrap().clone(), iter.next().unwrap().clone());
+            } else {
+                return Err(Exception::with_value(Reason::EXC_BADARG, item.clone()));
+            }
+            list = &(*l).tail;
+        }
+    }
+    Ok(Value::Map(value::Map(Arc::new(map))))
 }
 
 pub fn bif_maps_is_key_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
@@ -148,6 +169,7 @@ mod tests {
     use crate::process::{self};
     use crate::module;
     use crate::process;
+    use crate::immix::Heap;
 
     #[test]
     fn test_maps_find_2() {
@@ -256,7 +278,65 @@ mod tests {
 
     #[test]
     fn test_maps_from_list_1() {
-        unimplemented!();
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let heap = &Heap::new();
+        let list = cons!(heap,
+                         tup2!(heap, str_to_atom!("test"), Value::Integer(1)),
+                         cons!(heap, tup2!(heap, str_to_atom!("test2"), Value::Integer(2)), Value::Nil));
+        let args = vec![list];
+        let res = bif_maps_from_list_1(&vm, &process, &args);
+
+        if let Ok(Value::Map(m)) = res {
+            assert_eq!(m.0.len(), 2);
+            assert_eq!(m.0.find(&str_to_atom!("test")), Some(&Value::Integer(1)));
+            assert_eq!(m.0.find(&str_to_atom!("test2")), Some(&Value::Integer(2)));
+        } else {
+            panic!();
+        }
+    }
+
+    #[test]
+    fn test_maps_from_list_1_not_map() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let heap = &Heap::new();
+        let bad_list = Value::Integer(1);
+        let args = vec![bad_list.clone()];
+        let res = bif_maps_from_list_1(&vm, &process, &args);
+
+        if let Err(exception) = res {
+            assert_eq!(exception.reason, Reason::EXC_BADARG);
+            assert_eq!(exception.value, bad_list.clone());
+        } else {
+            panic!();
+        }
+    }
+
+    #[test]
+    fn test_maps_from_list_1_bad_items() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let heap = &Heap::new();
+        let bad_tuple = tup3!(heap, Value::Integer(1), Value::Integer(2), Value::Integer(3));
+        let list = cons!(heap,
+                         bad_tuple.clone(),
+                         cons!(heap, tup2!(heap, str_to_atom!("test2"), Value::Integer(2)), Value::Nil));
+        let args = vec![list];
+        let res = bif_maps_from_list_1(&vm, &process, &args);
+
+        if let Err(exception) = res {
+            assert_eq!(exception.reason, Reason::EXC_BADARG);
+            assert_eq!(exception.value, bad_tuple.clone());
+        } else {
+            panic!();
+        }
     }
 
     #[test]
@@ -358,7 +438,7 @@ mod tests {
 
         let res = bif_maps_merge_2(&vm, &process, &args);
         if let Ok(Value::Map(body)) = res {
-            assert_eq!(body.0.iter().count(), 3);
+            assert_eq!(body.0.len(), 3);
             assert_eq!(body.0.find(&str_to_atom!("test")), Some(&Value::Integer(1)));
             assert_eq!(body.0.find(&str_to_atom!("test2")), Some(&Value::Integer(2)));
             assert_eq!(body.0.find(&str_to_atom!("test3")), Some(&Value::Integer(4)));
