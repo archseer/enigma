@@ -4,6 +4,8 @@ mod macros;
 pub mod exception;
 #[macro_use]
 pub mod vm;
+#[macro_use]
+pub mod nanbox;
 mod atom;
 mod bif;
 mod bitstring;

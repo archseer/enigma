@@ -36,6 +36,33 @@ pub struct Loader<'a> {
     instructions: Vec<Instruction>,
 }
 
+/// Compact term encoding values. BEAM does some tricks to be able to share the memory layout with
+/// regular values, but for the most part we don't need this (it also doesn't fit nanboxed values
+/// well).
+#[derive(Debug)]
+pub enum LValue {
+    Literal(u32),
+    X(u32),
+    Y(u32),
+    Label(u32),
+    ExtendedList(Box<Vec<Value>>),
+    FloatReg(u32),
+    AllocList(Box<Vec<(u8, u32)>>),
+    ExtendedLiteral(u32), // TODO; replace at load time
+}
+
+impl LValue {
+    pub fn to_u32(&self) -> u32 {
+        match *self {
+            Value::Literal(i) => i,
+            Value::Atom(i) => i,
+            Value::Label(i) => i,
+            Value::Integer(i) => i as u32,
+            _ => unimplemented!("to_u32 for {:?}", self),
+        }
+    }
+}
+
 impl<'a> Loader<'a> {
     pub fn new() -> Loader<'a> {
         Loader {
@@ -276,7 +303,7 @@ impl<'a> Loader<'a> {
                 }
                 Opcode::Label => {
                     // one operand, Integer
-                    if let Value::Literal(i) = instruction.args[0] {
+                    if let LValue::Literal(i) = instruction.args[0] {
                         self.labels.insert(i as u32, self.instructions.len() as u32);
                     } else {
                         panic!("Bad argument to {:?}", instruction.op)
@@ -286,7 +313,7 @@ impl<'a> Loader<'a> {
                 Opcode::FuncInfo => {
                     // record function data M:F/A
                     // don't skip so we can apply tracing during runtime
-                    if let [_module, Value::Atom(f), Value::Literal(a)] = &instruction.args[..] {
+                    if let [_module, LValue::Atom(f), LValue::Literal(a)] = &instruction.args[..] {
                         let f = self.atom_map[&(*f - 1)]; // necessary because atoms weren't remapped yet
                         self.funs
                             .insert((f, *a as u32), (self.instructions.len() as u32) + 1); // need to point after func_info
@@ -302,7 +329,7 @@ impl<'a> Loader<'a> {
                     break;
                 }
                 Opcode::BsPutString => {
-                    if let [Value::Literal(len), Value::Literal(offset)] = instruction.args[..] {
+                    if let [LValue::Literal(len), LValue::Literal(offset)] = instruction.args[..] {
                         // TODO: ideally use a single string that we slice into for these interned strings
                         // but need to tie them to the string heap lifetime
                         let offset = offset as usize;
@@ -323,19 +350,19 @@ impl<'a> Loader<'a> {
 
         let atom_map = &self.atom_map;
         let labels = &self.labels;
-        let postprocess_value = |arg: &Value| -> Value {
+        let postprocess_value = |arg: &LValue| -> LValue {
             match arg {
-                Value::Atom(i) => {
+                LValue::Atom(i) => {
                     if *i == 0 {
                         return Value::Nil;
                     }
-                    Value::Atom(atom_map[&(i - 1)])
+                    LValue::Atom(atom_map[&(i - 1)])
                 }
-                Value::Label(l) => {
+                LValue::Label(l) => {
                     if *l == 0 {
                         return Value::Label(0);
                     }
-                    Value::Label(labels[l])
+                    LValue::Label(labels[l])
                 }
                 val => val.clone(),
             }
@@ -347,9 +374,9 @@ impl<'a> Loader<'a> {
                 .args
                 .iter()
                 .map(|arg| match arg {
-                    Value::ExtendedList(vec) => {
+                    LValue::ExtendedList(vec) => {
                         let vec = (*vec).iter().map(|arg| postprocess_value(arg)).collect();
-                        Value::ExtendedList(Box::new(vec))
+                        LValue::ExtendedList(Box::new(vec))
                     }
                     _ => postprocess_value(arg),
                 })
@@ -409,13 +436,13 @@ fn decode_line_items<'a>(rest: &'a [u8], mut count: u32) -> IResult<&'a [u8], Ve
         let (rest, term) = compact_term(new_rest)?;
         new_rest = rest;
         match term {
-            Value::Integer(n) => {
+            LValue::Integer(n) => {
                 vec.push((fname_index, n as u32));
                 // TODO: validate
                 // Too many files or huge line number. Silently invalidate the location.
                 // loc = LINE_INVALID_LOCATION;
             }
-            Value::Atom(i) => {
+            LValue::Atom(i) => {
                 fname_index = i;
                 // if (val > stp->num_fnames) {
                 // LoadError2(stp, "file index overflow (%u/%u)",
@@ -556,7 +583,7 @@ named!(
 fn read_smallint(b: u8, rest: &[u8]) -> IResult<&[u8], i64> {
     let (rest, val) = read_int(b, rest)?;
 
-    if let Value::Integer(i) = val {
+    if let LValue::Integer(i) = val {
         return Ok((rest, i));
     }
     unreachable!()
@@ -630,13 +657,13 @@ fn compact_term(i: &[u8]) -> IResult<&[u8], Value> {
         let (rest, val) = read_smallint(b, rest)?;
 
         return match tag {
-            0 => Ok((rest, Value::Literal(val as u32))),
-            1 => Ok((rest, Value::Integer(val))), // TODO: this cast is unsafe
-            2 => Ok((rest, Value::Atom(val as u32))),
-            3 => Ok((rest, Value::X(val as u32))),
-            4 => Ok((rest, Value::Y(val as u32))),
-            5 => Ok((rest, Value::Label(val as u32))),
-            6 => Ok((rest, Value::Character(val as u8))),
+            0 => Ok((rest, LValue::Literal(val as u32))),
+            1 => Ok((rest, LValue::Integer(val))), // TODO: this cast is unsafe
+            2 => Ok((rest, LValue::Atom(val as u32))),
+            3 => Ok((rest, LValue::X(val as u32))),
+            4 => Ok((rest, LValue::Y(val as u32))),
+            5 => Ok((rest, LValue::Label(val as u32))),
+            6 => Ok((rest, LValue::Character(val as u8))),
             _ => unreachable!(),
         };
     }
@@ -669,14 +696,14 @@ fn parse_list(rest: &[u8]) -> IResult<&[u8], Value> {
         rest = new_rest;
     }
 
-    Ok((rest, Value::ExtendedList(Box::new(els))))
+    Ok((rest, LValue::ExtendedList(Box::new(els))))
 }
 
 fn parse_float_reg(rest: &[u8]) -> IResult<&[u8], Value> {
     let (rest, b) = be_u8(rest)?;
     let (rest, n) = read_smallint(b, rest)?;
 
-    Ok((rest, Value::FloatReg(n as u32)))
+    Ok((rest, LValue::FloatReg(n as u32)))
 }
 
 fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], Value> {
@@ -697,13 +724,13 @@ fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], Value> {
         rest = new_rest;
     }
 
-    Ok((rest, Value::AllocList(Box::new(els))))
+    Ok((rest, LValue::AllocList(Box::new(els))))
 }
 
 fn parse_extended_literal(rest: &[u8]) -> IResult<&[u8], Value> {
     let (rest, b) = be_u8(rest)?;
     let (rest, val) = read_smallint(b, rest)?;
-    Ok((rest, Value::ExtendedLiteral(val as u32)))
+    Ok((rest, LValue::ExtendedLiteral(val as u32)))
 }
 
 // ---------------------------------------------------
@@ -711,7 +738,7 @@ fn parse_extended_literal(rest: &[u8]) -> IResult<&[u8], Value> {
 #[derive(Debug)]
 pub struct Instruction {
     pub op: Opcode,
-    pub args: Vec<Value>,
+    pub args: Vec<LValue>,
 }
 
 named!(
@@ -736,11 +763,11 @@ mod tests {
     fn test_compact_term() {
         assert_eq!(
             compact_term(&vec![0b10010000u8]),
-            Ok((&[] as &[u8], Value::Literal(9)))
+            Ok((&[] as &[u8], LValue::Literal(9)))
         );
         assert_eq!(
             compact_term(&vec![0b11110000u8]),
-            Ok((&[] as &[u8], Value::Literal(15)))
+            Ok((&[] as &[u8], LValue::Literal(15)))
         );
     }
 }

@@ -4,6 +4,7 @@ use crate::bitstring;
 use crate::exception::{self, Exception, Reason};
 use crate::exports_table::{Export, ExportsTable, RcExportsTable};
 use crate::module;
+use crate::loader::LValue;
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
 use crate::opcodes::Opcode;
 use crate::pool::{Job, JoinGuard as PoolJoinGuard, Pool, Worker};
@@ -50,10 +51,10 @@ pub struct Machine {
 macro_rules! set_register {
     ($context:expr, $register:expr, $value:expr) => {{
         match $register {
-            &Value::X(reg) => {
+            &LValue::X(reg) => {
                 $context.x[reg as usize] = $value;
             }
-            &Value::Y(reg) => {
+            &LValue::Y(reg) => {
                 let len = $context.stack.len();
                 $context.stack[(len - (reg + 2) as usize)] = $value;
             }
@@ -65,21 +66,21 @@ macro_rules! set_register {
 macro_rules! expand_float {
     ($context:expr, $value:expr) => {{
         match $value {
-            &Value::ExtendedLiteral(i) => unsafe {
+            &LValue::ExtendedLiteral(i) => unsafe {
                 if let Value::Float(value::Float(f)) = (*$context.ip.module).literals[i as usize] {
                     f
                 } else {
                     unreachable!()
                 }
             },
-            &Value::X(reg) => {
+            &LValue::X(reg) => {
                 if let Value::Float(value::Float(f)) = $context.x[reg as usize] {
                     f
                 } else {
                     unreachable!()
                 }
             }
-            &Value::Y(reg) => {
+            &LValue::Y(reg) => {
                 let len = $context.stack.len();
                 if let Value::Float(value::Float(f)) = $context.stack[len - (reg + 2) as usize] {
                     f
@@ -87,7 +88,7 @@ macro_rules! expand_float {
                     unreachable!()
                 }
             }
-            &Value::FloatReg(reg) => $context.f[reg as usize],
+            &LValue::FloatReg(reg) => $context.f[reg as usize],
             _ => unreachable!(),
         }
     }};
@@ -140,7 +141,7 @@ macro_rules! op_call_ext {
                 let args = &$context.x[0..*$arity as usize];
                 match bif($vm, $process, args) {
                     Ok(val) => {
-                        set_register!($context, &Value::X(0), val); // HAXX
+                        set_register!($context, &LValue::X(0), val); // HAXX
                         op_return!($context);
                     }
                     Err(exc) => return Err(exc),
@@ -291,7 +292,7 @@ macro_rules! op_fixed_apply {
                 let args = &$context.x[0..arity];
                 match bif($vm, $process, args) {
                     Ok(val) => {
-                        set_register!($context, &Value::X(0), val); // HAXX
+                        set_register!($context, &LValue::X(0), val); // HAXX
                         op_return!($context);
                     }
                     Err(exc) => return Err(exc),
@@ -339,7 +340,7 @@ macro_rules! op_float {
         debug_assert_eq!($args.len(), 4);
 
         // TODO: I think this fail is always unused
-        if let [_fail, Value::FloatReg(a), Value::FloatReg(b), Value::FloatReg(dest)] = $args {
+        if let [_fail, LValue::FloatReg(a), LValue::FloatReg(b), LValue::FloatReg(dest)] = $args {
             $context.f[*dest as usize] = to_expr!($context.f[*a as usize] $op $context.f[*b as usize]);
         } else {
             unreachable!()
@@ -473,13 +474,13 @@ impl Machine {
     }
 
     #[inline]
-    fn expand_arg<'a>(&'a self, context: &'a ExecutionContext, arg: &'a Value) -> &Value {
+    fn expand_arg<'a>(&'a self, context: &'a ExecutionContext, arg: &'a LValue) -> &Value {
         match arg {
             // TODO: optimize away into a reference somehow at load time
-            Value::ExtendedLiteral(i) => unsafe { &(*context.ip.module).literals[*i as usize] },
-            Value::X(i) => &context.x[*i as usize],
-            Value::Y(i) => &context.stack[context.stack.len() - (*i + 2) as usize],
-            value => value,
+            LValue::ExtendedLiteral(i) => unsafe { &(*context.ip.module).literals[*i as usize] },
+            LValue::X(i) => &context.x[*i as usize],
+            LValue::Y(i) => &context.stack[context.stack.len() - (*i + 2) as usize],
+            value => unimplemented!("expand unimplemented for {:?}", value),
         }
     }
 
@@ -617,7 +618,7 @@ impl Machine {
                 Opcode::Call => {
                     //literal arity, label jmp
                     // store arity as live
-                    if let [Value::Literal(_a), Value::Label(i)] = &ins.args[..] {
+                    if let [LValue::Literal(_a), LValue::Label(i)] = &ins.args[..] {
                         context.cp = Some(context.ip);
                         op_jump!(context, *i);
                     } else {
@@ -628,7 +629,7 @@ impl Machine {
                 Opcode::CallLast => {
                     //literal arity, label jmp, nwords
                     // store arity as live
-                    if let [Value::Literal(_a), Value::Label(i), Value::Literal(nwords)] =
+                    if let [LValue::Literal(_a), LValue::Label(i), LValue::Literal(nwords)] =
                         &ins.args[..]
                     {
                         op_deallocate!(context, *nwords);
@@ -642,7 +643,7 @@ impl Machine {
                 Opcode::CallOnly => {
                     //literal arity, label jmp
                     // store arity as live
-                    if let [Value::Literal(_a), Value::Label(i)] = &ins.args[..] {
+                    if let [LValue::Literal(_a), LValue::Label(i)] = &ins.args[..] {
                         op_jump!(context, *i);
                     } else {
                         unreachable!()
@@ -651,7 +652,7 @@ impl Machine {
                 }
                 Opcode::CallExt => {
                     //literal arity, literal destination (module.imports index)
-                    if let [Value::Literal(arity), Value::Literal(dest)] = &ins.args[..] {
+                    if let [LValue::Literal(arity), LValue::Literal(dest)] = &ins.args[..] {
                         // save pointer onto CP
                         context.cp = Some(context.ip);
 
@@ -663,7 +664,7 @@ impl Machine {
                 }
                 Opcode::CallExtOnly => {
                     //literal arity, literal destination (module.imports index)
-                    if let [Value::Literal(arity), Value::Literal(dest)] = &ins.args[..] {
+                    if let [LValue::Literal(arity), LValue::Literal(dest)] = &ins.args[..] {
                         op_call_ext!(self, context, process, arity, dest);
                     } else {
                         unreachable!()
@@ -672,7 +673,7 @@ impl Machine {
                 }
                 Opcode::CallExtLast => {
                     //literal arity, literal destination (module.imports index), literal deallocate
-                    if let [Value::Literal(arity), Value::Literal(dest), Value::Literal(nwords)] =
+                    if let [LValue::Literal(arity), LValue::Literal(dest), LValue::Literal(nwords)] =
                         &ins.args[..]
                     {
                         op_deallocate!(context, *nwords);
@@ -685,7 +686,7 @@ impl Machine {
                 }
                 Opcode::Bif0 => {
                     // literal export, x reg
-                    if let [Value::Literal(dest), reg] = &ins.args[..] {
+                    if let [LValue::Literal(dest), reg] = &ins.args[..] {
                         let mfa = &module.imports[*dest as usize];
                         let val = bif::apply(self, process, mfa, &[]).unwrap(); // TODO handle fail
                         set_register!(context, reg, val); // HAXX
@@ -697,7 +698,7 @@ impl Machine {
                 }
                 Opcode::Allocate => {
                     // stackneed, live
-                    if let [Value::Literal(stackneed), Value::Literal(_live)] = &ins.args[..] {
+                    if let [LValue::Literal(stackneed), LValue::Literal(_live)] = &ins.args[..] {
                         for _ in 0..*stackneed {
                             context.stack.push(Value::Nil)
                         }
@@ -713,7 +714,7 @@ impl Machine {
                     // literal stackneed, literal heapneed, literal live
                     // allocate stackneed space on stack, ensure heapneed on heap, if gc, keep live
                     // num of X regs. save CP on stack.
-                    if let [Value::Literal(stackneed), Value::Literal(_heapneed), Value::Literal(_live)] =
+                    if let [LValue::Literal(stackneed), LValue::Literal(_heapneed), LValue::Literal(_live)] =
                         &ins.args[..]
                     {
                         for _ in 0..*stackneed {
@@ -727,7 +728,7 @@ impl Machine {
                 }
                 Opcode::AllocateZero => {
                     // literal stackneed, literal live
-                    if let [Value::Literal(need), Value::Literal(_live)] = &ins.args[..] {
+                    if let [LValue::Literal(need), LValue::Literal(_live)] = &ins.args[..] {
                         for _ in 0..*need {
                             context.stack.push(Value::Nil)
                         }
@@ -740,7 +741,7 @@ impl Machine {
                     // literal stackneed, literal heapneed, literal live
                     // allocate stackneed space on stack, ensure heapneed on heap, if gc, keep live
                     // num of X regs. save CP on stack.
-                    if let [Value::Literal(stackneed), Value::Literal(_heapneed), Value::Literal(_live)] =
+                    if let [LValue::Literal(stackneed), LValue::Literal(_heapneed), LValue::Literal(_live)] =
                         &ins.args[..]
                     {
                         for _ in 0..*stackneed {
@@ -759,7 +760,7 @@ impl Machine {
                 }
                 Opcode::Deallocate => {
                     // literal nwords
-                    if let [Value::Literal(nwords)] = &ins.args[..] {
+                    if let [LValue::Literal(nwords)] = &ins.args[..] {
                         op_deallocate!(context, *nwords)
                     } else {
                         unreachable!()
@@ -870,7 +871,7 @@ impl Machine {
                 }
                 Opcode::TestArity => {
                     // check tuple arity
-                    if let [Value::Label(fail), arg, Value::Literal(arity)] = &ins.args[..] {
+                    if let [LValue::Label(fail), arg, LValue::Literal(arity)] = &ins.args[..] {
                         if let Value::Tuple(t) = self.expand_arg(context, arg) {
                             unsafe {
                                 if (**t).len() != (*arity as usize) {
@@ -887,7 +888,7 @@ impl Machine {
                 Opcode::SelectVal => {
                     // arg, fail, dests
                     // loop over dests
-                    if let [arg, Value::Label(fail), Value::ExtendedList(vec)] = &ins.args[..] {
+                    if let [arg, LValue::Label(fail), LValue::ExtendedList(vec)] = &ins.args[..] {
                         let arg = self.expand_arg(context, arg);
                         let mut i = 0;
                         loop {
@@ -910,7 +911,7 @@ impl Machine {
                 }
                 Opcode::SelectTupleArity => {
                     // tuple fail dests
-                    if let [arg, Value::Label(fail), Value::ExtendedList(vec)] = &ins.args[..] {
+                    if let [arg, LValue::Label(fail), LValue::ExtendedList(vec)] = &ins.args[..] {
                         if let Value::Tuple(tup) = self.expand_arg(context, arg) {
                             let len = Value::Integer(unsafe { (**tup).len as i64 });
                             let mut i = 0;
@@ -988,7 +989,7 @@ impl Machine {
                 }
                 Opcode::PutTuple2 => {
                     // op: PutTuple2, args: [X(0), ExtendedList([Y(1), Y(0), X(0)])] }
-                    if let Value::ExtendedList(list) = &ins.args[1] {
+                    if let LValue::ExtendedList(list) = &ins.args[1] {
                         let arity = list.len();
 
                         let tuple = value::tuple(&context.heap, arity as u32);
@@ -1127,7 +1128,7 @@ impl Machine {
                 Opcode::Apply => {
                     //literal arity
 
-                    if let [Value::Literal(arity)] = &ins.args[..] {
+                    if let [LValue::Literal(arity)] = &ins.args[..] {
                         context.cp = Some(context.ip);
 
                         op_fixed_apply!(self, context, process, *arity)
@@ -1140,7 +1141,7 @@ impl Machine {
                 }
                 Opcode::ApplyLast => {
                     //literal arity, nwords (dealloc)
-                    if let [Value::Literal(arity), Value::Literal(nwords)] = &ins.args[..] {
+                    if let [LValue::Literal(arity), LValue::Literal(nwords)] = &ins.args[..] {
                         op_deallocate!(context, *nwords);
 
                         op_fixed_apply!(self, context, process, *arity)
@@ -1151,7 +1152,7 @@ impl Machine {
                 }
                 Opcode::GcBif1 => {
                     // fail label, live, bif, arg1, dest
-                    if let Value::Literal(i) = &ins.args[2] {
+                    if let LValue::Literal(i) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
                         let args = &[self.expand_arg(context, &ins.args[3]).clone()];
                         let mfa = &module.imports[*i as usize];
@@ -1175,7 +1176,7 @@ impl Machine {
                     // optimize when one append is 0 and unit is 1, it's just a move
                     // bs_add Fail S1=i==0 S2 Unit=u==1 D => move S2 D
 
-                    if let [Value::Label(_fail), s1, s2, Value::Literal(unit), dest] = &ins.args[..]
+                    if let [LValue::Label(_fail), s1, s2, LValue::Literal(unit), dest] = &ins.args[..]
                     {
                         // TODO use fail label
                         let s1 = self.expand_arg(context, s1).to_u32();
@@ -1202,7 +1203,7 @@ impl Machine {
                     //   allocate binary + procbin
                     //   set as non writable initially??
 
-                    if let [Value::Label(_fail), s1, Value::Literal(_words), Value::Literal(_live), _flags, dest] =
+                    if let [LValue::Label(_fail), s1, LValue::Literal(_words), LValue::Literal(_live), _flags, dest] =
                         &ins.args[..]
                     {
                         // TODO: use a current_string ptr to be able to write to the Arc wrapped str
@@ -1227,7 +1228,7 @@ impl Machine {
                     }
                 }
                 Opcode::BsPutBinary => {
-                    if let [Value::Label(fail), size, Value::Literal(unit), _flags, src] =
+                    if let [LValue::Label(fail), size, LValue::Literal(unit), _flags, src] =
                         &ins.args[..]
                     {
                         // TODO: fail label
@@ -1252,7 +1253,7 @@ impl Machine {
                 Opcode::BsPutFloat => {
                     // gen_put_float(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
                     // Size can be atom all
-                    if let [Value::Label(fail), size, Value::Literal(unit), _flags, src] =
+                    if let [LValue::Label(fail), size, LValue::Literal(unit), _flags, src] =
                         &ins.args[..]
                     {
                         // TODO: fail label
@@ -1262,7 +1263,7 @@ impl Machine {
 
                         if let Value::Float(value::Float(f)) = self.expand_arg(context, src) {
                             match size {
-                                Value::Atom(atom::ALL) => unsafe {
+                                LValue::Atom(atom::ALL) => unsafe {
                                     let bytes: [u8; 8] = transmute(*f);
                                     (*context.bs).extend_from_slice(&bytes);
                                 },
@@ -1288,7 +1289,7 @@ impl Machine {
                     // bs_append Fail Size Extra Live Unit Bin Flags Dst => \
                     //   move Bin x | i_bs_append Fail Extra Live Unit Size Dst
 
-                    if let [Value::Label(fail), Value::Integer(size), Value::Literal(extra_heap), Value::Literal(live), Value::Literal(unit), src, _flags, dest] =
+                    if let [LValue::Label(fail), LValue::Integer(size), LValue::Literal(extra_heap), LValue::Literal(live), LValue::Literal(unit), src, _flags, dest] =
                         &ins.args[..]
                     {
                         // TODO: execute fail if non zero
@@ -1331,14 +1332,14 @@ impl Machine {
                     let f = expand_float!(context, &ins.args[0]);
 
                     match &ins.args[1] {
-                        &Value::X(reg) => {
+                        &LValue::X(reg) => {
                             context.x[reg as usize] = Value::Float(value::Float(f));
                         }
-                        &Value::Y(reg) => {
+                        &LValue::Y(reg) => {
                             let len = context.stack.len();
                             context.stack[len - (reg + 2) as usize] = Value::Float(value::Float(f));
                         }
-                        &Value::FloatReg(reg) => {
+                        &LValue::FloatReg(reg) => {
                             context.f[reg as usize] = f;
                         }
                         _reg => unimplemented!(),
@@ -1353,7 +1354,7 @@ impl Machine {
                         _ => return Err(Exception::new(Reason::EXC_BADARITH)),
                     };
 
-                    if let Value::FloatReg(dest) = ins.args[1] {
+                    if let LValue::FloatReg(dest) = ins.args[1] {
                         context.f[dest as usize] = val;
                     } else {
                         unreachable!()
@@ -1365,7 +1366,7 @@ impl Machine {
                 Opcode::Fdiv => op_float!(context, &ins.args[..], /),
                 Opcode::Fnegate => {
                     debug_assert_eq!(ins.args.len(), 2);
-                    if let [Value::FloatReg(a), Value::FloatReg(dest)] = ins.args[..] {
+                    if let [LValue::FloatReg(a), LValue::FloatReg(dest)] = ins.args[..] {
                         context.f[dest as usize] = -context.f[a as usize];
                     } else {
                         unreachable!()
@@ -1373,7 +1374,7 @@ impl Machine {
                 }
                 Opcode::GcBif2 => {
                     // fail label, live, bif, arg1, arg2, dest
-                    if let Value::Literal(i) = &ins.args[2] {
+                    if let LValue::Literal(i) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
                         let args = &[
                             self.expand_arg(context, &ins.args[3]).clone(),
@@ -1391,7 +1392,7 @@ impl Machine {
                 }
                 Opcode::GcBif3 => {
                     // fail label, live, bif, arg1, arg2, arg3, dest
-                    if let Value::Literal(i) = &ins.args[2] {
+                    if let LValue::Literal(i) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
                         let args = &[
                             self.expand_arg(context, &ins.args[3]).clone(),
