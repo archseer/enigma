@@ -3,7 +3,7 @@ use crate::exports_table::{ExportsTable, RcExportsTable};
 use crate::immix::Heap;
 use crate::loader::{FuncInfo, Instruction};
 use crate::process::InstrPtr;
-use crate::value::Value;
+use crate::value::Term;
 use crate::vm::Machine;
 use hashbrown::HashMap;
 
@@ -24,7 +24,7 @@ pub struct Lambda {
 pub struct Module {
     pub imports: Vec<MFA>, // mod,  func, arity
     pub exports: Vec<MFA>, // func, arity, label
-    pub literals: Vec<Value>,
+    pub literals: Vec<Term>,
     pub literal_heap: Heap,
     pub lambdas: Vec<Lambda>,
     pub funs: HashMap<(u32, u32), u32>, // (fun name as atom, arity) -> offset

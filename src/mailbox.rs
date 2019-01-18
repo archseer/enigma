@@ -1,14 +1,14 @@
-use crate::value::Value;
+use crate::value::Term;
 use parking_lot::Mutex;
 use std::collections::VecDeque;
 
 #[derive(Default)]
 pub struct Mailbox {
     /// Internal mailbox from which the process is safe to read.
-    internal: VecDeque<*const Value>,
+    internal: VecDeque<*const Term>,
 
     /// External mailbox, to which other processes can write (while holding the lock)
-    external: VecDeque<*const Value>,
+    external: VecDeque<*const Term>,
 
     /// Used for synchronizing writes to the external part.
     write_lock: Mutex<()>,
@@ -27,17 +27,17 @@ impl Mailbox {
         }
     }
 
-    pub fn send_external(&mut self, message: *const Value) {
+    pub fn send_external(&mut self, message: *const Term) {
         let _lock = self.write_lock.lock();
 
         self.external.push_back(message);
     }
 
-    pub fn send_internal(&mut self, message: *const Value) {
+    pub fn send_internal(&mut self, message: *const Term) {
         self.internal.push_back(message);
     }
 
-    pub fn receive(&mut self) -> Option<&*const Value> {
+    pub fn receive(&mut self) -> Option<&*const Term> {
         if self.internal.len() >= self.save {
             let _lock = self.write_lock.lock();
 

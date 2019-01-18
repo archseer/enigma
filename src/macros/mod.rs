@@ -8,7 +8,7 @@ macro_rules! tup2 {
             std::ptr::write(&mut tuple[0], $element1);
             std::ptr::write(&mut tuple[1], $element2);
         }
-        Value::Tuple(tuple)
+        Term::from(tuple)
     }};
 }
 
@@ -22,7 +22,7 @@ macro_rules! tup3 {
             std::ptr::write(&mut tuple[1], $element2);
             std::ptr::write(&mut tuple[2], $element3);
         }
-        Value::Tuple(tuple)
+        Term::from(tuple)
     }};
 }
 
@@ -36,7 +36,7 @@ macro_rules! tup4 {
             std::ptr::write(&mut tuple[2], $element3);
             std::ptr::write(&mut tuple[3], $element4);
         }
-        Value::Tuple(tuple)
+        Term::from(tuple)
     }};
 }
 
@@ -50,7 +50,7 @@ macro_rules! cons {
 #[macro_export]
 macro_rules! bitstring {
     ($heap:expr, $str:expr) => {{
-        let mut list = Value::Nil;
+        let mut list = Term::nil();
         for char in $str.bytes().rev() {
             list = cons!($heap, Value::Character(char), list);
         }
@@ -61,14 +61,14 @@ macro_rules! bitstring {
 #[macro_export]
 macro_rules! atom {
     ($const:ident) => {
-        Value::Atom(atom::$const)
+        Term::atom(atom::$const)
     };
 }
 
 #[macro_export]
 macro_rules! str_to_atom {
     ($str:expr) => {
-        Value::Atom(atom::from_str($str))
+        Term::atom(atom::from_str($str))
     };
 }
 
@@ -95,6 +95,6 @@ macro_rules! map {
 #[macro_export]
 macro_rules! iter_to_list {
     ($heap: expr, $iter:expr) => {
-        $iter.fold(Value::Nil, |res, val| value::cons($heap, val, res))
-    }
+        $iter.fold(Term::nil(), |res, val| value::cons($heap, val, res))
+    };
 }

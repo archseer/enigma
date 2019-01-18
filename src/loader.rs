@@ -5,7 +5,7 @@ use crate::immix::Heap;
 use crate::module::{Lambda, Module, MFA};
 use crate::opcodes::*;
 use crate::servo_arc::Arc;
-use crate::value::Value;
+use crate::value::{Value, Term};
 use compress::zlib;
 use hashbrown::HashMap;
 use nom::*;
@@ -23,7 +23,7 @@ pub struct Loader<'a> {
     atoms: Vec<&'a str>,
     imports: Vec<MFA>,
     exports: Vec<MFA>,
-    literals: Vec<Value>,
+    literals: Vec<Term>,
     strings: String,
     lambdas: Vec<Lambda>,
     atom_map: HashMap<u32, u32>, // TODO: remove this; local id -> global id
@@ -41,6 +41,12 @@ pub struct Loader<'a> {
 /// well).
 #[derive(Debug)]
 pub enum LValue {
+    // TODO: these dupe LTerm values
+    Atom(u32),
+    Integer(i32),
+    Character(u8),
+    Nil,
+    // 
     Literal(u32),
     X(u32),
     Y(u32),
@@ -54,10 +60,10 @@ pub enum LValue {
 impl LValue {
     pub fn to_u32(&self) -> u32 {
         match *self {
-            Value::Literal(i) => i,
-            Value::Atom(i) => i,
-            Value::Label(i) => i,
-            Value::Integer(i) => i as u32,
+            LValue::Literal(i) => i,
+            LValue::Atom(i) => i,
+            LValue::Label(i) => i,
+            LValue::Integer(i) => i as u32,
             _ => unimplemented!("to_u32 for {:?}", self),
         }
     }
@@ -354,13 +360,13 @@ impl<'a> Loader<'a> {
             match arg {
                 LValue::Atom(i) => {
                     if *i == 0 {
-                        return Value::Nil;
+                        return LValue::Nil;
                     }
                     LValue::Atom(atom_map[&(i - 1)])
                 }
                 LValue::Label(l) => {
                     if *l == 0 {
-                        return Value::Label(0);
+                        return LValue::Label(0);
                     }
                     LValue::Label(labels[l])
                 }
@@ -392,7 +398,7 @@ impl<'a> Loader<'a> {
     }
 }
 
-fn decode_literals<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Vec<Value>> {
+fn decode_literals<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Vec<Term>> {
     do_parse!(
         rest,
         _count: be_u32
@@ -642,7 +648,7 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], Value> {
     } // if larger than 11 bits
 }
 
-fn compact_term(i: &[u8]) -> IResult<&[u8], Value> {
+fn compact_term(i: &[u8]) -> IResult<&[u8], LValue> {
     let (rest, b) = be_u8(i)?;
     let tag = b & 0b111;
 
@@ -671,7 +677,7 @@ fn compact_term(i: &[u8]) -> IResult<&[u8], Value> {
     parse_extended_term(b, rest)
 }
 
-fn parse_extended_term(b: u8, rest: &[u8]) -> IResult<&[u8], Value> {
+fn parse_extended_term(b: u8, rest: &[u8]) -> IResult<&[u8], LValue> {
     match b {
         0b0001_0111 => parse_list(rest),
         0b0010_0111 => parse_float_reg(rest),
@@ -681,7 +687,7 @@ fn parse_extended_term(b: u8, rest: &[u8]) -> IResult<&[u8], Value> {
     }
 }
 
-fn parse_list(rest: &[u8]) -> IResult<&[u8], Value> {
+fn parse_list(rest: &[u8]) -> IResult<&[u8], LValue> {
     // The stream now contains a smallint size, then size/2 pairs of values
     let (rest, b) = be_u8(rest)?;
     let (mut rest, n) = read_smallint(b, rest)?;
@@ -699,14 +705,14 @@ fn parse_list(rest: &[u8]) -> IResult<&[u8], Value> {
     Ok((rest, LValue::ExtendedList(Box::new(els))))
 }
 
-fn parse_float_reg(rest: &[u8]) -> IResult<&[u8], Value> {
+fn parse_float_reg(rest: &[u8]) -> IResult<&[u8], LValue> {
     let (rest, b) = be_u8(rest)?;
     let (rest, n) = read_smallint(b, rest)?;
 
     Ok((rest, LValue::FloatReg(n as u32)))
 }
 
-fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], Value> {
+fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], LValue> {
     let (rest, b) = be_u8(rest)?;
     let (mut rest, n) = read_smallint(b, rest)?;
     let mut els = Vec::with_capacity(n as usize);
@@ -727,7 +733,7 @@ fn parse_alloc_list(rest: &[u8]) -> IResult<&[u8], Value> {
     Ok((rest, LValue::AllocList(Box::new(els))))
 }
 
-fn parse_extended_literal(rest: &[u8]) -> IResult<&[u8], Value> {
+fn parse_extended_literal(rest: &[u8]) -> IResult<&[u8], LValue> {
     let (rest, b) = be_u8(rest)?;
     let (rest, val) = read_smallint(b, rest)?;
     Ok((rest, LValue::ExtendedLiteral(val as u32)))
@@ -738,7 +744,7 @@ fn parse_extended_literal(rest: &[u8]) -> IResult<&[u8], Value> {
 #[derive(Debug)]
 pub struct Instruction {
     pub op: Opcode,
-    pub args: Vec<LValue>,
+    pub args: Vec<Term>,
 }
 
 named!(

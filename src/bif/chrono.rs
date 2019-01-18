@@ -1,6 +1,6 @@
 use crate::bif::BifResult;
 use crate::process::RcProcess;
-use crate::value::{self, Value};
+use crate::value::{self, Term};
 use crate::vm;
 use chrono::{Datelike, Local, Timelike, Utc};
 use num::bigint::ToBigInt;
@@ -10,38 +10,34 @@ use std::time::SystemTime;
 /// http://erlang.org/doc/apps/erts/time_correction.html#Erlang_System_Time
 
 #[inline]
-pub fn bif_erlang_date_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Value]) -> BifResult {
+pub fn bif_erlang_date_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResult {
     let heap = &process.context_mut().heap;
     let date = Local::today();
 
     Ok(tup3!(
         heap,
-        Value::Integer(i64::from(date.year())),
-        Value::Integer(i64::from(date.month())),
-        Value::Integer(i64::from(date.day()))
+        Term::int(i32::from(date.year())),
+        Term::int(i32::from(date.month())),
+        Term::int(i32::from(date.day()))
     ))
 }
 
 #[inline]
-pub fn bif_erlang_localtime_0(
-    _vm: &vm::Machine,
-    process: &RcProcess,
-    _args: &[Value],
-) -> BifResult {
+pub fn bif_erlang_localtime_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResult {
     let heap = &process.context_mut().heap;
     let datetime = Local::now();
 
     let date = tup3!(
         heap,
-        Value::Integer(i64::from(datetime.year())),
-        Value::Integer(i64::from(datetime.month())),
-        Value::Integer(i64::from(datetime.day()))
+        Term::int(i32::from(datetime.year())),
+        Term::int(i32::from(datetime.month())),
+        Term::int(i32::from(datetime.day()))
     );
     let time = tup3!(
         heap,
-        Value::Integer(i64::from(datetime.hour())),
-        Value::Integer(i64::from(datetime.minute())),
-        Value::Integer(i64::from(datetime.second()))
+        Term::int(i32::from(datetime.hour())),
+        Term::int(i32::from(datetime.minute())),
+        Term::int(i32::from(datetime.second()))
     );
     Ok(tup2!(heap, date, time))
 }
@@ -51,7 +47,7 @@ pub fn bif_erlang_localtime_0(
 pub fn bif_erlang_monotonic_time_0(
     vm: &vm::Machine,
     _process: &RcProcess,
-    _args: &[Value],
+    _args: &[Term],
 ) -> BifResult {
     // TODO: needs https://github.com/rust-lang/rust/issues/50202
     // .as_nanos()
@@ -66,7 +62,7 @@ pub fn bif_erlang_monotonic_time_0(
 pub fn bif_erlang_system_time_0(
     _vm: &vm::Machine,
     _process: &RcProcess,
-    _args: &[Value],
+    _args: &[Term],
 ) -> BifResult {
     Ok(Value::BigInt(Box::new(
         SystemTime::now()
@@ -94,22 +90,22 @@ pub fn bif_erlang_system_time_0(
 pub fn bif_erlang_universaltime_0(
     _vm: &vm::Machine,
     process: &RcProcess,
-    _args: &[Value],
+    _args: &[Term],
 ) -> BifResult {
     let heap = &process.context_mut().heap;
     let datetime = Utc::now();
 
     let date = tup3!(
         heap,
-        Value::Integer(i64::from(datetime.year())),
-        Value::Integer(i64::from(datetime.month())),
-        Value::Integer(i64::from(datetime.day()))
+        Term::int(i32::from(datetime.year())),
+        Term::int(i32::from(datetime.month())),
+        Term::int(i32::from(datetime.day()))
     );
     let time = tup3!(
         heap,
-        Value::Integer(i64::from(datetime.hour())),
-        Value::Integer(i64::from(datetime.minute())),
-        Value::Integer(i64::from(datetime.second()))
+        Term::int(i32::from(datetime.hour())),
+        Term::int(i32::from(datetime.minute())),
+        Term::int(i32::from(datetime.second()))
     );
     Ok(tup2!(heap, date, time))
 }

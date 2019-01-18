@@ -12,7 +12,7 @@ use crate::process::{self, ExecutionContext, InstrPtr, RcProcess};
 use crate::process_registry::ProcessRegistry;
 use crate::process_table::ProcessTable;
 use crate::servo_arc::Arc;
-use crate::value::{self, Value};
+use crate::value::{self, Term};
 use log::debug;
 use parking_lot::Mutex;
 use std::mem::transmute;
@@ -254,7 +254,7 @@ macro_rules! op_fixed_apply {
         if !func.is_atom() || !module.is_atom() {
             $context.x[0] = module;
             $context.x[1] = func;
-            $context.x[2] = Value::Nil;
+            $context.x[2] = Term::nil();
 
             return Err(Exception::new(
                 Reason::EXC_BADARG,
@@ -464,7 +464,7 @@ impl Machine {
         let context = process.context_mut();
         let fun = atom::from_str("start");
         let arity = 2;
-        context.x[0] = Value::Atom(atom::from_str("init"));
+        context.x[0] = Term::atom(atom::from_str("init"));
         context.x[1] = bitstring!(&context.heap, "");
         unsafe { op_jump!(context, (*context.ip.module).funs[&(fun, arity)]) }
         /* TEMP */
@@ -474,7 +474,7 @@ impl Machine {
     }
 
     #[inline]
-    fn expand_arg<'a>(&'a self, context: &'a ExecutionContext, arg: &'a LValue) -> &Value {
+    fn expand_arg<'a>(&'a self, context: &'a ExecutionContext, arg: &'a LValue) -> &Term {
         match arg {
             // TODO: optimize away into a reference somehow at load time
             LValue::ExtendedLiteral(i) => unsafe { &(*context.ip.module).literals[*i as usize] },
@@ -700,7 +700,7 @@ impl Machine {
                     // stackneed, live
                     if let [LValue::Literal(stackneed), LValue::Literal(_live)] = &ins.args[..] {
                         for _ in 0..*stackneed {
-                            context.stack.push(Value::Nil)
+                            context.stack.push(Term::nil())
                         }
                         context.stack.push(Value::CP(Box::new(context.cp)));
                     } else {
@@ -718,7 +718,7 @@ impl Machine {
                         &ins.args[..]
                     {
                         for _ in 0..*stackneed {
-                            context.stack.push(Value::Nil)
+                            context.stack.push(Term::nil())
                         }
                         // TODO: check heap for heapneed space!
                         context.stack.push(Value::CP(Box::new(context.cp)));
@@ -730,7 +730,7 @@ impl Machine {
                     // literal stackneed, literal live
                     if let [LValue::Literal(need), LValue::Literal(_live)] = &ins.args[..] {
                         for _ in 0..*need {
-                            context.stack.push(Value::Nil)
+                            context.stack.push(Term::nil())
                         }
                         context.stack.push(Value::CP(Box::new(context.cp)));
                     } else {
@@ -745,7 +745,7 @@ impl Machine {
                         &ins.args[..]
                     {
                         for _ in 0..*stackneed {
-                            context.stack.push(Value::Nil)
+                            context.stack.push(Term::nil())
                         }
                         // TODO: check heap for heapneed space!
                         context.stack.push(Value::CP(Box::new(context.cp)));
@@ -756,7 +756,7 @@ impl Machine {
                 Opcode::TestHeap => println!("TODO: TestHeap unimplemented!"),
                 Opcode::Init => {
                     debug_assert_eq!(ins.args.len(), 1);
-                    set_register!(context, &ins.args[0], Value::Nil)
+                    set_register!(context, &ins.args[0], Term::nil())
                 }
                 Opcode::Deallocate => {
                     // literal nwords
@@ -1035,14 +1035,14 @@ impl Machine {
                 Opcode::TryEnd => {
                     // y
                     context.catches -= 1;
-                    set_register!(context, &ins.args[0], Value::Nil) // TODO: make_blank macro
+                    set_register!(context, &ins.args[0], Term::nil()) // TODO: make_blank macro
                 }
                 Opcode::TryCase => {
                     // pops a catch context in y  Erases the label saved in the Arg0 slot. Noval in R0 indicate that something is caught. If so, R0 is set to R1, R1 — to R2, R2 — to R3.
 
                     // TODO: this initial part is identical to TryEnd
                     context.catches -= 1;
-                    set_register!(context, &ins.args[0], Value::Nil); // TODO: make_blank macro
+                    set_register!(context, &ins.args[0], Term::nil()); // TODO: make_blank macro
 
                     assert!(context.x[0].is_none());
                     // TODO: c_p->fvalue = NIL;
@@ -1082,14 +1082,14 @@ impl Machine {
 
                     // TODO: this initial part is identical to TryEnd
                     context.catches -= 1; // TODO: this is overflowing
-                    set_register!(context, &ins.args[0], Value::Nil); // TODO: make_blank macro
+                    set_register!(context, &ins.args[0], Term::nil()); // TODO: make_blank macro
 
                     if context.x[0].is_none() {
                         // c_p->fvalue = NIL;
-                        if context.x[1] == Value::Atom(atom::THROW) {
+                        if context.x[1] == Term::atom(atom::THROW) {
                             context.x[0] = context.x[2].clone()
                         } else {
-                            if context.x[1] == Value::Atom(atom::ERROR) {
+                            if context.x[1] == Term::atom(atom::ERROR) {
                                 context.x[2] = exception::add_stacktrace(
                                     process,
                                     &context.x[2],
@@ -1102,7 +1102,7 @@ impl Machine {
                             //     FCALLS -= erts_garbage_collect_nobump(c_p, 3, reg+2, 1, FCALLS);
                             // }
                             context.x[0] =
-                                tup2!(&context.heap, Value::Atom(atom::EXIT), context.x[2].clone());
+                                tup2!(&context.heap, Term::atom(atom::EXIT), context.x[2].clone());
                         }
                     }
                     unimplemented!();
@@ -1238,7 +1238,7 @@ impl Machine {
 
                         if let Value::Binary(str) = self.expand_arg(context, src) {
                             match size {
-                                Value::Atom(atom::ALL) => unsafe {
+                                Term::atom(atom::ALL) => unsafe {
                                     (*context.bs).extend_from_slice(&str.data);
                                 },
                                 _ => unimplemented!(),
@@ -1496,7 +1496,7 @@ impl Machine {
                     let trace = context.x[2].clone();
 
                     match class {
-                        Value::Atom(atom::ERROR) => {
+                        Term::atom(atom::ERROR) => {
                             let mut reason = Reason::EXC_ERROR;
                             reason.remove(Reason::EXF_SAVETRACE);
                             return Err(Exception {
@@ -1505,7 +1505,7 @@ impl Machine {
                                 trace,
                             });
                         }
-                        Value::Atom(atom::EXIT) => {
+                        Term::atom(atom::EXIT) => {
                             let mut reason = Reason::EXC_EXIT;
                             reason.remove(Reason::EXF_SAVETRACE);
                             return Err(Exception {
@@ -1514,7 +1514,7 @@ impl Machine {
                                 trace,
                             });
                         }
-                        Value::Atom(atom::THROW) => {
+                        Term::atom(atom::THROW) => {
                             let mut reason = Reason::EXC_THROWN;
                             reason.remove(Reason::EXF_SAVETRACE);
                             return Err(Exception {
@@ -1523,7 +1523,7 @@ impl Machine {
                                 trace,
                             });
                         }
-                        _ => context.x[0] = Value::Atom(atom::BADARG),
+                        _ => context.x[0] = Term::atom(atom::BADARG),
                     }
                 }
                 opcode => unimplemented!("Unimplemented opcode {:?}: {:?}", opcode, ins),

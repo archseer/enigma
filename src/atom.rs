@@ -1,5 +1,5 @@
 //use std::ptr;
-use crate::value::Value;
+use crate::value::Term;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
@@ -87,7 +87,7 @@ impl AtomTable {
         self.register_atom(val)
     }
 
-    pub fn to_str(&self, a: &Value) -> Result<String, String> {
+    pub fn to_str(&self, a: &Term) -> Result<String, String> {
         if let Value::Atom(index) = a {
             if let Some(p) = self.lookup(a) {
                 return Ok(unsafe { (*p).name.clone() });
@@ -97,7 +97,7 @@ impl AtomTable {
         panic!("Value is not an atom!")
     }
 
-    pub fn lookup(&self, a: &Value) -> Option<*const Atom> {
+    pub fn lookup(&self, a: &Term) -> Option<*const Atom> {
         if let Value::Atom(index) = a {
             let index_r = self.index_r.read();
             if *index >= index_r.len() as u32 {
@@ -208,7 +208,7 @@ pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)
 }
 
-pub fn to_str(a: &Value) -> Result<String, String> {
+pub fn to_str(a: &Term) -> Result<String, String> {
     ATOMS.to_str(a)
 }
 

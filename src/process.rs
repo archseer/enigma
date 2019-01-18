@@ -5,7 +5,7 @@ use crate::mailbox::Mailbox;
 use crate::module::{Module, MFA};
 use crate::pool::Job;
 pub use crate::process_table::PID;
-use crate::value::Value;
+use crate::value::{Term, HAMT};
 use crate::vm::RcState;
 use hashbrown::HashMap;
 use std::cell::UnsafeCell;
@@ -27,11 +27,11 @@ pub const MAX_REG: usize = 16;
 
 pub struct ExecutionContext {
     /// X registers.
-    pub x: [Value; MAX_REG],
+    pub x: [Term; MAX_REG],
     /// Floating point registers.
     pub f: [f64; MAX_REG],
     /// Stack (accessible through Y registers).
-    pub stack: Vec<Value>,
+    pub stack: Vec<Term>,
     pub heap: Heap,
     /// Number of catches on stack.
     pub catches: usize,
@@ -139,7 +139,7 @@ impl ExecutionContext {
     pub fn new(module: *const Module) -> ExecutionContext {
         unsafe {
             let mut ctx = ExecutionContext {
-                x: std::mem::uninitialized(), //[Value::Nil; 16],
+                x: std::mem::uninitialized(), //[Term::nil(); 16],
                 f: [0.0f64; 16],
                 stack: Vec::new(),
                 heap: Heap::new(),
@@ -159,12 +159,12 @@ impl ExecutionContext {
                 // TODO: not great
                 bs: std::mem::uninitialized(),
 
-                flags: Flag::INITIAL
+                flags: Flag::INITIAL,
             };
             for (_i, el) in ctx.x.iter_mut().enumerate() {
                 // Overwrite `element` without running the destructor of the old value.
-                // Since Value does not implement Copy, it is moved.
-                std::ptr::write(el, Value::Nil);
+                // Since Term does not implement Copy, it is moved.
+                std::ptr::write(el, Term::nil());
             }
             ctx
         }
@@ -181,7 +181,7 @@ pub struct LocalData {
     pub thread_id: Option<u8>,
 
     /// A [process dictionary](https://www.erlang.org/course/advanced#dict)
-    pub dictionary: HashMap<Value, Value>,
+    pub dictionary: HAMT,
 }
 
 pub struct Process {
@@ -252,7 +252,7 @@ impl Process {
         self.pid == 0
     }
 
-    pub fn send_message(&self, sender: &RcProcess, message: &Value) {
+    pub fn send_message(&self, sender: &RcProcess, message: &Term) {
         if sender.pid == self.pid {
             self.local_data_mut().mailbox.send_internal(message);
         } else {
@@ -289,8 +289,8 @@ pub fn spawn(
     state: &RcState,
     module: *const Module,
     func: u32,
-    args: Value,
-) -> Result<Value, Exception> {
+    args: Term,
+) -> Result<Term, Exception> {
     println!("Spawning..");
     // let block_obj = block_ptr.block_value()?;
     let new_proc = allocate(state, module)?;
@@ -321,7 +321,28 @@ pub fn spawn(
             .get(&(func, i as u32)) // arglist arity
             .expect("process::spawn could not locate func")
     };
+
     context.ip.ptr = *func;
+
+    /*
+     * Check if this process should be initially linked to its parent.
+     */
+
+    // if (so->flags & SPO_LINK) {
+    //     ErtsLink *lnk;
+    //     ErtsLinkData *ldp = erts_link_create(ERTS_LNK_TYPE_PROC,
+    //                                          parent->common.id,
+    //                                          p->common.id);
+    //     lnk = erts_link_tree_lookup_insert(&ERTS_P_LINKS(parent), &ldp->a);
+    //     if (lnk) {
+    //         /*
+    //          * This should more or less never happen, but could
+    //          * potentially happen if pid:s wrap...
+    //          */
+    //         erts_link_release(lnk);
+    //     }
+    //     erts_link_tree_insert(&ERTS_P_LINKS(p), &ldp->b);
+    // }
 
     state.process_pool.schedule(Job::normal(new_proc));
 
@@ -332,9 +353,9 @@ pub fn send_message<'a>(
     state: &RcState,
     process: &RcProcess,
     // TODO: use pointers for these
-    pid: &Value,
-    msg: &'a Value,
-) -> Result<&'a Value, Exception> {
+    pid: &Term,
+    msg: &'a Term,
+) -> Result<&'a Term, Exception> {
     let pid = pid.to_u32();
 
     if let Some(receiver) = state.process_table.lock().get(pid) {

@@ -7,13 +7,16 @@ use crate::nanbox::TypedNanBox;
 use crate::process::{self, InstrPtr};
 use crate::servo_arc::Arc;
 use allocator_api::Layout;
-use core::marker::PhantomData;
-use hamt_rs::HamtMap;
 use num::bigint::BigInt;
-use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
-use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
+
+mod cons;
+mod map;
+mod tuple;
+pub use cons::Cons;
+pub use map::{Map, HAMT};
+pub use tuple::Tuple;
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 // annoying: we have to wrap Floats to be able to define hash
@@ -22,30 +25,6 @@ impl Eq for Float {}
 impl Hash for Float {
     fn hash<H: Hasher>(&self, _state: &mut H) {
         unimplemented!()
-    }
-}
-
-pub type HAMT = HamtMap<Value, Value>;
-
-#[derive(PartialEq, Eq, Clone)]
-pub struct Map(pub Arc<HamtMap<Value, Value>>);
-
-impl Hash for Map {
-    fn hash<H: Hasher>(&self, _state: &mut H) {
-        unimplemented!()
-    }
-}
-
-impl PartialOrd for Map {
-    fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
-        // Some(self.cmp(other))
-        unimplemented!()
-    }
-}
-
-impl std::fmt::Debug for Map {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "#{{map}}")
     }
 }
 
@@ -65,24 +44,52 @@ impl std::fmt::Debug for Map {
 // what about catch which is direct immediate in erlang, also CP is 00 on stack and means header on
 // heap.
 
+const TERM_FLOAT: u8 = 0;
+const TERM_NIL: u8 = 1;
+const TERM_INTEGER: u8 = 2;
+const TERM_ATOM: u8 = 3;
+const TERM_PORT: u8 = 4;
+const TERM_PID: u8 = 5;
+const TERM_CONS: u8 = 6;
+const TERM_POINTER: u8 = 7;
+
+struct WrongBoxError;
+
 /// A term is a nanboxed compact representation of a value in 64 bits. It can either be immediate,
 /// in which case it embeds the data, or a boxed pointer, that points to more data.
-#[derive(Debug)]
+//#[derive(Debug, Eq, PartialEq, PartialOrd, Clone, Hash)]
+#[derive(Debug, Clone)] // TODO make it Copy
 pub struct Term {
     value: TypedNanBox<Variant>,
 }
 
-#[derive(Clone, Debug)]
+unsafe impl Sync for Term {}
+unsafe impl Send for Term {}
+
+impl Hash for Term {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // maybe we could hash the repr directly
+        self.into_variant().hash(state)
+    }
+}
+
+pub enum Special {
+    Nil,
+    /// An internal placeholder signifying "THE_NON_VALUE".
+    None,
+    Literal(),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Hash)]
 pub enum Variant {
     Float(f64),
-    Nil,
+    Nil(Special), // TODO: expand nil to be able to hold different types of empty (tuple, list, map)
     Integer(i32),
     Atom(u32),
     Port(u32),
     Pid(process::PID),
-    Pointer(*const Value), // list, tuple, map, bunary, ref
-    /// An internal placeholder signifying "THE_NON_VALUE".
-    None,
+    Cons(*const self::Cons),
+    Pointer(*const Header), // tuple, map, binary, ref
 }
 
 impl From<f64> for Term {
@@ -103,9 +110,15 @@ impl From<process::PID> for Term {
     }
 }
 
-impl From<*const Value> for Term {
-    fn from(value: *const Value) -> Term {
-        Term::from(Variant::Pointer(value))
+impl From<*const Cons> for Term {
+    fn from(value: *const Cons) -> Term {
+        Term::from(Variant::Cons(value))
+    }
+}
+
+impl From<&mut Tuple> for Term {
+    fn from(value: &mut Tuple) -> Term {
+        Term::from(Variant::Pointer(value as *const Tuple as *const Header))
     }
 }
 
@@ -114,28 +127,28 @@ impl From<Variant> for Term {
         unsafe {
             match value {
                 Variant::Float(value) => Term {
-                    value: TypedNanBox::new(0, value),
+                    value: TypedNanBox::new(TERM_FLOAT, value),
                 },
-                Variant::Nil => Term {
-                    value: TypedNanBox::new(1, 0),
+                Variant::Nil(..) => Term {
+                    value: TypedNanBox::new(TERM_NIL, 0),
                 },
                 Variant::Integer(value) => Term {
-                    value: TypedNanBox::new(2, value),
+                    value: TypedNanBox::new(TERM_INTEGER, value),
                 },
                 Variant::Atom(value) => Term {
-                    value: TypedNanBox::new(3, value),
+                    value: TypedNanBox::new(TERM_ATOM, value),
                 },
                 Variant::Port(value) => Term {
-                    value: TypedNanBox::new(4, value),
+                    value: TypedNanBox::new(TERM_PORT, value),
                 },
                 Variant::Pid(value) => Term {
-                    value: TypedNanBox::new(5, value),
+                    value: TypedNanBox::new(TERM_PID, value),
+                },
+                Variant::Cons(value) => Term {
+                    value: TypedNanBox::new(TERM_CONS, value),
                 },
                 Variant::Pointer(value) => Term {
-                    value: TypedNanBox::new(6, value),
-                },
-                Variant::None => Term {
-                    value: TypedNanBox::new(7, 0),
+                    value: TypedNanBox::new(TERM_POINTER, value),
                 },
             }
         }
@@ -153,14 +166,14 @@ impl From<TypedNanBox<Variant>> for Variant {
         #[allow(unused_assignments)]
         unsafe {
             match value.tag() {
-                0 => Variant::Float(value.unpack()),
-                1 => Variant::Nil,
-                2 => Variant::Integer(value.unpack()),
-                3 => Variant::Atom(value.unpack()),
-                4 => Variant::Port(value.unpack()),
-                5 => Variant::Pid(value.unpack()),
-                6 => Variant::Pointer(value.unpack()),
-                7 => Variant::None,
+                TERM_FLOAT => Variant::Float(value.unpack()),
+                TERM_NIL => Variant::Nil(0),
+                TERM_INTEGER => Variant::Integer(value.unpack()),
+                TERM_ATOM => Variant::Atom(value.unpack()),
+                TERM_PORT => Variant::Port(value.unpack()),
+                TERM_PID => Variant::Pid(value.unpack()),
+                TERM_CONS => Variant::Cons(value.unpack()),
+                TERM_POINTER => Variant::Pointer(value.unpack()),
                 _ => std::hint::unreachable_unchecked(),
             }
         }
@@ -173,120 +186,62 @@ impl Term {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, PartialOrd, Clone, Hash)]
-pub enum Value {
-    // TODO: figure out if these should be an enum or a header + ptr (typed ptr)
-    /// Boxed values (on heap)
-    Ref(u32),
-    List(*const self::Cons),
-    Tuple(*const self::Tuple),
-    /// Strings use an Arc so they can be sent to other processes without
-    /// requiring a full copy of the data.
-    Binary(Arc<bitstring::Binary>),
-    Map(self::Map),
-    BigInt(Box<BigInt>), // Arc<BigInt>
-    Closure(*const self::Closure),
+/// Represents the header of a boxed value on the heap. Is followed by value.
+pub type Header = u8;
 
-    /// Special emulator values
+pub const BOXED_REF: u8 = 0;
+pub const BOXED_TUPLE: u8 = 1;
+pub const BOXED_BINARY: u8 = 2;
+pub const BOXED_MAP: u8 = 3;
+pub const BOXED_BIGINT: u8 = 4;
+pub const BOXED_CLOSURE: u8 = 5;
 
-    /// continuation pointer
-    CP(Box<Option<InstrPtr>>),
-    /// Catch context
-    Catch(Box<InstrPtr>),
-    /// Stack trace
-    StackTrace(*const exception::StackTrace),
+// pub enum Value {
+//     /// Special emulator values
+
+//     /// continuation pointer
+//     CP(Option<InstrPtr>),
+//     /// Catch context
+//     Catch(InstrPtr),
+//     /// Stack trace
+//     StackTrace(*const exception::StackTrace),
+// }
+
+/// Strings use an Arc so they can be sent to other processes without
+/// requiring a full copy of the data.
+#[derive(Debug)]
+#[repr(C)]
+pub struct Binary {
+    pub header: Header,
+    pub value: bitstring::Binary,
 }
 
 #[derive(Debug)]
-pub struct Cons {
-    pub head: Value,
-    pub tail: Value,
-}
-
-pub struct Iter<'a> {
-    head: Option<NonNull<Cons>>,
-    //len: usize,
-    marker: PhantomData<&'a Cons>,
-}
-
-impl<'a> Iterator for Iter<'a> {
-    type Item = &'a Value;
-
-    #[inline]
-    fn next(&mut self) -> Option<&'a Value> {
-        self.head.map(|node| unsafe {
-            // Need an unbound lifetime to get 'a
-            let node = &*node.as_ptr();
-            if let Value::List(cons) = node.tail {
-                self.head = Some(NonNull::new_unchecked(cons as *mut Cons));
-            } else {
-                // TODO match badly formed lists
-                self.head = None;
-            }
-            &node.head
-        })
-    }
-}
-
-impl Cons {
-    pub fn iter(&self) -> Iter {
-        Iter {
-            head: unsafe { Some(NonNull::new_unchecked(self as *const Cons as *mut Cons)) },
-            //len: self.len,
-            marker: PhantomData,
-        }
-    }
-}
-
-impl<'a> IntoIterator for &'a Cons {
-    type Item = &'a Value;
-    type IntoIter = Iter<'a>;
-
-    fn into_iter(self) -> Iter<'a> {
-        self.iter()
-    }
+#[repr(C)]
+pub struct Bignum {
+    pub header: Header,
+    pub value: BigInt,
 }
 
 #[derive(Debug)]
-pub struct Tuple {
-    /// Number of elements following the header.
-    pub len: u32,
-    pub ptr: NonNull<Value>,
-}
-
-impl Tuple {
-    pub fn as_slice(&self) -> &[Value] {
-        &self[..]
-    }
+#[repr(C)]
+pub struct Ref {
+    pub header: Header,
+    pub value: u32,
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct Closure {
+    pub header: Header,
     pub mfa: module::MFA,
     pub ptr: u32,
-    pub binding: Option<Vec<Value>>,
+    pub binding: Option<Vec<Term>>,
 }
-
-impl Deref for Tuple {
-    type Target = [Value];
-    fn deref(&self) -> &[Value] {
-        unsafe { ::std::slice::from_raw_parts(self.ptr.as_ptr(), self.len as usize) }
-    }
-}
-
-impl DerefMut for Tuple {
-    fn deref_mut(&mut self) -> &mut [Value] {
-        unsafe { ::std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len as usize) }
-    }
-}
-
-unsafe impl Sync for Value {}
-unsafe impl Send for Value {}
-
-unsafe impl Sync for Cons {}
 
 // term order:
 // number < atom < reference < fun < port < pid < tuple < map < nil < list < bit string
+#[derive(Eq, PartialEq)]
 pub enum Type {
     Number,
     Atom,
@@ -303,97 +258,111 @@ pub enum Type {
 
 impl Term {
     #[inline]
+    pub fn nil() -> Self {
+        Term {
+            value: TypedNanBox::new(TERM_NIL, 0),
+        }
+    }
+
+    #[inline]
+    pub fn atom(value: u32) -> Self {
+        Term {
+            value: TypedNanBox::new(TERM_ATOM, value),
+        }
+    }
+
+    // TODO: just use Term::from everywhere
+    #[inline]
+    pub fn int(value: i32) -> Self {
+        Term::from(value as i32)
+    }
+
+    // immediates
+
+    #[inline]
     pub fn is_none(&self) -> bool {
         self.value.tag() == 7
     }
 
     pub fn is_float(&self) -> bool {
-        self.value.tag() == 0
+        self.value.tag() == TERM_FLOAT
     }
 
     pub fn is_nil(&self) -> bool {
-        self.value.tag() == 1
+        self.value.tag() == TERM_NIL
     }
 
     pub fn is_smallint(&self) -> bool {
-        self.value.tag() == 2
+        self.value.tag() == TERM_INTEGER
     }
 
     pub fn is_atom(&self) -> bool {
-        self.value.tag() == 3
+        self.value.tag() == TERM_ATOM
     }
 
     pub fn is_port(&self) -> bool {
-        self.value.tag() == 4
+        self.value.tag() == TERM_PORT
     }
 
     pub fn is_pid(&self) -> bool {
-        self.value.tag() == 5
+        self.value.tag() == TERM_PID
     }
 
     pub fn is_pointer(&self) -> bool {
-        self.value.tag() == 6
+        self.value.tag() == TERM_POINTER
     }
 
+    #[inline]
+    pub fn is_list(&self) -> bool {
+        let tag = self.value.tag();
+        tag == TERM_POINTER || tag == TERM_NIL
+    }
+
+    #[inline]
     pub fn get_type(&self) -> Type {
         match self.value.tag() {
-            0 => Type::Number,
-            1 => Type::Nil,
-            2 => Type::Number,
-            3 => Type::Atom,
-            4 => Type::Port,
-            5 => Type::Pid,
-            6 => {
-                match self.get_boxed_value() {
-                    Value::Ref(..) => Type::Ref,
-                    Value::List(..) => Type::List,
-                    Value::Tuple(..) => Type::Tuple,
-                    Value::Binary(..) => Type::Binary,
-                    Value::Map(..) => Type::Map,
-                    Value::BigInt(..) => Type::Number,
-                    Value::Closure(..) => Type::Closure,
-                    _ => unimplemented!()
-                }
+            TERM_FLOAT => Type::Number,
+            TERM_NIL => Type::Nil,
+            TERM_INTEGER => Type::Number,
+            TERM_ATOM => Type::Atom,
+            TERM_PORT => Type::Port,
+            TERM_PID => Type::Pid,
+            TERM_CONS => Type::Pid,
+            TERM_POINTER => match self.get_boxed_value::<Header>().variant {
+                BOXED_REF => Type::Ref,
+                BOXED_TUPLE => Type::Tuple,
+                BOXED_BINARY => Type::Binary,
+                BOXED_MAP => Type::Map,
+                BOXED_BIGINT => Type::Number,
+                BOXED_CLOSURE => Type::Closure,
+                _ => unimplemented!(),
             },
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 
-    pub fn get_boxed_value(&self) -> &Value {
-       if let Variant::Pointer(ptr) = self.into_variant() {
-           unsafe {
-               return &*ptr
-           }
-       }
-       panic!("Not a boxed type!")
-    }
-
-    pub fn get_boxed_value_mut(&self) -> &mut Value {
-       if let Variant::Pointer(ptr) = self.into_variant() {
-           unsafe {
-               return &mut *ptr
-           }
-       }
-       panic!("Not a boxed type!")
-    }
-}
-
-impl Variant {
-    #[inline]
-    pub fn is_none(&self) -> bool {
-        match *self {
-            Variant::None => true,
-            _ => false,
+    pub fn get_boxed_header(&self) -> &Header {
+        if let Variant::Pointer(ptr) = self.into_variant() {
+            unsafe { return &*ptr }
         }
+        panic!("Not a boxed type!")
     }
 
-    #[inline]
-    pub fn is_smallint(&self) -> bool {
-        match *self {
-            Variant::Integer(..) => true,
-            _ => false,
+    pub fn get_boxed_value<T>(&self) -> &T {
+        if let Variant::Pointer(ptr) = self.into_variant() {
+            unsafe { &*(ptr as *const T) }
         }
+        panic!("Not a boxed type!")
     }
+
+    pub fn get_boxed_value_mut<T>(&self) -> &mut T {
+        if let Variant::Pointer(ptr) = self.into_variant() {
+            unsafe { return &mut *ptr }
+        }
+        panic!("Not a boxed type!")
+    }
+
+    // ------
 
     #[inline]
     pub fn is_integer(&self) -> bool {
@@ -405,105 +374,40 @@ impl Variant {
     }
 
     #[inline]
-    pub fn is_float(&self) -> bool {
-        match *self {
-            Variant::Float(..) => true,
-            _ => false,
-        }
-    }
-
-    #[inline]
     pub fn is_number(&self) -> bool {
-        match *self {
-            Variant::Float(..) => true,
-            Variant::BigInt(..) => true,
-            Variant::Integer(..) => true,
-            _ => false,
-        }
-    }
-
-    #[inline]
-    pub fn is_atom(&self) -> bool {
-        match *self {
-            Variant::Atom(..) => true,
-            _ => false,
-        }
-    }
-
-    #[inline]
-    pub fn is_pid(&self) -> bool {
-        match *self {
-            Variant::Pid(..) => true,
-            _ => false,
-        }
+        self.get_type() == Type::Number
     }
 
     #[inline]
     pub fn is_ref(&self) -> bool {
-        match *self {
-            Variant::Ref(..) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_port(&self) -> bool {
-        match *self {
-            Variant::Port(..) => true,
-            _ => false,
-        }
-    }
-
-    #[inline]
-    pub fn is_nil(&self) -> bool {
-        match *self {
-            Variant::Nil => true,
-            _ => false,
-        }
+        self.get_type() == Type::Ref
     }
 
     pub fn is_binary(&self) -> bool {
-        match *self {
-            Variant::Binary(..) => true,
-            _ => false,
-        }
-    }
-
-    #[inline]
-    pub fn is_list(&self) -> bool {
-        match *self {
-            Variant::List { .. } => true,
-            Variant::Nil => true, // apparently also valid
-            _ => false,
-        }
+        self.get_type() == Type::Binary
     }
 
     #[inline]
     pub fn is_non_empty_list(&self) -> bool {
         match *self {
-            Variant::List(ptr) => unsafe { !(*ptr).head.is_nil() },
+            Variant::Cons(ptr) => unsafe { !(*ptr).head.is_nil() },
             _ => false,
         }
     }
 
     #[inline]
     pub fn is_tuple(&self) -> bool {
-        match *self {
-            Variant::Tuple(..) => true,
-            _ => false,
-        }
+        self.get_type() == Type::Tuple
     }
 
     #[inline]
     pub fn is_function(&self) -> bool {
-        match *self {
-            Variant::Closure(..) => true,
-            _ => false,
-        }
+        self.get_type() == Type::Closure
     }
 
     #[inline]
     pub fn is_boolean(&self) -> bool {
-        match *self {
+        match self.into_variant() {
             Variant::Atom(atom::TRUE) | Variant::Atom(atom::FALSE) => true,
             _ => false,
         }
@@ -511,10 +415,7 @@ impl Variant {
 
     #[inline]
     pub fn is_map(&self) -> bool {
-        match *self {
-            Variant::Map(..) => true,
-            _ => false,
-        }
+        self.get_type() == Type::Map
     }
 
     pub fn is_cp(&self) -> bool {
@@ -525,7 +426,7 @@ impl Variant {
     }
 
     pub fn to_u32(&self) -> u32 {
-        match *self {
+        match self.into_variant() {
             Variant::Atom(i) => i,
             Variant::Pid(i) => i,
             Variant::Integer(i) => i as u32,
@@ -535,11 +436,13 @@ impl Variant {
 
     pub fn boolean(value: bool) -> Self {
         if value {
-            return Variant::Atom(atom::TRUE);
+            return Variant::Atom(atom::TRUE).into();
         }
-        Variant::Atom(atom::FALSE)
+        Variant::Atom(atom::FALSE).into()
     }
+}
 
+impl Variant {
     pub fn erl_eq(&self, other: &Variant) -> bool {
         match (self, other) {
             (Variant::Nil, Variant::Nil) => true,
@@ -554,7 +457,7 @@ impl Variant {
             (Variant::Port(p1), Variant::Port(p2)) => p1 == p2,
             (Variant::Ref(r1), Variant::Ref(r2)) => r1 == r2,
 
-            (Variant::List(l1), Variant::List(l2)) => unsafe {
+            (Variant::Cons(l1), Variant::Cons(l2)) => unsafe {
                 (**l1)
                     .iter()
                     .zip((**l2).iter())
@@ -588,13 +491,13 @@ impl Variant {
 impl std::fmt::Display for Variant {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Variant::Nil => write!(f, "nil"),
+            Variant::Nil(..) => write!(f, "nil"),
             Variant::Integer(i) => write!(f, "{}", i),
             Variant::Character(i) => write!(f, "{}", i),
             Variant::Atom(i) => write!(f, ":{}", atom::to_str(&Variant::Atom(*i)).unwrap()),
             Variant::Tuple(t) => unsafe {
                 write!(f, "{{")?;
-                let slice: &[Value] = &(**t);
+                let slice: &[Term] = &(**t);
                 let mut iter = slice.iter().peekable();
                 while let Some(val) = iter.next() {
                     write!(f, "{}", val)?;
@@ -604,16 +507,16 @@ impl std::fmt::Display for Variant {
                 }
                 write!(f, "}}")
             },
-            Variant::List(c) => unsafe {
+            Variant::Cons(c) => unsafe {
                 write!(f, "[")?;
                 let mut cons = *c;
                 loop {
                     write!(f, "{}", (*cons).head)?;
                     match &(*cons).tail {
                         // Proper list ends here, do not show the tail
-                        Variant::Nil => break,
+                        Variant::Nil(..) => break,
                         // List continues, print a comma and follow the tail
-                        Variant::List(c) => {
+                        Variant::Cons(c) => {
                             write!(f, ", ")?;
                             cons = *c;
                         }
@@ -634,16 +537,16 @@ impl std::fmt::Display for Variant {
 
 #[allow(clippy::mut_from_ref)]
 pub fn tuple(heap: &Heap, len: u32) -> &mut Tuple {
-    let layout = Layout::new::<Value>().repeat(len as usize).unwrap().0;
     let tuple = heap.alloc(self::Tuple {
         len,
         ptr: NonNull::dangling(),
     });
+    let layout = Layout::new::<Term>().repeat(len as usize).unwrap().0;
     tuple.ptr = heap.alloc_layout(layout).cast();
     tuple
 }
 
-pub fn cons(heap: &Heap, head: Value, tail: Value) -> Value {
+pub fn cons(heap: &Heap, head: Term, tail: Term) -> Term {
     Value::List(heap.alloc(self::Cons { head, tail }))
 }
 
@@ -655,48 +558,22 @@ mod tests {
     #[test]
     fn test_list_equality() {
         let heap = &Heap::new();
-        let v1 = cons!(
-            heap,
-            Value::Integer(1),
-            cons!(heap, Value::Integer(2), Value::Nil)
-        );
-        let v2 = cons!(
-            heap,
-            Value::Integer(1),
-            cons!(heap, Value::Integer(2), Value::Nil)
-        );
+        let v1 = cons!(heap, Term::int(1), cons!(heap, Term::int(2), Term::nil()));
+        let v2 = cons!(heap, Term::int(1), cons!(heap, Term::int(2), Term::nil()));
         assert!(v1.erl_eq(&v2));
 
-        let v3 = cons!(
-            heap,
-            Value::Integer(1),
-            cons!(heap, Value::Integer(3), Value::Nil)
-        );
+        let v3 = cons!(heap, Term::int(1), cons!(heap, Term::int(3), Term::nil()));
         assert!(!v1.erl_eq(&v3));
     }
 
     #[test]
     fn test_tuple_equality() {
         let heap = &Heap::new();
-        let v1 = tup2!(heap, Value::Integer(1), Value::Integer(2));
-        let v2 = tup2!(heap, Value::Integer(1), Value::Integer(2));
+        let v1 = tup2!(heap, Term::int(1), Term::int(2));
+        let v2 = tup2!(heap, Term::int(1), Term::int(2));
         assert!(v1.erl_eq(&v2));
 
-        let v3 = tup3!(
-            heap,
-            Value::Integer(1),
-            Value::Integer(1),
-            Value::Integer(1)
-        );
+        let v3 = tup3!(heap, Term::int(1), Term::int(1), Term::int(1));
         assert!(!v1.erl_eq(&v3));
     }
 }
-
-// /// A pointer to a value managed by the GC.
-// #[derive(Clone, Copy)]
-// pub struct ValuePointer {
-//     pub raw: TaggedPointer<Value>,
-// }
-
-// unsafe impl Send for ValuePointer {}
-// unsafe impl Sync for ValuePointer {}

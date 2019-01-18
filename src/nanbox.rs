@@ -199,11 +199,11 @@ impl NanBox {
     }
 
     #[inline]
-    pub fn tag(self) -> u32 {
+    pub fn tag(self) -> u8 {
         if self.0 <= SHIFTED_DOUBLE_MAX_TAG {
             0
         } else {
-            (self.0 >> TAG_SHIFT) as u32 & !DOUBLE_MAX_TAG
+            ((self.0 >> TAG_SHIFT) as u32 & !DOUBLE_MAX_TAG) as u8
         }
     }
 }
@@ -303,7 +303,7 @@ impl<T> TypedNanBox<T> {
         self.nanbox.unpack()
     }
 
-    pub fn tag(&self) -> u32 {
+    pub fn tag(&self) -> u8 {
         self.nanbox.tag()
     }
 }
