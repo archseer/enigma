@@ -7,7 +7,6 @@ use crate::value::{self, Value};
 use crate::servo_arc::Arc;
 use crate::vm;
 use hamt_rs::HamtMap;
-use crate::servo_arc::Arc;
 
 pub fn bif_maps_find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
     let key = &args[0];
@@ -58,8 +57,7 @@ pub fn bif_maps_from_list_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Val
                 if (tuple.len != 2) {
                     return Err(Exception::with_value(Reason::EXC_BADARG, item.clone()));
                 }
-                let mut iter = tuple.iter();
-                map = map.plus(iter.next().unwrap().clone(), iter.next().unwrap().clone());
+                map = map.plus(tuple[0].clone(), tuple[1].clone());
             } else {
                 return Err(Exception::with_value(Reason::EXC_BADARG, item.clone()));
             }
@@ -102,9 +100,9 @@ pub fn bif_maps_merge_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value])
     };
     let mut new_map = map2.clone();
     for (k, v) in map1.iter() {
-        new_map = new_map.clone().plus(k.clone(), v.clone());
+        new_map = new_map.plus(k.clone(), v.clone());
     }
-    Ok(Value::Map(value::Map(Arc::new(new_map.clone()))))
+    Ok(Value::Map(value::Map(Arc::new(new_map))))
 }
 
 pub fn bif_maps_put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -> BifResult {
@@ -169,7 +167,7 @@ pub fn bif_maps_take_2(_vm: &vm::Machine, process: &RcProcess, args: &[Value]) -
         let result = if let Some(value) = (*m.0).find(key) {
             let new_map = (*m.0).clone().minus(key);
             let heap = &process.context_mut().heap;
-            tup2!(heap, value.clone(), Value::Map(value::Map(Arc::new(new_map.clone()))))
+            tup2!(heap, value.clone(), Value::Map(value::Map(Arc::new(new_map))))
         } else {
             str_to_atom!("error")
         };
@@ -184,7 +182,6 @@ mod tests {
     use crate::atom;
     use crate::process::{self};
     use crate::module;
-    use crate::process;
     use crate::immix::Heap;
 
     #[test]
@@ -412,10 +409,10 @@ mod tests {
         if let Ok(Value::List(cons)) = bif_maps_keys_1(&vm, &process, &args) {
             unsafe {
                 let key1 = &(*cons).head;
-                assert_eq!(key1, &str_to_atom!("test2"));
+                assert_eq!(key1, &str_to_atom!("test"));
                 if let Value::List(tail) = (*cons).tail {
                     let key2 = &(*tail).head;
-                    assert_eq!(key2, &str_to_atom!("test"));
+                    assert_eq!(key2, &str_to_atom!("test2"));
                 } else {
                     panic!();
                 }
@@ -656,10 +653,10 @@ mod tests {
         if let Ok(Value::List(cons)) = bif_maps_values_1(&vm, &process, &args) {
             unsafe {
                 let key1 = &(*cons).head;
-                assert_eq!(key1, &Value::Integer(2));
+                assert_eq!(key1, &Value::Integer(1));
                 if let Value::List(tail) = (*cons).tail {
                     let key2 = &(*tail).head;
-                    assert_eq!(key2, &Value::Integer(1));
+                    assert_eq!(key2, &Value::Integer(2));
                 } else {
                     panic!();
                 }
