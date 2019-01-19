@@ -117,7 +117,7 @@ macro_rules! op_call_ext {
 
         println!(
             "call_ext mfa: {:?}, pid: {:?}",
-            (atom::from_index(mfa.0), atom::from_index(mfa.1), mfa.2),
+            (atom::to_str(mfa.0), atom::to_str(mfa.1), mfa.2),
             $process.pid
         );
 
@@ -532,7 +532,7 @@ impl Machine {
                 "running proc pid {:?} reds: {:?}, mod: {:?}, ins {:?}, args: {:?}",
                 process.pid,
                 reductions,
-                atom::from_index(module.name).unwrap(),
+                atom::to_str(module.name).unwrap(),
                 ins.op,
                 ins.args
             );
@@ -963,7 +963,7 @@ impl Machine {
                     let n = self.expand_arg(context, &ins.args[1]).to_u32();
                     if let Value::Tuple(t) = source {
                         let elem = unsafe {
-                            let slice: &[Value] = &(**t);
+                            let slice: &[Term] = &(**t);
                             slice[n as usize].clone()
                         };
                         set_register!(context, &ins.args[2], elem)
@@ -1001,7 +1001,7 @@ impl Machine {
                                 );
                             }
                         }
-                        set_register!(context, &ins.args[0], Value::Tuple(tuple))
+                        set_register!(context, &ins.args[0], Term::from(tuple))
                     }
                 }
                 Opcode::Badmatch => {

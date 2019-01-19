@@ -145,8 +145,8 @@ pub fn apply(
 //     .iter()
 //     .map(|mfa| {
 //         (
-//             atom::from_index(&mfa.0).unwrap(),
-//             atom::from_index(&mfa.1).unwrap(),
+//             atom::to_str(&mfa.0).unwrap(),
+//             atom::to_str(&mfa.1).unwrap(),
 //             mfa.2,
 //         )
 //     })
@@ -456,7 +456,7 @@ pub fn bif_erlang_process_flag_2(_vm: &vm::Machine, process: &RcProcess, args: &
                 return Ok(Term::atom(atom::FALSE));
             }
         },
-        Term::atom(i) => unimplemented!("erlang:process_flag/2 not implemented for {:?}", atom::from_index(*i)),
+        Term::atom(i) => unimplemented!("erlang:process_flag/2 not implemented for {:?}", atom::to_str(*i)),
         _ => unreachable!()
     }
 }

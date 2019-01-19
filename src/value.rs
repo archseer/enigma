@@ -9,7 +9,6 @@ use crate::servo_arc::Arc;
 use allocator_api::Layout;
 use num::bigint::BigInt;
 use std::hash::{Hash, Hasher};
-use std::ptr::NonNull;
 
 mod cons;
 mod map;
@@ -58,7 +57,7 @@ struct WrongBoxError;
 /// A term is a nanboxed compact representation of a value in 64 bits. It can either be immediate,
 /// in which case it embeds the data, or a boxed pointer, that points to more data.
 //#[derive(Debug, Eq, PartialEq, PartialOrd, Clone, Hash)]
-#[derive(Debug, Clone)] // TODO make it Copy
+#[derive(Debug, Clone, Eq)] // TODO make it Copy
 pub struct Term {
     value: TypedNanBox<Variant>,
 }
@@ -73,6 +72,7 @@ impl Hash for Term {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Special {
     Nil,
     /// An internal placeholder signifying "THE_NON_VALUE".
@@ -80,7 +80,7 @@ pub enum Special {
     Literal(),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Hash)]
+#[derive(Debug, Clone, Eq, PartialOrd, Hash)]
 pub enum Variant {
     Float(f64),
     Nil(Special), // TODO: expand nil to be able to hold different types of empty (tuple, list, map)
@@ -110,8 +110,8 @@ impl From<process::PID> for Term {
     }
 }
 
-impl From<*const Cons> for Term {
-    fn from(value: *const Cons) -> Term {
+impl From<&mut Cons> for Term {
+    fn from(value: &mut Cons) -> Term {
         Term::from(Variant::Cons(value))
     }
 }
@@ -328,7 +328,7 @@ impl Term {
             TERM_PORT => Type::Port,
             TERM_PID => Type::Pid,
             TERM_CONS => Type::Pid,
-            TERM_POINTER => match self.get_boxed_value::<Header>().variant {
+            TERM_POINTER => match self.get_boxed_header() {
                 BOXED_REF => Type::Ref,
                 BOXED_TUPLE => Type::Tuple,
                 BOXED_BINARY => Type::Binary,
@@ -341,23 +341,23 @@ impl Term {
         }
     }
 
-    pub fn get_boxed_header(&self) -> &Header {
+    pub fn get_boxed_header(&self) -> Header {
         if let Variant::Pointer(ptr) = self.into_variant() {
-            unsafe { return &*ptr }
+            unsafe { return *ptr }
         }
         panic!("Not a boxed type!")
     }
 
     pub fn get_boxed_value<T>(&self) -> &T {
         if let Variant::Pointer(ptr) = self.into_variant() {
-            unsafe { &*(ptr as *const T) }
+            unsafe { return &*(ptr as *const T) }
         }
         panic!("Not a boxed type!")
     }
 
     pub fn get_boxed_value_mut<T>(&self) -> &mut T {
         if let Variant::Pointer(ptr) = self.into_variant() {
-            unsafe { return &mut *ptr }
+            unsafe { return &mut *(ptr as *mut T) }
         }
         panic!("Not a boxed type!")
     }
@@ -389,7 +389,7 @@ impl Term {
 
     #[inline]
     pub fn is_non_empty_list(&self) -> bool {
-        match *self {
+        match self.into_variant() {
             Variant::Cons(ptr) => unsafe { !(*ptr).head.is_nil() },
             _ => false,
         }
@@ -442,20 +442,22 @@ impl Term {
     }
 }
 
-impl Variant {
-    pub fn erl_eq(&self, other: &Variant) -> bool {
+impl PartialEq for Term {
+    fn eq(&self, other: &Self) -> bool {
+        self.into_variant().eq(other.into_variant())
+    }
+}
+
+impl PartialEq for Variant {
+    fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Variant::Nil, Variant::Nil) => true,
+            (Variant::Nil(..), Variant::Nil(..)) => true,
             (Variant::Integer(i1), Variant::Integer(i2)) => i1 == i2,
             (Variant::Float(f1), Variant::Float(f2)) => f1 == f2,
-            (Variant::BigInt(b1), Variant::BigInt(b2)) => b1 == b2,
-            (Variant::Integer(_), Variant::Float(_)) => unimplemented!(),
-            (Variant::Float(_), Variant::Integer(_)) => unimplemented!(),
 
             (Variant::Atom(a1), Variant::Atom(a2)) => a1 == a2,
             (Variant::Pid(p1), Variant::Pid(p2)) => p1 == p2,
             (Variant::Port(p1), Variant::Port(p2)) => p1 == p2,
-            (Variant::Ref(r1), Variant::Ref(r2)) => r1 == r2,
 
             (Variant::Cons(l1), Variant::Cons(l2)) => unsafe {
                 (**l1)
@@ -463,6 +465,11 @@ impl Variant {
                     .zip((**l2).iter())
                     .all(|(e1, e2)| e1.erl_eq(e2))
             },
+
+            (Variant::Pointer(p1), Variant::Pointer(p2)) => unsafe {
+
+            (Variant::Ref(r1), Variant::Ref(r2)) => r1 == r2,
+            (Variant::BigInt(b1), Variant::BigInt(b2)) => b1 == b2,
             (Variant::Tuple(v1), Variant::Tuple(v2)) => unsafe {
                 if (**v1).len == (**v2).len {
                     (**v1)
@@ -475,7 +482,6 @@ impl Variant {
                 }
             },
             (Variant::Binary(b1), Variant::Binary(b2)) => b1 == b2,
-            (Variant::Literal(l1), Variant::Literal(l2)) => l1 == l2,
             (Variant::Closure(c1), Variant::Closure(c2)) => unsafe { (**c1).mfa == (**c2).mfa },
             (Variant::CP(l1), Variant::CP(l2)) => l1 == l2,
             (Variant::Catch(l1), Variant::Catch(l2)) => l1 == l2,
@@ -486,6 +492,15 @@ impl Variant {
             _ => false,
         }
     }
+    // non strict comparisons need to handle these + bigint
+    // (Variant::Integer(_), Variant::Float(_)) => unimplemented!(),
+    // (Variant::Float(_), Variant::Integer(_)) => unimplemented!(),
+}
+
+impl std::fmt::Display for Term {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self.into_variant())
+    }
 }
 
 impl std::fmt::Display for Variant {
@@ -493,32 +508,21 @@ impl std::fmt::Display for Variant {
         match self {
             Variant::Nil(..) => write!(f, "nil"),
             Variant::Integer(i) => write!(f, "{}", i),
-            Variant::Character(i) => write!(f, "{}", i),
-            Variant::Atom(i) => write!(f, ":{}", atom::to_str(&Variant::Atom(*i)).unwrap()),
-            Variant::Tuple(t) => unsafe {
-                write!(f, "{{")?;
-                let slice: &[Term] = &(**t);
-                let mut iter = slice.iter().peekable();
-                while let Some(val) = iter.next() {
-                    write!(f, "{}", val)?;
-                    if iter.peek().is_some() {
-                        write!(f, ", ")?;
-                    }
-                }
-                write!(f, "}}")
-            },
+            Variant::Atom(i) => write!(f, ":{}", atom::to_str(*i).unwrap()),
+            Variant::Port(i) => write!(f, "#Port<{}>", i),
+            Variant::Pid(i) => write!(f, "#Pid<{}>", i),
             Variant::Cons(c) => unsafe {
                 write!(f, "[")?;
                 let mut cons = *c;
                 loop {
                     write!(f, "{}", (*cons).head)?;
-                    match &(*cons).tail {
+                    match (*cons).tail.into_variant() {
                         // Proper list ends here, do not show the tail
                         Variant::Nil(..) => break,
                         // List continues, print a comma and follow the tail
                         Variant::Cons(c) => {
                             write!(f, ", ")?;
-                            cons = *c;
+                            cons = c;
                         }
                         // Improper list, show tail
                         val => {
@@ -529,8 +533,29 @@ impl std::fmt::Display for Variant {
                 }
                 write!(f, "]")
             },
-            Variant::Pid(pid) => write!(f, "#Pid<{}>", pid),
-            v => write!(f, "({:?})", v),
+            Variant::Pointer(ptr) => unsafe {
+                match **ptr {
+                    BOXED_TUPLE => {
+                        let t = *(*ptr as *const Tuple);
+                        
+                        write!(f, "{{")?;
+                        let mut iter = t.iter().peekable();
+                        while let Some(val) = iter.next() {
+                            write!(f, "{}", val)?;
+                            if iter.peek().is_some() {
+                                write!(f, ", ")?;
+                            }
+                        }
+                        write!(f, "}}")
+                    },
+                    BOXED_REF => write!(f, "#Ref<>"),
+                    BOXED_BINARY => write!(f, "#Binary<>"),
+                    BOXED_MAP => write!(f, "#Map<>"),
+                    BOXED_BIGINT => write!(f, "#BigInt<>"),
+                    BOXED_CLOSURE => write!(f, "#Closure<>"),
+                    _ => unimplemented!(),
+                }
+            }
         }
     }
 }
@@ -538,16 +563,16 @@ impl std::fmt::Display for Variant {
 #[allow(clippy::mut_from_ref)]
 pub fn tuple(heap: &Heap, len: u32) -> &mut Tuple {
     let tuple = heap.alloc(self::Tuple {
+        header: BOXED_TUPLE,
         len,
-        ptr: NonNull::dangling(),
     });
     let layout = Layout::new::<Term>().repeat(len as usize).unwrap().0;
-    tuple.ptr = heap.alloc_layout(layout).cast();
+    heap.alloc_layout(layout); // TODO: do something with the ptr
     tuple
 }
 
 pub fn cons(heap: &Heap, head: Term, tail: Term) -> Term {
-    Value::List(heap.alloc(self::Cons { head, tail }))
+    Term::from(heap.alloc(self::Cons { head, tail }))
 }
 
 #[cfg(test)]

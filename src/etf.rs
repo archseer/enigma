@@ -2,7 +2,7 @@ use crate::atom;
 use crate::bitstring;
 use crate::immix::Heap;
 use crate::servo_arc::Arc;
-use crate::value::{self, Term, Value, HAMT};
+use crate::value::{self, Term, HAMT};
 use nom::*;
 use num::traits::ToPrimitive;
 use num_bigint::{BigInt, Sign};
@@ -129,7 +129,7 @@ pub fn decode_tuple<'a>(rest: &'a [u8], len: u32, heap: &Heap) -> IResult<&'a [u
         rest
     });
 
-    Ok((rest, Term::Tuple(tuple)))
+    Ok((rest, tuple.into()))
 }
 
 pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
@@ -140,7 +140,7 @@ pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
 
         let start = heap.alloc(value::Cons {
             head: val,
-            tail: Term::Nil,
+            tail: Term::nil(),
         });
 
         let (tail, rest) =
@@ -149,7 +149,7 @@ pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
                 let (rest, val) = decode_value(rest, heap).unwrap();
                 let new_cons = heap.alloc(value::Cons {
                     head: val,
-                    tail: Term::Nil,
+                    tail: Term::nil(),
                 });
                 std::mem::replace(&mut *tail, Term::List(new_cons));
                 (new_cons as *mut value::Cons, rest)
@@ -182,7 +182,7 @@ pub fn decode_map<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
 pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
     let (rest, len) = be_u16(rest)?;
     if len == 0 {
-        return Ok((rest, Term::Nil));
+        return Ok((rest, Term::nil()));
     }
 
     unsafe {
@@ -190,7 +190,7 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term>
 
         let start = heap.alloc(value::Cons {
             head: Term::Character(elem),
-            tail: Term::Nil,
+            tail: Term::nil(),
         });
 
         let (tail, rest) =
@@ -200,7 +200,7 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term>
 
                 let new_cons = heap.alloc(value::Cons {
                     head: Term::Character(elem),
-                    tail: Term::Nil,
+                    tail: Term::nil(),
                 });
 
                 std::mem::replace(&mut *tail, Term::List(new_cons as *const value::Cons));
@@ -208,7 +208,7 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term>
             });
 
         // set the tail
-        (*tail).tail = Term::Nil;
+        (*tail).tail = Term::nil();
 
         Ok((rest, Term::List(start)))
     }
@@ -241,10 +241,10 @@ pub fn decode_bignum(rest: &[u8], size: u32) -> IResult<&[u8], Term> {
     let (rest, digits) = take!(rest, size)?;
     let big = BigInt::from_bytes_le(sign, digits);
 
-    // Assert that the number fits into small
+    // Assert that the number fits into small TODO: double check again
     if big.bits() < WORD_BITS - 4 {
         let b_signed = big.to_isize().unwrap();
-        return Ok((rest, Term::Integer(b_signed as i64)));
+        return Ok((rest, Term::int(b_signed as i32)));
     }
 
     Ok((rest, Term::BigInt(Box::new(big))))

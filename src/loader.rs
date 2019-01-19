@@ -5,7 +5,7 @@ use crate::immix::Heap;
 use crate::module::{Lambda, Module, MFA};
 use crate::opcodes::*;
 use crate::servo_arc::Arc;
-use crate::value::{Value, Term};
+use crate::value::Term;
 use compress::zlib;
 use hashbrown::HashMap;
 use nom::*;
@@ -744,7 +744,7 @@ fn parse_extended_literal(rest: &[u8]) -> IResult<&[u8], LValue> {
 #[derive(Debug)]
 pub struct Instruction {
     pub op: Opcode,
-    pub args: Vec<Term>,
+    pub args: Vec<LValue>,
 }
 
 named!(
