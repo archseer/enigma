@@ -1,4 +1,4 @@
-use super::{Term, Variant, Header, WrongBoxError};
+use super::{Term, Variant, WrongBoxError, TryInto};
 use std::ptr::NonNull;
 use core::marker::PhantomData;
 
@@ -12,11 +12,13 @@ pub struct Cons {
 unsafe impl Sync for Cons {}
 
 // TODO: to be TryFrom once rust stabilizes the trait
-impl Cons {
+impl TryInto<Cons> for Term {
+    type Error = WrongBoxError;
+
     #[inline]
-    fn try_from(value: &Term) -> Result<&mut Self, WrongBoxError> {
-        if let Variant::Cons(ptr) = value.into_variant() {
-            unsafe { return Ok(&mut *(ptr as *const Self)) }
+    fn try_into(&self) -> Result<&Cons, WrongBoxError> {
+        if let Variant::Cons(ptr) = self.into_variant() {
+            unsafe { return Ok(&*(ptr as *const Cons)) }
         }
         Err(WrongBoxError)
     }
@@ -29,15 +31,15 @@ pub struct Iter<'a> {
 }
 
 impl<'a> Iterator for Iter<'a> {
-    type Item = &'a Value;
+    type Item = &'a Term;
 
     #[inline]
-    fn next(&mut self) -> Option<&'a Value> {
+    fn next(&mut self) -> Option<&'a Term> {
         self.head.map(|node| unsafe {
             // Need an unbound lifetime to get 'a
             let node = &*node.as_ptr();
-            if let Value::List(cons) = node.tail {
-                self.head = Some(NonNull::new_unchecked(cons as *mut Cons));
+            if let Ok(cons) = node.tail.try_into() {
+                self.head = Some(NonNull::new_unchecked(cons as *const Cons as *mut Cons));
             } else {
                 // TODO match badly formed lists
                 self.head = None;
@@ -58,7 +60,7 @@ impl Cons {
 }
 
 impl<'a> IntoIterator for &'a Cons {
-    type Item = &'a Value;
+    type Item = &'a Term;
     type IntoIter = Iter<'a>;
 
     fn into_iter(self) -> Iter<'a> {

@@ -1,8 +1,8 @@
-use super::{Term, Variant, Header, WrongBoxError, BOXED_TUPLE};
+use super::{Term, Variant, Header, WrongBoxError, BOXED_TUPLE, TryInto};
 use std::ops::{Deref, DerefMut};
 // use std::convert::TryFrom;
 
-#[derive(Debug)]
+#[derive(Debug, Eq)]
 #[repr(C)]
 pub struct Tuple {
     /// Number of elements following the header.
@@ -31,14 +31,22 @@ impl DerefMut for Tuple {
     }
 }
 
+impl PartialEq for Tuple {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_slice() == other.as_slice()
+    }
+}
+
 // TODO: to be TryFrom once rust stabilizes the trait
-impl Tuple {
+impl TryInto<Tuple> for Term {
+    type Error = WrongBoxError;
+
     #[inline]
-    fn try_from(value: &Term) -> Result<&mut Self, WrongBoxError> {
-        if let Variant::Pointer(ptr) = value.into_variant() {
+    fn try_into(&self) -> Result<&Tuple, WrongBoxError> {
+        if let Variant::Pointer(ptr) = self.into_variant() {
             unsafe {
                 if *ptr == BOXED_TUPLE {
-                    return Ok(&mut *(ptr as *const Self))
+                    return Ok(&*(ptr as *const Tuple))
                 }
             }
         }

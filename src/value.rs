@@ -17,6 +17,14 @@ pub use cons::Cons;
 pub use map::{Map, HAMT};
 pub use tuple::Tuple;
 
+pub trait TryInto<T>: Sized {
+    /// The type returned in the event of a conversion error.
+    type Error;
+
+    /// Performs the conversion.
+    fn try_into(&self) -> Result<&T, Self::Error>;
+}
+
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 // annoying: we have to wrap Floats to be able to define hash
 pub struct Float(pub f64);
@@ -463,32 +471,27 @@ impl PartialEq for Variant {
                 (**l1)
                     .iter()
                     .zip((**l2).iter())
-                    .all(|(e1, e2)| e1.erl_eq(e2))
+                    .all(|(e1, e2)| e1.eq(e2))
             },
 
             (Variant::Pointer(p1), Variant::Pointer(p2)) => unsafe {
-
-            (Variant::Ref(r1), Variant::Ref(r2)) => r1 == r2,
-            (Variant::BigInt(b1), Variant::BigInt(b2)) => b1 == b2,
-            (Variant::Tuple(v1), Variant::Tuple(v2)) => unsafe {
-                if (**v1).len == (**v2).len {
-                    (**v1)
-                        .as_slice()
-                        .iter()
-                        .zip((**v2).as_slice())
-                        .all(|(e1, e2)| e1.erl_eq(e2))
+                let header = **p1;
+                if header == **p2 {
+                    match header {
+                        BOXED_TUPLE => {
+                            let t1 = &*(*p1 as *const Tuple);
+                            let t2 = &*(*p2 as *const Tuple);
+                            t1.eq(t2)
+                        },
+                        BOXED_CLOSURE => unreachable!(),
+                        // TODO: handle other boxed types
+                        // ref, bigint, cp, catch, stacktrace
+                        _ => unimplemented!(),
+                    }
                 } else {
                     false
                 }
             },
-            (Variant::Binary(b1), Variant::Binary(b2)) => b1 == b2,
-            (Variant::Closure(c1), Variant::Closure(c2)) => unsafe { (**c1).mfa == (**c2).mfa },
-            (Variant::CP(l1), Variant::CP(l2)) => l1 == l2,
-            (Variant::Catch(l1), Variant::Catch(l2)) => l1 == l2,
-            (Value::Closure { .. }, _) => unreachable!(), // There should never happen
-            (_, Value::Closure { .. }) => unreachable!(),
-            (Value::StackTrace(..), _) => unreachable!(),
-            (_, Value::StackTrace(..)) => unreachable!(),
             _ => false,
         }
     }
@@ -537,7 +540,7 @@ impl std::fmt::Display for Variant {
                 match **ptr {
                     BOXED_TUPLE => {
                         let t = *(*ptr as *const Tuple);
-                        
+
                         write!(f, "{{")?;
                         let mut iter = t.iter().peekable();
                         while let Some(val) = iter.next() {
