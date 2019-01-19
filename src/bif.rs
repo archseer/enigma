@@ -59,6 +59,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::from_str("trunc"), 1), bif_erlang_trunc_1);
     bifs.insert((erlang, atom::from_str("tuple_size"), 1), bif_erlang_tuple_size_1);
     bifs.insert((erlang, atom::from_str("byte_size"), 1), bif_erlang_byte_size_1);
+    bifs.insert((erlang, atom::from_str("map_size"), 1), bif_erlang_map_size_1);
     bifs.insert((erlang, atom::from_str("error"), 1), bif_erlang_error_1);
     bifs.insert((erlang, atom::from_str("error"), 2), bif_erlang_error_2);
     //bifs.insert((erlang, atom::from_str("raise"), 3), bif_erlang_raise_3);
@@ -387,6 +388,14 @@ fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     Ok(Term::int(res as i32)) // TODO: cast potentially unsafe
+}
+
+fn bif_erlang_map_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    let res = match &args[0] {
+        Value::Map(map) => map.0.len(),
+        _ => return Err(Exception::with_value(Reason::EXC_BADARG, args[0].clone())),
+    };
+    Ok(Value::Integer(res as i64))
 }
 
 fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
@@ -1159,6 +1168,19 @@ mod tests {
         let res = bif_erlang_tuple_size_1(&vm, &process, &args);
 
         assert_eq!(res, Ok(Term::int(3)));
+    }
+
+    #[test]
+    fn test_bif_map_size_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+
+        let map = map!(str_to_atom!("test") => Value::Integer(1), str_to_atom!("test2") => Value::Integer(3));
+        let args = vec![map];
+        let res = bif_erlang_map_size_1(&vm, &process, &args);
+
+        assert_eq!(res, Ok(Value::Integer(2)));
     }
 
     #[test]
