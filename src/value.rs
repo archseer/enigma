@@ -8,6 +8,7 @@ use crate::process::{self, InstrPtr};
 use crate::servo_arc::Arc;
 use allocator_api::Layout;
 use num::bigint::BigInt;
+use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
 mod cons;
@@ -88,7 +89,7 @@ pub enum Special {
     Literal(),
 }
 
-#[derive(Debug, Clone, Eq, PartialOrd, Hash)]
+#[derive(Debug, Clone, Eq, Hash)]
 pub enum Variant {
     Float(f64),
     Nil(Special), // TODO: expand nil to be able to hold different types of empty (tuple, list, map)
@@ -127,6 +128,12 @@ impl From<&mut Cons> for Term {
 impl From<&mut Tuple> for Term {
     fn from(value: &mut Tuple) -> Term {
         Term::from(Variant::Pointer(value as *const Tuple as *const Header))
+    }
+}
+
+impl From<&mut Map> for Term {
+    fn from(value: &mut Map) -> Term {
+        Term::from(Variant::Pointer(value as *const Map as *const Header))
     }
 }
 
@@ -249,7 +256,7 @@ pub struct Closure {
 
 // term order:
 // number < atom < reference < fun < port < pid < tuple < map < nil < list < bit string
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Ord, PartialOrd)]
 pub enum Type {
     Number,
     Atom,
@@ -283,6 +290,19 @@ impl Term {
     #[inline]
     pub fn int(value: i32) -> Self {
         Term::from(value as i32)
+    }
+
+    pub fn pid(value: process::PID) -> Self {
+        Term {
+            value: TypedNanBox::new(TERM_PID, value),
+        }
+    }
+
+    pub fn map(heap: &Heap, value: HAMT) -> Self {
+        Term::from(heap.alloc(self::Map {
+            header: BOXED_MAP,
+            value,
+        }))
     }
 
     // immediates
@@ -452,7 +472,7 @@ impl Term {
 
 impl PartialEq for Term {
     fn eq(&self, other: &Self) -> bool {
-        self.into_variant().eq(other.into_variant())
+        self.into_variant().eq(&other.into_variant())
     }
 }
 
@@ -467,12 +487,7 @@ impl PartialEq for Variant {
             (Variant::Pid(p1), Variant::Pid(p2)) => p1 == p2,
             (Variant::Port(p1), Variant::Port(p2)) => p1 == p2,
 
-            (Variant::Cons(l1), Variant::Cons(l2)) => unsafe {
-                (**l1)
-                    .iter()
-                    .zip((**l2).iter())
-                    .all(|(e1, e2)| e1.eq(e2))
-            },
+            (Variant::Cons(l1), Variant::Cons(l2)) => unsafe { (*l1).eq(&*l2) },
 
             (Variant::Pointer(p1), Variant::Pointer(p2)) => unsafe {
                 let header = **p1;
@@ -482,7 +497,7 @@ impl PartialEq for Variant {
                             let t1 = &*(*p1 as *const Tuple);
                             let t2 = &*(*p2 as *const Tuple);
                             t1.eq(t2)
-                        },
+                        }
                         BOXED_CLOSURE => unreachable!(),
                         // TODO: handle other boxed types
                         // ref, bigint, cp, catch, stacktrace
@@ -500,9 +515,38 @@ impl PartialEq for Variant {
     // (Variant::Float(_), Variant::Integer(_)) => unimplemented!(),
 }
 
+// TODO: make faster by not doing into_variant in some cases
+impl PartialOrd for Term {
+    fn partial_cmp(&self, other: &Term) -> Option<Ordering> {
+        Some(self.cmp(&other))
+    }
+}
+
+// TODO: make faster by not doing into_variant in some cases
+impl Ord for Term {
+    fn cmp(&self, other: &Term) -> Ordering {
+        // TODO: prevent blowing out the stack from recursion in the future
+
+        // compare types first, if not equal, we can compare them as raw Type casts
+        // else, start comparing immediates
+        // allow inexact number comparison
+
+        let t1 = self.get_type();
+        let t2 = self.get_type();
+
+        if t1 != t2 {
+            // types don't match, use term ordering
+            return t1.cmp(&t2);
+        }
+
+        // types match, let's keep going
+        unimplemented!()
+    }
+}
+
 impl std::fmt::Display for Term {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self.into_variant())
+        write!(f, "{}", self.into_variant())
     }
 }
 
@@ -550,7 +594,7 @@ impl std::fmt::Display for Variant {
                             }
                         }
                         write!(f, "}}")
-                    },
+                    }
                     BOXED_REF => write!(f, "#Ref<>"),
                     BOXED_BINARY => write!(f, "#Binary<>"),
                     BOXED_MAP => write!(f, "#Map<>"),
@@ -558,7 +602,7 @@ impl std::fmt::Display for Variant {
                     BOXED_CLOSURE => write!(f, "#Closure<>"),
                     _ => unimplemented!(),
                 }
-            }
+            },
         }
     }
 }

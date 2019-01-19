@@ -75,11 +75,11 @@ macro_rules! str_to_atom {
 // based off of maplit: https://github.com/bluss/maplit/blob/master/src/lib.rs
 #[macro_export]
 macro_rules! map {
-    (@single $($x:tt)*) => (());
+    // (@single $($x:tt)*) => (());
     //(@count $($rest:expr),*) => (<[()]>::len(&[$(map!(@single $rest)),*]));
 
-    ($($key:expr => $value:expr,)+) => { map!($($key => $value),+) };
-    ($($key:expr => $value:expr),*) => {
+    ($heap:expr, $($key:expr => $value:expr,)+) => { map!($heap, $($key => $value),+) };
+    ($heap:expr, $($key:expr => $value:expr),*) => {
         {
             // let _cap = map!(@count $($key),*);
             // let mut _map = ::std::collections::HashMap::with_capacity(_cap);
@@ -87,7 +87,7 @@ macro_rules! map {
             $(
                 _map = _map.plus($key, $value);
             )*
-            Value::Map(value::Map(Arc::new(_map)))
+            Term::map($heap, _map)
         }
     };
 }

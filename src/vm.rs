@@ -3,8 +3,8 @@ use crate::bif;
 use crate::bitstring;
 use crate::exception::{self, Exception, Reason};
 use crate::exports_table::{Export, ExportsTable, RcExportsTable};
-use crate::module;
 use crate::loader::LValue;
+use crate::module;
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
 use crate::opcodes::Opcode;
 use crate::pool::{Job, JoinGuard as PoolJoinGuard, Pool, Worker};
@@ -67,14 +67,14 @@ macro_rules! expand_float {
     ($context:expr, $value:expr) => {{
         match $value {
             &LValue::ExtendedLiteral(i) => unsafe {
-                if let Value::Float(value::Float(f)) = (*$context.ip.module).literals[i as usize] {
+                if let Term::Float(value::Float(f)) = (*$context.ip.module).literals[i as usize] {
                     f
                 } else {
                     unreachable!()
                 }
             },
             &LValue::X(reg) => {
-                if let Value::Float(value::Float(f)) = $context.x[reg as usize] {
+                if let Term::Float(value::Float(f)) = $context.x[reg as usize] {
                     f
                 } else {
                     unreachable!()
@@ -82,7 +82,7 @@ macro_rules! expand_float {
             }
             &LValue::Y(reg) => {
                 let len = $context.stack.len();
-                if let Value::Float(value::Float(f)) = $context.stack[len - (reg + 2) as usize] {
+                if let Term::Float(value::Float(f)) = $context.stack[len - (reg + 2) as usize] {
                     f
                 } else {
                     unreachable!()
@@ -100,7 +100,7 @@ macro_rules! op_deallocate {
         $context
             .stack
             .truncate($context.stack.len() - $nwords as usize);
-        if let Value::CP(cp) = cp {
+        if let Term::CP(cp) = cp {
             $context.cp = *cp;
         } else {
             panic!("Bad CP value! {:?}", cp)
@@ -196,7 +196,7 @@ macro_rules! op_apply_fun {
         let mut tmp = &$context.x[1];
         let mut arity = 0;
 
-        while let Value::List(ptr) = *tmp {
+        while let Term::List(ptr) = *tmp {
             if arity < process::MAX_REG - 1 {
                 $context.x[arity] = unsafe { (*ptr).head.clone() };
                 arity += 1;
@@ -212,7 +212,7 @@ macro_rules! op_apply_fun {
         }
         //context.x[arity] = fun.clone();
 
-        if let Value::Closure(closure) = fun {
+        if let Term::Closure(closure) = fun {
             op_call_fun!($vm, $context, &closure, arity);
         } else {
             // TODO raise error
@@ -372,7 +372,7 @@ impl Machine {
         let primary_threads = 8;
         let process_pool = Pool::new(primary_threads, Some("primary".to_string()));
 
-        println!("sizeof value: {:?}", std::mem::size_of::<Value>());
+        println!("sizeof value: {:?}", std::mem::size_of::<Term>());
 
         let state = State {
             process_table: Mutex::new(ProcessTable::new()),
@@ -702,7 +702,7 @@ impl Machine {
                         for _ in 0..*stackneed {
                             context.stack.push(Term::nil())
                         }
-                        context.stack.push(Value::CP(Box::new(context.cp)));
+                        context.stack.push(Term::CP(Box::new(context.cp)));
                     } else {
                         unreachable!()
                     }
@@ -721,7 +721,7 @@ impl Machine {
                             context.stack.push(Term::nil())
                         }
                         // TODO: check heap for heapneed space!
-                        context.stack.push(Value::CP(Box::new(context.cp)));
+                        context.stack.push(Term::CP(Box::new(context.cp)));
                     } else {
                         unreachable!()
                     }
@@ -732,7 +732,7 @@ impl Machine {
                         for _ in 0..*need {
                             context.stack.push(Term::nil())
                         }
-                        context.stack.push(Value::CP(Box::new(context.cp)));
+                        context.stack.push(Term::CP(Box::new(context.cp)));
                     } else {
                         unreachable!()
                     }
@@ -748,7 +748,7 @@ impl Machine {
                             context.stack.push(Term::nil())
                         }
                         // TODO: check heap for heapneed space!
-                        context.stack.push(Value::CP(Box::new(context.cp)));
+                        context.stack.push(Term::CP(Box::new(context.cp)));
                     } else {
                         unreachable!()
                     }
@@ -798,7 +798,7 @@ impl Machine {
                     let v1 = self.expand_arg(context, &ins.args[1]);
                     let v2 = self.expand_arg(context, &ins.args[2]);
 
-                    if let Some(std::cmp::Ordering::Equal) = v1.partial_cmp(v2) {
+                    if let Some(std::cmp::Ordering::Equal) = v1.erl_partial_cmp(v2) {
                         // ok
                     } else {
                         let fail = self.expand_arg(context, &ins.args[0]).to_u32();
@@ -811,7 +811,7 @@ impl Machine {
                     let v1 = self.expand_arg(context, &ins.args[1]);
                     let v2 = self.expand_arg(context, &ins.args[2]);
 
-                    if let Some(std::cmp::Ordering::Equal) = v1.partial_cmp(v2) {
+                    if let Some(std::cmp::Ordering::Equal) = v1.erl_partial_cmp(v2) {
                         let fail = self.expand_arg(context, &ins.args[0]).to_u32();
                         op_jump!(context, fail);
                     }
@@ -822,7 +822,7 @@ impl Machine {
                     let v1 = self.expand_arg(context, &ins.args[1]);
                     let v2 = self.expand_arg(context, &ins.args[2]);
 
-                    if v1.erl_eq(v2) {
+                    if v1.eq(v2) {
                         // ok
                     } else {
                         let fail = self.expand_arg(context, &ins.args[0]).to_u32();
@@ -835,7 +835,7 @@ impl Machine {
                     let v1 = self.expand_arg(context, &ins.args[1]);
                     let v2 = self.expand_arg(context, &ins.args[2]);
 
-                    if v1.erl_eq(v2) {
+                    if v1.eq(v2) {
                         let fail = self.expand_arg(context, &ins.args[0]).to_u32();
                         op_jump!(context, fail);
                     } else {
@@ -858,7 +858,7 @@ impl Machine {
                 Opcode::IsBoolean => op_is_type!(self, context, ins.args, is_boolean),
                 Opcode::IsMap => op_is_type!(self, context, ins.args, is_map),
                 Opcode::IsFunction2 => {
-                    if let Value::Closure(closure) = self.expand_arg(context, &ins.args[0]) {
+                    if let Term::Closure(closure) = self.expand_arg(context, &ins.args[0]) {
                         let arity = self.expand_arg(context, &ins.args[1]).to_u32();
                         unsafe {
                             if (**closure).mfa.2 == arity {
@@ -872,7 +872,7 @@ impl Machine {
                 Opcode::TestArity => {
                     // check tuple arity
                     if let [LValue::Label(fail), arg, LValue::Literal(arity)] = &ins.args[..] {
-                        if let Value::Tuple(t) = self.expand_arg(context, arg) {
+                        if let Term::Tuple(t) = self.expand_arg(context, arg) {
                             unsafe {
                                 if (**t).len() != (*arity as usize) {
                                     op_jump!(context, *fail);
@@ -912,8 +912,8 @@ impl Machine {
                 Opcode::SelectTupleArity => {
                     // tuple fail dests
                     if let [arg, LValue::Label(fail), LValue::ExtendedList(vec)] = &ins.args[..] {
-                        if let Value::Tuple(tup) = self.expand_arg(context, arg) {
-                            let len = Value::Integer(unsafe { (**tup).len as i64 });
+                        if let Term::Tuple(tup) = self.expand_arg(context, arg) {
+                            let len = Term::int(unsafe { (**tup).len as i32 });
                             let mut i = 0;
                             loop {
                                 // if key matches, jump to the following label
@@ -948,7 +948,7 @@ impl Machine {
                 }
                 Opcode::GetList => {
                     // source, head, tail
-                    if let Value::List(cons) = self.expand_arg(context, &ins.args[0]) {
+                    if let Term::List(cons) = self.expand_arg(context, &ins.args[0]) {
                         let head = unsafe { (**cons).head.clone() };
                         let tail = unsafe { (**cons).tail.clone() };
                         set_register!(context, &ins.args[1], head);
@@ -961,7 +961,7 @@ impl Machine {
                     // source, element, dest
                     let source = self.expand_arg(context, &ins.args[0]);
                     let n = self.expand_arg(context, &ins.args[1]).to_u32();
-                    if let Value::Tuple(t) = source {
+                    if let Term::Tuple(t) = source {
                         let elem = unsafe {
                             let slice: &[Term] = &(**t);
                             slice[n as usize].clone()
@@ -976,8 +976,8 @@ impl Machine {
                     // Creates a cons cell with [H|T] and places the value into Dst.
                     let head = self.expand_arg(context, &ins.args[0]).clone();
                     let tail = self.expand_arg(context, &ins.args[1]).clone();
-                    let cons = context.heap.alloc(value::Cons { head, tail });
-                    set_register!(context, &ins.args[2], Value::List(cons))
+                    let cons = cons!(&context.heap, head, tail);
+                    set_register!(context, &ins.args[2], cons)
                 }
                 Opcode::PutTuple => {
                     // put_tuple dest size
@@ -1026,7 +1026,7 @@ impl Machine {
                     set_register!(
                         context,
                         &ins.args[0],
-                        Value::Catch(Box::new(InstrPtr {
+                        Term::Catch(Box::new(InstrPtr {
                             ptr: fail,
                             module: context.ip.module
                         }))
@@ -1063,7 +1063,7 @@ impl Machine {
                     set_register!(
                         context,
                         &ins.args[0],
-                        Value::Catch(Box::new(InstrPtr {
+                        Term::Catch(Box::new(InstrPtr {
                             ptr: fail,
                             module: context.ip.module
                         }))
@@ -1176,13 +1176,14 @@ impl Machine {
                     // optimize when one append is 0 and unit is 1, it's just a move
                     // bs_add Fail S1=i==0 S2 Unit=u==1 D => move S2 D
 
-                    if let [LValue::Label(_fail), s1, s2, LValue::Literal(unit), dest] = &ins.args[..]
+                    if let [LValue::Label(_fail), s1, s2, LValue::Literal(unit), dest] =
+                        &ins.args[..]
                     {
                         // TODO use fail label
                         let s1 = self.expand_arg(context, s1).to_u32();
                         let s2 = self.expand_arg(context, s2).to_u32();
 
-                        let res = Value::Integer(((s1 + s2) * (*unit)) as i64);
+                        let res = Term::int(((s1 + s2) * (*unit)) as i32);
                         set_register!(context, dest, res)
                     } else {
                         unreachable!()
@@ -1212,14 +1213,14 @@ impl Machine {
                         let size = self.expand_arg(context, s1).to_u32();
                         let arc = Arc::new(bitstring::Binary::with_capacity(size as usize));
                         context.bs = &arc.data as *const Vec<u8> as *mut Vec<u8>; // nasty, point to arc instead
-                        set_register!(context, dest, Value::Binary(arc));
+                        set_register!(context, dest, Term::Binary(arc));
                     } else {
                         unreachable!()
                     }
                 }
                 Opcode::BsPutString => {
                     // BsPutString uses the StrT strings table! needs to be patched in loader
-                    if let Value::Binary(str) = &ins.args[0] {
+                    if let Term::Binary(str) = &ins.args[0] {
                         unsafe {
                             (*context.bs).extend_from_slice(&str.data);
                         }
@@ -1236,7 +1237,7 @@ impl Machine {
                             unimplemented!()
                         }
 
-                        if let Value::Binary(str) = self.expand_arg(context, src) {
+                        if let Term::Binary(str) = self.expand_arg(context, src) {
                             match size {
                                 Term::atom(atom::ALL) => unsafe {
                                     (*context.bs).extend_from_slice(&str.data);
@@ -1261,7 +1262,7 @@ impl Machine {
                             unimplemented!()
                         }
 
-                        if let Value::Float(value::Float(f)) = self.expand_arg(context, src) {
+                        if let Term::Float(value::Float(f)) = self.expand_arg(context, src) {
                             match size {
                                 LValue::Atom(atom::ALL) => unsafe {
                                     let bytes: [u8; 8] = transmute(*f);
@@ -1333,11 +1334,11 @@ impl Machine {
 
                     match &ins.args[1] {
                         &LValue::X(reg) => {
-                            context.x[reg as usize] = Value::Float(value::Float(f));
+                            context.x[reg as usize] = Term::from(f);
                         }
                         &LValue::Y(reg) => {
                             let len = context.stack.len();
-                            context.stack[len - (reg + 2) as usize] = Value::Float(value::Float(f));
+                            context.stack[len - (reg + 2) as usize] = Term::from(f);
                         }
                         &LValue::FloatReg(reg) => {
                             context.f[reg as usize] = f;
@@ -1348,8 +1349,8 @@ impl Machine {
                 Opcode::Fconv => {
                     // reg (x), dest (float reg)
                     let val: f64 = match self.expand_arg(context, &ins.args[0]) {
-                        Value::Float(value::Float(f)) => *f,
-                        Value::Integer(i) => *i as f64, // TODO: i64 -> f64 is unsafe
+                        Term::Float(value::Float(f)) => *f,
+                        Term::Integer(i) => *i as f64, // TODO: i64 -> f64 is unsafe
                         // TODO: bignum if it fits into float
                         _ => return Err(Exception::new(Reason::EXC_BADARITH)),
                     };
@@ -1436,12 +1437,12 @@ impl Machine {
                         ptr: lambda.offset,
                         binding,
                     });
-                    context.x[0] = Value::Closure(closure);
+                    context.x[0] = Term::Closure(closure);
                 }
                 Opcode::CallFun => {
                     // literal arity
                     let arity = ins.args[0].to_u32();
-                    if let Value::Closure(closure) = &context.x[arity as usize] {
+                    if let Term::Closure(closure) = &context.x[arity as usize] {
                         op_call_fun!(self, context, closure, arity)
                     } else {
                         unreachable!()
@@ -1449,7 +1450,7 @@ impl Machine {
                 }
                 Opcode::GetHd => {
                     // source head
-                    if let Value::List(cons) = self.expand_arg(context, &ins.args[0]) {
+                    if let Term::List(cons) = self.expand_arg(context, &ins.args[0]) {
                         let val = unsafe { (**cons).head.clone() };
                         set_register!(context, &ins.args[1], val);
                     } else {
@@ -1458,7 +1459,7 @@ impl Machine {
                 }
                 Opcode::GetTl => {
                     // source head
-                    if let Value::List(cons) = self.expand_arg(context, &ins.args[0]) {
+                    if let Term::List(cons) = self.expand_arg(context, &ins.args[0]) {
                         let val = unsafe { (**cons).tail.clone() };
                         set_register!(context, &ins.args[1], val);
                     } else {
@@ -1471,7 +1472,7 @@ impl Machine {
                     let reg = self.expand_arg(context, &ins.args[1]);
                     let n = self.expand_arg(context, &ins.args[2]).to_u32();
                     let atom = self.expand_arg(context, &ins.args[3]);
-                    if let Value::Tuple(t) = reg {
+                    if let Term::Tuple(t) = reg {
                         let arity = unsafe { (**t).len() };
                         if arity == 0 || arity != (n as usize) {
                             op_jump!(context, fail);

@@ -1,4 +1,4 @@
-use crate::value::Value;
+use crate::value::Term;
 use parking_lot::Mutex;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
@@ -80,13 +80,13 @@ pub struct SubBinary {
     /// Is the underlying binary writable?
     is_writable: bool,
     /// Original binary (refc or heap)
-    original: Value,
+    original: Term,
 }
 
 // TODO: let's use nom to handle offsets & matches, and keep a reference to the binary
 pub struct MatchBuffer {
     /// Original binary
-    original: Value,
+    original: Term,
     /// Current position in binary
     base: usize,
     /// Offset in bits
@@ -99,7 +99,7 @@ pub struct MatchState<'a> {
     // TODO: wrap into value
     mb: MatchBuffer,
     /// Saved offsets, only valid for contexts created through bs_start_match2.
-    saved_offsets: &'a [Value],
+    saved_offsets: &'a [Term],
 }
 
 bitflags! {

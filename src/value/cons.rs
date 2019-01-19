@@ -11,6 +11,15 @@ pub struct Cons {
 
 unsafe impl Sync for Cons {}
 
+impl PartialEq for Cons {
+    fn eq(&self, other: &Self) -> bool {
+        self
+            .iter()
+            .zip(other.iter())
+            .all(|(e1, e2)| e1.eq(e2))
+    }
+}
+
 // TODO: to be TryFrom once rust stabilizes the trait
 impl TryInto<Cons> for Term {
     type Error = WrongBoxError;

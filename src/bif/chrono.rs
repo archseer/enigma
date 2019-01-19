@@ -52,7 +52,7 @@ pub fn bif_erlang_monotonic_time_0(
     // TODO: needs https://github.com/rust-lang/rust/issues/50202
     // .as_nanos()
 
-    Ok(Value::BigInt(Box::new(
+    Ok(Term::BigInt(Box::new(
         vm.elapsed_time().as_secs().to_bigint().unwrap(),
     )))
 }
@@ -64,7 +64,7 @@ pub fn bif_erlang_system_time_0(
     _process: &RcProcess,
     _args: &[Term],
 ) -> BifResult {
-    Ok(Value::BigInt(Box::new(
+    Ok(Term::BigInt(Box::new(
         SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()

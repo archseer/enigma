@@ -356,7 +356,7 @@ fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
 
     while ptr > 0 {
         match context.stack[ptr - 1].clone() {
-            Value::Catch(ptr) => {
+            Term::Catch(ptr) => {
                 // ASSERT(ptr < STACK_START(c_p));
                 // Unwind the stack up to the current frame.
                 context.stack.truncate(prev);
@@ -365,7 +365,7 @@ fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
                 // return catch_pc(*ptr);
                 return Some(*ptr);
             }
-            Value::CP(ref _cp) => {
+            Term::CP(ref _cp) => {
                 prev = ptr;
                 // TODO: OTP does tracing instr handling here
             }
@@ -576,7 +576,7 @@ fn save_stacktrace(
 
     // Package args and stack trace
     // c_p->ftrace = CONS(hp, args, make_big((Eterm *) s));
-    exc.trace = cons!(heap, args, Value::StackTrace(s)); // TODO: need to cast S into something
+    exc.trace = cons!(heap, args, Term::StackTrace(s)); // TODO: need to cast S into something
 
     // Save the actual stack trace
     erts_save_stacktrace(process, s, depth)
@@ -596,7 +596,7 @@ fn erts_save_stacktrace(process: &RcProcess, s: &mut StackTrace, mut depth: u32)
      * Skip trace stack frames.
      */
     while ptr > 0 && depth > 0 {
-        if let Value::CP(boxed_cp) = &context.stack[ptr - 1] {
+        if let Term::CP(boxed_cp) = &context.stack[ptr - 1] {
             if let Some(cp) = **boxed_cp {
                 if Some(&cp) != s.trace.last() {
                     // Record non-duplicates only
@@ -612,9 +612,9 @@ fn erts_save_stacktrace(process: &RcProcess, s: &mut StackTrace, mut depth: u32)
 // Getting the relevant fields from the term pointed to by ftrace
 pub fn get_trace_from_exc(trace: &Term) -> Option<&StackTrace> {
     match trace {
-        Value::Nil => None,
-        Value::List(cons) => unsafe {
-            if let Value::StackTrace(s) = (**cons).tail {
+        Term::Nil => None,
+        Term::List(cons) => unsafe {
+            if let Term::StackTrace(s) = (**cons).tail {
                 Some(&*s)
             } else {
                 unreachable!()
@@ -626,18 +626,18 @@ pub fn get_trace_from_exc(trace: &Term) -> Option<&StackTrace> {
 
 pub fn get_args_from_exc(trace: &Term) -> &Term {
     match trace {
-        Value::Nil => &Value::Nil,
-        Value::List(cons) => unsafe { &(**cons).head },
+        Term::Nil => &Term::Nil,
+        Term::List(cons) => unsafe { &(**cons).head },
         _ => unreachable!(),
     }
 }
 
 fn is_raised_exc(exc: &Term) -> bool {
     match exc {
-        Value::Nil => false,
-        Value::List(cons) => unsafe {
+        Term::Nil => false,
+        Term::List(cons) => unsafe {
             //return bignum_header_is_neg(*big_val(CDR(list_val(exc))));
-            if let Value::StackTrace(s) = (**cons).tail {
+            if let Term::StackTrace(s) = (**cons).tail {
                 if let StackTrace { complete: true, .. } = *s {
                     return true;
                 }

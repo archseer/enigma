@@ -5,7 +5,7 @@ use crate::mailbox::Mailbox;
 use crate::module::{Module, MFA};
 use crate::pool::Job;
 pub use crate::process_table::PID;
-use crate::value::{Term, HAMT};
+use crate::value::Term;
 use crate::vm::RcState;
 use hashbrown::HashMap;
 use std::cell::UnsafeCell;
@@ -181,7 +181,7 @@ pub struct LocalData {
     pub thread_id: Option<u8>,
 
     /// A [process dictionary](https://www.erlang.org/course/advanced#dict)
-    pub dictionary: HAMT,
+    pub dictionary: HashMap<Term, Term>,
 }
 
 pub struct Process {
@@ -296,7 +296,7 @@ pub fn spawn(
     let new_proc = allocate(state, module)?;
     let new_pid = new_proc.pid;
     // let pid_ptr = new_proc.allocate_usize(new_pid, state.integer_prototype);
-    let pid_ptr = Value::Pid(new_pid);
+    let pid_ptr = Term::pid(new_pid);
 
     let context = new_proc.context_mut();
 
@@ -305,7 +305,7 @@ pub fn spawn(
     let mut i = 0;
     unsafe {
         let mut cons = &args;
-        while let Value::List(ptr) = *cons {
+        while let Term::List(ptr) = *cons {
             context.x[i] = (*ptr).head.clone();
             i += 1;
             cons = &(*ptr).tail;

@@ -55,7 +55,7 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> 
     match tag {
         Tag::NewFloat => {
             let (rest, flt) = be_u64(rest)?;
-            Ok((rest, Term::Float(value::Float(f64::from_bits(flt)))))
+            Ok((rest, Term::from(f64::from_bits(flt))))
         }
         // TODO:
         // BitBinary
@@ -151,7 +151,7 @@ pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
                     head: val,
                     tail: Term::nil(),
                 });
-                std::mem::replace(&mut *tail, Term::List(new_cons));
+                std::mem::replace(&mut *tail, Term::from(new_cons));
                 (new_cons as *mut value::Cons, rest)
             });
 
@@ -159,7 +159,7 @@ pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
         let (rest, val) = decode_value(rest, heap).unwrap();
         (*tail).tail = val;
 
-        Ok((rest, Term::List(start)))
+        Ok((rest, Term::from(start)))
     }
 }
 
@@ -174,7 +174,7 @@ pub fn decode_map<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
         map = map.plus(key, val);
         new_rest = rest;
     }
-    Ok((new_rest, Term::Map(value::Map(Arc::new(map)))))
+    Ok((new_rest, Term::map(map)))
 }
 
 /// A string of bytes encoded as tag 107 (String) with 16-bit length.
@@ -189,7 +189,7 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term>
         let (rest, elem) = be_u8(rest)?;
 
         let start = heap.alloc(value::Cons {
-            head: Term::Character(elem),
+            head: Term::int(elem as i32),
             tail: Term::nil(),
         });
 
@@ -199,18 +199,18 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term>
                 let (rest, elem) = be_u8(rest).unwrap();
 
                 let new_cons = heap.alloc(value::Cons {
-                    head: Term::Character(elem),
+                    head: Term::int(elem as i32),
                     tail: Term::nil(),
                 });
 
-                std::mem::replace(&mut *tail, Term::List(new_cons as *const value::Cons));
+                std::mem::replace(&mut *tail, Term::from(new_cons));
                 (new_cons as *mut value::Cons, rest)
             });
 
         // set the tail
         (*tail).tail = Term::nil();
 
-        Ok((rest, Term::List(start)))
+        Ok((rest, Term::from(start)))
     }
 }
 
