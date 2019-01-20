@@ -1,5 +1,6 @@
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
+use crate::loader::LValue;
 use crate::loader::{FuncInfo, LINE_INVALID_LOCATION};
 use crate::mailbox::Mailbox;
 use crate::module::{Module, MFA};
@@ -53,6 +54,19 @@ bitflags! {
     pub struct Flag: u32 {
         const INITIAL = 0;
         const TRAP_EXIT = (1 << 0);
+    }
+}
+
+impl ExecutionContext {
+    #[inline]
+    pub fn expand_arg<'a>(&'a self, arg: &'a LValue) -> &'a Term {
+        match arg {
+            // TODO: optimize away into a reference somehow at load time
+            LValue::ExtendedLiteral(i) => unsafe { &(*self.ip.module).literals[*i as usize] },
+            LValue::X(i) => &self.x[*i as usize],
+            LValue::Y(i) => &self.stack[self.stack.len() - (*i + 2) as usize],
+            value => unimplemented!("expand unimplemented for {:?}", value),
+        }
     }
 }
 

@@ -315,10 +315,10 @@ macro_rules! op_fixed_apply {
 }
 
 macro_rules! op_is_type {
-    ($vm:expr, $context:expr, $args:expr, $op:ident) => {{
+    ($context:expr, $args:expr, $op:ident) => {{
         debug_assert_eq!($args.len(), 2);
 
-        let val = $vm.expand_arg($context, &$args[1]);
+        let val = $context.expand_arg(&$args[1]);
 
         if !val.$op() {
             // TODO: patch the labels to point to exact offsets to avoid labels lookup
@@ -473,17 +473,6 @@ impl Machine {
         self.state.process_pool.schedule(process);
     }
 
-    #[inline]
-    fn expand_arg<'a>(&'a self, context: &'a ExecutionContext, arg: &'a LValue) -> &Term {
-        match arg {
-            // TODO: optimize away into a reference somehow at load time
-            LValue::ExtendedLiteral(i) => unsafe { &(*context.ip.module).literals[*i as usize] },
-            LValue::X(i) => &context.x[*i as usize],
-            LValue::Y(i) => &context.stack[context.stack.len() - (*i + 2) as usize],
-            value => unimplemented!("expand unimplemented for {:?}", value),
-        }
-    }
-
     /// Executes a single process, terminating in the event of an error.
     pub fn run_with_error_handling(&self, _worker: &mut Worker, process: &RcProcess) {
         // We are using AssertUnwindSafe here so we can pass a &mut Worker to
@@ -574,7 +563,7 @@ impl Machine {
                             context.x[0] = (**msg).clone();
                         }
                     } else {
-                        let fail = self.expand_arg(context, &ins.args[0]).to_u32();
+                        let fail = context.expand_arg(&ins.args[0]).to_u32();
                         op_jump!(context, fail);
                     }
                 }
@@ -585,7 +574,7 @@ impl Machine {
 
                     process.local_data_mut().mailbox.advance();
 
-                    let label = self.expand_arg(context, &ins.args[0]).to_u32();
+                    let label = context.expand_arg(&ins.args[0]).to_u32();
                     op_jump!(context, label);
                 }
                 Opcode::Wait => {
@@ -593,7 +582,7 @@ impl Machine {
                     // jump to label, set wait flag on process
                     debug_assert_eq!(ins.args.len(), 1);
 
-                    let label = self.expand_arg(context, &ins.args[0]).to_u32();
+                    let label = context.expand_arg(&ins.args[0]).to_u32();
                     op_jump!(context, label);
 
                     // TODO: this currently races if the process is sending us
@@ -769,11 +758,11 @@ impl Machine {
                 Opcode::IsGe => {
                     debug_assert_eq!(ins.args.len(), 3);
 
-                    let v1 = self.expand_arg(context, &ins.args[1]);
-                    let v2 = self.expand_arg(context, &ins.args[2]);
+                    let v1 = context.expand_arg(&ins.args[1]);
+                    let v2 = context.expand_arg(&ins.args[2]);
 
                     if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(v2) {
-                        let fail = self.expand_arg(context, &ins.args[0]).to_u32();
+                        let fail = context.expand_arg(&ins.args[0]).to_u32();
                         op_jump!(context, fail);
                     } else {
                         // ok
@@ -782,97 +771,97 @@ impl Machine {
                 Opcode::IsLt => {
                     debug_assert_eq!(ins.args.len(), 3);
 
-                    let v1 = self.expand_arg(context, &ins.args[1]);
-                    let v2 = self.expand_arg(context, &ins.args[2]);
+                    let v1 = context.expand_arg(&ins.args[1]);
+                    let v2 = context.expand_arg(&ins.args[2]);
 
                     if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(v2) {
                         // ok
                     } else {
-                        let fail = self.expand_arg(context, &ins.args[0]).to_u32();
+                        let fail = context.expand_arg(&ins.args[0]).to_u32();
                         op_jump!(context, fail);
                     }
                 }
                 Opcode::IsEq => {
                     debug_assert_eq!(ins.args.len(), 3);
 
-                    let v1 = self.expand_arg(context, &ins.args[1]);
-                    let v2 = self.expand_arg(context, &ins.args[2]);
+                    let v1 = context.expand_arg(&ins.args[1]);
+                    let v2 = context.expand_arg(&ins.args[2]);
 
                     if let Some(std::cmp::Ordering::Equal) = v1.erl_partial_cmp(v2) {
                         // ok
                     } else {
-                        let fail = self.expand_arg(context, &ins.args[0]).to_u32();
+                        let fail = context.expand_arg(&ins.args[0]).to_u32();
                         op_jump!(context, fail);
                     }
                 }
                 Opcode::IsNe => {
                     debug_assert_eq!(ins.args.len(), 3);
 
-                    let v1 = self.expand_arg(context, &ins.args[1]);
-                    let v2 = self.expand_arg(context, &ins.args[2]);
+                    let v1 = context.expand_arg(&ins.args[1]);
+                    let v2 = context.expand_arg(&ins.args[2]);
 
                     if let Some(std::cmp::Ordering::Equal) = v1.erl_partial_cmp(v2) {
-                        let fail = self.expand_arg(context, &ins.args[0]).to_u32();
+                        let fail = context.expand_arg(&ins.args[0]).to_u32();
                         op_jump!(context, fail);
                     }
                 }
                 Opcode::IsEqExact => {
                     debug_assert_eq!(ins.args.len(), 3);
 
-                    let v1 = self.expand_arg(context, &ins.args[1]);
-                    let v2 = self.expand_arg(context, &ins.args[2]);
+                    let v1 = context.expand_arg(&ins.args[1]);
+                    let v2 = context.expand_arg(&ins.args[2]);
 
                     if v1.eq(v2) {
                         // ok
                     } else {
-                        let fail = self.expand_arg(context, &ins.args[0]).to_u32();
+                        let fail = context.expand_arg(&ins.args[0]).to_u32();
                         op_jump!(context, fail);
                     }
                 }
                 Opcode::IsNeExact => {
                     debug_assert_eq!(ins.args.len(), 3);
 
-                    let v1 = self.expand_arg(context, &ins.args[1]);
-                    let v2 = self.expand_arg(context, &ins.args[2]);
+                    let v1 = context.expand_arg(&ins.args[1]);
+                    let v2 = context.expand_arg(&ins.args[2]);
 
                     if v1.eq(v2) {
-                        let fail = self.expand_arg(context, &ins.args[0]).to_u32();
+                        let fail = context.expand_arg(&ins.args[0]).to_u32();
                         op_jump!(context, fail);
                     } else {
                         // ok
                     }
                 }
-                Opcode::IsInteger => op_is_type!(self, context, ins.args, is_integer),
-                Opcode::IsFloat => op_is_type!(self, context, ins.args, is_float),
-                Opcode::IsNumber => op_is_type!(self, context, ins.args, is_number),
-                Opcode::IsAtom => op_is_type!(self, context, ins.args, is_atom),
-                Opcode::IsPid => op_is_type!(self, context, ins.args, is_pid),
-                Opcode::IsReference => op_is_type!(self, context, ins.args, is_ref),
-                Opcode::IsPort => op_is_type!(self, context, ins.args, is_port),
-                Opcode::IsNil => op_is_type!(self, context, ins.args, is_nil),
-                Opcode::IsBinary => op_is_type!(self, context, ins.args, is_binary),
-                Opcode::IsList => op_is_type!(self, context, ins.args, is_list),
-                Opcode::IsNonemptyList => op_is_type!(self, context, ins.args, is_non_empty_list),
-                Opcode::IsTuple => op_is_type!(self, context, ins.args, is_tuple),
-                Opcode::IsFunction => op_is_type!(self, context, ins.args, is_function),
-                Opcode::IsBoolean => op_is_type!(self, context, ins.args, is_boolean),
-                Opcode::IsMap => op_is_type!(self, context, ins.args, is_map),
+                Opcode::IsInteger => op_is_type!(context, ins.args, is_integer),
+                Opcode::IsFloat => op_is_type!(context, ins.args, is_float),
+                Opcode::IsNumber => op_is_type!(context, ins.args, is_number),
+                Opcode::IsAtom => op_is_type!(context, ins.args, is_atom),
+                Opcode::IsPid => op_is_type!(context, ins.args, is_pid),
+                Opcode::IsReference => op_is_type!(context, ins.args, is_ref),
+                Opcode::IsPort => op_is_type!(context, ins.args, is_port),
+                Opcode::IsNil => op_is_type!(context, ins.args, is_nil),
+                Opcode::IsBinary => op_is_type!(context, ins.args, is_binary),
+                Opcode::IsList => op_is_type!(context, ins.args, is_list),
+                Opcode::IsNonemptyList => op_is_type!(context, ins.args, is_non_empty_list),
+                Opcode::IsTuple => op_is_type!(context, ins.args, is_tuple),
+                Opcode::IsFunction => op_is_type!(context, ins.args, is_function),
+                Opcode::IsBoolean => op_is_type!(context, ins.args, is_boolean),
+                Opcode::IsMap => op_is_type!(context, ins.args, is_map),
                 Opcode::IsFunction2 => {
-                    if let Term::Closure(closure) = self.expand_arg(context, &ins.args[0]) {
-                        let arity = self.expand_arg(context, &ins.args[1]).to_u32();
+                    if let Term::Closure(closure) = context.expand_arg(&ins.args[0]) {
+                        let arity = context.expand_arg(&ins.args[1]).to_u32();
                         unsafe {
                             if (**closure).mfa.2 == arity {
                                 continue;
                             }
                         }
                     }
-                    let fail = self.expand_arg(context, &ins.args[2]).to_u32();
+                    let fail = context.expand_arg(&ins.args[2]).to_u32();
                     op_jump!(context, fail);
                 }
                 Opcode::TestArity => {
                     // check tuple arity
                     if let [LValue::Label(fail), arg, LValue::Literal(arity)] = &ins.args[..] {
-                        if let Term::Tuple(t) = self.expand_arg(context, arg) {
+                        if let Term::Tuple(t) = context.expand_arg(arg) {
                             unsafe {
                                 if (**t).len() != (*arity as usize) {
                                     op_jump!(context, *fail);
@@ -889,7 +878,7 @@ impl Machine {
                     // arg, fail, dests
                     // loop over dests
                     if let [arg, LValue::Label(fail), LValue::ExtendedList(vec)] = &ins.args[..] {
-                        let arg = self.expand_arg(context, arg);
+                        let arg = context.expand_arg(arg);
                         let mut i = 0;
                         loop {
                             // if key matches, jump to the following label
@@ -912,7 +901,7 @@ impl Machine {
                 Opcode::SelectTupleArity => {
                     // tuple fail dests
                     if let [arg, LValue::Label(fail), LValue::ExtendedList(vec)] = &ins.args[..] {
-                        if let Term::Tuple(tup) = self.expand_arg(context, arg) {
+                        if let Term::Tuple(tup) = context.expand_arg(arg) {
                             let len = Term::int(unsafe { (**tup).len as i32 });
                             let mut i = 0;
                             loop {
@@ -938,17 +927,17 @@ impl Machine {
                 }
                 Opcode::Jump => {
                     debug_assert_eq!(ins.args.len(), 1);
-                    let label = self.expand_arg(context, &ins.args[0]).to_u32();
+                    let label = context.expand_arg(&ins.args[0]).to_u32();
                     op_jump!(context, label)
                 }
                 Opcode::Move => {
                     // arg1 can be either a value or a register
-                    let val = self.expand_arg(context, &ins.args[0]);
+                    let val = context.expand_arg(&ins.args[0]);
                     set_register!(context, &ins.args[1], val.clone()) // TODO: mem::move would be preferred
                 }
                 Opcode::GetList => {
                     // source, head, tail
-                    if let Term::List(cons) = self.expand_arg(context, &ins.args[0]) {
+                    if let Term::List(cons) = context.expand_arg(&ins.args[0]) {
                         let head = unsafe { (**cons).head.clone() };
                         let tail = unsafe { (**cons).tail.clone() };
                         set_register!(context, &ins.args[1], head);
@@ -959,8 +948,8 @@ impl Machine {
                 }
                 Opcode::GetTupleElement => {
                     // source, element, dest
-                    let source = self.expand_arg(context, &ins.args[0]);
-                    let n = self.expand_arg(context, &ins.args[1]).to_u32();
+                    let source = context.expand_arg(&ins.args[0]);
+                    let n = context.expand_arg(&ins.args[1]).to_u32();
                     if let Term::Tuple(t) = source {
                         let elem = unsafe {
                             let slice: &[Term] = &(**t);
@@ -974,8 +963,8 @@ impl Machine {
                 Opcode::PutList => {
                     // put_list H T Dst::slot()
                     // Creates a cons cell with [H|T] and places the value into Dst.
-                    let head = self.expand_arg(context, &ins.args[0]).clone();
-                    let tail = self.expand_arg(context, &ins.args[1]).clone();
+                    let head = context.expand_arg(&ins.args[0]).clone();
+                    let tail = context.expand_arg(&ins.args[1]).clone();
                     let cons = cons!(&context.heap, head, tail);
                     set_register!(context, &ins.args[2], cons)
                 }
@@ -997,7 +986,7 @@ impl Machine {
                             unsafe {
                                 std::ptr::write(
                                     &mut tuple[i],
-                                    self.expand_arg(context, &list[i]).clone(),
+                                    context.expand_arg(&list[i]).clone(),
                                 );
                             }
                         }
@@ -1005,7 +994,7 @@ impl Machine {
                     }
                 }
                 Opcode::Badmatch => {
-                    let value = self.expand_arg(context, &ins.args[0]).clone();
+                    let value = context.expand_arg(&ins.args[0]).clone();
                     return Err(Exception::with_value(Reason::EXC_BADMATCH, value));
                 }
                 Opcode::IfEnd => {
@@ -1014,7 +1003,7 @@ impl Machine {
                 }
                 Opcode::CaseEnd => {
                     // Raises the case_clause exception with the value of Arg0
-                    let value = self.expand_arg(context, &ins.args[0]).clone();
+                    let value = context.expand_arg(&ins.args[0]).clone();
                     return Err(Exception::with_value(Reason::EXC_CASE_CLAUSE, value));
                 }
                 Opcode::Try => {
@@ -1053,7 +1042,7 @@ impl Machine {
                 }
                 Opcode::TryCaseEnd => {
                     // Raises a try_clause exception with the value read from Arg0.
-                    let value = self.expand_arg(context, &ins.args[0]).clone();
+                    let value = context.expand_arg(&ins.args[0]).clone();
                     return Err(Exception::with_value(Reason::EXC_TRY_CLAUSE, value));
                 }
                 Opcode::Catch => {
@@ -1111,8 +1100,8 @@ impl Machine {
                     // Raises the exception. The instruction is garbled by backward compatibility. Arg0 is a stack trace
                     // and Arg1 is the value accompanying the exception. The reason of the raised exception is dug up
                     // from the stack trace
-                    let trace = self.expand_arg(context, &ins.args[0]);
-                    let value = self.expand_arg(context, &ins.args[1]);
+                    let trace = context.expand_arg(&ins.args[0]);
+                    let value = context.expand_arg(&ins.args[1]);
 
                     let reason = if let Some(s) = exception::get_trace_from_exc(trace) {
                         primary_exception!(s.reason)
@@ -1154,7 +1143,7 @@ impl Machine {
                     // fail label, live, bif, arg1, dest
                     if let LValue::Literal(i) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
-                        let args = &[self.expand_arg(context, &ins.args[3]).clone()];
+                        let args = &[context.expand_arg(&ins.args[3]).clone()];
                         let mfa = &module.imports[*i as usize];
                         let val = bif::apply(self, process, mfa, &args[..]).unwrap(); // TODO: handle fail
 
@@ -1180,8 +1169,8 @@ impl Machine {
                         &ins.args[..]
                     {
                         // TODO use fail label
-                        let s1 = self.expand_arg(context, s1).to_u32();
-                        let s2 = self.expand_arg(context, s2).to_u32();
+                        let s1 = context.expand_arg(s1).to_u32();
+                        let s2 = context.expand_arg(s2).to_u32();
 
                         let res = Term::int(((s1 + s2) * (*unit)) as i32);
                         set_register!(context, dest, res)
@@ -1210,7 +1199,7 @@ impl Machine {
                         // TODO: use a current_string ptr to be able to write to the Arc wrapped str
                         // alternatively, loop through the instrs until we hit a non bs_ instr.
                         // that way, no unsafe ptrs!
-                        let size = self.expand_arg(context, s1).to_u32();
+                        let size = context.expand_arg(s1).to_u32();
                         let arc = Arc::new(bitstring::Binary::with_capacity(size as usize));
                         context.bs = &arc.data as *const Vec<u8> as *mut Vec<u8>; // nasty, point to arc instead
                         set_register!(context, dest, Term::Binary(arc));
@@ -1237,7 +1226,7 @@ impl Machine {
                             unimplemented!()
                         }
 
-                        if let Term::Binary(str) = self.expand_arg(context, src) {
+                        if let Term::Binary(str) = context.expand_arg(src) {
                             match size {
                                 Term::atom(atom::ALL) => unsafe {
                                     (*context.bs).extend_from_slice(&str.data);
@@ -1262,7 +1251,7 @@ impl Machine {
                             unimplemented!()
                         }
 
-                        if let Term::Float(value::Float(f)) = self.expand_arg(context, src) {
+                        if let Term::Float(value::Float(f)) = context.expand_arg(src) {
                             match size {
                                 LValue::Atom(atom::ALL) => unsafe {
                                     let bytes: [u8; 8] = transmute(*f);
@@ -1348,7 +1337,7 @@ impl Machine {
                 }
                 Opcode::Fconv => {
                     // reg (x), dest (float reg)
-                    let val: f64 = match self.expand_arg(context, &ins.args[0]) {
+                    let val: f64 = match context.expand_arg(&ins.args[0]) {
                         Term::Float(value::Float(f)) => *f,
                         Term::Integer(i) => *i as f64, // TODO: i64 -> f64 is unsafe
                         // TODO: bignum if it fits into float
@@ -1378,8 +1367,8 @@ impl Machine {
                     if let LValue::Literal(i) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
                         let args = &[
-                            self.expand_arg(context, &ins.args[3]).clone(),
-                            self.expand_arg(context, &ins.args[4]).clone(),
+                            context.expand_arg(&ins.args[3]).clone(),
+                            context.expand_arg(&ins.args[4]).clone(),
                         ];
                         let mfa = &module.imports[*i as usize];
                         let val = bif::apply(self, process, mfa, &args[..]).unwrap(); // TODO: handle fail
@@ -1396,9 +1385,9 @@ impl Machine {
                     if let LValue::Literal(i) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
                         let args = &[
-                            self.expand_arg(context, &ins.args[3]).clone(),
-                            self.expand_arg(context, &ins.args[4]).clone(),
-                            self.expand_arg(context, &ins.args[5]).clone(),
+                            context.expand_arg(&ins.args[3]).clone(),
+                            context.expand_arg(&ins.args[4]).clone(),
+                            context.expand_arg(&ins.args[5]).clone(),
                         ];
                         let mfa = &module.imports[*i as usize];
                         let val = bif::apply(self, process, mfa, &args[..]).unwrap(); // TODO: handle fail
@@ -1450,7 +1439,7 @@ impl Machine {
                 }
                 Opcode::GetHd => {
                     // source head
-                    if let Term::List(cons) = self.expand_arg(context, &ins.args[0]) {
+                    if let Term::List(cons) = context.expand_arg(&ins.args[0]) {
                         let val = unsafe { (**cons).head.clone() };
                         set_register!(context, &ins.args[1], val);
                     } else {
@@ -1459,7 +1448,7 @@ impl Machine {
                 }
                 Opcode::GetTl => {
                     // source head
-                    if let Term::List(cons) = self.expand_arg(context, &ins.args[0]) {
+                    if let Term::List(cons) = context.expand_arg(&ins.args[0]) {
                         let val = unsafe { (**cons).tail.clone() };
                         set_register!(context, &ins.args[1], val);
                     } else {
@@ -1468,10 +1457,10 @@ impl Machine {
                 }
                 Opcode::IsTaggedTuple => {
                     debug_assert_eq!(ins.args.len(), 4);
-                    let fail = self.expand_arg(context, &ins.args[0]).to_u32();
-                    let reg = self.expand_arg(context, &ins.args[1]);
-                    let n = self.expand_arg(context, &ins.args[2]).to_u32();
-                    let atom = self.expand_arg(context, &ins.args[3]);
+                    let fail = context.expand_arg(&ins.args[0]).to_u32();
+                    let reg = context.expand_arg(&ins.args[1]);
+                    let n = context.expand_arg(&ins.args[2]).to_u32();
+                    let atom = context.expand_arg(&ins.args[3]);
                     if let Term::Tuple(t) = reg {
                         let arity = unsafe { (**t).len() };
                         if arity == 0 || arity != (n as usize) {
