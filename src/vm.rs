@@ -12,7 +12,7 @@ use crate::process::{self, ExecutionContext, InstrPtr, RcProcess};
 use crate::process_registry::ProcessRegistry;
 use crate::process_table::ProcessTable;
 use crate::servo_arc::Arc;
-use crate::value::{self, Term};
+use crate::value::{self, Term, Variant, TryInto};
 use log::debug;
 use parking_lot::Mutex;
 use std::mem::transmute;
@@ -861,11 +861,10 @@ impl Machine {
                 Opcode::TestArity => {
                     // check tuple arity
                     if let [LValue::Label(fail), arg, LValue::Literal(arity)] = &ins.args[..] {
-                        if let Term::Tuple(t) = context.expand_arg(arg) {
-                            unsafe {
-                                if (**t).len() != (*arity as usize) {
-                                    op_jump!(context, *fail);
-                                }
+                        if let Ok(t) = context.expand_arg(arg).try_into() {
+                            let t: &value::Tuple = t; // annoying, need type annotation
+                            if t.len != *arity {
+                                op_jump!(context, *fail);
                             }
                         } else {
                             panic!("Bad argument to {:?}", ins.op)
@@ -901,8 +900,9 @@ impl Machine {
                 Opcode::SelectTupleArity => {
                     // tuple fail dests
                     if let [arg, LValue::Label(fail), LValue::ExtendedList(vec)] = &ins.args[..] {
-                        if let Term::Tuple(tup) = context.expand_arg(arg) {
-                            let len = Term::int(unsafe { (**tup).len as i32 });
+                        if let Ok(tup) = context.expand_arg(arg).try_into() {
+                            let tup: &value::Tuple = tup; // annoying, need type annotation
+                            let len = Term::int(tup.len as i32);
                             let mut i = 0;
                             loop {
                                 // if key matches, jump to the following label
@@ -937,11 +937,9 @@ impl Machine {
                 }
                 Opcode::GetList => {
                     // source, head, tail
-                    if let Term::List(cons) = context.expand_arg(&ins.args[0]) {
-                        let head = unsafe { (**cons).head.clone() };
-                        let tail = unsafe { (**cons).tail.clone() };
-                        set_register!(context, &ins.args[1], head);
-                        set_register!(context, &ins.args[2], tail);
+                    if let Ok(value::Cons{ head, tail }) = context.expand_arg(&ins.args[0]).try_into() {
+                        set_register!(context, &ins.args[1], head.clone());
+                        set_register!(context, &ins.args[2], tail.clone());
                     } else {
                         panic!("badarg to GetHd")
                     }
@@ -950,12 +948,9 @@ impl Machine {
                     // source, element, dest
                     let source = context.expand_arg(&ins.args[0]);
                     let n = context.expand_arg(&ins.args[1]).to_u32();
-                    if let Term::Tuple(t) = source {
-                        let elem = unsafe {
-                            let slice: &[Term] = &(**t);
-                            slice[n as usize].clone()
-                        };
-                        set_register!(context, &ins.args[2], elem)
+                    if let Ok(t) = source.try_into() {
+                        let t: &value::Tuple = t; // annoying, need type annotation
+                        set_register!(context, &ins.args[2], t[n as usize].clone())
                     } else {
                         panic!("GetTupleElement: source is of wrong type")
                     }
@@ -1337,9 +1332,9 @@ impl Machine {
                 }
                 Opcode::Fconv => {
                     // reg (x), dest (float reg)
-                    let val: f64 = match context.expand_arg(&ins.args[0]) {
-                        Term::Float(value::Float(f)) => *f,
-                        Term::Integer(i) => *i as f64, // TODO: i64 -> f64 is unsafe
+                    let val: f64 = match context.expand_arg(&ins.args[0]).into_number() {
+                        value::Num::Float(f) => f,
+                        value::Num::Integer(i) => i as f64, // TODO: i32 -> f64 is unsafe
                         // TODO: bignum if it fits into float
                         _ => return Err(Exception::new(Reason::EXC_BADARITH)),
                     };
@@ -1439,18 +1434,16 @@ impl Machine {
                 }
                 Opcode::GetHd => {
                     // source head
-                    if let Term::List(cons) = context.expand_arg(&ins.args[0]) {
-                        let val = unsafe { (**cons).head.clone() };
-                        set_register!(context, &ins.args[1], val);
+                    if let Ok(value::Cons{ head, .. }) = context.expand_arg(&ins.args[0]).try_into() {
+                        set_register!(context, &ins.args[1], head.clone());
                     } else {
                         unreachable!()
                     }
                 }
                 Opcode::GetTl => {
                     // source head
-                    if let Term::List(cons) = context.expand_arg(&ins.args[0]) {
-                        let val = unsafe { (**cons).tail.clone() };
-                        set_register!(context, &ins.args[1], val);
+                    if let Ok(value::Cons{ tail, .. }) = context.expand_arg(&ins.args[0]).try_into() {
+                        set_register!(context, &ins.args[1], tail.clone());
                     } else {
                         unreachable!()
                     }
@@ -1461,13 +1454,13 @@ impl Machine {
                     let reg = context.expand_arg(&ins.args[1]);
                     let n = context.expand_arg(&ins.args[2]).to_u32();
                     let atom = context.expand_arg(&ins.args[3]);
-                    if let Term::Tuple(t) = reg {
-                        let arity = unsafe { (**t).len() };
-                        if arity == 0 || arity != (n as usize) {
+                    if let Ok(t) = reg.try_into() {
+                        let tuple: &value::Tuple = t; // annoying, need type annotation
+
+                        if tuple.len == 0 || tuple.len != n {
                             op_jump!(context, fail);
                         } else {
-                            let elem = unsafe { &(**t)[0] };
-                            if elem.erl_eq(atom) {
+                            if tuple[0].eq(atom) {
                                 // ok
                             } else {
                                 op_jump!(context, fail);
@@ -1485,8 +1478,8 @@ impl Machine {
                     let value = context.x[1].clone();
                     let trace = context.x[2].clone();
 
-                    match class {
-                        Term::atom(atom::ERROR) => {
+                    match class.into_variant() {
+                        Variant::Atom(atom::ERROR) => {
                             let mut reason = Reason::EXC_ERROR;
                             reason.remove(Reason::EXF_SAVETRACE);
                             return Err(Exception {
@@ -1495,7 +1488,7 @@ impl Machine {
                                 trace,
                             });
                         }
-                        Term::atom(atom::EXIT) => {
+                        Variant::Atom(atom::EXIT) => {
                             let mut reason = Reason::EXC_EXIT;
                             reason.remove(Reason::EXF_SAVETRACE);
                             return Err(Exception {
@@ -1504,7 +1497,7 @@ impl Machine {
                                 trace,
                             });
                         }
-                        Term::atom(atom::THROW) => {
+                        Variant::Atom(atom::THROW) => {
                             let mut reason = Reason::EXC_THROWN;
                             reason.remove(Reason::EXF_SAVETRACE);
                             return Err(Exception {

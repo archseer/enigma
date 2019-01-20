@@ -271,6 +271,12 @@ pub enum Type {
     Binary,
 }
 
+pub enum Num {
+    Float(f64),
+    Integer(i32),
+    Bignum(BigInt)
+}
+
 impl Term {
     #[inline]
     pub fn nil() -> Self {
@@ -388,6 +394,21 @@ impl Term {
             unsafe { return &mut *(ptr as *mut T) }
         }
         panic!("Not a boxed type!")
+    }
+
+    /// A method that's optimized for retrieving number types.
+    pub fn into_number(&self) -> Num {
+        match self.into_variant() {
+            Variant::Integer(i) => Num::Integer(i),
+            Variant::Float(i) => Num::Float(i),
+            Variant::Pointer(ptr) => unsafe {
+                match *ptr {
+                    BOXED_BIGINT => return &*(ptr as *const BigInt),
+                    _ => panic!("invalid type!")
+                }
+            }
+            _ => panic!("invalid type!"),
+        }
     }
 
     // ------

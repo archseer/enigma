@@ -271,10 +271,10 @@ macro_rules! trig_func {
     $arg:expr,
     $op:ident
 ) => {{
-        let res = match $arg {
-            Term::Integer(i) => i as f64, // TODO: potentially unsafe
-            Term::Float(value::Float(f)) => f,
-            Term::BigInt(..) => unimplemented!(),
+        let res = match $arg.into_number() {
+            value::Num::Integer(i) => i as f64, // TODO: potentially unsafe
+            value::Num::Float(f) => f,
+            value::Num::Bignum(..) => unimplemented!(),
             _ => return Err(Exception::new(Reason::EXC_BADARG)),
         };
         Ok(Term::from(res.$op()))
@@ -346,16 +346,16 @@ fn bif_math_sqrt_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Bi
 }
 
 fn bif_math_atan2_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
-    let res = match args[0] {
-        Term::Integer(i) => i as f64, // TODO: potentially unsafe
-        Term::Float(value::Float(f)) => f,
-        Term::BigInt(..) => unimplemented!(),
+    let res = match args[0].into_number() {
+        value::Num::Integer(i) => i as f64, // TODO: potentially unsafe
+        value::Num::Float(f) => f,
+        value::Num::Bignum(..) => unimplemented!(),
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
-    let arg = match args[1] {
-        Term::Integer(i) => i as f64, // TODO: potentially unsafe
-        Term::Float(value::Float(f)) => f,
-        Term::BigInt(..) => unimplemented!(),
+    let arg = match args[1].into_number() {
+        value::Num::Integer(i) => i as f64, // TODO: potentially unsafe
+        value::Num::Float(f) => f,
+        value::Num::Bignum(..) => unimplemented!(),
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     Ok(Term::from(res.atan2(arg)))
@@ -585,7 +585,7 @@ fn bif_lists_member_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     // non_immed_key = is_not_immed(term);
     let mut list = &args[1];
 
-    while let Term::List(l) = *list {
+    while let Ok(Cons{ head, tail }) = list.try_into() {
         max_iter -= 1;
         if max_iter < 0 {
             // BUMP_ALL_REDS(BIF_P);
@@ -594,15 +594,12 @@ fn bif_lists_member_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
             // and passing it in the bif call)
         }
 
-        unsafe {
-            let item = &(*l).head;
-            if *item == *term {
-                // || (non_immed_key && deep_equals) {
-                // BIF_RET2(am_true, reds_left - max_iter/16);
-                return Ok(atom!(TRUE));
-            }
-            list = &(*l).tail;
+        if *head == *term {
+            // || (non_immed_key && deep_equals) {
+            // BIF_RET2(am_true, reds_left - max_iter/16);
+            return Ok(atom!(TRUE));
         }
+        list = tail;
     }
 
     if !list.is_list() {
