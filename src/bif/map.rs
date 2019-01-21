@@ -42,18 +42,18 @@ pub fn bif_maps_get_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
 pub fn bif_maps_from_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let mut list = &args[0];
     if !list.is_list() {
-        return Err(Exception::with_value(Reason::EXC_BADARG, *list));
+        return Err(Exception::new(Reason::EXC_BADARG));
     }
     let mut map = HamtMap::new();
     while let Ok(value::Cons { head, tail }) = list.try_into() {
         if let Ok(tuple) = head.try_into() {
             let tuple: &value::Tuple = tuple; // annoying, need type annotation
             if tuple.len != 2 {
-                return Err(Exception::with_value(Reason::EXC_BADARG, *list));
+                return Err(Exception::new(Reason::EXC_BADARG));
             }
             map = map.plus(tuple[0], tuple[1]);
         } else {
-            return Err(Exception::with_value(Reason::EXC_BADARG, *list));
+            return Err(Exception::new(Reason::EXC_BADARG));
         }
         list = tail;
     }
@@ -314,7 +314,6 @@ mod tests {
 
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
-            assert_eq!(exception.value, bad_list.clone());
         } else {
             panic!();
         }
@@ -342,7 +341,6 @@ mod tests {
 
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
-            assert_eq!(exception.value, bad_tuple.clone());
         } else {
             panic!();
         }
