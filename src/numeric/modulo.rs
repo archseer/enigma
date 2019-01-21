@@ -16,6 +16,26 @@ pub trait OverflowingModulo<RHS = Self> {
     fn overflowing_modulo(self, rhs: RHS) -> (Self::Output, bool);
 }
 
+impl Modulo for i32 {
+    type Output = i32;
+
+    fn modulo(self, rhs: Self) -> Self::Output {
+        ((self % rhs) + rhs) % rhs
+    }
+}
+
+impl OverflowingModulo for i32 {
+    type Output = i32;
+
+    fn overflowing_modulo(self, rhs: Self) -> (Self::Output, bool) {
+        if self == Self::min_value() && rhs == -1 {
+            (0, true)
+        } else {
+            (self.modulo(rhs), false)
+        }
+    }
+}
+
 impl Modulo for i64 {
     type Output = i64;
 

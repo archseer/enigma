@@ -4,6 +4,8 @@ mod macros;
 pub mod exception;
 #[macro_use]
 pub mod vm;
+#[macro_use]
+pub mod nanbox;
 mod atom;
 mod bif;
 mod bitstring;
@@ -29,3 +31,7 @@ extern crate once_cell;
 
 #[macro_use]
 extern crate bitflags;
+
+#[cfg(test)]
+#[macro_use]
+extern crate quickcheck;

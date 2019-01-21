@@ -1,4 +1,4 @@
-use crate::value::Value;
+use crate::value::{self, Term, TryInto};
 use parking_lot::Mutex;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
@@ -67,6 +67,23 @@ impl Hash for Binary {
     }
 }
 
+// TODO: to be TryFrom once rust stabilizes the trait
+impl TryInto<value::Boxed<Binary>> for Term {
+    type Error = value::WrongBoxError;
+
+    #[inline]
+    fn try_into(&self) -> Result<&value::Boxed<Binary>, value::WrongBoxError> {
+        if let value::Variant::Pointer(ptr) = self.into_variant() {
+            unsafe {
+                if *ptr == value::BOXED_BINARY {
+                    return Ok(&*(ptr as *const value::Boxed<Binary>));
+                }
+            }
+        }
+        Err(value::WrongBoxError)
+    }
+}
+
 pub struct SubBinary {
     // TODO: wrap into value
     /// Binary size in bytes
@@ -80,13 +97,13 @@ pub struct SubBinary {
     /// Is the underlying binary writable?
     is_writable: bool,
     /// Original binary (refc or heap)
-    original: Value,
+    original: Term,
 }
 
 // TODO: let's use nom to handle offsets & matches, and keep a reference to the binary
 pub struct MatchBuffer {
     /// Original binary
-    original: Value,
+    original: Term,
     /// Current position in binary
     base: usize,
     /// Offset in bits
@@ -99,7 +116,7 @@ pub struct MatchState<'a> {
     // TODO: wrap into value
     mb: MatchBuffer,
     /// Saved offsets, only valid for contexts created through bs_start_match2.
-    saved_offsets: &'a [Value],
+    saved_offsets: &'a [Term],
 }
 
 bitflags! {
@@ -117,3 +134,18 @@ bitflags! {
         const BSF_NATIVE = 16;
     }
 }
+
+// Stores data on the process heap. Small, but expensive to copy.
+// HeapBin(len + ptr)
+// Stores data off the process heap, in an Arc<>. Cheap to copy around.
+// RefBin(Arc<String/Vec<u8?>>)
+// ^^ start with just RefBin since Rust already will do the String management for us
+// SubBin(len (original?), offset, bitsize,bitoffset,is_writable, orig_ptr -> Bin/RefBin)
+
+// consider using an Arc<RwLock<>> to make the inner string mutable? is the overhead worth it?
+// data is always append only, so maybe have an atomic bool for the writable bit and keep the
+// normal structure lockless.
+
+// bitstring is the base model, binary is an 8-bit aligned bitstring
+// https://www.reddit.com/r/rust/comments/2d7rrj/bit_level_pattern_matching/
+// https://docs.rs/bitstring/0.1.1/bitstring/bit_string/trait.BitString.html

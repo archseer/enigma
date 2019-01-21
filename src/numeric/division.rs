@@ -16,6 +16,26 @@ pub trait OverflowingFlooredDiv<RHS = Self> {
     fn overflowing_floored_division(self, rhs: RHS) -> (Self::Output, bool);
 }
 
+impl FlooredDiv for i32 {
+    type Output = i32;
+
+    fn floored_division(self, rhs: Self) -> Self::Output {
+        num_integer::div_floor(self, rhs)
+    }
+}
+
+impl OverflowingFlooredDiv for i32 {
+    type Output = i32;
+
+    fn overflowing_floored_division(self, rhs: Self) -> (Self::Output, bool) {
+        if self == Self::min_value() && rhs == -1 {
+            (self, true)
+        } else {
+            (self.floored_division(rhs), false)
+        }
+    }
+}
+
 impl FlooredDiv for i64 {
     type Output = i64;
 

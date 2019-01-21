@@ -1,7 +1,7 @@
+use crate::process::PID;
+use crate::servo_arc::Arc;
 use hashbrown::HashMap;
 use parking_lot::Mutex;
-use crate::servo_arc::Arc;
-use crate::process::PID;
 
 // pub type RcProcessRegistry = Arc<Mutex<ProcessRegistry<RcProcess>>>;
 
@@ -85,7 +85,7 @@ impl<T: Clone> ProcessRegistry<T> {
 //     }
 
 //     r.name = name;
-    
+
 //     rp = (RegProc*) hash_put(&process_reg, (void*) &r);
 //     if (proc && rp->p == proc) {
 // 	if (IS_TRACED_FL(proc, F_TRACE_PROCS)) {

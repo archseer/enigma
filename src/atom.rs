@@ -1,5 +1,4 @@
 //use std::ptr;
-use crate::value::Value;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
@@ -87,27 +86,7 @@ impl AtomTable {
         self.register_atom(val)
     }
 
-    pub fn to_str(&self, a: &Value) -> Result<String, String> {
-        if let Value::Atom(index) = a {
-            if let Some(p) = self.lookup(a) {
-                return Ok(unsafe { (*p).name.clone() });
-            }
-            return Err(format!("Atom does not exist: {}", index));
-        }
-        panic!("Value is not an atom!")
-    }
-
-    pub fn lookup(&self, a: &Value) -> Option<*const Atom> {
-        if let Value::Atom(index) = a {
-            let index_r = self.index_r.read();
-            if *index >= index_r.len() as u32 {
-                return None;
-            }
-            return Some(&index_r[*index as usize] as *const Atom);
-        }
-        panic!("Value is not an atom!")
-    }
-    pub fn lookup_index(&self, index: u32) -> Option<*const Atom> {
+    pub fn to_str(&self, index: u32) -> Option<*const Atom> {
         let index_r = self.index_r.read();
         if index >= index_r.len() as u32 {
             return None;
@@ -208,12 +187,8 @@ pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)
 }
 
-pub fn to_str(a: &Value) -> Result<String, String> {
-    ATOMS.to_str(a)
-}
-
-pub fn from_index(index: u32) -> Result<String, String> {
-    if let Some(p) = ATOMS.lookup_index(index) {
+pub fn to_str(index: u32) -> Result<String, String> {
+    if let Some(p) = ATOMS.to_str(index) {
         return Ok(unsafe { (*p).name.clone() });
     }
     Err(format!("Atom does not exist: {}", index))
