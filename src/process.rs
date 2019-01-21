@@ -60,13 +60,15 @@ bitflags! {
 impl ExecutionContext {
     #[inline]
     // TODO: expand_arg should return by value
-    pub fn expand_arg<'a>(&'a self, arg: &'a LValue) -> &'a Term {
+    pub fn expand_arg(&self, arg: &LValue) -> Term {
         match arg {
             // TODO: optimize away into a reference somehow at load time
-            LValue::ExtendedLiteral(i) => unsafe { &(*self.ip.module).literals[*i as usize] },
-            LValue::X(i) => &self.x[*i as usize],
-            LValue::Y(i) => &self.stack[self.stack.len() - (*i + 2) as usize],
-            //LValue::Integer(i) => &Term::int(*i as i32), // TODO: make LValue i32
+            LValue::ExtendedLiteral(i) => unsafe { (*self.ip.module).literals[*i as usize] },
+            LValue::X(i) => self.x[*i as usize],
+            LValue::Y(i) => self.stack[self.stack.len() - (*i + 2) as usize],
+            LValue::Integer(i) => Term::int(*i as i32), // TODO: make LValue i32
+            LValue::Atom(i) => Term::atom(*i),
+            LValue::Nil => Term::nil(),
             value => unimplemented!("expand unimplemented for {:?}", value),
         }
     }

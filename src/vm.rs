@@ -563,7 +563,7 @@ impl Machine {
                     if let Some(msg) = process.local_data_mut().mailbox.receive() {
                         context.x[0] = *msg
                     } else {
-                        let fail = context.expand_arg(&ins.args[0]).to_u32();
+                        let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
                     }
                 }
@@ -574,7 +574,7 @@ impl Machine {
 
                     process.local_data_mut().mailbox.advance();
 
-                    let label = context.expand_arg(&ins.args[0]).to_u32();
+                    let label = ins.args[0].to_u32();
                     op_jump!(context, label);
                 }
                 Opcode::Wait => {
@@ -582,7 +582,7 @@ impl Machine {
                     // jump to label, set wait flag on process
                     debug_assert_eq!(ins.args.len(), 1);
 
-                    let label = context.expand_arg(&ins.args[0]).to_u32();
+                    let label = ins.args[0].to_u32();
                     op_jump!(context, label);
 
                     // TODO: this currently races if the process is sending us
@@ -761,8 +761,8 @@ impl Machine {
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
 
-                    if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(v2) {
-                        let fail = context.expand_arg(&ins.args[0]).to_u32();
+                    if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(&v2) {
+                        let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
                     } else {
                         // ok
@@ -774,10 +774,10 @@ impl Machine {
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
 
-                    if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(v2) {
+                    if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(&v2) {
                         // ok
                     } else {
-                        let fail = context.expand_arg(&ins.args[0]).to_u32();
+                        let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
                     }
                 }
@@ -787,10 +787,10 @@ impl Machine {
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
 
-                    if let Some(std::cmp::Ordering::Equal) = v1.erl_partial_cmp(v2) {
+                    if let Some(std::cmp::Ordering::Equal) = v1.erl_partial_cmp(&v2) {
                         // ok
                     } else {
-                        let fail = context.expand_arg(&ins.args[0]).to_u32();
+                        let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
                     }
                 }
@@ -800,8 +800,8 @@ impl Machine {
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
 
-                    if let Some(std::cmp::Ordering::Equal) = v1.erl_partial_cmp(v2) {
-                        let fail = context.expand_arg(&ins.args[0]).to_u32();
+                    if let Some(std::cmp::Ordering::Equal) = v1.erl_partial_cmp(&v2) {
+                        let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
                     }
                 }
@@ -811,10 +811,10 @@ impl Machine {
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
 
-                    if v1.eq(v2) {
+                    if v1.eq(&v2) {
                         // ok
                     } else {
-                        let fail = context.expand_arg(&ins.args[0]).to_u32();
+                        let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
                     }
                 }
@@ -824,8 +824,8 @@ impl Machine {
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
 
-                    if v1.eq(v2) {
-                        let fail = context.expand_arg(&ins.args[0]).to_u32();
+                    if v1.eq(&v2) {
+                        let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
                     } else {
                         // ok
@@ -851,12 +851,12 @@ impl Machine {
                         context.expand_arg(&ins.args[0]).try_into()
                     {
                         let closure: &value::Closure = value; // ughh type annotation
-                        let arity = context.expand_arg(&ins.args[1]).to_u32();
+                        let arity = ins.args[1].to_u32();
                         if closure.mfa.2 == arity {
                             continue;
                         }
                     }
-                    let fail = context.expand_arg(&ins.args[2]).to_u32();
+                    let fail = ins.args[2].to_u32();
                     op_jump!(context, fail);
                 }
                 Opcode::TestArity => {
@@ -928,13 +928,13 @@ impl Machine {
                 }
                 Opcode::Jump => {
                     debug_assert_eq!(ins.args.len(), 1);
-                    let label = context.expand_arg(&ins.args[0]).to_u32();
+                    let label = ins.args[0].to_u32();
                     op_jump!(context, label)
                 }
                 Opcode::Move => {
                     // arg1 can be either a value or a register
                     let val = context.expand_arg(&ins.args[0]);
-                    set_register!(context, &ins.args[1], *val)
+                    set_register!(context, &ins.args[1], val)
                 }
                 Opcode::GetList => {
                     // source, head, tail
@@ -951,7 +951,7 @@ impl Machine {
                 Opcode::GetTupleElement => {
                     // source, element, dest
                     let source = context.expand_arg(&ins.args[0]);
-                    let n = context.expand_arg(&ins.args[1]).to_u32();
+                    let n = ins.args[1].to_u32();
                     if let Ok(t) = source.try_into() {
                         let t: &value::Tuple = t; // annoying, need type annotation
                         set_register!(context, &ins.args[2], t[n as usize])
@@ -964,7 +964,7 @@ impl Machine {
                     // Creates a cons cell with [H|T] and places the value into Dst.
                     let head = context.expand_arg(&ins.args[0]);
                     let tail = context.expand_arg(&ins.args[1]);
-                    let cons = cons!(&context.heap, *head, *tail);
+                    let cons = cons!(&context.heap, head, tail);
                     set_register!(context, &ins.args[2], cons)
                 }
                 Opcode::PutTuple => {
@@ -983,14 +983,14 @@ impl Machine {
                         let tuple = value::tuple(&context.heap, arity as u32);
                         for i in 0..arity {
                             unsafe {
-                                std::ptr::write(&mut tuple[i], *context.expand_arg(&list[i]));
+                                std::ptr::write(&mut tuple[i], context.expand_arg(&list[i]));
                             }
                         }
                         set_register!(context, &ins.args[0], Term::from(tuple))
                     }
                 }
                 Opcode::Badmatch => {
-                    let value = *context.expand_arg(&ins.args[0]);
+                    let value = context.expand_arg(&ins.args[0]);
                     return Err(Exception::with_value(Reason::EXC_BADMATCH, value));
                 }
                 Opcode::IfEnd => {
@@ -999,7 +999,7 @@ impl Machine {
                 }
                 Opcode::CaseEnd => {
                     // Raises the case_clause exception with the value of Arg0
-                    let value = *context.expand_arg(&ins.args[0]);
+                    let value = context.expand_arg(&ins.args[0]);
                     return Err(Exception::with_value(Reason::EXC_CASE_CLAUSE, value));
                 }
                 Opcode::Try => {
@@ -1042,7 +1042,7 @@ impl Machine {
                 Opcode::TryCaseEnd => {
                     // Raises a try_clause exception with the value read from Arg0.
                     let value = context.expand_arg(&ins.args[0]);
-                    return Err(Exception::with_value(Reason::EXC_TRY_CLAUSE, *value));
+                    return Err(Exception::with_value(Reason::EXC_TRY_CLAUSE, value));
                 }
                 Opcode::Catch => {
                     // create a catch context that wraps f - fail label, and stores to y - reg.
@@ -1102,15 +1102,15 @@ impl Machine {
                     let trace = context.expand_arg(&ins.args[0]);
                     let value = context.expand_arg(&ins.args[1]);
 
-                    let reason = if let Some(s) = exception::get_trace_from_exc(trace) {
+                    let reason = if let Some(s) = exception::get_trace_from_exc(&trace) {
                         primary_exception!(s.reason)
                     } else {
                         Reason::EXC_ERROR
                     };
                     return Err(Exception {
                         reason,
-                        value: *value,
-                        trace: *trace,
+                        value,
+                        trace,
                     });
                 }
                 Opcode::Apply => {
@@ -1142,7 +1142,7 @@ impl Machine {
                     // fail label, live, bif, arg1, dest
                     if let LValue::Literal(i) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
-                        let args = &[*context.expand_arg(&ins.args[3])];
+                        let args = &[context.expand_arg(&ins.args[3])];
                         let mfa = &module.imports[*i as usize];
                         let val = bif::apply(self, process, mfa, &args[..]).unwrap(); // TODO: handle fail
 
@@ -1198,7 +1198,7 @@ impl Machine {
                         // TODO: use a current_string ptr to be able to write to the Arc wrapped str
                         // alternatively, loop through the instrs until we hit a non bs_ instr.
                         // that way, no unsafe ptrs!
-                        let size = context.expand_arg(s1).to_u32();
+                        let size = s1.to_u32();
                         let binary = bitstring::Binary::with_capacity(size as usize);
                         context.bs = &binary.data as *const Vec<u8> as *mut Vec<u8>; // nasty, point to arc instead
                                                                                      // TODO ^ ensure this pointer stays valid after heap alloc
@@ -1393,9 +1393,9 @@ impl Machine {
                     if let LValue::Literal(i) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
                         let args = &[
-                            *context.expand_arg(&ins.args[3]),
-                            *context.expand_arg(&ins.args[4]),
-                            *context.expand_arg(&ins.args[5]),
+                            context.expand_arg(&ins.args[3]),
+                            context.expand_arg(&ins.args[4]),
+                            context.expand_arg(&ins.args[5]),
                         ];
                         let mfa = &module.imports[*i as usize];
                         let val = bif::apply(self, process, mfa, &args[..]).unwrap(); // TODO: handle fail
@@ -1473,14 +1473,14 @@ impl Machine {
                 }
                 Opcode::IsTaggedTuple => {
                     debug_assert_eq!(ins.args.len(), 4);
-                    let fail = context.expand_arg(&ins.args[0]).to_u32();
+                    let fail = ins.args[0].to_u32();
                     let reg = context.expand_arg(&ins.args[1]);
-                    let n = context.expand_arg(&ins.args[2]).to_u32();
+                    let n = ins.args[2].to_u32();
                     let atom = context.expand_arg(&ins.args[3]);
                     if let Ok(t) = reg.try_into() {
                         let tuple: &value::Tuple = t; // annoying, need type annotation
 
-                        if tuple.len == 0 || tuple.len != n || !tuple[0].eq(atom) {
+                        if tuple.len == 0 || tuple.len != n || !tuple[0].eq(&atom) {
                             op_jump!(context, fail);
                         } else {
                             // ok
