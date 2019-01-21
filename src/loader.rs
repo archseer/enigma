@@ -353,7 +353,7 @@ impl<'a> Loader<'a> {
                     }
                 }
                 Opcode::PutTuple => {
-                    if let [Value::Literal(arity), destination] = &instruction.args[..] {
+                    if let [LValue::Literal(arity), destination] = &instruction.args[..] {
                         let mut i = *arity;
                         let mut list = Vec::new();
                         while i > 0 {
@@ -374,7 +374,7 @@ impl<'a> Loader<'a> {
                         }
                         instruction.op = Opcode::PutTuple2;
                         instruction.args =
-                            vec![destination.clone(), Value::ExtendedList(Box::new(list))];
+                            vec![destination.clone(), LValue::ExtendedList(Box::new(list))];
                         instruction
                     } else {
                         unreachable!()
