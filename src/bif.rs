@@ -153,21 +153,29 @@ fn bif_erlang_spawn_3(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> 
     // arg[2] = arguments for func (well-formed list)
     // opts, options for spawn
 
-    if let [Term::Atom(module), Term::Atom(func), arglist] = &args[..] {
-        let registry = vm.modules.lock();
-        let module = registry.lookup(*module).unwrap();
-        // TODO: avoid the clone here since we copy later
-        return process::spawn(&vm.state, module, *func, arglist.clone());
-    }
-    Err(Exception::new(Reason::EXC_BADARG))
+    let module = match args[0].into_variant() {
+        Variant::Atom(module) => module,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    let func = match args[1].into_variant() {
+        Variant::Atom(func) => func,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    let arglist = &args[2];
+
+    let registry = vm.modules.lock();
+    let module = registry.lookup(module).unwrap();
+    // TODO: avoid the clone here since we copy later
+    return process::spawn(&vm.state, module, func, arglist.clone());
 }
 
 fn bif_erlang_abs_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let heap = &process.context_mut().heap;
     match &args[0].into_number() {
-        value::Num::Integer(i) => Ok(Term::int(i.abs())),
-        value::Num::Float(f) => Ok(Term::from(f.abs())),
-        value::Num::Bignum(i) => Ok(Term::bigint(heap, i.abs())),
+        Ok(value::Num::Integer(i)) => Ok(Term::int(i.abs())),
+        Ok(value::Num::Float(f)) => Ok(Term::from(f.abs())),
+        Ok(value::Num::Bignum(i)) => Ok(Term::bigint(heap, i.abs())),
         _ => Err(Exception::new(Reason::EXC_BADARG)),
     }
 }
@@ -273,10 +281,10 @@ macro_rules! trig_func {
     $op:ident
 ) => {{
         let res = match $arg.into_number() {
-            value::Num::Integer(i) => i as f64, // TODO: potentially unsafe
-            value::Num::Float(f) => f,
-            value::Num::Bignum(..) => unimplemented!(),
-            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+            Ok(value::Num::Integer(i)) => i as f64, // TODO: potentially unsafe
+            Ok(value::Num::Float(f)) => f,
+            Ok(value::Num::Bignum(..)) => unimplemented!(),
+            Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
         };
         Ok(Term::from(res.$op()))
     }};
@@ -348,16 +356,16 @@ fn bif_math_sqrt_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Bi
 
 fn bif_math_atan2_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     let res = match args[0].into_number() {
-        value::Num::Integer(i) => i as f64, // TODO: potentially unsafe
-        value::Num::Float(f) => f,
-        value::Num::Bignum(..) => unimplemented!(),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        Ok(value::Num::Integer(i)) => i as f64, // TODO: potentially unsafe
+        Ok(value::Num::Float(f)) => f,
+        Ok(value::Num::Bignum(..)) => unimplemented!(),
+        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     let arg = match args[1].into_number() {
-        value::Num::Integer(i) => i as f64, // TODO: potentially unsafe
-        value::Num::Float(f) => f,
-        value::Num::Bignum(..) => unimplemented!(),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        Ok(value::Num::Integer(i)) => i as f64, // TODO: potentially unsafe
+        Ok(value::Num::Float(f)) => f,
+        Ok(value::Num::Bignum(..)) => unimplemented!(),
+        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     Ok(Term::from(res.atan2(arg)))
 }
@@ -371,10 +379,13 @@ fn bif_erlang_tuple_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term
 
 fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     let res = match &args[0].try_into() {
-        Ok(value::Boxed { header: BOXED_BINARY, value: str }) => {
+        Ok(value::Boxed {
+            header: value::BOXED_BINARY,
+            value: str,
+        }) => {
             let str: &bitstring::Binary = str; // type annotation
             str.data.len()
-        },
+        }
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     Ok(Term::int(res as i32)) // TODO: cast potentially unsafe
@@ -785,10 +796,10 @@ fn bif_erlang_tl_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Bi
 fn bif_erlang_trunc_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let heap = &process.context_mut().heap;
     match &args[0].into_number() {
-        value::Num::Integer(i) => Ok(Term::int(*i)),
-        value::Num::Float(f) => Ok(Term::from(f.trunc())),
-        value::Num::Bignum(v) => Ok(Term::bigint(heap, v.clone())),
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        Ok(value::Num::Integer(i)) => Ok(Term::int(*i)),
+        Ok(value::Num::Float(f)) => Ok(Term::from(f.trunc())),
+        Ok(value::Num::Bignum(v)) => Ok(Term::bigint(heap, v.clone())),
+        Err(_) => Err(Exception::new(Reason::EXC_BADARG)),
     }
 }
 
@@ -838,15 +849,13 @@ mod tests {
     /// Converts an erlang list to a value vector.
     fn to_vec(value: Term) -> Vec<Term> {
         let mut vec = Vec::new();
-        unsafe {
-            let mut cons = &value;
-            while let Ok(ptr) = *cons.try_into::<Cons>() {
-                vec.push((*ptr).head.clone());
-                cons = &(*ptr).tail;
-            }
-            // lastly, the tail
-            vec.push((*cons).clone());
+        let mut cons = &value;
+        while let Ok(Cons { head, tail }) = cons.try_into() {
+            vec.push(head.clone());
+            cons = &tail;
         }
+        // lastly, the tail
+        vec.push((*cons).clone());
         vec
     }
 
@@ -924,7 +933,7 @@ mod tests {
         let process = process::allocate(&vm.state, module).unwrap();
         let args = vec![];
         let res = bif_erlang_self_0(&vm, &process, &args);
-        assert_eq!(res, Ok(Term::Pid(process.pid)));
+        assert_eq!(res, Ok(Term::pid(process.pid)));
     }
 
     // TODO: test send_2
@@ -1019,7 +1028,8 @@ mod tests {
         let res = bif_erlang_is_number_1(&vm, &process, &args);
         assert_eq!(res, Ok(atom!(TRUE)));
 
-        let args = vec![Term::BigInt(Box::new(10000_i32.to_bigint().unwrap()))];
+        let heap = &process.context_mut().heap;
+        let args = vec![Term::bigint(heap, 10000_i32.to_bigint().unwrap())];
         let res = bif_erlang_is_number_1(&vm, &process, &args);
         assert_eq!(res, Ok(atom!(TRUE)));
 
@@ -1034,7 +1044,7 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
 
-        let args = vec![Term::Port(80)];
+        let args = vec![Term::port(80)];
         let res = bif_erlang_is_port_1(&vm, &process, &args);
         assert_eq!(res, Ok(atom!(TRUE)));
 
@@ -1048,8 +1058,9 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
 
-        let args = vec![Term::Ref(197)];
+        let args = vec![Term::reference(heap, 197)];
         let res = bif_erlang_is_reference_1(&vm, &process, &args);
         assert_eq!(res, Ok(atom!(TRUE)));
 
@@ -1079,9 +1090,16 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
 
-        let func: *const value::Closure = std::ptr::null();
-        let args = vec![Term::Closure(func)];
+        let args = vec![Term::closure(
+            heap,
+            value::Closure {
+                mfa: (0, 0, 0),
+                ptr: 0,
+                binding: None,
+            },
+        )];
         let res = bif_erlang_is_function_1(&vm, &process, &args);
         assert_eq!(res, Ok(atom!(TRUE)));
 

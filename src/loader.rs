@@ -39,14 +39,14 @@ pub struct Loader<'a> {
 /// Compact term encoding values. BEAM does some tricks to be able to share the memory layout with
 /// regular values, but for the most part we don't need this (it also doesn't fit nanboxed values
 /// well).
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum LValue {
     // TODO: these dupe LTerm values
     Atom(u32),
     Integer(i64),
     Character(u8),
     Nil,
-    Binary(bitstring::Binary),
+    Binary(Arc<bitstring::Binary>),
     BigInt(BigInt),
     //
     Literal(u32),
@@ -344,7 +344,7 @@ impl<'a> Loader<'a> {
                         let bytes = &self.strings[offset..offset + len as usize];
                         let string = bytes.as_bytes().to_vec(); // TODO: check if most efficient
                         instruction.args =
-                            vec![LValue::Binary(bitstring::Binary::from_vec(string))];
+                            vec![LValue::Binary(Arc::new(bitstring::Binary::from_vec(string)))];
                         instruction
                     } else {
                         unreachable!()
@@ -364,15 +364,15 @@ impl<'a> Loader<'a> {
                     if *i == 0 {
                         return LValue::Nil;
                     }
-                    LValue::Atom(atom_map[&(i - 1)])
+                    LValue::Atom(atom_map[&(*i - 1)])
                 }
                 LValue::Label(l) => {
                     if *l == 0 {
                         return LValue::Label(0);
                     }
-                    LValue::Label(labels[l])
+                    LValue::Label(labels[&l])
                 }
-                val => *val.clone(),
+                val => val.clone()
             }
         };
 

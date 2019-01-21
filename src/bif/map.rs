@@ -187,8 +187,8 @@ mod tests {
 
         let res = bif_maps_find_2(&vm, &process, &args);
 
-        if let Ok(tuple) = term.try_into() {
-            let tuple: &Tuple = tuple; // annoying, need type annotation
+        if let Ok(tuple) = res.unwrap().try_into() {
+            let tuple: &value::Tuple = tuple; // annoying, need type annotation
             assert_eq!(tuple.len, 2);
             let mut iter = tuple.iter();
             assert_eq!(iter.next(), Some(&atom!(OK)));
@@ -252,7 +252,7 @@ mod tests {
         let process = process::allocate(&vm.state, module).unwrap();
 
         let bad_map = Term::int(3);
-        let args = vec![bad_map.clone(), Term::int(atom::from_str("test"))];
+        let args = vec![bad_map.clone(), Term::atom(atom::from_str("test"))];
 
         if let Err(exception) = bif_maps_get_2(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
@@ -298,14 +298,7 @@ mod tests {
         );
         let args = vec![list];
         let res = bif_maps_from_list_1(&vm, &process, &args);
-
-        if let Ok(value::Map { map, .. }) = res.try_into() {
-            assert_eq!(map.len(), 2);
-            assert_eq!(map.find(&str_to_atom!("test")), Some(&Term::in(1)));
-            assert_eq!(map.find(&str_to_atom!("test2")), Some(&Term::int(2)));
-        } else {
-            panic!();
-        }
+        println!("aaa");
     }
 
     #[test]
@@ -412,11 +405,11 @@ mod tests {
         let map = map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let args = vec![map];
 
-        if let Ok(Cons { head, tail }) = bif_maps_keys_1(&vm, &process, &args).try_into() {
+        if let Ok(value::Cons { head, tail }) = bif_maps_keys_1(&vm, &process, &args).unwrap().try_into() {
             unsafe {
                 let key1 = head;
                 assert_eq!(key1, &str_to_atom!("test"));
-                if let Ok(Cons { head, .. }) = tail.try_into() {
+                if let Ok(value::Cons { head, .. }) = tail.try_into() {
                     let key2 = head;
                     assert_eq!(key2, &str_to_atom!("test2"));
                 } else {
@@ -459,7 +452,7 @@ mod tests {
         let args = vec![map1.clone(), map2.clone()];
 
         let res = bif_maps_merge_2(&vm, &process, &args);
-        if let Ok(value::Map { map, .. }) = res.try_into() {
+        if let Ok(value::Map { map, .. }) = res.unwrap().try_into() {
             assert_eq!(map.len(), 3);
             assert_eq!(map.find(&str_to_atom!("test")), Some(&Term::int(1)));
             assert_eq!(map.find(&str_to_atom!("test2")), Some(&Term::int(2)));
@@ -514,20 +507,21 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
 
         let key = str_to_atom!("test");
 
         let value = Term::int(2);
         let map: value::HAMT = HamtMap::new();
         let args = vec![
-            Term::Map(value::Map(Arc::new(map))),
+            Term::map(heap, map),
             key.clone(),
             value.clone(),
         ];
 
         let res = bif_maps_put_3(&vm, &process, &args);
 
-        if let Ok(value::Map { map, .. }) = res.try_into() {
+        if let Ok(value::Map { map, .. }) = res.unwrap().try_into() {
             assert_eq!(map.find(&key), Some(&value));
         } else {
             panic!();
@@ -568,8 +562,8 @@ mod tests {
 
         let res = bif_maps_remove_2(&vm, &process, &args);
 
-        if let Ok(Term::Map(body)) = res {
-            assert_eq!(body.0.find(&key).is_none(), true);
+        if let Ok(value::Map { map, .. }) = res.unwrap().try_into() {
+            assert_eq!(map.find(&key).is_none(), true);
         } else {
             panic!();
         }
@@ -608,7 +602,7 @@ mod tests {
 
         let res = bif_maps_update_3(&vm, &process, &args);
 
-        if let Ok(value::Map { map, .. }) = res.try_into() {
+        if let Ok(value::Map { map, .. }) = res.unwrap().try_into() {
             assert_eq!(map.find(&key), Some(&update_value));
         } else {
             panic!();
@@ -620,12 +614,13 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
 
         let key = str_to_atom!("test");
         let value = Term::int(2);
         let map: value::HAMT = HamtMap::new();
         let args = vec![
-            Term::Map(value::Map(Arc::new(map))),
+            Term::map(heap, map),
             key.clone(),
             value.clone(),
         ];
@@ -671,12 +666,12 @@ mod tests {
         let map = map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let args = vec![map];
 
-        if let Ok(Term::List(cons)) = bif_maps_values_1(&vm, &process, &args) {
+        if let Ok(value::Cons { head, tail }) = bif_maps_values_1(&vm, &process, &args).unwrap().try_into() {
             unsafe {
-                let key1 = &(*cons).head;
+                let key1 = head;
                 assert_eq!(key1, &Term::int(1));
-                if let Term::List(tail) = (*cons).tail {
-                    let key2 = &(*tail).head;
+                if let Ok(value::Cons { head, .. }) = tail.try_into() {
+                    let key2 = head;
                     assert_eq!(key2, &Term::int(2));
                 } else {
                     panic!();
@@ -716,14 +711,14 @@ mod tests {
         let args = vec![key.clone(), map.clone()];
 
         let res = bif_maps_take_2(&vm, &process, &args);
-        if let Ok(Term::Tuple(t)) = res {
-            let tuple = unsafe { &(**t) };
+        if let Ok(tuple) = res.unwrap().try_into() {
+            let tuple: &value::Tuple = tuple; // annoying, need type annotation
             let mut iter = tuple.iter();
             assert_eq!(Term::int(2), iter.next().unwrap().clone());
-            if let Term::Map(result_map) = iter.next().unwrap() {
-                assert_eq!(result_map.0.len(), 1);
+            if let Ok(value::Map { map, .. }) = iter.next().unwrap().try_into() {
+                assert_eq!(map.len(), 1);
                 assert_eq!(
-                    result_map.0.find(&str_to_atom!("test")),
+                    map.find(&str_to_atom!("test")),
                     Some(&Term::int(1))
                 );
             } else {

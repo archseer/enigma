@@ -372,7 +372,7 @@ fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
     // TODO: tracing instr handling here
 
     while ptr > 0 {
-        match context.stack[ptr - 1].try_into() {
+        match context.stack[ptr - 1].clone().try_into() {
             Ok(value::Boxed {
                 header: value::BOXED_CATCH,
                 value: ptr,
@@ -602,12 +602,12 @@ fn save_stacktrace(
     }
     // }
 
+    // Save the actual stack trace
+    erts_save_stacktrace(process, s, depth);
+
     // Package args and stack trace
     // c_p->ftrace = CONS(hp, args, make_big((Eterm *) s));
     exc.trace = cons!(heap, args, Term::from(boxed)); // TODO: need to cast S into something
-
-    // Save the actual stack trace
-    erts_save_stacktrace(process, s, depth)
 }
 
 fn erts_save_stacktrace(process: &RcProcess, s: &mut StackTrace, mut depth: u32) {

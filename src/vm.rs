@@ -168,14 +168,12 @@ macro_rules! op_call_fun {
         // keep X regs set based on arity
         // set additional X regs based on lambda.binding
         // set x from 1 + arity (x0 is func, followed by call params) onwards to binding
-        let closure = *$closure;
-        if let Some(binding) = closure.binding {
+        let closure = $closure;
+        if let Some(binding) = &closure.binding {
             // TODO: maybe we can copy_from_slice in the future
             let arity = $arity as usize;
             $context.x[arity..arity + binding.len()].clone_from_slice(&binding[..]);
         }
-
-        println!("call_fun closure {:?}", closure);
 
         // TODO: closure needs to jump_ptr to the correct module.
         let ptr = {
@@ -200,7 +198,7 @@ macro_rules! op_apply_fun {
         // the parameters to the x registers (reg[]).
 
         let fun = $context.x[0].clone();
-        let mut tmp = &$context.x[1];
+        let mut tmp = &$context.x[1].clone();
         let mut arity = 0;
 
         while let Ok(value::Cons { head, tail }) = tmp.try_into() {
@@ -460,11 +458,9 @@ impl Machine {
     /// Starts the main process
     pub fn start_main_process(&self, path: &str) {
         println!("Starting main process...");
-        let module = {
-            let registry = self.modules.lock();
-            // let module = module::load_module(&self.modules, path).unwrap();
-            registry.lookup(atom::from_str("erl_init")).unwrap()
-        };
+        let registry = self.modules.lock();
+        // let module = module::load_module(&self.modules, path).unwrap();
+        let module = registry.lookup(atom::from_str("erl_init")).unwrap();
         let process = process::allocate(&self.state, module).unwrap();
 
         /* TEMP */
@@ -885,11 +881,11 @@ impl Machine {
                     // arg, fail, dests
                     // loop over dests
                     if let [arg, LValue::Label(fail), LValue::ExtendedList(vec)] = &ins.args[..] {
-                        let arg = context.expand_arg(arg);
+                        let arg = context.expand_arg(arg).into_lvalue();
                         let mut i = 0;
                         loop {
                             // if key matches, jump to the following label
-                            if vec[i] == *arg {
+                            if vec[i] == arg {
                                 let label = vec[i + 1].to_u32();
                                 op_jump!(context, label);
                                 break;
@@ -910,7 +906,7 @@ impl Machine {
                     if let [arg, LValue::Label(fail), LValue::ExtendedList(vec)] = &ins.args[..] {
                         if let Ok(tup) = context.expand_arg(arg).try_into() {
                             let tup: &value::Tuple = tup; // annoying, need type annotation
-                            let len = Term::int(tup.len as i32);
+                            let len = LValue::Integer(i64::from(tup.len));
                             let mut i = 0;
                             loop {
                                 // if key matches, jump to the following label
@@ -946,7 +942,7 @@ impl Machine {
                 Opcode::GetList => {
                     // source, head, tail
                     if let Ok(value::Cons { head, tail }) =
-                        context.expand_arg(&ins.args[0]).try_into()
+                        context.expand_arg(&ins.args[0]).clone().try_into() // TODO: this clone is bad but the borrow checker complains (but doesn't on GetTl/GetHd)
                     {
                         set_register!(context, &ins.args[1], head.clone());
                         set_register!(context, &ins.args[2], tail.clone());
@@ -1357,10 +1353,11 @@ impl Machine {
                 Opcode::Fconv => {
                     // reg (x), dest (float reg)
                     let val: f64 = match context.expand_arg(&ins.args[0]).into_number() {
-                        value::Num::Float(f) => f,
-                        value::Num::Integer(i) => i as f64, // TODO: i32 -> f64 is unsafe
+                        Ok(value::Num::Float(f)) => f,
+                        Ok(value::Num::Integer(i)) => i as f64, // TODO: i32 -> f64 is unsafe
+                        Ok(_) => unimplemented!(),
                         // TODO: bignum if it fits into float
-                        _ => return Err(Exception::new(Reason::EXC_BADARITH)),
+                        Err(_) => return Err(Exception::new(Reason::EXC_BADARITH)),
                     };
 
                     if let LValue::FloatReg(dest) = ins.args[1] {
@@ -1452,7 +1449,8 @@ impl Machine {
                 Opcode::CallFun => {
                     // literal arity
                     let arity = ins.args[0].to_u32();
-                    if let Ok(value::Boxed { value, .. }) = &context.x[arity as usize].try_into() {
+                    // TODO: this clone is bad but the borrow checker complains (but doesn't on GetTl/GetHd)
+                    if let Ok(value::Boxed { value, .. }) = context.x[arity as usize].clone().try_into() {
                         let closure: &value::Closure = value; // ughh type annotation
                         op_call_fun!(self, context, closure, arity)
                     } else {

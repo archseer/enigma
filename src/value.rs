@@ -2,6 +2,7 @@ use crate::atom;
 use crate::bitstring;
 use crate::exception;
 use crate::immix::Heap;
+use crate::loader;
 use crate::nanbox::TypedNanBox;
 use crate::process::{self, InstrPtr};
 use allocator_api::Layout;
@@ -9,14 +10,14 @@ use num::bigint::BigInt;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
+mod closure;
 mod cons;
 mod map;
 mod tuple;
-mod closure;
+pub use closure::Closure;
 pub use cons::Cons;
 pub use map::{Map, HAMT};
 pub use tuple::Tuple;
-pub use closure::Closure;
 
 pub trait TryInto<T>: Sized {
     /// The type returned in the event of a conversion error.
@@ -26,7 +27,7 @@ pub trait TryInto<T>: Sized {
     fn try_into(&self) -> Result<&T, Self::Error>;
 }
 
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 // annoying: we have to wrap Floats to be able to define hash
 pub struct Float(pub f64);
 impl Eq for Float {}
@@ -66,7 +67,7 @@ pub struct WrongBoxError;
 /// A term is a nanboxed compact representation of a value in 64 bits. It can either be immediate,
 /// in which case it embeds the data, or a boxed pointer, that points to more data.
 //#[derive(Debug, Eq, PartialEq, PartialOrd, Clone, Hash)]
-#[derive(Debug, Clone, Eq)] // TODO make it Copy
+#[derive(Debug, Copy, Clone, Eq)] // TODO make it Copy
 pub struct Term {
     value: TypedNanBox<Variant>,
 }
@@ -81,15 +82,15 @@ impl Hash for Term {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Special {
-    Nil,
+    Nil = 0,
     /// An internal placeholder signifying "THE_NON_VALUE".
-    None,
-    Literal(),
+    None = 1,
+    //Literal,
 }
 
-#[derive(Debug, Clone, Eq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, Hash)]
 pub enum Variant {
     Float(self::Float),
     Nil(Special), // TODO: expand nil to be able to hold different types of empty (tuple, list, map)
@@ -150,8 +151,8 @@ impl From<Variant> for Term {
                 Variant::Float(self::Float(value)) => Term {
                     value: TypedNanBox::new(TERM_FLOAT, value),
                 },
-                Variant::Nil(..) => Term {
-                    value: TypedNanBox::new(TERM_NIL, 0),
+                Variant::Nil(value) => Term {
+                    value: TypedNanBox::new(TERM_NIL, value),
                 },
                 Variant::Integer(value) => Term {
                     value: TypedNanBox::new(TERM_INTEGER, value),
@@ -186,9 +187,9 @@ impl From<TypedNanBox<Variant>> for Variant {
     fn from(value: TypedNanBox<Variant>) -> Variant {
         #[allow(unused_assignments)]
         unsafe {
-            match value.tag() {
+            match value.tag() as u8 {
                 TERM_FLOAT => Variant::Float(self::Float(value.unpack())),
-                TERM_NIL => Variant::Nil(0),
+                TERM_NIL => Variant::Nil(value.unpack()),
                 TERM_INTEGER => Variant::Integer(value.unpack()),
                 TERM_ATOM => Variant::Atom(value.unpack()),
                 TERM_PORT => Variant::Port(value.unpack()),
@@ -231,7 +232,7 @@ pub const BOXED_STACKTRACE: u8 = 8;
 #[repr(C)]
 pub struct Boxed<T> {
     pub header: Header,
-    pub value: T
+    pub value: T,
 }
 
 /// Strings use an Arc so they can be sent to other processes without
@@ -274,41 +275,68 @@ pub enum Type {
 pub enum Num {
     Float(f64),
     Integer(i32),
-    Bignum(BigInt)
+    Bignum(BigInt),
 }
 
 impl Term {
     #[inline]
     pub fn nil() -> Self {
-        Term {
-            value: TypedNanBox::new(TERM_NIL, 0),
+        unsafe {
+            Term {
+                value: TypedNanBox::new(TERM_NIL, 0),
+            }
         }
     }
 
     #[inline]
     pub fn none() -> Self {
-        Term {
-            value: TypedNanBox::new(TERM_NIL, 1),
+        unsafe {
+            Term {
+                value: TypedNanBox::new(TERM_NIL, 1),
+            }
         }
     }
 
     #[inline]
     pub fn atom(value: u32) -> Self {
-        Term {
-            value: TypedNanBox::new(TERM_ATOM, value),
+        unsafe {
+            Term {
+                value: TypedNanBox::new(TERM_ATOM, value),
+            }
         }
     }
 
     // TODO: just use Term::from everywhere
     #[inline]
     pub fn int(value: i32) -> Self {
-        Term::from(value as i32)
+        unsafe {
+            Term {
+                value: TypedNanBox::new(TERM_INTEGER, value),
+            }
+        }
     }
 
     pub fn pid(value: process::PID) -> Self {
-        Term {
-            value: TypedNanBox::new(TERM_PID, value),
+        unsafe {
+            Term {
+                value: TypedNanBox::new(TERM_PID, value),
+            }
         }
+    }
+
+    pub fn port(value: u32) -> Self {
+        unsafe {
+            Term {
+                value: TypedNanBox::new(TERM_PORT, value),
+            }
+        }
+    }
+
+    pub fn reference(heap: &Heap, value: u32) -> Self {
+        Term::from(heap.alloc(Boxed {
+            header: BOXED_REF,
+            value,
+        }))
     }
 
     pub fn map(heap: &Heap, map: HAMT) -> Self {
@@ -321,7 +349,7 @@ impl Term {
     pub fn closure(heap: &Heap, value: Closure) -> Self {
         Term::from(heap.alloc(Boxed {
             header: BOXED_CLOSURE,
-            value
+            value,
         }))
     }
 
@@ -364,46 +392,46 @@ impl Term {
 
     #[inline]
     pub fn is_none(&self) -> bool {
-        self.value.tag() == 7
+        self.value.tag() as u8 == TERM_NIL // TODO
     }
 
     pub fn is_float(&self) -> bool {
-        self.value.tag() == TERM_FLOAT
+        self.value.tag() as u8 == TERM_FLOAT
     }
 
     pub fn is_nil(&self) -> bool {
-        self.value.tag() == TERM_NIL
+        self.value.tag() as u8 == TERM_NIL
     }
 
     pub fn is_smallint(&self) -> bool {
-        self.value.tag() == TERM_INTEGER
+        self.value.tag() as u8 == TERM_INTEGER
     }
 
     pub fn is_atom(&self) -> bool {
-        self.value.tag() == TERM_ATOM
+        self.value.tag() as u8 == TERM_ATOM
     }
 
     pub fn is_port(&self) -> bool {
-        self.value.tag() == TERM_PORT
+        self.value.tag() as u8 == TERM_PORT
     }
 
     pub fn is_pid(&self) -> bool {
-        self.value.tag() == TERM_PID
+        self.value.tag() as u8 == TERM_PID
     }
 
     pub fn is_pointer(&self) -> bool {
-        self.value.tag() == TERM_POINTER
+        self.value.tag() as u8 == TERM_POINTER
     }
 
     #[inline]
     pub fn is_list(&self) -> bool {
-        let tag = self.value.tag();
-        tag == TERM_POINTER || tag == TERM_NIL
+        let tag = self.value.tag() as u8;
+        tag == TERM_CONS || tag == TERM_NIL
     }
 
     #[inline]
     pub fn get_type(&self) -> Type {
-        match self.value.tag() {
+        match self.value.tag() as u8 {
             TERM_FLOAT => Type::Number,
             TERM_NIL => Type::Nil,
             TERM_INTEGER => Type::Number,
@@ -448,17 +476,31 @@ impl Term {
     }
 
     /// A method that's optimized for retrieving number types.
-    pub fn into_number(&self) -> Num {
+    pub fn into_number(&self) -> Result<Num, ()> {
         match self.into_variant() {
-            Variant::Integer(i) => Num::Integer(i),
-            Variant::Float(self::Float(i)) => Num::Float(i),
+            Variant::Integer(i) => Ok(Num::Integer(i)),
+            Variant::Float(self::Float(i)) => Ok(Num::Float(i)),
             Variant::Pointer(ptr) => unsafe {
                 match *ptr {
-                    BOXED_BIGINT => return &*(ptr as *const BigInt),
-                    _ => panic!("invalid type!")
+                    BOXED_BIGINT => {
+                        let boxed = &*(ptr as *const Boxed<BigInt>);
+                        Ok(Num::Bignum(boxed.value.clone()))
+                    }
+                    _ => Err(()),
                 }
-            }
-            _ => panic!("invalid type!"),
+            },
+            _ => Err(()),
+        }
+    }
+
+    // TODO: ExtendedList should instead become a Term vec
+    pub fn into_lvalue(&self) -> loader::LValue {
+        match self.into_variant() {
+            Variant::Integer(i) => loader::LValue::Integer(i64::from(i)),
+            Variant::Atom(i) => loader::LValue::Atom(i),
+            Variant::Nil(..) => loader::LValue::Nil,
+            //Variant::Float(self::Float(i)) => Num::Float(i),
+            _ => unimplemented!(),
         }
     }
 
@@ -471,9 +513,9 @@ impl Term {
             Variant::Pointer(ptr) => unsafe {
                 match *ptr {
                     BOXED_BIGINT => true,
-                    _ => false
+                    _ => false,
                 }
-            }
+            },
             _ => false,
         }
     }
@@ -543,6 +585,11 @@ impl Term {
         }
         Variant::Atom(atom::FALSE).into()
     }
+
+    pub fn erl_partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // TODO: loosely compare int and floats
+        Some(self.cmp(&other))
+    }
 }
 
 impl PartialEq for Term {
@@ -562,7 +609,7 @@ impl PartialEq for Variant {
             (Variant::Pid(p1), Variant::Pid(p2)) => p1 == p2,
             (Variant::Port(p1), Variant::Port(p2)) => p1 == p2,
 
-            (Variant::Cons(l1), Variant::Cons(l2)) => unsafe { (*l1).eq(&*l2) },
+            (Variant::Cons(l1), Variant::Cons(l2)) => unsafe { (**l1).eq(&(**l2)) },
 
             (Variant::Pointer(p1), Variant::Pointer(p2)) => unsafe {
                 let header = **p1;
@@ -630,6 +677,7 @@ impl std::fmt::Display for Variant {
         match self {
             Variant::Nil(..) => write!(f, "nil"),
             Variant::Integer(i) => write!(f, "{}", i),
+            Variant::Float(self::Float(i)) => write!(f, "{}", i),
             Variant::Atom(i) => write!(f, ":{}", atom::to_str(*i).unwrap()),
             Variant::Port(i) => write!(f, "#Port<{}>", i),
             Variant::Pid(i) => write!(f, "#Pid<{}>", i),
@@ -658,7 +706,7 @@ impl std::fmt::Display for Variant {
             Variant::Pointer(ptr) => unsafe {
                 match **ptr {
                     BOXED_TUPLE => {
-                        let t = *(*ptr as *const Tuple);
+                        let t = &*(*ptr as *const Tuple);
 
                         write!(f, "{{")?;
                         let mut iter = t.iter().peekable();
@@ -707,10 +755,10 @@ mod tests {
         let heap = &Heap::new();
         let v1 = cons!(heap, Term::int(1), cons!(heap, Term::int(2), Term::nil()));
         let v2 = cons!(heap, Term::int(1), cons!(heap, Term::int(2), Term::nil()));
-        assert!(v1.erl_eq(&v2));
+        assert!(v1.eq(&v2));
 
         let v3 = cons!(heap, Term::int(1), cons!(heap, Term::int(3), Term::nil()));
-        assert!(!v1.erl_eq(&v3));
+        assert!(!v1.eq(&v3));
     }
 
     #[test]
@@ -718,9 +766,9 @@ mod tests {
         let heap = &Heap::new();
         let v1 = tup2!(heap, Term::int(1), Term::int(2));
         let v2 = tup2!(heap, Term::int(1), Term::int(2));
-        assert!(v1.erl_eq(&v2));
+        assert!(v1.eq(&v2));
 
         let v3 = tup3!(heap, Term::int(1), Term::int(1), Term::int(1));
-        assert!(!v1.erl_eq(&v3));
+        assert!(!v1.eq(&v3));
     }
 }

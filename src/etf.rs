@@ -1,7 +1,6 @@
 use crate::atom;
 use crate::bitstring;
 use crate::immix::Heap;
-use crate::servo_arc::Arc;
 use crate::value::{self, Term, HAMT};
 use nom::*;
 use num::traits::ToPrimitive;
@@ -63,11 +62,11 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> 
         Tag::SmallInteger => {
             let (rest, int) = be_u8(rest)?;
             // TODO store inside the pointer once we no longer copy
-            Ok((rest, Term::from(i32::from(int))))
+            Ok((rest, Term::int(i32::from(int))))
         }
         Tag::Integer => {
             let (rest, int) = be_i32(rest)?;
-            Ok((rest, Term::from(int)))
+            Ok((rest, Term::int(int)))
         }
         // Float: outdated? in favour of NewFloat
         // Reference
@@ -151,8 +150,9 @@ pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
                     head: val,
                     tail: Term::nil(),
                 });
+                let ptr = new_cons as *mut value::Cons;
                 std::mem::replace(&mut *tail, Term::from(new_cons));
-                (new_cons as *mut value::Cons, rest)
+                (ptr, rest)
             });
 
         // set the tail
@@ -203,8 +203,9 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term>
                     tail: Term::nil(),
                 });
 
+                let ptr = new_cons as *mut value::Cons;
                 std::mem::replace(&mut *tail, Term::from(new_cons));
-                (new_cons as *mut value::Cons, rest)
+                (ptr, rest)
             });
 
         // set the tail

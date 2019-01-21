@@ -24,7 +24,7 @@ macro_rules! integer_overflow_op {
     ) => {{
         // TODO: figure out if we can reduce amount of cloning here.
         match [$args[0].into_number(), $args[1].into_number()] {
-            [value::Num::Integer(rec), value::Num::Integer(arg)] => {
+            [Ok(value::Num::Integer(rec)), Ok(value::Num::Integer(arg))] => {
                 // Example: int + int -> int
                 //
                 // This will produce a bigint if the produced integer overflowed or
@@ -48,14 +48,14 @@ macro_rules! integer_overflow_op {
                     Term::int(result)
                 }
             }
-            [value::Num::Bignum(rec), value::Num::Integer(arg)] => {
+            [Ok(value::Num::Bignum(rec)), Ok(value::Num::Integer(arg))] => {
                 // Example: bigint + int -> bigint
 
                 let bigint = to_expr!(rec.$op(arg));
 
                 Term::bigint($heap, bigint)
             }
-            [value::Num::Integer(rec), value::Num::Bignum(arg)] => {
+            [Ok(value::Num::Integer(rec)), Ok(value::Num::Bignum(arg))] => {
                 // Example: int + bigint -> bigint
 
                 let rec = BigInt::from(rec);
@@ -63,7 +63,7 @@ macro_rules! integer_overflow_op {
 
                 Term::bigint($heap, bigint)
             }
-            [value::Num::Bignum(rec), value::Num::Bignum(arg)] => {
+            [Ok(value::Num::Bignum(rec)), Ok(value::Num::Bignum(arg))] => {
                 // Example: bigint + bigint -> bigint
 
                 let bigint = to_expr!(rec.$op(arg));

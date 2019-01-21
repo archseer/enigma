@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use std::mem;
 
 const TAG_SHIFT: u64 = 48;
-const DOUBLE_MAX_TAG: u32 = 0b11111_11111_11000_0;
+const DOUBLE_MAX_TAG: u32 = 0b11111_11111_11000_0; //000_0;
 const SHIFTED_DOUBLE_MAX_TAG: u64 = ((DOUBLE_MAX_TAG as u64) << TAG_SHIFT) | 0xFFFFFFFF;
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -34,7 +34,7 @@ pub trait NanBoxable: Sized {
 
         let shifted_tag = ((DOUBLE_MAX_TAG as u64) | (tag as u64)) << TAG_SHIFT;
         b.0 |= shifted_tag;
-        debug_assert!(b.tag() == tag, "{} == {}", b.tag(), tag);
+        debug_assert!(b.tag() == u32::from(tag), "{} == {}", b.tag(), tag);
         b
     }
 
@@ -42,6 +42,18 @@ pub trait NanBoxable: Sized {
         let mask = (1 << TAG_SHIFT) - 1;
         let b = NanBox(value.0 & mask);
         Self::from_nan_box(b)
+    }
+}
+
+// TODO: had to add this to allow packing discriminants
+use crate::value;
+impl NanBoxable for value::Special {
+    unsafe fn from_nan_box(n: NanBox) -> Self {
+        std::mem::transmute(n.0 as u8)
+    }
+
+    fn into_nan_box(self) -> NanBox {
+        NanBox(self as u64)
     }
 }
 
@@ -80,7 +92,38 @@ macro_rules! impl_cast {
     }
 }
 
-impl_cast! { u8 u16 u32 i8 i16 i32 }
+impl_cast! { u8 u16 u32 }
+
+impl NanBoxable for i8 {
+    unsafe fn from_nan_box(n: NanBox) -> i8 {
+        n.0 as i8
+    }
+
+    fn into_nan_box(self) -> NanBox {
+        NanBox(self as u8 as u64)
+    }
+}
+
+
+impl NanBoxable for i16 {
+    unsafe fn from_nan_box(n: NanBox) -> i16 {
+        n.0 as i16
+    }
+
+    fn into_nan_box(self) -> NanBox {
+        NanBox(self as u16 as u64)
+    }
+}
+
+impl NanBoxable for i32 {
+    unsafe fn from_nan_box(n: NanBox) -> i32 {
+        n.0 as i32
+    }
+
+    fn into_nan_box(self) -> NanBox {
+        NanBox(self as u32 as u64)
+    }
+}
 
 impl NanBoxable for char {
     unsafe fn from_nan_box(n: NanBox) -> char {
@@ -199,11 +242,11 @@ impl NanBox {
     }
 
     #[inline]
-    pub fn tag(self) -> u8 {
+    pub fn tag(self) -> u32 {
         if self.0 <= SHIFTED_DOUBLE_MAX_TAG {
             0
         } else {
-            ((self.0 >> TAG_SHIFT) as u32 & !DOUBLE_MAX_TAG) as u8
+            (self.0 >> TAG_SHIFT) as u32 & !DOUBLE_MAX_TAG
         }
     }
 }
@@ -220,12 +263,10 @@ where
     T: From<TypedNanBox<T>> + Into<TypedNanBox<T>> + Clone,
 {
     fn clone(&self) -> Self {
-        T::from(TypedNanBox {
+        Self::from(TypedNanBox {
             nanbox: self.nanbox,
             _marker: PhantomData,
         })
-        //.clone()
-        .into()
     }
 }
 
@@ -303,7 +344,7 @@ impl<T> TypedNanBox<T> {
         self.nanbox.unpack()
     }
 
-    pub fn tag(&self) -> u8 {
+    pub fn tag(&self) -> u32 {
         self.nanbox.tag()
     }
 }
@@ -317,10 +358,104 @@ impl<T> TypedNanBox<T> {
 ///   `debug_assert!`)
 /// * Pointers stored in a nanbox must only use the lower 48 bits (checked via `debug_assert!` only).
 ///
+/// ```
+/// #[macro_use]
+/// extern crate nanbox;
+///
+/// // Creates one `nanbox` type called `Value` and one normal enum called `Variant`.
+/// // `From` implementations are generated to converted between these two types as well as `From`
+/// // implementation for each of the types in the match arms (`From<f64>` etc).
+/// unsafe_make_nanbox!{
+///     pub enum Value, Variant {
+///         Float(f64),
+///         Byte(u8),
+///         Int(i32),
+///         Pointer(*mut Value)
+///     }
+/// }
+///
+/// # fn main() { }
+///
+/// ```
+#[macro_export]
+macro_rules! unsafe_make_nanbox {
+    (
+        $(#[$meta:meta])*
+        pub enum $name: ident, $enum_name: ident {
+            $($field: ident ($typ: ty)),*
+        }
+    ) => {
+        $(#[$meta])*
+        pub struct $name {
+            value: TypedNanBox<$enum_name>,
+        }
 
-#[cfg(test)]
-#[macro_use]
-extern crate quickcheck;
+        $(#[$meta])*
+        pub enum $enum_name {
+            $(
+                $field($typ),
+            )+
+        }
+
+        $(
+            impl From<$typ> for $name {
+                fn from(value: $typ) -> $name {
+                    $name::from($enum_name::$field(value))
+                }
+            }
+        )+
+
+        impl From<$enum_name> for $name {
+            fn from(value: $enum_name) -> $name {
+                #[allow(unused_assignments)]
+                unsafe {
+                    let mut tag = 0;
+                    $(
+                        if let $enum_name::$field(value) = value {
+                            return $name {
+                                value: TypedNanBox::new(tag, value)
+                            };
+                        }
+                        tag += 1;
+                    )+
+                    unreachable!()
+                    // $crate::unreachable::unreachable()
+                }
+            }
+        }
+
+        impl From<$name> for $enum_name {
+            fn from(value: $name) -> $enum_name {
+                value.value.into()
+            }
+        }
+
+        impl From<TypedNanBox<$enum_name>> for $enum_name {
+            fn from(value: TypedNanBox<$enum_name>) -> $enum_name {
+                #[allow(unused_assignments)]
+                unsafe {
+                    let mut expected_tag = 0;
+                    $(
+                        if expected_tag == value.tag() {
+                            return $enum_name::$field(value.unpack());
+                        }
+                        expected_tag += 1;
+                    )*
+                    debug_assert!(false, "Unexpected tag {}", value.tag());
+                    // $crate::unreachable::unreachable()
+                    unreachable!()
+                }
+            }
+        }
+
+        impl $name {
+            pub fn into_variant(self) -> $enum_name {
+                self.into()
+            }
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -350,6 +485,15 @@ mod tests {
         }
 
         fn nanbox_u32(tag: u8, v: u32) -> TestResult {
+            if tag == 0 || tag >= 8 {
+                return TestResult::discard();
+            }
+            unsafe {
+                TestResult::from_bool(NanBox::new(tag, v).tag() == tag as u32)
+            }
+        }
+
+        fn nanbox_i32(tag: u8, v: i32) -> TestResult {
             if tag == 0 || tag >= 8 {
                 return TestResult::discard();
             }

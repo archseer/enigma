@@ -65,6 +65,7 @@ impl ExecutionContext {
             LValue::ExtendedLiteral(i) => unsafe { &(*self.ip.module).literals[*i as usize] },
             LValue::X(i) => &self.x[*i as usize],
             LValue::Y(i) => &self.stack[self.stack.len() - (*i + 2) as usize],
+            //LValue::Integer(i) => &Term::int(*i as i32), // TODO: make LValue i32
             value => unimplemented!("expand unimplemented for {:?}", value),
         }
     }
