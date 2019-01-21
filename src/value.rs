@@ -61,7 +61,7 @@ const TERM_PID: u8 = 5;
 const TERM_CONS: u8 = 6;
 const TERM_POINTER: u8 = 7;
 
-struct WrongBoxError;
+pub struct WrongBoxError;
 
 /// A term is a nanboxed compact representation of a value in 64 bits. It can either be immediate,
 /// in which case it embeds the data, or a boxed pointer, that points to more data.
@@ -91,7 +91,7 @@ pub enum Special {
 
 #[derive(Debug, Clone, Eq, Hash)]
 pub enum Variant {
-    Float(f64),
+    Float(self::Float),
     Nil(Special), // TODO: expand nil to be able to hold different types of empty (tuple, list, map)
     Integer(i32),
     Atom(u32),
@@ -103,7 +103,7 @@ pub enum Variant {
 
 impl From<f64> for Term {
     fn from(value: f64) -> Term {
-        Term::from(Variant::Float(value))
+        Term::from(Variant::Float(self::Float(value)))
     }
 }
 
@@ -147,7 +147,7 @@ impl From<Variant> for Term {
     fn from(value: Variant) -> Term {
         unsafe {
             match value {
-                Variant::Float(value) => Term {
+                Variant::Float(self::Float(value)) => Term {
                     value: TypedNanBox::new(TERM_FLOAT, value),
                 },
                 Variant::Nil(..) => Term {
@@ -187,7 +187,7 @@ impl From<TypedNanBox<Variant>> for Variant {
         #[allow(unused_assignments)]
         unsafe {
             match value.tag() {
-                TERM_FLOAT => Variant::Float(value.unpack()),
+                TERM_FLOAT => Variant::Float(self::Float(value.unpack())),
                 TERM_NIL => Variant::Nil(0),
                 TERM_INTEGER => Variant::Integer(value.unpack()),
                 TERM_ATOM => Variant::Atom(value.unpack()),
@@ -222,6 +222,10 @@ pub const BOXED_BINARY: u8 = 2;
 pub const BOXED_MAP: u8 = 3;
 pub const BOXED_BIGINT: u8 = 4;
 pub const BOXED_CLOSURE: u8 = 5;
+// TODO: these should be direct pointers, no heap
+pub const BOXED_CP: u8 = 6;
+pub const BOXED_CATCH: u8 = 7;
+pub const BOXED_STACKTRACE: u8 = 8;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -229,17 +233,6 @@ pub struct Boxed<T> {
     pub header: Header,
     pub value: T
 }
-
-// pub enum Value {
-//     /// Special emulator values
-
-//     /// continuation pointer
-//     CP(Option<InstrPtr>),
-//     /// Catch context
-//     Catch(InstrPtr),
-//     /// Stack trace
-//     StackTrace(*const exception::StackTrace),
-// }
 
 /// Strings use an Arc so they can be sent to other processes without
 /// requiring a full copy of the data.
@@ -272,6 +265,10 @@ pub enum Type {
     Nil,
     List,
     Binary,
+
+    // runtime values
+    CP,
+    Catch,
 }
 
 pub enum Num {
@@ -285,6 +282,13 @@ impl Term {
     pub fn nil() -> Self {
         Term {
             value: TypedNanBox::new(TERM_NIL, 0),
+        }
+    }
+
+    #[inline]
+    pub fn none() -> Self {
+        Term {
+            value: TypedNanBox::new(TERM_NIL, 1),
         }
     }
 
@@ -324,6 +328,34 @@ impl Term {
     pub fn bigint(heap: &Heap, value: BigInt) -> Self {
         Term::from(heap.alloc(Boxed {
             header: BOXED_BIGINT,
+            value,
+        }))
+    }
+
+    pub fn binary(heap: &Heap, value: bitstring::Binary) -> Self {
+        Term::from(heap.alloc(Boxed {
+            header: BOXED_BINARY,
+            value,
+        }))
+    }
+
+    pub fn cp(heap: &Heap, value: Option<InstrPtr>) -> Self {
+        Term::from(heap.alloc(Boxed {
+            header: BOXED_CP,
+            value,
+        }))
+    }
+
+    pub fn catch(heap: &Heap, value: InstrPtr) -> Self {
+        Term::from(heap.alloc(Boxed {
+            header: BOXED_CATCH,
+            value,
+        }))
+    }
+
+    pub fn stacktrace(heap: &Heap, value: exception::StackTrace) -> Self {
+        Term::from(heap.alloc(Boxed {
+            header: BOXED_STACKTRACE,
             value,
         }))
     }
@@ -386,6 +418,8 @@ impl Term {
                 BOXED_MAP => Type::Map,
                 BOXED_BIGINT => Type::Number,
                 BOXED_CLOSURE => Type::Closure,
+                BOXED_CP => Type::CP,
+                BOXED_CATCH => Type::Catch,
                 _ => unimplemented!(),
             },
             _ => unreachable!(),
@@ -417,7 +451,7 @@ impl Term {
     pub fn into_number(&self) -> Num {
         match self.into_variant() {
             Variant::Integer(i) => Num::Integer(i),
-            Variant::Float(i) => Num::Float(i),
+            Variant::Float(self::Float(i)) => Num::Float(i),
             Variant::Pointer(ptr) => unsafe {
                 match *ptr {
                     BOXED_BIGINT => return &*(ptr as *const BigInt),
@@ -489,11 +523,9 @@ impl Term {
         self.get_type() == Type::Map
     }
 
+    #[inline]
     pub fn is_cp(&self) -> bool {
-        match *self {
-            Variant::CP(..) => true,
-            _ => false,
-        }
+        self.get_type() == Type::CP
     }
 
     pub fn to_u32(&self) -> u32 {

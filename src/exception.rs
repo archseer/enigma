@@ -4,7 +4,7 @@ use crate::loader::FuncInfo;
 use crate::module::MFA;
 use crate::process::InstrPtr;
 use crate::process::RcProcess;
-use crate::value::{self, Term};
+use crate::value::{self, Term, TryInto, Variant};
 
 /// http://erlang.org/doc/reference_manual/errors.html#exceptions
 #[derive(Debug, PartialEq, Eq)]
@@ -238,6 +238,23 @@ pub struct StackTrace {
     complete: bool,
 }
 
+// TODO: to be TryFrom once rust stabilizes the trait
+impl TryInto<value::Boxed<StackTrace>> for Term {
+    type Error = value::WrongBoxError;
+
+    #[inline]
+    fn try_into(&self) -> Result<&value::Boxed<StackTrace>, value::WrongBoxError> {
+        if let Variant::Pointer(ptr) = self.into_variant() {
+            unsafe {
+                if *ptr == value::BOXED_STACKTRACE {
+                    return Ok(&*(ptr as *const value::Boxed<StackTrace>));
+                }
+            }
+        }
+        Err(value::WrongBoxError)
+    }
+}
+
 /// To fully understand the error handling, one must keep in mind that
 /// when an exception is thrown, the search for a handler can jump back
 /// and forth between Beam and native code. Upon each mode switch, a
@@ -322,7 +339,7 @@ pub fn handle_error(
         // exception class, term and trace, respectively. (If the
         // handler is just a trap to native code, these registers will
         // be ignored.) */
-        context.x[0] = Term::None;
+        context.x[0] = Term::none();
         context.x[1] = Term::atom(EXIT_TAGS[exception_class!(exc.reason).bits as usize]);
         context.x[2] = exc.value.clone();
         context.x[3] = exc.trace.clone();
@@ -355,8 +372,11 @@ fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
     // TODO: tracing instr handling here
 
     while ptr > 0 {
-        match context.stack[ptr - 1].clone() {
-            Term::Catch(ptr) => {
+        match context.stack[ptr - 1].try_into() {
+            Ok(value::Boxed {
+                header: value::BOXED_CATCH,
+                value: ptr,
+            }) => {
                 // ASSERT(ptr < STACK_START(c_p));
                 // Unwind the stack up to the current frame.
                 context.stack.truncate(prev);
@@ -365,7 +385,10 @@ fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
                 // return catch_pc(*ptr);
                 return Some(*ptr);
             }
-            Term::CP(ref _cp) => {
+            Ok(value::Boxed {
+                header: value::BOXED_CP,
+                ..
+            }) => {
                 prev = ptr;
                 // TODO: OTP does tracing instr handling here
             }
@@ -494,14 +517,19 @@ fn save_stacktrace(
 
     let heap = &process.context_mut().heap;
     // Create a container for the exception data
-    let s = heap.alloc(StackTrace {
-        reason: exc.reason,
-        trace: Vec::new(),
-        // TODO: bad
-        current: unsafe { std::mem::uninitialized() },
-        pc: unsafe { std::mem::uninitialized() },
-        complete: false,
+    let boxed = heap.alloc(value::Boxed {
+        header: value::BOXED_STACKTRACE,
+        value: StackTrace {
+            reason: exc.reason,
+            trace: Vec::new(),
+            // TODO: bad
+            current: unsafe { std::mem::uninitialized() },
+            pc: unsafe { std::mem::uninitialized() },
+            complete: false,
+        },
     });
+
+    let s = &mut boxed.value;
 
     /*
      * If the failure was in a BIF other than 'error/1', 'error/2',
@@ -576,7 +604,7 @@ fn save_stacktrace(
 
     // Package args and stack trace
     // c_p->ftrace = CONS(hp, args, make_big((Eterm *) s));
-    exc.trace = cons!(heap, args, Term::StackTrace(s)); // TODO: need to cast S into something
+    exc.trace = cons!(heap, args, Term::from(boxed)); // TODO: need to cast S into something
 
     // Save the actual stack trace
     erts_save_stacktrace(process, s, depth)
@@ -596,8 +624,12 @@ fn erts_save_stacktrace(process: &RcProcess, s: &mut StackTrace, mut depth: u32)
      * Skip trace stack frames.
      */
     while ptr > 0 && depth > 0 {
-        if let Term::CP(boxed_cp) = &context.stack[ptr - 1] {
-            if let Some(cp) = **boxed_cp {
+        if let Ok(value::Boxed {
+            header: value::BOXED_CP,
+            value: boxed_cp,
+        }) = &context.stack[ptr - 1].try_into()
+        {
+            if let Some(cp) = *boxed_cp {
                 if Some(&cp) != s.trace.last() {
                     // Record non-duplicates only
                     s.trace.push(cp.clone()); // -1
@@ -611,11 +643,11 @@ fn erts_save_stacktrace(process: &RcProcess, s: &mut StackTrace, mut depth: u32)
 
 // Getting the relevant fields from the term pointed to by ftrace
 pub fn get_trace_from_exc(trace: &Term) -> Option<&StackTrace> {
-    match trace {
-        Term::Nil => None,
-        Term::List(cons) => unsafe {
-            if let Term::StackTrace(s) = (**cons).tail {
-                Some(&*s)
+    match trace.into_variant() {
+        Variant::Nil(..) => None,
+        Variant::Cons(cons) => unsafe {
+            if let Ok(value::Boxed { value, .. }) = (*cons).tail.try_into() {
+                Some(value)
             } else {
                 unreachable!()
             }
@@ -624,23 +656,25 @@ pub fn get_trace_from_exc(trace: &Term) -> Option<&StackTrace> {
     }
 }
 
-pub fn get_args_from_exc(trace: &Term) -> &Term {
-    match trace {
-        Term::Nil => &Term::Nil,
-        Term::List(cons) => unsafe { &(**cons).head },
+pub fn get_args_from_exc(trace: &Term) -> Term {
+    match trace.into_variant() {
+        Variant::Nil(value::Special::Nil) => Term::nil(),
+        Variant::Cons(cons) => unsafe { (*cons).head.clone() },
         _ => unreachable!(),
     }
 }
 
 fn is_raised_exc(exc: &Term) -> bool {
-    match exc {
-        Term::Nil => false,
-        Term::List(cons) => unsafe {
+    match exc.into_variant() {
+        Variant::Nil(value::Special::Nil) => false,
+        Variant::Cons(cons) => unsafe {
             //return bignum_header_is_neg(*big_val(CDR(list_val(exc))));
-            if let Term::StackTrace(s) = (**cons).tail {
-                if let StackTrace { complete: true, .. } = *s {
-                    return true;
-                }
+            if let Ok(value::Boxed {
+                value: StackTrace { complete: true, .. },
+                ..
+            }) = (*cons).tail.try_into()
+            {
+                return true;
             }
             false
         },
@@ -676,7 +710,7 @@ pub fn build_stacktrace(process: &RcProcess, exc: &Term) -> Term {
     let s = s.unwrap();
 
     if is_raised_exc(exc) {
-        return get_args_from_exc(exc).clone();
+        return get_args_from_exc(exc);
     }
 
     // Find the current function. If the saved s->pc is null, then the
@@ -699,7 +733,7 @@ pub fn build_stacktrace(process: &RcProcess, exc: &Term) -> Term {
      * (e.g. spawn_link(erlang, abs, [1])).
      */
     let args = if fi.is_some() {
-        get_args_from_exc(exc).clone()
+        get_args_from_exc(exc)
     } else {
         if depth == 0 {
             // erts_set_current_function(&fi, &c_p->u.initial); loc = LINE_INVALID_LOCATION

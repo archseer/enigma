@@ -86,7 +86,7 @@ impl AtomTable {
         self.register_atom(val)
     }
 
-    pub fn lookup(&self, index: u32) -> Option<*const Atom> {
+    pub fn to_str(&self, index: u32) -> Option<*const Atom> {
         let index_r = self.index_r.read();
         if index >= index_r.len() as u32 {
             return None;

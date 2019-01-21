@@ -8,11 +8,11 @@ use crate::module;
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
 use crate::opcodes::Opcode;
 use crate::pool::{Job, JoinGuard as PoolJoinGuard, Pool, Worker};
-use crate::process::{self, ExecutionContext, InstrPtr, RcProcess};
+use crate::process::{self, InstrPtr, RcProcess};
 use crate::process_registry::ProcessRegistry;
 use crate::process_table::ProcessTable;
 use crate::servo_arc::Arc;
-use crate::value::{self, Term, Variant, TryInto};
+use crate::value::{self, Term, TryInto, Variant};
 use log::debug;
 use parking_lot::Mutex;
 use std::mem::transmute;
@@ -67,14 +67,16 @@ macro_rules! expand_float {
     ($context:expr, $value:expr) => {{
         match $value {
             &LValue::ExtendedLiteral(i) => unsafe {
-                if let Term::Float(value::Float(f)) = (*$context.ip.module).literals[i as usize] {
+                if let Variant::Float(value::Float(f)) =
+                    (*$context.ip.module).literals[i as usize].into_variant()
+                {
                     f
                 } else {
                     unreachable!()
                 }
             },
             &LValue::X(reg) => {
-                if let Term::Float(value::Float(f)) = $context.x[reg as usize] {
+                if let Variant::Float(value::Float(f)) = $context.x[reg as usize].into_variant() {
                     f
                 } else {
                     unreachable!()
@@ -82,7 +84,9 @@ macro_rules! expand_float {
             }
             &LValue::Y(reg) => {
                 let len = $context.stack.len();
-                if let Term::Float(value::Float(f)) = $context.stack[len - (reg + 2) as usize] {
+                if let Variant::Float(value::Float(f)) =
+                    $context.stack[len - (reg + 2) as usize].into_variant()
+                {
                     f
                 } else {
                     unreachable!()
@@ -100,7 +104,12 @@ macro_rules! op_deallocate {
         $context
             .stack
             .truncate($context.stack.len() - $nwords as usize);
-        if let Term::CP(cp) = cp {
+
+        if let Ok(value::Boxed {
+            header: value::BOXED_CP,
+            value: cp,
+        }) = cp.try_into()
+        {
             $context.cp = *cp;
         } else {
             panic!("Bad CP value! {:?}", cp)
@@ -451,13 +460,12 @@ impl Machine {
     /// Starts the main process
     pub fn start_main_process(&self, path: &str) {
         println!("Starting main process...");
-        let process = {
+        let module = {
             let registry = self.modules.lock();
             // let module = module::load_module(&self.modules, path).unwrap();
-            let module = registry.lookup(atom::from_str("erl_init")).unwrap();
-
-            process::allocate(&self.state, module).unwrap()
+            registry.lookup(atom::from_str("erl_init")).unwrap()
         };
+        let process = process::allocate(&self.state, module).unwrap();
 
         /* TEMP */
         let context = process.context_mut();
@@ -465,7 +473,7 @@ impl Machine {
         let arity = 2;
         context.x[0] = Term::atom(atom::from_str("init"));
         context.x[1] = bitstring!(&context.heap, "");
-        unsafe { op_jump!(context, (*context.ip.module).funs[&(fun, arity)]) }
+        op_jump!(context, module.funs[&(fun, arity)]);
         /* TEMP */
 
         let process = Job::normal(process);
@@ -690,7 +698,7 @@ impl Machine {
                         for _ in 0..*stackneed {
                             context.stack.push(Term::nil())
                         }
-                        context.stack.push(Term::CP(Box::new(context.cp)));
+                        context.stack.push(Term::cp(&context.heap, context.cp));
                     } else {
                         unreachable!()
                     }
@@ -701,7 +709,7 @@ impl Machine {
 
                     // literal stackneed, literal heapneed, literal live
                     // allocate stackneed space on stack, ensure heapneed on heap, if gc, keep live
-                    // num of X regs. save CP on stack.
+                    // num of X regs. save cp on stack.
                     if let [LValue::Literal(stackneed), LValue::Literal(_heapneed), LValue::Literal(_live)] =
                         &ins.args[..]
                     {
@@ -709,7 +717,7 @@ impl Machine {
                             context.stack.push(Term::nil())
                         }
                         // TODO: check heap for heapneed space!
-                        context.stack.push(Term::CP(Box::new(context.cp)));
+                        context.stack.push(Term::cp(&context.heap, context.cp));
                     } else {
                         unreachable!()
                     }
@@ -720,7 +728,7 @@ impl Machine {
                         for _ in 0..*need {
                             context.stack.push(Term::nil())
                         }
-                        context.stack.push(Term::CP(Box::new(context.cp)));
+                        context.stack.push(Term::cp(&context.heap, context.cp));
                     } else {
                         unreachable!()
                     }
@@ -728,7 +736,7 @@ impl Machine {
                 Opcode::AllocateHeapZero => {
                     // literal stackneed, literal heapneed, literal live
                     // allocate stackneed space on stack, ensure heapneed on heap, if gc, keep live
-                    // num of X regs. save CP on stack.
+                    // num of X regs. save cp on stack.
                     if let [LValue::Literal(stackneed), LValue::Literal(_heapneed), LValue::Literal(_live)] =
                         &ins.args[..]
                     {
@@ -736,7 +744,7 @@ impl Machine {
                             context.stack.push(Term::nil())
                         }
                         // TODO: check heap for heapneed space!
-                        context.stack.push(Term::CP(Box::new(context.cp)));
+                        context.stack.push(Term::cp(&context.heap, context.cp));
                     } else {
                         unreachable!()
                     }
@@ -846,7 +854,9 @@ impl Machine {
                 Opcode::IsBoolean => op_is_type!(context, ins.args, is_boolean),
                 Opcode::IsMap => op_is_type!(context, ins.args, is_map),
                 Opcode::IsFunction2 => {
-                    if let Ok(value::Boxed { value, .. }) = context.expand_arg(&ins.args[0]).try_into() {
+                    if let Ok(value::Boxed { value, .. }) =
+                        context.expand_arg(&ins.args[0]).try_into()
+                    {
                         let closure: &value::Closure = value; // ughh type annotation
                         let arity = context.expand_arg(&ins.args[1]).to_u32();
                         if closure.mfa.2 == arity {
@@ -935,7 +945,9 @@ impl Machine {
                 }
                 Opcode::GetList => {
                     // source, head, tail
-                    if let Ok(value::Cons{ head, tail }) = context.expand_arg(&ins.args[0]).try_into() {
+                    if let Ok(value::Cons { head, tail }) =
+                        context.expand_arg(&ins.args[0]).try_into()
+                    {
                         set_register!(context, &ins.args[1], head.clone());
                         set_register!(context, &ins.args[2], tail.clone());
                     } else {
@@ -1008,10 +1020,13 @@ impl Machine {
                     set_register!(
                         context,
                         &ins.args[0],
-                        Term::Catch(Box::new(InstrPtr {
-                            ptr: fail,
-                            module: context.ip.module
-                        }))
+                        Term::catch(
+                            &context.heap,
+                            InstrPtr {
+                                ptr: fail,
+                                module: context.ip.module
+                            }
+                        )
                     );
                 }
                 Opcode::TryEnd => {
@@ -1045,10 +1060,13 @@ impl Machine {
                     set_register!(
                         context,
                         &ins.args[0],
-                        Term::Catch(Box::new(InstrPtr {
-                            ptr: fail,
-                            module: context.ip.module
-                        }))
+                        Term::catch(
+                            &context.heap,
+                            InstrPtr {
+                                ptr: fail,
+                                module: context.ip.module
+                            }
+                        )
                     );
                 }
                 Opcode::CatchEnd => {
@@ -1193,16 +1211,17 @@ impl Machine {
                         // alternatively, loop through the instrs until we hit a non bs_ instr.
                         // that way, no unsafe ptrs!
                         let size = context.expand_arg(s1).to_u32();
-                        let arc = Arc::new(bitstring::Binary::with_capacity(size as usize));
-                        context.bs = &arc.data as *const Vec<u8> as *mut Vec<u8>; // nasty, point to arc instead
-                        set_register!(context, dest, Term::Binary(arc));
+                        let binary = bitstring::Binary::with_capacity(size as usize);
+                        context.bs = &binary.data as *const Vec<u8> as *mut Vec<u8>; // nasty, point to arc instead
+                                                                                     // TODO ^ ensure this pointer stays valid after heap alloc
+                        set_register!(context, dest, Term::binary(&context.heap, binary));
                     } else {
                         unreachable!()
                     }
                 }
                 Opcode::BsPutString => {
                     // BsPutString uses the StrT strings table! needs to be patched in loader
-                    if let Term::Binary(str) = &ins.args[0] {
+                    if let LValue::Binary(str) = &ins.args[0] {
                         unsafe {
                             (*context.bs).extend_from_slice(&str.data);
                         }
@@ -1219,10 +1238,15 @@ impl Machine {
                             unimplemented!()
                         }
 
-                        if let Term::Binary(str) = context.expand_arg(src) {
+                        if let Ok(value::Boxed {
+                            value,
+                            header: value::BOXED_BINARY,
+                        }) = context.expand_arg(src).try_into()
+                        {
+                            let value: &bitstring::Binary = value;
                             match size {
-                                Term::atom(atom::ALL) => unsafe {
-                                    (*context.bs).extend_from_slice(&str.data);
+                                LValue::Atom(atom::ALL) => unsafe {
+                                    (*context.bs).extend_from_slice(&value.data);
                                 },
                                 _ => unimplemented!(),
                             }
@@ -1244,10 +1268,12 @@ impl Machine {
                             unimplemented!()
                         }
 
-                        if let Term::Float(value::Float(f)) = context.expand_arg(src) {
+                        if let Variant::Float(value::Float(f)) =
+                            context.expand_arg(src).into_variant()
+                        {
                             match size {
                                 LValue::Atom(atom::ALL) => unsafe {
-                                    let bytes: [u8; 8] = transmute(*f);
+                                    let bytes: [u8; 8] = transmute(f);
                                     (*context.bs).extend_from_slice(&bytes);
                                 },
                                 _ => unimplemented!(),
@@ -1394,7 +1420,7 @@ impl Machine {
                 }
                 Opcode::Trim => {
                     // trim N, _remain
-                    // drop N words from stack, (but keeping the CP). Second arg unused?
+                    // drop N words from stack, (but keeping the cp). Second arg unused?
                     let nwords = ins.args[0].to_u32();
                     let cp = context.stack.pop().unwrap();
                     context
@@ -1414,11 +1440,14 @@ impl Machine {
                         None
                     };
 
-                    context.x[0] = Term::closure(&context.heap, value::Closure {
-                        mfa: (module.name, lambda.name, lambda.arity), // TODO: use module id instead later
-                        ptr: lambda.offset,
-                        binding,
-                    });
+                    context.x[0] = Term::closure(
+                        &context.heap,
+                        value::Closure {
+                            mfa: (module.name, lambda.name, lambda.arity), // TODO: use module id instead later
+                            ptr: lambda.offset,
+                            binding,
+                        },
+                    );
                 }
                 Opcode::CallFun => {
                     // literal arity
@@ -1432,7 +1461,9 @@ impl Machine {
                 }
                 Opcode::GetHd => {
                     // source head
-                    if let Ok(value::Cons{ head, .. }) = context.expand_arg(&ins.args[0]).try_into() {
+                    if let Ok(value::Cons { head, .. }) =
+                        context.expand_arg(&ins.args[0]).try_into()
+                    {
                         set_register!(context, &ins.args[1], head.clone());
                     } else {
                         unreachable!()
@@ -1440,7 +1471,9 @@ impl Machine {
                 }
                 Opcode::GetTl => {
                     // source head
-                    if let Ok(value::Cons{ tail, .. }) = context.expand_arg(&ins.args[0]).try_into() {
+                    if let Ok(value::Cons { tail, .. }) =
+                        context.expand_arg(&ins.args[0]).try_into()
+                    {
                         set_register!(context, &ins.args[1], tail.clone());
                     } else {
                         unreachable!()

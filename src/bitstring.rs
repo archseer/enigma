@@ -1,4 +1,4 @@
-use crate::value::Term;
+use crate::value::{self, Term, TryInto};
 use parking_lot::Mutex;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
@@ -64,6 +64,23 @@ impl Eq for Binary {}
 impl Hash for Binary {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.data.hash(state)
+    }
+}
+
+// TODO: to be TryFrom once rust stabilizes the trait
+impl TryInto<value::Boxed<Binary>> for Term {
+    type Error = value::WrongBoxError;
+
+    #[inline]
+    fn try_into(&self) -> Result<&value::Boxed<Binary>, value::WrongBoxError> {
+        if let value::Variant::Pointer(ptr) = self.into_variant() {
+            unsafe {
+                if *ptr == value::BOXED_BINARY {
+                    return Ok(&*(ptr as *const value::Boxed<Binary>));
+                }
+            }
+        }
+        Err(value::WrongBoxError)
     }
 }
 

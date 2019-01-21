@@ -43,15 +43,17 @@ pub struct Loader<'a> {
 pub enum LValue {
     // TODO: these dupe LTerm values
     Atom(u32),
-    Integer(i32),
+    Integer(i64),
     Character(u8),
     Nil,
+    Binary(bitstring::Binary),
+    BigInt(BigInt),
     //
     Literal(u32),
     X(u32),
     Y(u32),
     Label(u32),
-    ExtendedList(Box<Vec<Term>>),
+    ExtendedList(Box<Vec<LValue>>),
     FloatReg(u32),
     AllocList(Box<Vec<(u8, u32)>>),
     ExtendedLiteral(u32), // TODO; replace at load time
@@ -342,7 +344,7 @@ impl<'a> Loader<'a> {
                         let bytes = &self.strings[offset..offset + len as usize];
                         let string = bytes.as_bytes().to_vec(); // TODO: check if most efficient
                         instruction.args =
-                            vec![Term::Binary(Arc::new(bitstring::Binary::from_vec(string)))];
+                            vec![LValue::Binary(bitstring::Binary::from_vec(string))];
                         instruction
                     } else {
                         unreachable!()
@@ -370,7 +372,7 @@ impl<'a> Loader<'a> {
                     }
                     LValue::Label(labels[l])
                 }
-                val => val.clone(),
+                val => *val.clone(),
             }
         };
 
@@ -595,11 +597,11 @@ fn read_smallint(b: u8, rest: &[u8]) -> IResult<&[u8], i64> {
     unreachable!()
 }
 
-fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], Term> {
+fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], LValue> {
     // it's not extended
     if 0 == (b & 0b1000) {
         // Bit 3 is 0 marks that 4 following bits contain the value
-        return Ok((rest, Term::int(i32::from(b >> 4))));
+        return Ok((rest, LValue::Integer(i64::from(b >> 4))));
     }
 
     // Bit 3 is 1, but...
@@ -609,7 +611,7 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], Term> {
         let (rest, r) = be_u8(rest)?;
         Ok((
             rest,
-            Term::int((((b as usize) & 0b1110_0000) << 3 | (r as usize)) as i32),
+            LValue::Integer((((b as usize) & 0b1110_0000) << 3 | (r as usize)) as i64),
         )) // upcasting to i64 from usize not safe
     } else {
         // Bit 4 is 1 means that bits 5-6-7 contain amount of bytes+2 to store
@@ -639,12 +641,12 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], Term> {
 
         let r = BigInt::from_bytes_be(sign, long_bytes);
 
-        if let Some(i) = r.to_i32() {
+        if let Some(i) = r.to_i64() {
             // fits in a regular int
-            return Ok((rest, Term::int(i)));
+            return Ok((rest, LValue::Integer(i)));
         }
 
-        Ok((rest, Term::BigInt(Box::new(r))))
+        Ok((rest, LValue::BigInt(r)))
     } // if larger than 11 bits
 }
 

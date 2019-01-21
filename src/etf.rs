@@ -214,16 +214,16 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term>
     }
 }
 
-pub fn decode_binary<'a>(rest: &'a [u8], _heap: &Heap) -> IResult<&'a [u8], Term> {
+pub fn decode_binary<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
     let (rest, len) = be_u32(rest)?;
     if len == 0 {
-        return Ok((rest, Term::Binary(Arc::new(bitstring::Binary::new()))));
+        return Ok((rest, Term::binary(heap, bitstring::Binary::new())));
     }
 
     let (rest, bytes) = take!(rest, len)?;
     Ok((
         rest,
-        Term::Binary(Arc::new(bitstring::Binary::from_vec(bytes.to_vec()))),
+        Term::binary(heap, bitstring::Binary::from_vec(bytes.to_vec())),
     ))
 }
 

@@ -149,6 +149,42 @@ impl InstrPtr {
     }
 }
 
+// TODO: these are kinda messy since Opt<ptr> vs ptr deboxes differently
+
+// TODO: to be TryFrom once rust stabilizes the trait
+impl TryInto<value::Boxed<Option<InstrPtr>>> for Term {
+    type Error = value::WrongBoxError;
+
+    #[inline]
+    fn try_into(&self) -> Result<&value::Boxed<Option<InstrPtr>>, value::WrongBoxError> {
+        if let value::Variant::Pointer(ptr) = self.into_variant() {
+            unsafe {
+                if *ptr == value::BOXED_CP {
+                    return Ok(&*(ptr as *const value::Boxed<Option<InstrPtr>>));
+                }
+            }
+        }
+        Err(value::WrongBoxError)
+    }
+}
+// TODO: to be TryFrom once rust stabilizes the trait
+impl TryInto<value::Boxed<InstrPtr>> for Term {
+    type Error = value::WrongBoxError;
+
+    #[inline]
+    fn try_into(&self) -> Result<&value::Boxed<InstrPtr>, value::WrongBoxError> {
+        if let value::Variant::Pointer(ptr) = self.into_variant() {
+            unsafe {
+                if *ptr == value::BOXED_CATCH {
+                    return Ok(&*(ptr as *const value::Boxed<InstrPtr>));
+                }
+            }
+        }
+        Err(value::WrongBoxError)
+    }
+}
+
+
 impl ExecutionContext {
     pub fn new(module: *const Module) -> ExecutionContext {
         unsafe {
