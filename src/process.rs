@@ -6,7 +6,7 @@ use crate::mailbox::Mailbox;
 use crate::module::{Module, MFA};
 use crate::pool::Job;
 pub use crate::process_table::PID;
-use crate::value::Term;
+use crate::value::{self, Term, TryInto};
 use crate::vm::RcState;
 use hashbrown::HashMap;
 use std::cell::UnsafeCell;
@@ -317,16 +317,14 @@ pub fn spawn(
     // arglist to process registers,
     // TODO: it also needs to deep clone all the vals (for example lists etc)
     let mut i = 0;
-    unsafe {
-        let mut cons = &args;
-        while let Term::List(ptr) = *cons {
-            context.x[i] = (*ptr).head.clone();
-            i += 1;
-            cons = &(*ptr).tail;
-        }
-        // lastly, the tail
-        context.x[i] = (*cons).clone();
+    let mut cons = &args;
+    while let Ok(value::Cons { head, tail }) = cons.try_into() {
+        context.x[i] = head.clone();
+        i += 1;
+        cons = tail;
     }
+    // lastly, the tail
+    context.x[i] = cons.clone();
 
     // TODO: func to ip offset
     let func = unsafe {

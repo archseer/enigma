@@ -2,16 +2,15 @@ use crate::atom;
 use crate::bif::BifResult;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Term};
+use crate::value::{self, Term, TryInto};
 use crate::vm;
 use hamt_rs::HamtMap;
 
 pub fn bif_maps_find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let key = &args[0];
     let map = &args[1];
-    if let Term::Map(m) = map {
-        let hamt_map = &m.0;
-        match hamt_map.find(key) {
+    if let Ok(value::Map { map, .. }) = map.try_into() {
+        match map.find(key) {
             Some(value) => {
                 let heap = &process.context_mut().heap;
                 return Ok(tup2!(&heap, atom!(OK), value.clone()));
@@ -26,10 +25,9 @@ pub fn bif_maps_find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
 
 pub fn bif_maps_get_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let map = &args[0];
-    if let Term::Map(m) = map {
-        let hamt_map = &m.0;
+    if let Ok(value::Map { map, .. }) = map.try_into() {
         let target = &args[1];
-        match hamt_map.find(target) {
+        match map.find(target) {
             Some(value) => {
                 return Ok(value.clone());
             }
@@ -42,25 +40,22 @@ pub fn bif_maps_get_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
 }
 
 pub fn bif_maps_from_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
-    if !args[0].is_list() {
-        return Err(Exception::with_value(Reason::EXC_BADARG, args[0].clone()));
-    }
     let mut list = &args[0];
+    if !list.is_list() {
+        return Err(Exception::with_value(Reason::EXC_BADARG, list.clone()));
+    }
     let mut map = HamtMap::new();
-    while let Term::List(l) = *list {
-        unsafe {
-            let item = &(*l).head;
-            if let Term::Tuple(ptr) = item {
-                let tuple = unsafe { &**ptr };
-                if tuple.len != 2 {
-                    return Err(Exception::with_value(Reason::EXC_BADARG, item.clone()));
-                }
-                map = map.plus(tuple[0].clone(), tuple[1].clone());
-            } else {
-                return Err(Exception::with_value(Reason::EXC_BADARG, item.clone()));
+    while let Ok(value::Cons { head, tail }) = list.try_into() {
+        if let Ok(tuple) = head.try_into() {
+            let tuple: &value::Tuple = tuple; // annoying, need type annotation
+            if tuple.len != 2 {
+                return Err(Exception::with_value(Reason::EXC_BADARG, list.clone()));
             }
-            list = &(*l).tail;
+            map = map.plus(tuple[0].clone(), tuple[1].clone());
+        } else {
+            return Err(Exception::with_value(Reason::EXC_BADARG, list.clone()));
         }
+        list = tail;
     }
     let heap = &process.context_mut().heap;
     Ok(Term::map(heap, map))
@@ -68,10 +63,9 @@ pub fn bif_maps_from_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term
 
 pub fn bif_maps_is_key_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let map = &args[0];
-    if let Term::Map(m) = map {
-        let hamt_map = &m.0;
+    if let Ok(value::Map { map, .. }) = map.try_into() {
         let target = &args[1];
-        let exist = hamt_map.find(target).is_some();
+        let exist = map.find(target).is_some();
         return Ok(Term::boolean(exist));
     }
     Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
@@ -79,22 +73,21 @@ pub fn bif_maps_is_key_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
 
 pub fn bif_maps_keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let map = &args[0];
-    if let Term::Map(m) = map {
-        let hamt_map = &m.0;
+    if let Ok(value::Map { map, .. }) = map.try_into() {
         let heap = &process.context_mut().heap;
-        let list = iter_to_list!(heap, hamt_map.iter().map(|(k, _)| k).cloned());
+        let list = iter_to_list!(heap, map.iter().map(|(k, _)| k).cloned());
         return Ok(list);
     }
     Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
 }
 
 pub fn bif_maps_merge_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
-    let map1 = match &args[0] {
-        Term::Map(map) => &(*map.0),
+    let map1 = match args[0].try_into() {
+        Ok(value::Map { map, .. }) => map,
         _ => return Err(Exception::with_value(Reason::EXC_BADMAP, args[0].clone())),
     };
-    let map2 = match &args[1] {
-        Term::Map(map) => &(*map.0),
+    let map2 = match args[1].try_into() {
+        Ok(value::Map { map, .. }) => map,
         _ => return Err(Exception::with_value(Reason::EXC_BADMAP, args[1].clone())),
     };
     let mut new_map = map2.clone();
@@ -110,8 +103,7 @@ pub fn bif_maps_put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     let map = &args[0];
     let key = &args[1];
     let value = &args[2];
-    if let Term::Map(m) = map {
-        let map = &(*m.0);
+    if let Ok(value::Map { map, .. }) = map.try_into() {
         let new_map = map.clone().plus(key.clone(), value.clone());
         return Ok(Term::map(heap, new_map));
     }
@@ -122,8 +114,7 @@ pub fn bif_maps_remove_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     let heap = &process.context_mut().heap;
     let map = &args[0];
     let key = &args[1];
-    if let Term::Map(m) = map {
-        let map = &(*m.0);
+    if let Ok(value::Map { map, .. }) = map.try_into() {
         let new_map = map.clone().minus(&key.clone());
         return Ok(Term::map(heap, new_map));
     }
@@ -135,8 +126,7 @@ pub fn bif_maps_update_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     let map = &args[0];
     let key = &args[1];
     let value = &args[2];
-    if let Term::Map(m) = map {
-        let map = &(*m.0);
+    if let Ok(value::Map { map, .. }) = map.try_into() {
         match map.find(&key) {
             Some(_v) => {
                 let new_map = map.clone().plus(key.clone(), value.clone());
@@ -153,10 +143,9 @@ pub fn bif_maps_update_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
 
 pub fn bif_maps_values_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let map = &args[0];
-    if let Term::Map(m) = map {
-        let hamt_map = &m.0;
+    if let Ok(value::Map { map, .. }) = map.try_into() {
         let heap = &process.context_mut().heap;
-        let list = iter_to_list!(heap, hamt_map.iter().map(|(_, v)| v).cloned());
+        let list = iter_to_list!(heap, map.iter().map(|(_, v)| v).cloned());
         return Ok(list);
     }
     Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
@@ -165,9 +154,9 @@ pub fn bif_maps_values_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
 pub fn bif_maps_take_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let key = &args[0];
     let map = &args[1];
-    if let Term::Map(m) = map {
-        let result = if let Some(value) = (*m.0).find(key) {
-            let new_map = (*m.0).clone().minus(key);
+    if let Ok(value::Map { map, .. }) = map.try_into() {
+        let result = if let Some(value) = map.find(key) {
+            let new_map = map.clone().minus(key);
             let heap = &process.context_mut().heap;
             tup2!(heap, value.clone(), Term::map(heap, new_map))
         } else {
@@ -198,14 +187,12 @@ mod tests {
 
         let res = bif_maps_find_2(&vm, &process, &args);
 
-        if let Ok(Term::Tuple(tuple)) = res {
-            unsafe {
-                assert_eq!((*tuple).len, 2);
-                let slice: &[Term] = &(**tuple);
-                let mut iter = slice.iter();
-                assert_eq!(iter.next(), Some(&atom!(OK)));
-                assert_eq!(iter.next(), Some(&Term::int(3)));
-            }
+        if let Ok(tuple) = term.try_into() {
+            let tuple: &Tuple = tuple; // annoying, need type annotation
+            assert_eq!(tuple.len, 2);
+            let mut iter = tuple.iter();
+            assert_eq!(iter.next(), Some(&atom!(OK)));
+            assert_eq!(iter.next(), Some(&Term::int(3)));
         } else {
             panic!();
         }
@@ -216,6 +203,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
 
         let key = str_to_atom!("test");
         let map = map!(heap, key.clone() => Term::int(3));
@@ -311,10 +299,10 @@ mod tests {
         let args = vec![list];
         let res = bif_maps_from_list_1(&vm, &process, &args);
 
-        if let Ok(Term::Map(m)) = res {
-            assert_eq!(m.0.len(), 2);
-            assert_eq!(m.0.find(&str_to_atom!("test")), Some(&Term::in(1)));
-            assert_eq!(m.0.find(&str_to_atom!("test2")), Some(&Term::int(2)));
+        if let Ok(value::Map { map, .. }) = res.try_into() {
+            assert_eq!(map.len(), 2);
+            assert_eq!(map.find(&str_to_atom!("test")), Some(&Term::in(1)));
+            assert_eq!(map.find(&str_to_atom!("test2")), Some(&Term::int(2)));
         } else {
             panic!();
         }
@@ -372,8 +360,9 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
 
-        let map = map!(str_to_atom!("test") => Term::int(1));
+        let map = map!(heap, str_to_atom!("test") => Term::int(1));
         let args = vec![map, str_to_atom!("test")];
 
         let res = bif_maps_is_key_2(&vm, &process, &args);
@@ -386,8 +375,9 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
 
-        let map = map!(str_to_atom!("test") => Term::int(3));
+        let map = map!(heap, str_to_atom!("test") => Term::int(3));
         let args = vec![map, str_to_atom!("false")];
 
         let res = bif_maps_is_key_2(&vm, &process, &args);
@@ -417,16 +407,17 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
 
-        let map = map!(str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
+        let map = map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let args = vec![map];
 
-        if let Ok(Term::List(cons)) = bif_maps_keys_1(&vm, &process, &args) {
+        if let Ok(Cons { head, tail }) = bif_maps_keys_1(&vm, &process, &args).try_into() {
             unsafe {
-                let key1 = &(*cons).head;
+                let key1 = head;
                 assert_eq!(key1, &str_to_atom!("test"));
-                if let Term::List(tail) = (*cons).tail {
-                    let key2 = &(*tail).head;
+                if let Ok(Cons { head, .. }) = tail.try_into() {
+                    let key2 = head;
                     assert_eq!(key2, &str_to_atom!("test2"));
                 } else {
                     panic!();
@@ -459,19 +450,20 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
 
         let map1 =
-            map!(str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
+            map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let map2 =
-            map!(str_to_atom!("test") => Term::int(3), str_to_atom!("test3") => Term::int(4));
+            map!(heap, str_to_atom!("test") => Term::int(3), str_to_atom!("test3") => Term::int(4));
         let args = vec![map1.clone(), map2.clone()];
 
         let res = bif_maps_merge_2(&vm, &process, &args);
-        if let Ok(Term::Map(body)) = res {
-            assert_eq!(body.0.len(), 3);
-            assert_eq!(body.0.find(&str_to_atom!("test")), Some(&Term::int(1)));
-            assert_eq!(body.0.find(&str_to_atom!("test2")), Some(&Term::int(2)));
-            assert_eq!(body.0.find(&str_to_atom!("test3")), Some(&Term::int(4)));
+        if let Ok(value::Map { map, .. }) = res.try_into() {
+            assert_eq!(map.len(), 3);
+            assert_eq!(map.find(&str_to_atom!("test")), Some(&Term::int(1)));
+            assert_eq!(map.find(&str_to_atom!("test2")), Some(&Term::int(2)));
+            assert_eq!(map.find(&str_to_atom!("test3")), Some(&Term::int(4)));
         } else {
             panic!();
         }
@@ -482,8 +474,9 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
 
-        let map = map!(str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
+        let map = map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let bad_map = Term::int(2);
 
         let args = vec![map.clone(), bad_map.clone()];
@@ -534,8 +527,8 @@ mod tests {
 
         let res = bif_maps_put_3(&vm, &process, &args);
 
-        if let Ok(Term::Map(body)) = res {
-            assert_eq!(body.0.find(&key), Some(&value));
+        if let Ok(value::Map { map, .. }) = res.try_into() {
+            assert_eq!(map.find(&key), Some(&value));
         } else {
             panic!();
         }
@@ -567,9 +560,10 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
 
         let key = str_to_atom!("test");
-        let map = map!(key.clone() => Term::int(1));
+        let map = map!(heap, key.clone() => Term::int(1));
         let args = vec![map, key.clone()];
 
         let res = bif_maps_remove_2(&vm, &process, &args);
@@ -604,17 +598,18 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
 
         let key = str_to_atom!("test");
         let value = Term::int(1);
         let update_value = Term::int(2);
-        let map = map!(key.clone() => value.clone());
+        let map = map!(heap, key.clone() => value.clone());
         let args = vec![map, key.clone(), update_value.clone()];
 
         let res = bif_maps_update_3(&vm, &process, &args);
 
-        if let Ok(Term::Map(body)) = res {
-            assert_eq!(body.0.find(&key), Some(&update_value));
+        if let Ok(value::Map { map, .. }) = res.try_into() {
+            assert_eq!(map.find(&key), Some(&update_value));
         } else {
             panic!();
         }
@@ -671,8 +666,9 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
 
-        let map = map!(str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
+        let map = map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let args = vec![map];
 
         if let Ok(Term::List(cons)) = bif_maps_values_1(&vm, &process, &args) {
@@ -713,8 +709,9 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
 
-        let map = map!(str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
+        let map = map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let key = str_to_atom!("test2");
         let args = vec![key.clone(), map.clone()];
 
@@ -761,8 +758,9 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
 
-        let map = map!(str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
+        let map = map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let key = str_to_atom!("test3");
         let args = vec![key.clone(), map.clone()];
 

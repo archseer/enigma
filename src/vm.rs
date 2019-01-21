@@ -196,11 +196,11 @@ macro_rules! op_apply_fun {
         let mut tmp = &$context.x[1];
         let mut arity = 0;
 
-        while let Term::List(ptr) = *tmp {
+        while let Ok(value::Cons { head, tail }) = tmp.try_into() {
             if arity < process::MAX_REG - 1 {
-                $context.x[arity] = unsafe { (*ptr).head.clone() };
+                $context.x[arity] = head.clone();
                 arity += 1;
-                tmp = unsafe { &(*ptr).tail }
+                tmp = tail
             } else {
                 return Err(Exception::new(Reason::EXC_SYSTEM_LIMIT));
             }

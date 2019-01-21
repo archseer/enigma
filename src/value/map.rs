@@ -9,7 +9,7 @@ pub type HAMT = HamtMap<Term, Term>;
 #[repr(C)]
 pub struct Map {
     pub header: Header,
-    pub value: HAMT,
+    pub map: HAMT,
 }
 
 // TODO: to be TryFrom once rust stabilizes the trait

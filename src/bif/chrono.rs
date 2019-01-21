@@ -16,9 +16,9 @@ pub fn bif_erlang_date_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term])
 
     Ok(tup3!(
         heap,
-        Term::int(i32::from(date.year())),
-        Term::int(i32::from(date.month())),
-        Term::int(i32::from(date.day()))
+        Term::int(date.year() as i32),
+        Term::int(date.month() as i32),
+        Term::int(date.day() as i32)
     ))
 }
 
@@ -29,15 +29,15 @@ pub fn bif_erlang_localtime_0(_vm: &vm::Machine, process: &RcProcess, _args: &[T
 
     let date = tup3!(
         heap,
-        Term::int(i32::from(datetime.year())),
-        Term::int(i32::from(datetime.month())),
-        Term::int(i32::from(datetime.day()))
+        Term::int(datetime.year() as i32),
+        Term::int(datetime.month() as i32),
+        Term::int(datetime.day() as i32)
     );
     let time = tup3!(
         heap,
-        Term::int(i32::from(datetime.hour())),
-        Term::int(i32::from(datetime.minute())),
-        Term::int(i32::from(datetime.second()))
+        Term::int(datetime.hour() as i32),
+        Term::int(datetime.minute() as i32),
+        Term::int(datetime.second() as i32)
     );
     Ok(tup2!(heap, date, time))
 }
@@ -97,15 +97,15 @@ pub fn bif_erlang_universaltime_0(
 
     let date = tup3!(
         heap,
-        Term::int(i32::from(datetime.year())),
-        Term::int(i32::from(datetime.month())),
-        Term::int(i32::from(datetime.day()))
+        Term::int(datetime.year() as i32),
+        Term::int(datetime.month() as i32),
+        Term::int(datetime.day() as i32)
     );
     let time = tup3!(
         heap,
-        Term::int(i32::from(datetime.hour())),
-        Term::int(i32::from(datetime.minute())),
-        Term::int(i32::from(datetime.second()))
+        Term::int(datetime.hour() as i32),
+        Term::int(datetime.minute() as i32),
+        Term::int(datetime.second() as i32)
     );
     Ok(tup2!(heap, date, time))
 }

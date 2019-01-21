@@ -5,7 +5,6 @@ use crate::immix::Heap;
 use crate::module;
 use crate::nanbox::TypedNanBox;
 use crate::process::{self, InstrPtr};
-use crate::servo_arc::Arc;
 use allocator_api::Layout;
 use num::bigint::BigInt;
 use std::cmp::Ordering;
@@ -304,10 +303,10 @@ impl Term {
         }
     }
 
-    pub fn map(heap: &Heap, value: HAMT) -> Self {
+    pub fn map(heap: &Heap, map: HAMT) -> Self {
         Term::from(heap.alloc(self::Map {
             header: BOXED_MAP,
-            value,
+            map,
         }))
     }
 
@@ -415,9 +414,14 @@ impl Term {
 
     #[inline]
     pub fn is_integer(&self) -> bool {
-        match *self {
-            Variant::BigInt(..) => true,
-            Variant::Integer(..) => true,
+        match self.into_variant() {
+            Variant::Integer(i) => true,
+            Variant::Pointer(ptr) => unsafe {
+                match *ptr {
+                    BOXED_BIGINT => true,
+                    _ => false
+                }
+            }
             _ => false,
         }
     }

@@ -805,8 +805,8 @@ fn keyfind(_func: BifFn, _process: &RcProcess, args: &[Term]) -> BifResult {
 
         let term = head;
         list = tail;
-        if let Ok(ptr) = term.try_into() {
-            let tuple: &Tuple = ptr; // annoying, need type annotation
+        if let Ok(tuple) = term.try_into() {
+            let tuple: &Tuple = tuple; // annoying, need type annotation
             if pos <= (tuple.len as usize) && *key == tuple[pos] {
                 return Ok(term.clone());
             }
