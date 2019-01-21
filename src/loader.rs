@@ -265,8 +265,9 @@ impl<'a> Loader<'a> {
     fn postprocess_raw_code(&mut self) {
         // scan over the Code chunk bits, but we'll need to know bit length of each instruction.
         let (_, code) = scan_instructions(self.code).unwrap();
+        let mut code_iter = code.into_iter();
 
-        for mut instruction in code {
+        while let Some(mut instruction) = code_iter.next() {
             let instruction = match &instruction.op {
                 Opcode::Line => {
                     // args: [Literal(4)]
@@ -350,6 +351,38 @@ impl<'a> Loader<'a> {
                     } else {
                         unreachable!()
                     }
+                }
+                Opcode::PutTuple => {
+                    if let [Value::Literal(arity), destination] = &instruction.args[..] {
+                        let mut i = *arity;
+                        let mut list = Vec::new();
+                        while i > 0 {
+                            if let Some(Instruction {
+                                op: Opcode::Put,
+                                args,
+                            }) = code_iter.next()
+                            {
+                                if let [arg] = &args[..] {
+                                    list.push(arg.clone());
+                                    i = i - 1;
+                                } else {
+                                    unreachable!()
+                                }
+                            } else {
+                                unreachable!()
+                            }
+                        }
+                        instruction.op = Opcode::PutTuple2;
+                        instruction.args =
+                            vec![destination.clone(), Value::ExtendedList(Box::new(list))];
+                        instruction
+                    } else {
+                        unreachable!()
+                    }
+                }
+                Opcode::Put => {
+                    // put should always have been caught by the put_tuple case and translated to put_tuple2
+                    unreachable!()
                 }
                 _ => instruction,
             };
