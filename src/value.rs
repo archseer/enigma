@@ -2,7 +2,6 @@ use crate::atom;
 use crate::bitstring;
 use crate::exception;
 use crate::immix::Heap;
-use crate::module;
 use crate::nanbox::TypedNanBox;
 use crate::process::{self, InstrPtr};
 use allocator_api::Layout;
@@ -13,9 +12,11 @@ use std::hash::{Hash, Hasher};
 mod cons;
 mod map;
 mod tuple;
+mod closure;
 pub use cons::Cons;
 pub use map::{Map, HAMT};
 pub use tuple::Tuple;
+pub use closure::Closure;
 
 pub trait TryInto<T>: Sized {
     /// The type returned in the event of a conversion error.
@@ -136,9 +137,9 @@ impl From<&mut Map> for Term {
     }
 }
 
-impl From<&mut Bignum> for Term {
-    fn from(value: &mut Bignum) -> Term {
-        Term::from(Variant::Pointer(value as *const Bignum as *const Header))
+impl<T> From<&mut Boxed<T>> for Term {
+    fn from(value: &mut Boxed<T>) -> Term {
+        Term::from(Variant::Pointer(value as *const Boxed<T> as *const Header))
     }
 }
 
@@ -207,6 +208,12 @@ impl Term {
 }
 
 /// Represents the header of a boxed value on the heap. Is followed by value.
+/// Any value allocated on the heap needs repr(C) to guarantee the ordering.
+/// This is because we always point to Header, then we recast into the right type.
+///
+/// TODO: We could avoid this by having the value follow the header and offseting the pointer by
+/// header, but that means we'd need to have the header be one full processor word wide to ensure
+/// alignment. That means there would be some wasted space.
 pub type Header = u8;
 
 pub const BOXED_REF: u8 = 0;
@@ -215,6 +222,13 @@ pub const BOXED_BINARY: u8 = 2;
 pub const BOXED_MAP: u8 = 3;
 pub const BOXED_BIGINT: u8 = 4;
 pub const BOXED_CLOSURE: u8 = 5;
+
+#[derive(Debug)]
+#[repr(C)]
+pub struct Boxed<T> {
+    pub header: Header,
+    pub value: T
+}
 
 // pub enum Value {
 //     /// Special emulator values
@@ -238,25 +252,9 @@ pub struct Binary {
 
 #[derive(Debug)]
 #[repr(C)]
-pub struct Bignum {
-    pub header: Header,
-    pub value: BigInt,
-}
-
-#[derive(Debug)]
-#[repr(C)]
 pub struct Ref {
     pub header: Header,
     pub value: u32,
-}
-
-#[derive(Debug)]
-#[repr(C)]
-pub struct Closure {
-    pub header: Header,
-    pub mfa: module::MFA,
-    pub ptr: u32,
-    pub binding: Option<Vec<Term>>,
 }
 
 // term order:
@@ -316,8 +314,15 @@ impl Term {
         }))
     }
 
+    pub fn closure(heap: &Heap, value: Closure) -> Self {
+        Term::from(heap.alloc(Boxed {
+            header: BOXED_CLOSURE,
+            value
+        }))
+    }
+
     pub fn bigint(heap: &Heap, value: BigInt) -> Self {
-        Term::from(heap.alloc(self::Bignum {
+        Term::from(heap.alloc(Boxed {
             header: BOXED_BIGINT,
             value,
         }))

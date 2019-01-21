@@ -159,31 +159,29 @@ macro_rules! op_call_fun {
         // keep X regs set based on arity
         // set additional X regs based on lambda.binding
         // set x from 1 + arity (x0 is func, followed by call params) onwards to binding
-        unsafe {
-            let closure = *$closure;
-            if let Some(binding) = &(*closure).binding {
-                // TODO: maybe we can copy_from_slice in the future
-                let arity = $arity as usize;
-                $context.x[arity..arity + binding.len()].clone_from_slice(&binding[..]);
-            }
-
-            println!("call_fun closure {:?}", *closure);
-
-            // TODO: closure needs to jump_ptr to the correct module.
-            let ptr = {
-                // temporary HAXX
-                let registry = $vm.modules.lock();
-                // let module = module::load_module(&self.modules, path).unwrap();
-                let module = registry.lookup((*closure).mfa.0).unwrap();
-
-                InstrPtr {
-                    module,
-                    ptr: (*closure).ptr,
-                }
-            };
-
-            op_jump_ptr!($context, ptr);
+        let closure = *$closure;
+        if let Some(binding) = closure.binding {
+            // TODO: maybe we can copy_from_slice in the future
+            let arity = $arity as usize;
+            $context.x[arity..arity + binding.len()].clone_from_slice(&binding[..]);
         }
+
+        println!("call_fun closure {:?}", closure);
+
+        // TODO: closure needs to jump_ptr to the correct module.
+        let ptr = {
+            // temporary HAXX
+            let registry = $vm.modules.lock();
+            // let module = module::load_module(&self.modules, path).unwrap();
+            let module = registry.lookup(closure.mfa.0).unwrap();
+
+            InstrPtr {
+                module,
+                ptr: closure.ptr,
+            }
+        };
+
+        op_jump_ptr!($context, ptr);
     }};
 }
 
@@ -212,8 +210,9 @@ macro_rules! op_apply_fun {
         }
         //context.x[arity] = fun.clone();
 
-        if let Term::Closure(closure) = fun {
-            op_call_fun!($vm, $context, &closure, arity);
+        if let Ok(value::Boxed { value, .. }) = fun.try_into() {
+            let closure: &value::Closure = value; // ughh type annotation
+            op_call_fun!($vm, $context, closure, arity);
         } else {
             // TODO raise error
             unimplemented!()
@@ -847,12 +846,11 @@ impl Machine {
                 Opcode::IsBoolean => op_is_type!(context, ins.args, is_boolean),
                 Opcode::IsMap => op_is_type!(context, ins.args, is_map),
                 Opcode::IsFunction2 => {
-                    if let Term::Closure(closure) = context.expand_arg(&ins.args[0]) {
+                    if let Ok(value::Boxed { value, .. }) = context.expand_arg(&ins.args[0]).try_into() {
+                        let closure: &value::Closure = value; // ughh type annotation
                         let arity = context.expand_arg(&ins.args[1]).to_u32();
-                        unsafe {
-                            if (**closure).mfa.2 == arity {
-                                continue;
-                            }
+                        if closure.mfa.2 == arity {
+                            continue;
                         }
                     }
                     let fail = context.expand_arg(&ins.args[2]).to_u32();
@@ -1416,17 +1414,17 @@ impl Machine {
                         None
                     };
 
-                    let closure = context.heap.alloc(value::Closure {
+                    context.x[0] = Term::closure(&context.heap, value::Closure {
                         mfa: (module.name, lambda.name, lambda.arity), // TODO: use module id instead later
                         ptr: lambda.offset,
                         binding,
                     });
-                    context.x[0] = Term::Closure(closure);
                 }
                 Opcode::CallFun => {
                     // literal arity
                     let arity = ins.args[0].to_u32();
-                    if let Term::Closure(closure) = &context.x[arity as usize] {
+                    if let Ok(value::Boxed { value, .. }) = &context.x[arity as usize].try_into() {
+                        let closure: &value::Closure = value; // ughh type annotation
                         op_call_fun!(self, context, closure, arity)
                     } else {
                         unreachable!()
