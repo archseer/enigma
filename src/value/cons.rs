@@ -1,6 +1,6 @@
-use super::{Term, Variant, WrongBoxError, TryInto};
-use std::ptr::NonNull;
+use super::{Term, TryInto, Variant, WrongBoxError};
 use core::marker::PhantomData;
+use std::ptr::NonNull;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -13,10 +13,7 @@ unsafe impl Sync for Cons {}
 
 impl PartialEq for Cons {
     fn eq(&self, other: &Self) -> bool {
-        self
-            .iter()
-            .zip(other.iter())
-            .all(|(e1, e2)| e1.eq(e2))
+        self.iter().zip(other.iter()).all(|(e1, e2)| e1.eq(e2))
     }
 }
 
@@ -76,4 +73,3 @@ impl<'a> IntoIterator for &'a Cons {
         self.iter()
     }
 }
-

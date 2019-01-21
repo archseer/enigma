@@ -942,7 +942,8 @@ impl Machine {
                 Opcode::GetList => {
                     // source, head, tail
                     if let Ok(value::Cons { head, tail }) =
-                        context.expand_arg(&ins.args[0]).clone().try_into() // TODO: this clone is bad but the borrow checker complains (but doesn't on GetTl/GetHd)
+                        context.expand_arg(&ins.args[0]).clone().try_into()
+                    // TODO: this clone is bad but the borrow checker complains (but doesn't on GetTl/GetHd)
                     {
                         set_register!(context, &ins.args[1], head.clone());
                         set_register!(context, &ins.args[2], tail.clone());
@@ -1450,7 +1451,9 @@ impl Machine {
                     // literal arity
                     let arity = ins.args[0].to_u32();
                     // TODO: this clone is bad but the borrow checker complains (but doesn't on GetTl/GetHd)
-                    if let Ok(value::Boxed { value, .. }) = context.x[arity as usize].clone().try_into() {
+                    if let Ok(value::Boxed { value, .. }) =
+                        context.x[arity as usize].clone().try_into()
+                    {
                         let closure: &value::Closure = value; // ughh type annotation
                         op_call_fun!(self, context, closure, arity)
                     } else {

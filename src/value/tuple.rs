@@ -1,4 +1,4 @@
-use super::{Term, Variant, Header, WrongBoxError, BOXED_TUPLE, TryInto};
+use super::{Header, Term, TryInto, Variant, WrongBoxError, BOXED_TUPLE};
 use std::ops::{Deref, DerefMut};
 // use std::convert::TryFrom;
 
@@ -21,13 +21,23 @@ impl Tuple {
 impl Deref for Tuple {
     type Target = [Term];
     fn deref(&self) -> &[Term] {
-        unsafe { ::std::slice::from_raw_parts((self as *const Tuple).add(TUPLE_SIZE) as *const Term, self.len as usize) }
+        unsafe {
+            ::std::slice::from_raw_parts(
+                (self as *const Tuple).add(TUPLE_SIZE) as *const Term,
+                self.len as usize,
+            )
+        }
     }
 }
 
 impl DerefMut for Tuple {
     fn deref_mut(&mut self) -> &mut [Term] {
-        unsafe { ::std::slice::from_raw_parts_mut((self as *mut Tuple).add(TUPLE_SIZE) as *mut Term, self.len as usize) }
+        unsafe {
+            ::std::slice::from_raw_parts_mut(
+                (self as *mut Tuple).add(TUPLE_SIZE) as *mut Term,
+                self.len as usize,
+            )
+        }
     }
 }
 
@@ -46,7 +56,7 @@ impl TryInto<Tuple> for Term {
         if let Variant::Pointer(ptr) = self.into_variant() {
             unsafe {
                 if *ptr == BOXED_TUPLE {
-                    return Ok(&*(ptr as *const Tuple))
+                    return Ok(&*(ptr as *const Tuple));
                 }
             }
         }

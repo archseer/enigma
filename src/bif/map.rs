@@ -402,10 +402,13 @@ mod tests {
         let process = process::allocate(&vm.state, module).unwrap();
         let heap = &process.context_mut().heap;
 
-        let map = map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
+        let map =
+            map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let args = vec![map];
 
-        if let Ok(value::Cons { head, tail }) = bif_maps_keys_1(&vm, &process, &args).unwrap().try_into() {
+        if let Ok(value::Cons { head, tail }) =
+            bif_maps_keys_1(&vm, &process, &args).unwrap().try_into()
+        {
             unsafe {
                 let key1 = head;
                 assert_eq!(key1, &str_to_atom!("test"));
@@ -469,7 +472,8 @@ mod tests {
         let process = process::allocate(&vm.state, module).unwrap();
         let heap = &process.context_mut().heap;
 
-        let map = map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
+        let map =
+            map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let bad_map = Term::int(2);
 
         let args = vec![map.clone(), bad_map.clone()];
@@ -513,11 +517,7 @@ mod tests {
 
         let value = Term::int(2);
         let map: value::HAMT = HamtMap::new();
-        let args = vec![
-            Term::map(heap, map),
-            key.clone(),
-            value.clone(),
-        ];
+        let args = vec![Term::map(heap, map), key.clone(), value.clone()];
 
         let res = bif_maps_put_3(&vm, &process, &args);
 
@@ -619,11 +619,7 @@ mod tests {
         let key = str_to_atom!("test");
         let value = Term::int(2);
         let map: value::HAMT = HamtMap::new();
-        let args = vec![
-            Term::map(heap, map),
-            key.clone(),
-            value.clone(),
-        ];
+        let args = vec![Term::map(heap, map), key.clone(), value.clone()];
 
         let res = bif_maps_update_3(&vm, &process, &args);
 
@@ -663,10 +659,13 @@ mod tests {
         let process = process::allocate(&vm.state, module).unwrap();
         let heap = &process.context_mut().heap;
 
-        let map = map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
+        let map =
+            map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let args = vec![map];
 
-        if let Ok(value::Cons { head, tail }) = bif_maps_values_1(&vm, &process, &args).unwrap().try_into() {
+        if let Ok(value::Cons { head, tail }) =
+            bif_maps_values_1(&vm, &process, &args).unwrap().try_into()
+        {
             unsafe {
                 let key1 = head;
                 assert_eq!(key1, &Term::int(1));
@@ -706,7 +705,8 @@ mod tests {
         let process = process::allocate(&vm.state, module).unwrap();
         let heap = &process.context_mut().heap;
 
-        let map = map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
+        let map =
+            map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let key = str_to_atom!("test2");
         let args = vec![key.clone(), map.clone()];
 
@@ -717,10 +717,7 @@ mod tests {
             assert_eq!(Term::int(2), iter.next().unwrap().clone());
             if let Ok(value::Map { map, .. }) = iter.next().unwrap().try_into() {
                 assert_eq!(map.len(), 1);
-                assert_eq!(
-                    map.find(&str_to_atom!("test")),
-                    Some(&Term::int(1))
-                );
+                assert_eq!(map.find(&str_to_atom!("test")), Some(&Term::int(1)));
             } else {
                 panic!();
             }
@@ -755,7 +752,8 @@ mod tests {
         let process = process::allocate(&vm.state, module).unwrap();
         let heap = &process.context_mut().heap;
 
-        let map = map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
+        let map =
+            map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let key = str_to_atom!("test3");
         let args = vec![key.clone(), map.clone()];
 

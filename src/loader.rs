@@ -343,8 +343,9 @@ impl<'a> Loader<'a> {
                         let offset = offset as usize;
                         let bytes = &self.strings[offset..offset + len as usize];
                         let string = bytes.as_bytes().to_vec(); // TODO: check if most efficient
-                        instruction.args =
-                            vec![LValue::Binary(Arc::new(bitstring::Binary::from_vec(string)))];
+                        instruction.args = vec![LValue::Binary(Arc::new(
+                            bitstring::Binary::from_vec(string),
+                        ))];
                         instruction
                     } else {
                         unreachable!()
@@ -372,7 +373,7 @@ impl<'a> Loader<'a> {
                     }
                     LValue::Label(labels[&l])
                 }
-                val => val.clone()
+                val => val.clone(),
             }
         };
 

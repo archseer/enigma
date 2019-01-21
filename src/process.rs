@@ -185,7 +185,6 @@ impl TryInto<value::Boxed<InstrPtr>> for Term {
     }
 }
 
-
 impl ExecutionContext {
     pub fn new(module: *const Module) -> ExecutionContext {
         unsafe {

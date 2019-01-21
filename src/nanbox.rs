@@ -104,7 +104,6 @@ impl NanBoxable for i8 {
     }
 }
 
-
 impl NanBoxable for i16 {
     unsafe fn from_nan_box(n: NanBox) -> i16 {
         n.0 as i16
@@ -455,7 +454,6 @@ macro_rules! unsafe_make_nanbox {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
