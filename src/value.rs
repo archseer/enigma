@@ -391,46 +391,53 @@ impl Term {
     // immediates
 
     #[inline]
-    pub fn is_none(&self) -> bool {
+    pub fn is_none(self) -> bool {
         self.value.tag() as u8 == TERM_NIL // TODO
     }
 
-    pub fn is_float(&self) -> bool {
+    #[inline]
+    pub fn is_float(self) -> bool {
         self.value.tag() as u8 == TERM_FLOAT
     }
 
-    pub fn is_nil(&self) -> bool {
+    #[inline]
+    pub fn is_nil(self) -> bool {
         self.value.tag() as u8 == TERM_NIL
     }
 
-    pub fn is_smallint(&self) -> bool {
+    #[inline]
+    pub fn is_smallint(self) -> bool {
         self.value.tag() as u8 == TERM_INTEGER
     }
 
-    pub fn is_atom(&self) -> bool {
+    #[inline]
+    pub fn is_atom(self) -> bool {
         self.value.tag() as u8 == TERM_ATOM
     }
 
-    pub fn is_port(&self) -> bool {
+    #[inline]
+    pub fn is_port(self) -> bool {
         self.value.tag() as u8 == TERM_PORT
     }
 
-    pub fn is_pid(&self) -> bool {
+    #[inline]
+    pub fn is_pid(self) -> bool {
         self.value.tag() as u8 == TERM_PID
     }
 
-    pub fn is_pointer(&self) -> bool {
+    #[inline]
+    pub fn is_pointer(self) -> bool {
         self.value.tag() as u8 == TERM_POINTER
     }
 
     #[inline]
-    pub fn is_list(&self) -> bool {
+    pub fn is_list(self) -> bool {
         let tag = self.value.tag() as u8;
         tag == TERM_CONS || tag == TERM_NIL
     }
 
     #[inline]
-    pub fn get_type(&self) -> Type {
+    pub fn get_type(self) -> Type {
         match self.value.tag() as u8 {
             TERM_FLOAT => Type::Number,
             TERM_NIL => Type::Nil,
@@ -454,7 +461,7 @@ impl Term {
         }
     }
 
-    pub fn get_boxed_header(&self) -> Header {
+    pub fn get_boxed_header(self) -> Header {
         if let Variant::Pointer(ptr) = self.into_variant() {
             unsafe { return *ptr }
         }
@@ -476,7 +483,7 @@ impl Term {
     }
 
     /// A method that's optimized for retrieving number types.
-    pub fn into_number(&self) -> Result<Num, ()> {
+    pub fn into_number(self) -> Result<Num, ()> {
         match self.into_variant() {
             Variant::Integer(i) => Ok(Num::Integer(i)),
             Variant::Float(self::Float(i)) => Ok(Num::Float(i)),
@@ -494,7 +501,7 @@ impl Term {
     }
 
     // TODO: ExtendedList should instead become a Term vec
-    pub fn into_lvalue(&self) -> loader::LValue {
+    pub fn into_lvalue(self) -> loader::LValue {
         match self.into_variant() {
             Variant::Integer(i) => loader::LValue::Integer(i64::from(i)),
             Variant::Atom(i) => loader::LValue::Atom(i),
@@ -507,9 +514,9 @@ impl Term {
     // ------
 
     #[inline]
-    pub fn is_integer(&self) -> bool {
+    pub fn is_integer(self) -> bool {
         match self.into_variant() {
-            Variant::Integer(i) => true,
+            Variant::Integer(_) => true,
             Variant::Pointer(ptr) => unsafe {
                 match *ptr {
                     BOXED_BIGINT => true,
@@ -521,21 +528,21 @@ impl Term {
     }
 
     #[inline]
-    pub fn is_number(&self) -> bool {
+    pub fn is_number(self) -> bool {
         self.get_type() == Type::Number
     }
 
     #[inline]
-    pub fn is_ref(&self) -> bool {
+    pub fn is_ref(self) -> bool {
         self.get_type() == Type::Ref
     }
 
-    pub fn is_binary(&self) -> bool {
+    pub fn is_binary(self) -> bool {
         self.get_type() == Type::Binary
     }
 
     #[inline]
-    pub fn is_non_empty_list(&self) -> bool {
+    pub fn is_non_empty_list(self) -> bool {
         match self.into_variant() {
             Variant::Cons(ptr) => unsafe { !(*ptr).head.is_nil() },
             _ => false,
@@ -543,17 +550,17 @@ impl Term {
     }
 
     #[inline]
-    pub fn is_tuple(&self) -> bool {
+    pub fn is_tuple(self) -> bool {
         self.get_type() == Type::Tuple
     }
 
     #[inline]
-    pub fn is_function(&self) -> bool {
+    pub fn is_function(self) -> bool {
         self.get_type() == Type::Closure
     }
 
     #[inline]
-    pub fn is_boolean(&self) -> bool {
+    pub fn is_boolean(self) -> bool {
         match self.into_variant() {
             Variant::Atom(atom::TRUE) | Variant::Atom(atom::FALSE) => true,
             _ => false,
@@ -561,16 +568,16 @@ impl Term {
     }
 
     #[inline]
-    pub fn is_map(&self) -> bool {
+    pub fn is_map(self) -> bool {
         self.get_type() == Type::Map
     }
 
     #[inline]
-    pub fn is_cp(&self) -> bool {
+    pub fn is_cp(self) -> bool {
         self.get_type() == Type::CP
     }
 
-    pub fn to_u32(&self) -> u32 {
+    pub fn to_u32(self) -> u32 {
         match self.into_variant() {
             Variant::Atom(i) => i,
             Variant::Pid(i) => i,
@@ -588,7 +595,7 @@ impl Term {
 
     pub fn erl_partial_cmp(&self, other: &Self) -> Option<Ordering> {
         // TODO: loosely compare int and floats
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 

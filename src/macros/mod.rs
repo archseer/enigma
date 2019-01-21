@@ -52,7 +52,7 @@ macro_rules! bitstring {
     ($heap:expr, $str:expr) => {{
         let mut list = Term::nil();
         for char in $str.bytes().rev() {
-            list = cons!($heap, Term::int(char as i32), list);
+            list = cons!($heap, Term::int(i32::from(char)), list);
         }
         list
     }};

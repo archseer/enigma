@@ -59,6 +59,7 @@ bitflags! {
 
 impl ExecutionContext {
     #[inline]
+    // TODO: expand_arg should return by value
     pub fn expand_arg<'a>(&'a self, arg: &'a LValue) -> &'a Term {
         match arg {
             // TODO: optimize away into a reference somehow at load time
@@ -302,7 +303,7 @@ impl Process {
         self.pid == 0
     }
 
-    pub fn send_message(&self, sender: &RcProcess, message: &Term) {
+    pub fn send_message(&self, sender: &RcProcess, message: Term) {
         if sender.pid == self.pid {
             self.local_data_mut().mailbox.send_internal(message);
         } else {
@@ -355,12 +356,12 @@ pub fn spawn(
     let mut i = 0;
     let mut cons = &args;
     while let Ok(value::Cons { head, tail }) = cons.try_into() {
-        context.x[i] = head.clone();
+        context.x[i] = *head;
         i += 1;
         cons = tail;
     }
     // lastly, the tail
-    context.x[i] = cons.clone();
+    context.x[i] = *cons;
 
     // TODO: func to ip offset
     let func = unsafe {
@@ -397,13 +398,13 @@ pub fn spawn(
     Ok(pid_ptr)
 }
 
-pub fn send_message<'a>(
+pub fn send_message(
     state: &RcState,
     process: &RcProcess,
     // TODO: use pointers for these
-    pid: &Term,
-    msg: &'a Term,
-) -> Result<&'a Term, Exception> {
+    pid: Term,
+    msg: Term,
+) -> Result<Term, Exception> {
     let pid = pid.to_u32();
 
     if let Some(receiver) = state.process_table.lock().get(pid) {

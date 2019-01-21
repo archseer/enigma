@@ -341,8 +341,8 @@ pub fn handle_error(
         // be ignored.) */
         context.x[0] = Term::none();
         context.x[1] = Term::atom(EXIT_TAGS[exception_class!(exc.reason).bits as usize]);
-        context.x[2] = exc.value.clone();
-        context.x[3] = exc.trace.clone();
+        context.x[2] = exc.value;
+        context.x[3] = exc.trace;
         if let Some(new_pc) = next_catch(process) {
             context.cp = None; // To avoid keeping stale references.
                                //ERTS_RECV_MARK_CLEAR(c_p); // No longer safe to use this position
@@ -405,7 +405,7 @@ fn terminate_process(process: &RcProcess, mut exc: Exception) {
 
     // Add a stacktrace if this is an error.
     if exception_class!(exc.reason) == Reason::EXT_ERROR {
-        exc.value = add_stacktrace(process, &exc.value, &exc.trace);
+        exc.value = add_stacktrace(process, exc.value, exc.trace);
     }
     // EXF_LOG is a primary exception flag
     if exc.reason.contains(Reason::EXF_LOG) {
@@ -437,10 +437,10 @@ fn terminate_process(process: &RcProcess, mut exc: Exception) {
 }
 
 /// Build and add a symbolic stack trace to the error value.
-pub fn add_stacktrace(process: &RcProcess, value: &Term, trace: &Term) -> Term {
+pub fn add_stacktrace(process: &RcProcess, value: Term, trace: Term) -> Term {
     let heap = &process.context_mut().heap;
     let origin = build_stacktrace(process, trace);
-    tup2!(heap, value.clone(), origin)
+    tup2!(heap, value, origin)
 }
 
 /// Forming the correct error value from the internal error code.
@@ -632,7 +632,7 @@ fn erts_save_stacktrace(process: &RcProcess, s: &mut StackTrace, mut depth: u32)
             if let Some(cp) = *boxed_cp {
                 if Some(&cp) != s.trace.last() {
                     // Record non-duplicates only
-                    s.trace.push(cp.clone()); // -1
+                    s.trace.push(cp); // -1
                     depth -= 1;
                 }
             }
@@ -656,15 +656,15 @@ pub fn get_trace_from_exc(trace: &Term) -> Option<&StackTrace> {
     }
 }
 
-pub fn get_args_from_exc(trace: &Term) -> Term {
+pub fn get_args_from_exc(trace: Term) -> Term {
     match trace.into_variant() {
         Variant::Nil(value::Special::Nil) => Term::nil(),
-        Variant::Cons(cons) => unsafe { (*cons).head.clone() },
+        Variant::Cons(cons) => unsafe { (*cons).head },
         _ => unreachable!(),
     }
 }
 
-fn is_raised_exc(exc: &Term) -> bool {
+fn is_raised_exc(exc: Term) -> bool {
     match exc.into_variant() {
         Variant::Nil(value::Special::Nil) => false,
         Variant::Cons(cons) => unsafe {
@@ -699,11 +699,11 @@ fn make_arglist(process: &RcProcess, mut a: usize) -> Term {
 /// holds the given args and the quick-saved data (encoded as a bignum).
 ///
 /// If the bignum is negative, the given args is a complete stacktrace.
-pub fn build_stacktrace(process: &RcProcess, exc: &Term) -> Term {
+pub fn build_stacktrace(process: &RcProcess, exc: Term) -> Term {
     let heap = &process.context_mut().heap;
 
     // TODO: awkward
-    let s = get_trace_from_exc(exc);
+    let s = get_trace_from_exc(&exc);
     if s.is_none() {
         return Term::nil();
     }

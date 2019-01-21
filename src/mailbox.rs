@@ -5,10 +5,10 @@ use std::collections::VecDeque;
 #[derive(Default)]
 pub struct Mailbox {
     /// Internal mailbox from which the process is safe to read.
-    internal: VecDeque<*const Term>,
+    internal: VecDeque<Term>,
 
     /// External mailbox, to which other processes can write (while holding the lock)
-    external: VecDeque<*const Term>,
+    external: VecDeque<Term>,
 
     /// Used for synchronizing writes to the external part.
     write_lock: Mutex<()>,
@@ -27,17 +27,17 @@ impl Mailbox {
         }
     }
 
-    pub fn send_external(&mut self, message: *const Term) {
+    pub fn send_external(&mut self, message: Term) {
         let _lock = self.write_lock.lock();
 
         self.external.push_back(message);
     }
 
-    pub fn send_internal(&mut self, message: *const Term) {
+    pub fn send_internal(&mut self, message: Term) {
         self.internal.push_back(message);
     }
 
-    pub fn receive(&mut self) -> Option<&*const Term> {
+    pub fn receive(&mut self) -> Option<&Term> {
         if self.internal.len() >= self.save {
             let _lock = self.write_lock.lock();
 

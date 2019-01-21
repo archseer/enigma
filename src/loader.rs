@@ -371,7 +371,7 @@ impl<'a> Loader<'a> {
                     if *l == 0 {
                         return LValue::Label(0);
                     }
-                    LValue::Label(labels[&l])
+                    LValue::Label(labels[l])
                 }
                 val => val.clone(),
             }

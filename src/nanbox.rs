@@ -262,10 +262,10 @@ where
     T: From<TypedNanBox<T>> + Into<TypedNanBox<T>> + Clone,
 {
     fn clone(&self) -> Self {
-        Self::from(TypedNanBox {
+        Self {
             nanbox: self.nanbox,
             _marker: PhantomData,
-        })
+        }
     }
 }
 

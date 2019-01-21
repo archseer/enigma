@@ -162,12 +162,12 @@ fn bif_erlang_spawn_3(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> 
         Variant::Atom(func) => func,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
-    let arglist = &args[2];
+    let arglist = args[2];
 
     let registry = vm.modules.lock();
     let module = registry.lookup(module).unwrap();
     // TODO: avoid the clone here since we copy later
-    return process::spawn(&vm.state, module, func, arglist.clone());
+    process::spawn(&vm.state, module, func, arglist)
 }
 
 fn bif_erlang_abs_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
@@ -217,11 +217,9 @@ fn bif_erlang_self_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> 
 
 fn bif_erlang_send_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     // args: dest <pid>, msg <term>
-    let pid = &args[0];
-    let msg = &args[1];
-    let res = process::send_message(&vm.state, process, pid, msg)
-        .unwrap()
-        .clone();
+    let pid = args[0];
+    let msg = args[1];
+    let res = process::send_message(&vm.state, process, pid, msg).unwrap();
     Ok(res)
 }
 
@@ -281,7 +279,7 @@ macro_rules! trig_func {
     $op:ident
 ) => {{
         let res = match $arg.into_number() {
-            Ok(value::Num::Integer(i)) => i as f64, // TODO: potentially unsafe
+            Ok(value::Num::Integer(i)) => f64::from(i),
             Ok(value::Num::Float(f)) => f,
             Ok(value::Num::Bignum(..)) => unimplemented!(),
             Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -392,15 +390,15 @@ fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]
 }
 
 fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
-    Err(Exception::with_value(Reason::EXC_THROWN, args[0].clone()))
+    Err(Exception::with_value(Reason::EXC_THROWN, args[0]))
 }
 
 fn bif_erlang_exit_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
-    Err(Exception::with_value(Reason::EXC_EXIT, args[0].clone()))
+    Err(Exception::with_value(Reason::EXC_EXIT, args[0]))
 }
 
 fn bif_erlang_error_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
-    Err(Exception::with_value(Reason::EXC_ERROR, args[0].clone()))
+    Err(Exception::with_value(Reason::EXC_ERROR, args[0]))
 }
 
 fn bif_erlang_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
@@ -408,12 +406,12 @@ fn bif_erlang_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
 
     Err(Exception::with_value(
         Reason::EXC_ERROR_2,
-        tup2!(heap, args[0].clone(), args[1].clone()),
+        tup2!(heap, args[0], args[1]),
     ))
 }
 
 fn bif_erlang_nif_error_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
-    Err(Exception::with_value(Reason::EXC_ERROR, args[0].clone()))
+    Err(Exception::with_value(Reason::EXC_ERROR, args[0]))
 }
 
 fn bif_erlang_nif_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
@@ -421,7 +419,7 @@ fn bif_erlang_nif_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
 
     Err(Exception::with_value(
         Reason::EXC_ERROR_2,
-        tup2!(heap, args[0].clone(), args[1].clone()),
+        tup2!(heap, args[0], args[1]),
     ))
 }
 
@@ -460,12 +458,7 @@ pub fn bif_erlang_process_flag_2(
                 Variant::Atom(atom::FALSE) => context.flags.set(process::Flag::TRAP_EXIT, false),
                 _ => return Err(Exception::new(Reason::EXC_BADARG)),
             }
-            if old_value {
-                // todo helper func From<>
-                return Ok(Term::atom(atom::TRUE));
-            } else {
-                return Ok(Term::atom(atom::FALSE));
-            }
+            Ok(Term::boolean(old_value))
         }
         Variant::Atom(i) => unimplemented!(
             "erlang:process_flag/2 not implemented for {:?}",
@@ -515,7 +508,7 @@ fn bif_erlang_get_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> B
 
     let result: Term = pdict.iter().fold(Term::nil(), |res, (key, val)| {
         // make tuple
-        let tuple = tup2!(heap, key.clone(), val.clone());
+        let tuple = tup2!(heap, *key, *val);
 
         // make cons
         value::cons(heap, tuple, res)
@@ -539,7 +532,7 @@ fn bif_erlang_get_keys_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term])
 
     let result: Term = pdict
         .keys()
-        .fold(Term::nil(), |res, key| value::cons(heap, key.clone(), res));
+        .fold(Term::nil(), |res, key| value::cons(heap, *key, res));
     Ok(result)
 }
 
@@ -550,7 +543,7 @@ fn bif_erlang_get_keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
 
     let result: Term = pdict.iter().fold(Term::nil(), |res, (key, val)| {
         if args[1] == *val {
-            value::cons(heap, key.clone(), res)
+            value::cons(heap, *key, res)
         } else {
             res
         }
@@ -562,7 +555,7 @@ fn bif_erlang_get_keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
 fn bif_erlang_put_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let pdict = &mut process.local_data_mut().dictionary;
     Ok(pdict
-        .insert(args[0].clone(), args[1].clone())
+        .insert(args[0], args[1])
         .unwrap_or_else(|| atom!(UNDEFINED)))
 }
 
@@ -735,7 +728,7 @@ fn bif_lists_member_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
 fn bif_lists_reverse_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     // Handle legal and illegal non-lists quickly.
     if args[0].is_nil() {
-        return Ok(args[1].clone());
+        return Ok(args[1]);
     } else if !args[1].is_list() {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
@@ -780,7 +773,7 @@ fn bif_lists_keyfind_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
 and is only here to keep Robert happy (Even more, since it's OP as well) */
 fn bif_erlang_hd_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     if let Ok(Cons { head, .. }) = args[0].try_into() {
-        return Ok(head.clone());
+        return Ok(*head);
     }
     Err(Exception::new(Reason::EXC_BADARG))
 }
@@ -788,7 +781,7 @@ fn bif_erlang_hd_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Bi
 /* returns the tails of a list - same comment as above */
 fn bif_erlang_tl_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     if let Ok(Cons { tail, .. }) = args[0].try_into() {
-        return Ok(tail.clone());
+        return Ok(*tail);
     }
     Err(Exception::new(Reason::EXC_BADARG))
 }
@@ -830,7 +823,7 @@ fn keyfind(_func: BifFn, _process: &RcProcess, args: &[Term]) -> BifResult {
         if let Ok(tuple) = term.try_into() {
             let tuple: &Tuple = tuple; // annoying, need type annotation
             if pos <= (tuple.len as usize) && *key == tuple[pos] {
-                return Ok(term.clone());
+                return Ok(*term);
             }
         }
     }
@@ -851,7 +844,7 @@ mod tests {
         let mut vec = Vec::new();
         let mut cons = &value;
         while let Ok(Cons { head, tail }) = cons.try_into() {
-            vec.push(head.clone());
+            vec.push(head);
             cons = &tail;
         }
         // lastly, the tail

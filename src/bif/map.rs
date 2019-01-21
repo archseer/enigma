@@ -13,14 +13,14 @@ pub fn bif_maps_find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
         match map.find(key) {
             Some(value) => {
                 let heap = &process.context_mut().heap;
-                return Ok(tup2!(&heap, atom!(OK), value.clone()));
+                return Ok(tup2!(&heap, atom!(OK), *value));
             }
             None => {
                 return Ok(atom!(ERROR));
             }
         };
     }
-    Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
+    Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
 pub fn bif_maps_get_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
@@ -29,31 +29,31 @@ pub fn bif_maps_get_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
         let target = &args[1];
         match map.find(target) {
             Some(value) => {
-                return Ok(value.clone());
+                return Ok(*value);
             }
             None => {
-                return Err(Exception::with_value(Reason::EXC_BADKEY, target.clone()));
+                return Err(Exception::with_value(Reason::EXC_BADKEY, *target));
             }
         };
     }
-    Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
+    Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
 pub fn bif_maps_from_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let mut list = &args[0];
     if !list.is_list() {
-        return Err(Exception::with_value(Reason::EXC_BADARG, list.clone()));
+        return Err(Exception::with_value(Reason::EXC_BADARG, *list));
     }
     let mut map = HamtMap::new();
     while let Ok(value::Cons { head, tail }) = list.try_into() {
         if let Ok(tuple) = head.try_into() {
             let tuple: &value::Tuple = tuple; // annoying, need type annotation
             if tuple.len != 2 {
-                return Err(Exception::with_value(Reason::EXC_BADARG, list.clone()));
+                return Err(Exception::with_value(Reason::EXC_BADARG, *list));
             }
-            map = map.plus(tuple[0].clone(), tuple[1].clone());
+            map = map.plus(tuple[0], tuple[1]);
         } else {
-            return Err(Exception::with_value(Reason::EXC_BADARG, list.clone()));
+            return Err(Exception::with_value(Reason::EXC_BADARG, *list));
         }
         list = tail;
     }
@@ -68,7 +68,7 @@ pub fn bif_maps_is_key_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
         let exist = map.find(target).is_some();
         return Ok(Term::boolean(exist));
     }
-    Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
+    Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
 pub fn bif_maps_keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
@@ -78,21 +78,21 @@ pub fn bif_maps_keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
         let list = iter_to_list!(heap, map.iter().map(|(k, _)| k).cloned());
         return Ok(list);
     }
-    Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
+    Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
 pub fn bif_maps_merge_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let map1 = match args[0].try_into() {
         Ok(value::Map { map, .. }) => map,
-        _ => return Err(Exception::with_value(Reason::EXC_BADMAP, args[0].clone())),
+        _ => return Err(Exception::with_value(Reason::EXC_BADMAP, args[0])),
     };
     let map2 = match args[1].try_into() {
         Ok(value::Map { map, .. }) => map,
-        _ => return Err(Exception::with_value(Reason::EXC_BADMAP, args[1].clone())),
+        _ => return Err(Exception::with_value(Reason::EXC_BADMAP, args[1])),
     };
     let mut new_map = map2.clone();
     for (k, v) in map1.iter() {
-        new_map = new_map.plus(k.clone(), v.clone());
+        new_map = new_map.plus(*k, *v);
     }
     let heap = &process.context_mut().heap;
     Ok(Term::map(heap, new_map))
@@ -104,10 +104,10 @@ pub fn bif_maps_put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     let key = &args[1];
     let value = &args[2];
     if let Ok(value::Map { map, .. }) = map.try_into() {
-        let new_map = map.clone().plus(key.clone(), value.clone());
+        let new_map = map.clone().plus(*key, *value);
         return Ok(Term::map(heap, new_map));
     }
-    Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
+    Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
 pub fn bif_maps_remove_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
@@ -118,7 +118,7 @@ pub fn bif_maps_remove_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
         let new_map = map.clone().minus(&key.clone());
         return Ok(Term::map(heap, new_map));
     }
-    Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
+    Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
 pub fn bif_maps_update_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
@@ -134,11 +134,11 @@ pub fn bif_maps_update_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
                 return Ok(Term::map(heap, new_map));
             }
             None => {
-                return Err(Exception::with_value(Reason::EXC_BADKEY, key.clone()));
+                return Err(Exception::with_value(Reason::EXC_BADKEY, *key));
             }
         }
     }
-    Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
+    Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
 pub fn bif_maps_values_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
@@ -148,7 +148,7 @@ pub fn bif_maps_values_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
         let list = iter_to_list!(heap, map.iter().map(|(_, v)| v).cloned());
         return Ok(list);
     }
-    Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()))
+    Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
 pub fn bif_maps_take_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
@@ -158,13 +158,13 @@ pub fn bif_maps_take_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
         let result = if let Some(value) = map.find(key) {
             let new_map = map.clone().minus(key);
             let heap = &process.context_mut().heap;
-            tup2!(heap, value.clone(), Term::map(heap, new_map))
+            tup2!(heap, *value, Term::map(heap, new_map))
         } else {
             str_to_atom!("error")
         };
         return Ok(result);
     }
-    return Err(Exception::with_value(Reason::EXC_BADMAP, map.clone()));
+    Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
 #[cfg(test)]

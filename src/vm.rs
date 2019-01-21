@@ -542,10 +542,10 @@ impl Machine {
                 }
                 Opcode::Send => {
                     // send x1 to x0, write result to x0
-                    let pid = &context.x[0];
-                    let msg = &context.x[1];
+                    let pid = context.x[0];
+                    let msg = context.x[1];
                     let res = process::send_message(&self.state, process, pid, msg)?;
-                    context.x[0] = res.clone();
+                    context.x[0] = res;
                 }
                 Opcode::RemoveMessage => {
                     // Unlink the current message from the message queue. Remove any timeout.
@@ -561,10 +561,7 @@ impl Machine {
                     // label, source
                     // grab message from queue, put to x0, if no message, jump to fail label
                     if let Some(msg) = process.local_data_mut().mailbox.receive() {
-                        // TODO: this is very hacky
-                        unsafe {
-                            context.x[0] = (**msg).clone();
-                        }
+                        context.x[0] = *msg
                     } else {
                         let fail = context.expand_arg(&ins.args[0]).to_u32();
                         op_jump!(context, fail);
@@ -937,7 +934,7 @@ impl Machine {
                 Opcode::Move => {
                     // arg1 can be either a value or a register
                     let val = context.expand_arg(&ins.args[0]);
-                    set_register!(context, &ins.args[1], val.clone()) // TODO: mem::move would be preferred
+                    set_register!(context, &ins.args[1], *val)
                 }
                 Opcode::GetList => {
                     // source, head, tail
@@ -945,8 +942,8 @@ impl Machine {
                         context.expand_arg(&ins.args[0]).clone().try_into()
                     // TODO: this clone is bad but the borrow checker complains (but doesn't on GetTl/GetHd)
                     {
-                        set_register!(context, &ins.args[1], head.clone());
-                        set_register!(context, &ins.args[2], tail.clone());
+                        set_register!(context, &ins.args[1], *head);
+                        set_register!(context, &ins.args[2], *tail);
                     } else {
                         panic!("badarg to GetHd")
                     }
@@ -957,7 +954,7 @@ impl Machine {
                     let n = context.expand_arg(&ins.args[1]).to_u32();
                     if let Ok(t) = source.try_into() {
                         let t: &value::Tuple = t; // annoying, need type annotation
-                        set_register!(context, &ins.args[2], t[n as usize].clone())
+                        set_register!(context, &ins.args[2], t[n as usize])
                     } else {
                         panic!("GetTupleElement: source is of wrong type")
                     }
@@ -965,9 +962,9 @@ impl Machine {
                 Opcode::PutList => {
                     // put_list H T Dst::slot()
                     // Creates a cons cell with [H|T] and places the value into Dst.
-                    let head = context.expand_arg(&ins.args[0]).clone();
-                    let tail = context.expand_arg(&ins.args[1]).clone();
-                    let cons = cons!(&context.heap, head, tail);
+                    let head = context.expand_arg(&ins.args[0]);
+                    let tail = context.expand_arg(&ins.args[1]);
+                    let cons = cons!(&context.heap, *head, *tail);
                     set_register!(context, &ins.args[2], cons)
                 }
                 Opcode::PutTuple => {
@@ -986,17 +983,14 @@ impl Machine {
                         let tuple = value::tuple(&context.heap, arity as u32);
                         for i in 0..arity {
                             unsafe {
-                                std::ptr::write(
-                                    &mut tuple[i],
-                                    context.expand_arg(&list[i]).clone(),
-                                );
+                                std::ptr::write(&mut tuple[i], *context.expand_arg(&list[i]));
                             }
                         }
                         set_register!(context, &ins.args[0], Term::from(tuple))
                     }
                 }
                 Opcode::Badmatch => {
-                    let value = context.expand_arg(&ins.args[0]).clone();
+                    let value = *context.expand_arg(&ins.args[0]);
                     return Err(Exception::with_value(Reason::EXC_BADMATCH, value));
                 }
                 Opcode::IfEnd => {
@@ -1005,7 +999,7 @@ impl Machine {
                 }
                 Opcode::CaseEnd => {
                     // Raises the case_clause exception with the value of Arg0
-                    let value = context.expand_arg(&ins.args[0]).clone();
+                    let value = *context.expand_arg(&ins.args[0]);
                     return Err(Exception::with_value(Reason::EXC_CASE_CLAUSE, value));
                 }
                 Opcode::Try => {
@@ -1041,14 +1035,14 @@ impl Machine {
                     assert!(context.x[0].is_none());
                     // TODO: c_p->fvalue = NIL;
                     // TODO: make more efficient
-                    context.x[0] = context.x[1].clone();
-                    context.x[1] = context.x[2].clone();
-                    context.x[2] = context.x[3].clone();
+                    context.x[0] = context.x[1];
+                    context.x[1] = context.x[2];
+                    context.x[2] = context.x[3];
                 }
                 Opcode::TryCaseEnd => {
                     // Raises a try_clause exception with the value read from Arg0.
-                    let value = context.expand_arg(&ins.args[0]).clone();
-                    return Err(Exception::with_value(Reason::EXC_TRY_CLAUSE, value));
+                    let value = context.expand_arg(&ins.args[0]);
+                    return Err(Exception::with_value(Reason::EXC_TRY_CLAUSE, *value));
                 }
                 Opcode::Catch => {
                     // create a catch context that wraps f - fail label, and stores to y - reg.
@@ -1084,14 +1078,11 @@ impl Machine {
                     if context.x[0].is_none() {
                         // c_p->fvalue = NIL;
                         if context.x[1] == Term::atom(atom::THROW) {
-                            context.x[0] = context.x[2].clone()
+                            context.x[0] = context.x[2]
                         } else {
                             if context.x[1] == Term::atom(atom::ERROR) {
-                                context.x[2] = exception::add_stacktrace(
-                                    process,
-                                    &context.x[2],
-                                    &context.x[3],
-                                );
+                                context.x[2] =
+                                    exception::add_stacktrace(process, context.x[2], context.x[3]);
                             }
                             // only x(2) is included in the rootset here
                             // if (E - HTOP < 3) { check for heap space, otherwise garbage collect
@@ -1099,7 +1090,7 @@ impl Machine {
                             //     FCALLS -= erts_garbage_collect_nobump(c_p, 3, reg+2, 1, FCALLS);
                             // }
                             context.x[0] =
-                                tup2!(&context.heap, Term::atom(atom::EXIT), context.x[2].clone());
+                                tup2!(&context.heap, Term::atom(atom::EXIT), context.x[2]);
                         }
                     }
                     unimplemented!();
@@ -1118,8 +1109,8 @@ impl Machine {
                     };
                     return Err(Exception {
                         reason,
-                        value: value.clone(),
-                        trace: trace.clone(),
+                        value: *value,
+                        trace: *trace,
                     });
                 }
                 Opcode::Apply => {
@@ -1151,7 +1142,7 @@ impl Machine {
                     // fail label, live, bif, arg1, dest
                     if let LValue::Literal(i) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
-                        let args = &[context.expand_arg(&ins.args[3]).clone()];
+                        let args = &[*context.expand_arg(&ins.args[3])];
                         let mfa = &module.imports[*i as usize];
                         let val = bif::apply(self, process, mfa, &args[..]).unwrap(); // TODO: handle fail
 
@@ -1402,9 +1393,9 @@ impl Machine {
                     if let LValue::Literal(i) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
                         let args = &[
-                            context.expand_arg(&ins.args[3]).clone(),
-                            context.expand_arg(&ins.args[4]).clone(),
-                            context.expand_arg(&ins.args[5]).clone(),
+                            *context.expand_arg(&ins.args[3]),
+                            *context.expand_arg(&ins.args[4]),
+                            *context.expand_arg(&ins.args[5]),
                         ];
                         let mfa = &module.imports[*i as usize];
                         let val = bif::apply(self, process, mfa, &args[..]).unwrap(); // TODO: handle fail
@@ -1465,7 +1456,7 @@ impl Machine {
                     if let Ok(value::Cons { head, .. }) =
                         context.expand_arg(&ins.args[0]).try_into()
                     {
-                        set_register!(context, &ins.args[1], head.clone());
+                        set_register!(context, &ins.args[1], *head);
                     } else {
                         unreachable!()
                     }
@@ -1475,7 +1466,7 @@ impl Machine {
                     if let Ok(value::Cons { tail, .. }) =
                         context.expand_arg(&ins.args[0]).try_into()
                     {
-                        set_register!(context, &ins.args[1], tail.clone());
+                        set_register!(context, &ins.args[1], *tail);
                     } else {
                         unreachable!()
                     }
@@ -1489,26 +1480,22 @@ impl Machine {
                     if let Ok(t) = reg.try_into() {
                         let tuple: &value::Tuple = t; // annoying, need type annotation
 
-                        if tuple.len == 0 || tuple.len != n {
+                        if tuple.len == 0 || tuple.len != n || !tuple[0].eq(atom) {
                             op_jump!(context, fail);
                         } else {
-                            if tuple[0].eq(atom) {
-                                // ok
-                            } else {
-                                op_jump!(context, fail);
-                            }
+                            // ok
                         }
                     } else {
                         op_jump!(context, fail);
                     }
                 }
                 Opcode::BuildStacktrace => {
-                    context.x[0] = exception::build_stacktrace(process, &context.x[0]);
+                    context.x[0] = exception::build_stacktrace(process, context.x[0]);
                 }
                 Opcode::RawRaise => {
                     let class = &context.x[0];
-                    let value = context.x[1].clone();
-                    let trace = context.x[2].clone();
+                    let value = context.x[1];
+                    let trace = context.x[2];
 
                     match class.into_variant() {
                         Variant::Atom(atom::ERROR) => {
