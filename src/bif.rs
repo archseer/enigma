@@ -844,11 +844,11 @@ mod tests {
         let mut vec = Vec::new();
         let mut cons = &value;
         while let Ok(Cons { head, tail }) = cons.try_into() {
-            vec.push(head);
+            vec.push(*head);
             cons = &tail;
         }
         // lastly, the tail
-        vec.push((*cons).clone());
+        vec.push(*cons);
         vec
     }
 
