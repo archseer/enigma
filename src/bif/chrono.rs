@@ -46,32 +46,38 @@ pub fn bif_erlang_localtime_0(_vm: &vm::Machine, process: &RcProcess, _args: &[T
 
 pub fn bif_erlang_monotonic_time_0(
     vm: &vm::Machine,
-    _process: &RcProcess,
+    process: &RcProcess,
     _args: &[Term],
 ) -> BifResult {
     // TODO: needs https://github.com/rust-lang/rust/issues/50202
     // .as_nanos()
 
-    Ok(Term::BigInt(Box::new(
+    let heap = &process.context_mut().heap;
+
+    Ok(Term::bigint(
+        heap,
         vm.elapsed_time().as_secs().to_bigint().unwrap(),
-    )))
+    ))
 }
 
 // TODO monotonic_time_1
 
 pub fn bif_erlang_system_time_0(
     _vm: &vm::Machine,
-    _process: &RcProcess,
+    process: &RcProcess,
     _args: &[Term],
 ) -> BifResult {
-    Ok(Term::BigInt(Box::new(
+    let heap = &process.context_mut().heap;
+
+    Ok(Term::bigint(
+        heap,
         SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_secs()
             .to_bigint()
             .unwrap(),
-    )))
+    ))
 }
 
 // TODO system_time_1

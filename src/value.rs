@@ -136,6 +136,12 @@ impl From<&mut Map> for Term {
     }
 }
 
+impl From<&mut Bignum> for Term {
+    fn from(value: &mut Bignum) -> Term {
+        Term::from(Variant::Pointer(value as *const Bignum as *const Header))
+    }
+}
+
 impl From<Variant> for Term {
     fn from(value: Variant) -> Term {
         unsafe {
@@ -307,6 +313,13 @@ impl Term {
         Term::from(heap.alloc(self::Map {
             header: BOXED_MAP,
             map,
+        }))
+    }
+
+    pub fn bigint(heap: &Heap, value: BigInt) -> Self {
+        Term::from(heap.alloc(self::Bignum {
+            header: BOXED_BIGINT,
+            value,
         }))
     }
 

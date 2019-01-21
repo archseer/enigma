@@ -96,11 +96,11 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> 
         }
         Tag::SmallBig => {
             let (rest, size) = be_u8(rest)?;
-            decode_bignum(rest, size.into())
+            decode_bignum(rest, size.into(), heap)
         }
         Tag::LargeBig => {
             let (rest, size) = be_u32(rest)?;
-            decode_bignum(rest, size)
+            decode_bignum(rest, size, heap)
         }
 
         _ => unimplemented!("etf: {:?}", tag),
@@ -174,7 +174,7 @@ pub fn decode_map<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
         map = map.plus(key, val);
         new_rest = rest;
     }
-    Ok((new_rest, Term::map(map)))
+    Ok((new_rest, Term::map(heap, map)))
 }
 
 /// A string of bytes encoded as tag 107 (String) with 16-bit length.
@@ -233,7 +233,7 @@ pub const WORD_BITS: usize = 32;
 #[cfg(target_pointer_width = "64")]
 pub const WORD_BITS: usize = 64;
 
-pub fn decode_bignum(rest: &[u8], size: u32) -> IResult<&[u8], Term> {
+pub fn decode_bignum<'a>(rest: &'a [u8], size: u32, heap: &Heap) -> IResult<&'a [u8], Term> {
     let (rest, sign) = be_u8(rest)?;
 
     let sign = if sign == 0 { Sign::Plus } else { Sign::Minus };
@@ -247,5 +247,5 @@ pub fn decode_bignum(rest: &[u8], size: u32) -> IResult<&[u8], Term> {
         return Ok((rest, Term::int(b_signed as i32)));
     }
 
-    Ok((rest, Term::BigInt(Box::new(big))))
+    Ok((rest, Term::bigint(heap, big)))
 }

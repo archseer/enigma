@@ -23,8 +23,8 @@ macro_rules! integer_overflow_op {
         $overflow:ident
     ) => {{
         // TODO: figure out if we can reduce amount of cloning here.
-        match [$args[0].into_variant(), $args[1].into_variant()] {
-            [Variant::Integer(rec), Variant::Integer(arg)] => {
+        match [$args[0].into_number(), $args[1].into_number()] {
+            [value::Num::Integer(rec), value::Num::Integer(arg)] => {
                 // Example: int + int -> int
                 //
                 // This will produce a bigint if the produced integer overflowed or
@@ -37,7 +37,7 @@ macro_rules! integer_overflow_op {
                     // big integers.
                     let result = to_expr!(BigInt::from(rec).$op(BigInt::from(arg)));
 
-                    Term::BigInt(Box::new(result))
+                    Term::bigint($heap, result)
                 // $heap.allocate(object_value::bigint(result))
                 // } else if ObjectPointer::integer_too_large(result) {
                 //     // An operation that doesn't overflow may still produce a number
@@ -48,37 +48,27 @@ macro_rules! integer_overflow_op {
                     Term::int(result)
                 }
             }
-            [Term::BigInt(rec), Variant::Integer(arg)] => {
+            [value::Num::Bignum(rec), value::Num::Integer(arg)] => {
                 // Example: bigint + int -> bigint
 
-                let rec = rec.clone();
+                let bigint = to_expr!(rec.$op(arg));
 
-                // in i32 range
-                let bigint = if arg >= i64::from(i32::MIN) && arg <= i64::from(i32::MAX) {
-                    to_expr!(rec.$op(arg as i32))
-                } else {
-                    to_expr!(rec.$op(BigInt::from(arg)))
-                };
-
-                Term::BigInt(Box::new(bigint))
-                // $heap.allocate(object_value::bigint(bigint))
+                Term::bigint($heap, bigint)
             }
-            [Variant::Integer(rec), Term::BigInt(arg)] => {
+            [value::Num::Integer(rec), value::Num::Bignum(arg)] => {
                 // Example: int + bigint -> bigint
 
                 let rec = BigInt::from(rec);
-                let bigint = to_expr!(rec.$op(*arg.clone()));
+                let bigint = to_expr!(rec.$op(arg));
 
-                Term::BigInt(Box::new(bigint))
-                // $heap.allocate(object_value::bigint(bigint))
+                Term::bigint($heap, bigint)
             }
-            [Term::BigInt(rec), Term::BigInt(arg)] => {
+            [value::Num::Bignum(rec), value::Num::Bignum(arg)] => {
                 // Example: bigint + bigint -> bigint
 
-                let bigint = to_expr!(rec.clone().$op(arg.clone()));
+                let bigint = to_expr!(rec.$op(arg));
 
-                Term::BigInt(Box::new(bigint))
-                // $heap.allocate(object_value::bigint(bigint))
+                Term::bigint($heap, bigint)
             }
             _ => {
                 return Err(Exception::new(Reason::EXC_BADARG));

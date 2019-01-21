@@ -34,7 +34,7 @@ pub trait NanBoxable: Sized {
 
         let shifted_tag = ((DOUBLE_MAX_TAG as u64) | (tag as u64)) << TAG_SHIFT;
         b.0 |= shifted_tag;
-        debug_assert!(b.tag() == u32::from(tag), "{} == {}", b.tag(), tag);
+        debug_assert!(b.tag() == tag, "{} == {}", b.tag(), tag);
         b
     }
 

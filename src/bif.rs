@@ -176,30 +176,35 @@ fn bif_erlang_abs_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> B
     }
 }
 
-fn bif_erlang_add_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
-    Ok(integer_overflow_op!(None, args, add, overflowing_add))
+fn bif_erlang_add_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    let heap = &process.context_mut().heap;
+    Ok(integer_overflow_op!(heap, args, add, overflowing_add))
 }
 
-fn bif_erlang_sub_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
-    Ok(integer_overflow_op!(None, args, sub, overflowing_sub))
+fn bif_erlang_sub_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    let heap = &process.context_mut().heap;
+    Ok(integer_overflow_op!(heap, args, sub, overflowing_sub))
 }
 
-fn bif_erlang_mult_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
-    Ok(integer_overflow_op!(None, args, mul, overflowing_mul))
+fn bif_erlang_mult_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    let heap = &process.context_mut().heap;
+    Ok(integer_overflow_op!(heap, args, mul, overflowing_mul))
 }
 
-fn bif_erlang_intdiv_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+fn bif_erlang_intdiv_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    let heap = &process.context_mut().heap;
     Ok(integer_overflow_op!(
-        None,
+        heap,
         args,
         floored_division,
         overflowing_floored_division
     ))
 }
 
-fn bif_erlang_mod_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+fn bif_erlang_mod_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     // TODO: should be rem but it's mod
-    Ok(integer_overflow_op!(None, args, modulo, overflowing_modulo))
+    let heap = &process.context_mut().heap;
+    Ok(integer_overflow_op!(heap, args, modulo, overflowing_modulo))
 }
 
 fn bif_erlang_self_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResult {
