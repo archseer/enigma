@@ -963,10 +963,13 @@ impl Machine {
                 Opcode::PutTuple => {
                     // put_tuple dest size
                     // followed by multiple put() ops (put val [potentially regX/Y])
-                    unimplemented!()
+                    unimplemented!("Stray PutTuple that wasn't rewritten by the loader!")
 
                     // Code compiled with OTP 22 and later uses put_tuple2 to to construct a tuple.
                     // PutTuple + Put is before OTP 22 and we should transform in loader to put_tuple2
+                }
+                Opcode::Put => {
+                    unimplemented!("Stray Put that wasn't rewritten by the loader!")
                 }
                 Opcode::PutTuple2 => {
                     // op: PutTuple2, args: [X(0), ExtendedList([Y(1), Y(0), X(0)])] }
