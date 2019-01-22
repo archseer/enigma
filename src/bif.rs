@@ -401,6 +401,23 @@ fn bif_math_atan2_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> B
     Ok(Term::from(res.atan2(arg)))
 }
 
+fn bif_math_pow_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    let base = match args[0] {
+        Value::Integer(i) => i as f64, // TODO: potentially unsafe
+        Value::Float(value::Float(f)) => f,
+        Value::BigInt(..) => unimplemented!(),
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    let index = match args[1] {
+        Value::Integer(i) => i as f64, // TODO: potentially unsafe
+        Value::Float(value::Float(f)) => f,
+        Value::BigInt(..) => unimplemented!(),
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    Ok(Value::Float(value::Float(base.powf(index))))
+}
+
 fn bif_erlang_tuple_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     if let Ok(Tuple { len, .. }) = args[0].try_into() {
         return Ok(Term::int(*len as i32));
