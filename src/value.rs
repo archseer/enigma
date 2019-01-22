@@ -283,7 +283,7 @@ impl Term {
     pub fn nil() -> Self {
         unsafe {
             Term {
-                value: TypedNanBox::new(TERM_NIL, 0),
+                value: TypedNanBox::new(TERM_NIL, Special::Nil),
             }
         }
     }
@@ -292,7 +292,7 @@ impl Term {
     pub fn none() -> Self {
         unsafe {
             Term {
-                value: TypedNanBox::new(TERM_NIL, 1),
+                value: TypedNanBox::new(TERM_NIL, Special::None),
             }
         }
     }
