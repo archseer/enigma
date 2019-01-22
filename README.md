@@ -75,7 +75,7 @@ Features:
 - [ ] Timers
 - [ ] Maps
   - [x] Basic type implementation
-  - [ ] BIF functions
+  - [x] BIF functions
   - [ ] Map specific opcodes
 - [ ] Binaries
   - [x] Basic type implementation

@@ -190,9 +190,8 @@ impl TryInto<value::Boxed<InstrPtr>> for Term {
 
 impl ExecutionContext {
     pub fn new(module: *const Module) -> ExecutionContext {
-        unsafe {
-            let mut ctx = ExecutionContext {
-                x: std::mem::uninitialized(), //[Term::nil(); 16],
+            ExecutionContext {
+                x: [Term::nil(); 16],
                 f: [0.0f64; 16],
                 stack: Vec::new(),
                 heap: Heap::new(),
@@ -210,17 +209,10 @@ impl ExecutionContext {
                 // line: block.code.line,
 
                 // TODO: not great
-                bs: std::mem::uninitialized(),
+                bs: unsafe { std::mem::uninitialized() },
 
                 flags: Flag::INITIAL,
-            };
-            for (_i, el) in ctx.x.iter_mut().enumerate() {
-                // Overwrite `element` without running the destructor of the old value.
-                // Since Term does not implement Copy, it is moved.
-                std::ptr::write(el, Term::nil());
             }
-            ctx
-        }
     }
 }
 

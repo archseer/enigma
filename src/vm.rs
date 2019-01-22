@@ -170,9 +170,8 @@ macro_rules! op_call_fun {
         // set x from 1 + arity (x0 is func, followed by call params) onwards to binding
         let closure = $closure;
         if let Some(binding) = &closure.binding {
-            // TODO: maybe we can copy_from_slice in the future
             let arity = $arity as usize;
-            $context.x[arity..arity + binding.len()].clone_from_slice(&binding[..]);
+            $context.x[arity..arity + binding.len()].copy_from_slice(&binding[..]);
         }
 
         // TODO: closure needs to jump_ptr to the correct module.
@@ -197,15 +196,15 @@ macro_rules! op_apply_fun {
         // Walk down the 3rd parameter of apply (the argument list) and copy
         // the parameters to the x registers (reg[]).
 
-        let fun = $context.x[0].clone();
-        let mut tmp = &$context.x[1].clone();
+        let fun = $context.x[0];
+        let mut tmp = $context.x[1];
         let mut arity = 0;
 
         while let Ok(value::Cons { head, tail }) = tmp.try_into() {
             if arity < process::MAX_REG - 1 {
-                $context.x[arity] = head.clone();
+                $context.x[arity] = *head;
                 arity += 1;
-                tmp = tail
+                tmp = *tail
             } else {
                 return Err(Exception::new(Reason::EXC_SYSTEM_LIMIT));
             }
@@ -215,7 +214,7 @@ macro_rules! op_apply_fun {
             /* Must be well-formed list */
             return Err(Exception::new(Reason::EXC_BADARG));
         }
-        //context.x[arity] = fun.clone();
+        //context.x[arity] = fun;
 
         if let Ok(value::Boxed { value, .. }) = fun.try_into() {
             let closure: &value::Closure = value; // ughh type annotation
@@ -254,8 +253,8 @@ macro_rules! op_jump_ptr {
 macro_rules! op_fixed_apply {
     ($vm:expr, $context:expr, $process:expr, $arity:expr) => {{
         let arity = $arity as usize;
-        let module = $context.x[arity].clone();
-        let func = $context.x[arity + 1].clone();
+        let module = $context.x[arity];
+        let func = $context.x[arity + 1];
 
         if !func.is_atom() || !module.is_atom() {
             $context.x[0] = module;
@@ -264,7 +263,7 @@ macro_rules! op_fixed_apply {
 
             return Err(Exception::new(
                 Reason::EXC_BADARG,
-                // value.clone(), TODO: with value?
+                // value, TODO: with value?
             ));
         }
 
@@ -939,7 +938,7 @@ impl Machine {
                 Opcode::GetList => {
                     // source, head, tail
                     if let Ok(value::Cons { head, tail }) =
-                        context.expand_arg(&ins.args[0]).clone().try_into()
+                        context.expand_arg(&ins.args[0]).try_into()
                     // TODO: this clone is bad but the borrow checker complains (but doesn't on GetTl/GetHd)
                     {
                         set_register!(context, &ins.args[1], *head);
@@ -1375,8 +1374,8 @@ impl Machine {
                     if let LValue::Literal(i) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
                         let args = &[
-                            context.expand_arg(&ins.args[3]).clone(),
-                            context.expand_arg(&ins.args[4]).clone(),
+                            context.expand_arg(&ins.args[3]),
+                            context.expand_arg(&ins.args[4]),
                         ];
                         let mfa = &module.imports[*i as usize];
                         let val = bif::apply(self, process, mfa, &args[..]).unwrap(); // TODO: handle fail

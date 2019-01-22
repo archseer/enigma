@@ -802,8 +802,8 @@ const CONTEXT_REDS: usize = 4000;
 fn keyfind(_func: BifFn, _process: &RcProcess, args: &[Term]) -> BifResult {
     let mut max_iter: isize = 10 * CONTEXT_REDS as isize;
 
-    let key = &args[0];
-    let pos_val = &args[1];
+    let key = args[0];
+    let pos_val = args[1];
     let mut list = &args[2];
 
     let pos = pos_val.to_u32() as usize;
@@ -822,7 +822,7 @@ fn keyfind(_func: BifFn, _process: &RcProcess, args: &[Term]) -> BifResult {
         list = tail;
         if let Ok(tuple) = term.try_into() {
             let tuple: &Tuple = tuple; // annoying, need type annotation
-            if pos <= (tuple.len as usize) && *key == tuple[pos] {
+            if pos <= (tuple.len as usize) && key == tuple[pos] {
                 return Ok(*term);
             }
         }
@@ -1228,7 +1228,7 @@ mod tests {
             vec![
                 tup2!(heap, Term::atom(1), Term::int(4)),
                 tup2!(heap, Term::atom(2), Term::int(3)),
-                target.clone(),
+                target,
                 tup2!(heap, Term::atom(4), Term::int(1)),
             ],
         );
