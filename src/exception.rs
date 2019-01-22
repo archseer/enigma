@@ -688,7 +688,7 @@ fn make_arglist(process: &RcProcess, mut a: usize) -> Term {
     let context = process.context_mut();
     let mut args = Term::nil();
     while a > 0 {
-        args = cons!(&context.heap, context.x[a - 1].clone(), args);
+        args = cons!(&context.heap, context.x[a - 1], args);
         a -= 1;
     }
     args

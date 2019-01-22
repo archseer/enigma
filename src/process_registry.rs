@@ -1,11 +1,9 @@
-use crate::process::PID;
-use crate::servo_arc::Arc;
 use hashbrown::HashMap;
-use parking_lot::Mutex;
 
 // pub type RcProcessRegistry = Arc<Mutex<ProcessRegistry<RcProcess>>>;
 
 /// A registry for handling processes with registered (atom) names.
+#[derive(Default)]
 pub struct ProcessRegistry<T: Clone> {
     processes: HashMap<u32, T>,
 }

@@ -190,29 +190,29 @@ impl TryInto<value::Boxed<InstrPtr>> for Term {
 
 impl ExecutionContext {
     pub fn new(module: *const Module) -> ExecutionContext {
-            ExecutionContext {
-                x: [Term::nil(); 16],
-                f: [0.0f64; 16],
-                stack: Vec::new(),
-                heap: Heap::new(),
-                catches: 0,
-                ip: InstrPtr { ptr: 0, module },
-                cp: None,
-                live: 0,
+        ExecutionContext {
+            x: [Term::nil(); 16],
+            f: [0.0f64; 16],
+            stack: Vec::new(),
+            heap: Heap::new(),
+            catches: 0,
+            ip: InstrPtr { ptr: 0, module },
+            cp: None,
+            live: 0,
 
-                exc: None,
+            exc: None,
 
-                current: (0, 0, 0),
+            current: (0, 0, 0),
 
-                // register: Register::new(block.code.registers as usize),
-                // binding: Binding::with_rc(block.locals(), block.receiver),
-                // line: block.code.line,
+            // register: Register::new(block.code.registers as usize),
+            // binding: Binding::with_rc(block.locals(), block.receiver),
+            // line: block.code.line,
 
-                // TODO: not great
-                bs: unsafe { std::mem::uninitialized() },
+            // TODO: not great
+            bs: unsafe { std::mem::uninitialized() },
 
-                flags: Flag::INITIAL,
-            }
+            flags: Flag::INITIAL,
+        }
     }
 }
 

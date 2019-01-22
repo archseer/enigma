@@ -65,34 +65,34 @@ macro_rules! set_register {
 
 macro_rules! expand_float {
     ($context:expr, $value:expr) => {{
-        match $value {
-            &LValue::ExtendedLiteral(i) => unsafe {
+        match &$value {
+            LValue::ExtendedLiteral(i) => unsafe {
                 if let Variant::Float(value::Float(f)) =
-                    (*$context.ip.module).literals[i as usize].into_variant()
+                    (*$context.ip.module).literals[*i as usize].into_variant()
                 {
                     f
                 } else {
                     unreachable!()
                 }
             },
-            &LValue::X(reg) => {
-                if let Variant::Float(value::Float(f)) = $context.x[reg as usize].into_variant() {
+            LValue::X(reg) => {
+                if let Variant::Float(value::Float(f)) = $context.x[*reg as usize].into_variant() {
                     f
                 } else {
                     unreachable!()
                 }
             }
-            &LValue::Y(reg) => {
+            LValue::Y(reg) => {
                 let len = $context.stack.len();
                 if let Variant::Float(value::Float(f)) =
-                    $context.stack[len - (reg + 2) as usize].into_variant()
+                    $context.stack[len - (*reg + 2) as usize].into_variant()
                 {
                     f
                 } else {
                     unreachable!()
                 }
             }
-            &LValue::FloatReg(reg) => $context.f[reg as usize],
+            LValue::FloatReg(reg) => $context.f[*reg as usize],
             _ => unreachable!(),
         }
     }};
@@ -705,7 +705,9 @@ impl Machine {
                     if let [LValue::Literal(stackneed), LValue::Literal(_heapneed), LValue::Literal(_live)] =
                         &ins.args[..]
                     {
-                        context.stack.resize(context.stack.len() + *stackneed as usize, Term::nil());
+                        context
+                            .stack
+                            .resize(context.stack.len() + *stackneed as usize, Term::nil());
                         // TODO: check heap for heapneed space!
                         context.stack.push(Term::cp(&context.heap, context.cp));
                     } else {
@@ -715,7 +717,9 @@ impl Machine {
                 Opcode::AllocateZero => {
                     // literal stackneed, literal live
                     if let [LValue::Literal(need), LValue::Literal(_live)] = &ins.args[..] {
-                        context.stack.resize(context.stack.len() + *need as usize, Term::nil());
+                        context
+                            .stack
+                            .resize(context.stack.len() + *need as usize, Term::nil());
                         context.stack.push(Term::cp(&context.heap, context.cp));
                     } else {
                         unreachable!()
@@ -728,7 +732,9 @@ impl Machine {
                     if let [LValue::Literal(stackneed), LValue::Literal(_heapneed), LValue::Literal(_live)] =
                         &ins.args[..]
                     {
-                        context.stack.resize(context.stack.len() + *stackneed as usize, Term::nil());
+                        context
+                            .stack
+                            .resize(context.stack.len() + *stackneed as usize, Term::nil());
                         // TODO: check heap for heapneed space!
                         context.stack.push(Term::cp(&context.heap, context.cp));
                     } else {
@@ -968,9 +974,7 @@ impl Machine {
                     // Code compiled with OTP 22 and later uses put_tuple2 to to construct a tuple.
                     // PutTuple + Put is before OTP 22 and we should transform in loader to put_tuple2
                 }
-                Opcode::Put => {
-                    unimplemented!("Stray Put that wasn't rewritten by the loader!")
-                }
+                Opcode::Put => unimplemented!("Stray Put that wasn't rewritten by the loader!"),
                 Opcode::PutTuple2 => {
                     // op: PutTuple2, args: [X(0), ExtendedList([Y(1), Y(0), X(0)])] }
                     if let LValue::ExtendedList(list) = &ins.args[1] {
@@ -1342,7 +1346,7 @@ impl Machine {
                     // reg (x), dest (float reg)
                     let val: f64 = match context.expand_arg(&ins.args[0]).into_number() {
                         Ok(value::Num::Float(f)) => f,
-                        Ok(value::Num::Integer(i)) => i as f64, // TODO: i32 -> f64 is unsafe
+                        Ok(value::Num::Integer(i)) => f64::from(i),
                         Ok(_) => unimplemented!(),
                         // TODO: bignum if it fits into float
                         Err(_) => return Err(Exception::new(Reason::EXC_BADARITH)),

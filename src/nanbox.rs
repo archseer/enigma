@@ -7,8 +7,8 @@ use std::marker::PhantomData;
 use std::mem;
 
 const TAG_SHIFT: u64 = 48;
-const DOUBLE_MAX_TAG: u32 = 0b11111_11111_11000_0; //000_0;
-const SHIFTED_DOUBLE_MAX_TAG: u64 = ((DOUBLE_MAX_TAG as u64) << TAG_SHIFT) | 0xFFFFFFFF;
+const DOUBLE_MAX_TAG: u32 = 0b1111_1111_1111_0000;
+const SHIFTED_DOUBLE_MAX_TAG: u64 = ((DOUBLE_MAX_TAG as u64) << TAG_SHIFT) | 0xFFFF_FFFF;
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct NanBox(u64);
@@ -85,7 +85,7 @@ macro_rules! impl_cast {
             }
 
             fn into_nan_box(self) -> NanBox {
-                NanBox(self as u64)
+                NanBox(u64::from(self))
             }
         }
         )*

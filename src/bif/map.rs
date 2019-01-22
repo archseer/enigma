@@ -13,7 +13,7 @@ pub fn bif_maps_find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
         match map.find(key) {
             Some(value) => {
                 let heap = &process.context_mut().heap;
-                return Ok(tup2!(&heap, atom!(OK), *value));
+                return Ok(tup2!(heap, atom!(OK), *value));
             }
             None => {
                 return Ok(atom!(ERROR));
@@ -23,7 +23,7 @@ pub fn bif_maps_find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
-pub fn bif_maps_get_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn bif_maps_get_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     let map = &args[0];
     if let Ok(value::Map { map, .. }) = map.try_into() {
         let target = &args[1];
@@ -61,7 +61,7 @@ pub fn bif_maps_from_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term
     Ok(Term::map(heap, map))
 }
 
-pub fn bif_maps_is_key_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn bif_maps_is_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     let map = &args[0];
     if let Ok(value::Map { map, .. }) = map.try_into() {
         let target = &args[1];
@@ -122,7 +122,6 @@ pub fn bif_maps_remove_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
 }
 
 pub fn bif_maps_update_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
-    let heap = &process.context_mut().heap;
     let map = args[0];
     let key = args[1];
     let value = args[2];
@@ -712,7 +711,7 @@ mod tests {
         if let Ok(tuple) = res.unwrap().try_into() {
             let tuple: &value::Tuple = tuple; // annoying, need type annotation
             let mut iter = tuple.iter();
-            assert_eq!(Term::int(2), iter.next().unwrap());
+            assert_eq!(Term::int(2), *iter.next().unwrap());
             if let Ok(value::Map { map, .. }) = iter.next().unwrap().try_into() {
                 assert_eq!(map.len(), 1);
                 assert_eq!(map.find(&str_to_atom!("test")), Some(&Term::int(1)));

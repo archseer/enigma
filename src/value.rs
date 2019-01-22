@@ -1,3 +1,6 @@
+// We cast header -> boxed value a lot in this file.
+#![allow(clippy::cast_ptr_alignment)]
+
 use crate::atom;
 use crate::bitstring;
 use crate::exception;
@@ -37,22 +40,6 @@ impl Hash for Float {
     }
 }
 
-// nanbox as:
-// 1 float
-// 2 nil
-// 3 int32
-// 4 atom -> could we represent nil as atom 0?
-// 5 port --> or maybe dump port for now
-// 6 pid
-// 7 box ptr (list, tuple, map, binary, ref (it's 96 bits), bigint, closure, cp/catch/stacktrace)
-// cons has a special type on BEAM
-// 8 the_non_val?? --> maybe we could keep a constant NaN for that
-//
-// box data should have a header followed by value
-//
-// what about catch which is direct immediate in erlang, also CP is 00 on stack and means header on
-// heap.
-
 const TERM_FLOAT: u8 = 0;
 const TERM_NIL: u8 = 1;
 const TERM_INTEGER: u8 = 2;
@@ -66,8 +53,7 @@ pub struct WrongBoxError;
 
 /// A term is a nanboxed compact representation of a value in 64 bits. It can either be immediate,
 /// in which case it embeds the data, or a boxed pointer, that points to more data.
-//#[derive(Debug, Eq, PartialEq, PartialOrd, Clone, Hash)]
-#[derive(Debug, Copy, Clone, Eq)] // TODO make it Copy
+#[derive(Debug, Copy, Clone, Eq)]
 pub struct Term {
     value: TypedNanBox<Variant>,
 }
@@ -279,7 +265,7 @@ pub enum Num {
 }
 
 impl Term {
-    #[inline]
+    #[inline(always)]
     pub fn nil() -> Self {
         unsafe {
             Term {
@@ -390,47 +376,47 @@ impl Term {
 
     // immediates
 
-    #[inline]
+    #[inline(always)]
     pub fn is_none(self) -> bool {
         self.value.tag() as u8 == TERM_NIL // TODO
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_float(self) -> bool {
         self.value.tag() as u8 == TERM_FLOAT
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_nil(self) -> bool {
         self.value.tag() as u8 == TERM_NIL
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_smallint(self) -> bool {
         self.value.tag() as u8 == TERM_INTEGER
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_atom(self) -> bool {
         self.value.tag() as u8 == TERM_ATOM
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_port(self) -> bool {
         self.value.tag() as u8 == TERM_PORT
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_pid(self) -> bool {
         self.value.tag() as u8 == TERM_PID
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_pointer(self) -> bool {
         self.value.tag() as u8 == TERM_POINTER
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_list(self) -> bool {
         let tag = self.value.tag() as u8;
         tag == TERM_CONS || tag == TERM_NIL
@@ -648,7 +634,7 @@ impl PartialEq for Variant {
 // TODO: make faster by not doing into_variant in some cases
 impl PartialOrd for Term {
     fn partial_cmp(&self, other: &Term) -> Option<Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 

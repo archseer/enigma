@@ -364,7 +364,7 @@ impl<'a> Loader<'a> {
                             {
                                 if let [arg] = &args[..] {
                                     list.push(arg.clone());
-                                    i = i - 1;
+                                    i -= 1;
                                 } else {
                                     unreachable!()
                                 }

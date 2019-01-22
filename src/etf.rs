@@ -87,7 +87,7 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> 
         Tag::Nil => Ok((rest, Term::nil())),
         Tag::SmallTuple => {
             let (rest, size) = be_u8(rest)?;
-            decode_tuple(rest, size as u32, heap)
+            decode_tuple(rest, u32::from(size), heap)
         }
         Tag::LargeTuple => {
             let (rest, size) = be_u32(rest)?;
@@ -189,7 +189,7 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term>
         let (rest, elem) = be_u8(rest)?;
 
         let start = heap.alloc(value::Cons {
-            head: Term::int(elem as i32),
+            head: Term::int(i32::from(elem)),
             tail: Term::nil(),
         });
 
@@ -199,7 +199,7 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term>
                 let (rest, elem) = be_u8(rest).unwrap();
 
                 let new_cons = heap.alloc(value::Cons {
-                    head: Term::int(elem as i32),
+                    head: Term::int(i32::from(elem)),
                     tail: Term::nil(),
                 });
 

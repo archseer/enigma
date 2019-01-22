@@ -39,7 +39,7 @@ pub type PID = u32;
 /// The maximum PID value.
 pub const MAX_PID: PID = u32::MAX;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ProcessTable<T: Clone> {
     /// The PID to use for the next process.
     next_pid: PID,

@@ -1,5 +1,5 @@
 use crate::bif;
-use crate::exports_table::{ExportsTable, RcExportsTable};
+use crate::exports_table::ExportsTable;
 use crate::immix::Heap;
 use crate::loader::{FuncInfo, Instruction};
 use crate::process::InstrPtr;

@@ -354,13 +354,13 @@ fn bif_math_sqrt_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Bi
 
 fn bif_math_atan2_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     let res = match args[0].into_number() {
-        Ok(value::Num::Integer(i)) => i as f64, // TODO: potentially unsafe
+        Ok(value::Num::Integer(i)) => f64::from(i),
         Ok(value::Num::Float(f)) => f,
         Ok(value::Num::Bignum(..)) => unimplemented!(),
         Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     let arg = match args[1].into_number() {
-        Ok(value::Num::Integer(i)) => i as f64, // TODO: potentially unsafe
+        Ok(value::Num::Integer(i)) => f64::from(i),
         Ok(value::Num::Float(f)) => f,
         Ok(value::Num::Bignum(..)) => unimplemented!(),
         Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -436,7 +436,7 @@ pub fn bif_erlang_apply_2(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term
     unreachable!("apply/2 called without macro override")
 }
 
-pub fn bif_erlang_apply_3(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn bif_erlang_apply_3(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> BifResult {
     // module, function (atom), args
     unreachable!("apply/3 called without macro override");
     // maps to i_apply
