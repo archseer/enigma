@@ -17,10 +17,10 @@ mod closure;
 mod cons;
 mod map;
 mod tuple;
-pub use closure::Closure;
-pub use cons::Cons;
-pub use map::{Map, HAMT};
-pub use tuple::Tuple;
+pub use self::closure::Closure;
+pub use self::cons::Cons;
+pub use self::map::{Map, HAMT};
+pub use self::tuple::Tuple;
 
 pub trait TryInto<T>: Sized {
     /// The type returned in the event of a conversion error.

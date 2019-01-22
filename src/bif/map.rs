@@ -713,7 +713,7 @@ mod tests {
         if let Ok(tuple) = res.unwrap().try_into() {
             let tuple: &value::Tuple = tuple; // annoying, need type annotation
             let mut iter = tuple.iter();
-            assert_eq!(Term::int(2), *iter.next().unwrap());
+            assert_eq!(&Term::int(2), iter.next().unwrap());
             if let Ok(value::Map { map, .. }) = iter.next().unwrap().try_into() {
                 assert_eq!(map.len(), 1);
                 assert_eq!(map.find(&str_to_atom!("test")), Some(&Term::int(1)));

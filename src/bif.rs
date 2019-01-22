@@ -90,11 +90,15 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((math, atom::from_str("asinh"), 1), bif_math_asinh_1);
     bifs.insert((math, atom::from_str("atan"), 1), bif_math_atan_1);
     bifs.insert((math, atom::from_str("atanh"), 1), bif_math_atanh_1);
+    bifs.insert((math, atom::from_str("erf"), 1), bif_math_erf_1);
+    bifs.insert((math, atom::from_str("erfc"), 1), bif_math_erfc_1);
+    bifs.insert((math, atom::from_str("log"), 1), bif_math_log_1);
     bifs.insert((math, atom::from_str("log"), 1), bif_math_log_1);
     bifs.insert((math, atom::from_str("log2"), 1), bif_math_log2_1);
     bifs.insert((math, atom::from_str("log10"), 1), bif_math_log10_1);
     bifs.insert((math, atom::from_str("sqrt"), 1), bif_math_sqrt_1);
     bifs.insert((math, atom::from_str("atan2"), 2), bif_math_atan2_2);
+    bifs.insert((math, atom::from_str("pow"), 2), bif_math_pow_2);
     // pdict
     bifs.insert((erlang, atom::from_str("get"), 0), bif_erlang_get_0);
     bifs.insert((erlang, atom::from_str("get"), 1), bif_erlang_get_1);
@@ -339,34 +343,34 @@ fn bif_math_atanh_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> B
     trig_func!(args[0], atanh)
 }
 
-fn bif_math_erf_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    let res = match args[0] {
-        Value::Integer(i) => i as f64, // TODO: potentially unsafe
-        Value::Float(value::Float(f)) => f,
-        Value::BigInt(..) => unimplemented!(),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+fn bif_math_erf_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+    let res = match args[0].into_number() {
+        Ok(value::Num::Integer(i)) => f64::from(i),
+        Ok(value::Num::Float(f)) => f,
+        Ok(value::Num::Bignum(..)) => unimplemented!(),
+        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
     };
-    Ok(Value::Float(value::Float(statrs::function::erf::erf(res))))
+    Ok(Term::from(statrs::function::erf::erf(res)))
 }
 
-fn bif_math_erfc_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    let res = match args[0] {
-        Value::Integer(i) => i as f64, // TODO: potentially unsafe
-        Value::Float(value::Float(f)) => f,
-        Value::BigInt(..) => unimplemented!(),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+fn bif_math_erfc_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+    let res = match args[0].into_number() {
+        Ok(value::Num::Integer(i)) => f64::from(i),
+        Ok(value::Num::Float(f)) => f,
+        Ok(value::Num::Bignum(..)) => unimplemented!(),
+        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
     };
-    Ok(Value::Float(value::Float(1.0_f64 - statrs::function::erf::erf(res))))
+    Ok(Term::from(1.0_f64 - statrs::function::erf::erf(res)))
 }
 
-fn bif_math_exp_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    let res: f64 = match args[0] {
-        Value::Integer(i) => i as f64, // TODO: potentially unsafe
-        Value::Float(value::Float(f)) => f,
-        Value::BigInt(..) => unimplemented!(),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+fn bif_math_exp_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+    let res: f64 = match args[0].into_number() {
+        Ok(value::Num::Integer(i)) => f64::from(i),
+        Ok(value::Num::Float(f)) => f,
+        Ok(value::Num::Bignum(..)) => unimplemented!(),
+        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
     };
-    Ok(Value::Float(value::Float(res.powf(std::f64::consts::E))))
+    Ok(Term::from(res.powf(std::f64::consts::E)))
 }
 
 fn bif_math_log_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
@@ -401,21 +405,21 @@ fn bif_math_atan2_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> B
     Ok(Term::from(res.atan2(arg)))
 }
 
-fn bif_math_pow_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    let base = match args[0] {
-        Value::Integer(i) => i as f64, // TODO: potentially unsafe
-        Value::Float(value::Float(f)) => f,
-        Value::BigInt(..) => unimplemented!(),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+fn bif_math_pow_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+    let base = match args[0].into_number() {
+        Ok(value::Num::Integer(i)) => i as f64, // TODO: potentially unsafe
+        Ok(value::Num::Float(f)) => f,
+        Ok(value::Num::Bignum(..)) => unimplemented!(),
+        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
     };
-    let index = match args[1] {
-        Value::Integer(i) => i as f64, // TODO: potentially unsafe
-        Value::Float(value::Float(f)) => f,
-        Value::BigInt(..) => unimplemented!(),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    let index = match args[1].into_number() {
+        Ok(value::Num::Integer(i)) => i as f64, // TODO: potentially unsafe
+        Ok(value::Num::Float(f)) => f,
+        Ok(value::Num::Bignum(..)) => unimplemented!(),
+        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
     };
 
-    Ok(Value::Float(value::Float(base.powf(index))))
+    Ok(Term::from(base.powf(index)))
 }
 
 fn bif_erlang_tuple_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
@@ -439,12 +443,11 @@ fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]
     Ok(Term::int(res as i32)) // TODO: cast potentially unsafe
 }
 
-fn bif_erlang_map_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
-    let res = match &args[0] {
-        Value::Map(map) => map.0.len(),
-        _ => return Err(Exception::with_value(Reason::EXC_BADARG, args[0].clone())),
-    };
-    Ok(Value::Integer(res as i64))
+fn bif_erlang_map_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+    if let Ok(value::Map { map, .. }) = &args[0].try_into() {
+        return Ok(Term::int(map.len() as i32));
+    }
+    Err(Exception::with_value(Reason::EXC_BADARG, args[0].clone()))
 }
 
 fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
@@ -1224,12 +1227,13 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
 
-        let map = map!(str_to_atom!("test") => Value::Integer(1), str_to_atom!("test2") => Value::Integer(3));
+        let map = map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(3));
         let args = vec![map];
         let res = bif_erlang_map_size_1(&vm, &process, &args);
 
-        assert_eq!(res, Ok(Value::Integer(2)));
+        assert_eq!(res, Ok(Term::int(2)));
     }
 
     #[test]
