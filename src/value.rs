@@ -595,6 +595,9 @@ impl Term {
 
     pub fn erl_partial_cmp(&self, other: &Self) -> Option<Ordering> {
         // TODO: loosely compare int and floats
+        // non strict comparisons need to handle these + bigint
+        // (Variant::Integer(_), Variant::Float(_)) => unimplemented!(),
+        // (Variant::Float(_), Variant::Integer(_)) => unimplemented!(),
         Some(self.cmp(other))
     }
 }
@@ -627,6 +630,7 @@ impl PartialEq for Variant {
                             let t2 = &*(*p2 as *const Tuple);
                             t1.eq(t2)
                         }
+                        BOXED_MAP => unimplemented!(),
                         BOXED_CLOSURE => unreachable!(),
                         // TODO: handle other boxed types
                         // ref, bigint, cp, catch, stacktrace
@@ -639,9 +643,6 @@ impl PartialEq for Variant {
             _ => false,
         }
     }
-    // non strict comparisons need to handle these + bigint
-    // (Variant::Integer(_), Variant::Float(_)) => unimplemented!(),
-    // (Variant::Float(_), Variant::Integer(_)) => unimplemented!(),
 }
 
 // TODO: make faster by not doing into_variant in some cases

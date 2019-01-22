@@ -519,7 +519,7 @@ impl Machine {
             let module = unsafe { &(*context.ip.module) };
             context.ip.ptr += 1;
 
-            println!(
+            debug!(
                 "running proc pid {:?} reds: {:?}, mod: {:?}, ins {:?}, args: {:?}",
                 process.pid,
                 reductions,
@@ -705,9 +705,7 @@ impl Machine {
                     if let [LValue::Literal(stackneed), LValue::Literal(_heapneed), LValue::Literal(_live)] =
                         &ins.args[..]
                     {
-                        for _ in 0..*stackneed {
-                            context.stack.push(Term::nil())
-                        }
+                        context.stack.resize(context.stack.len() + *stackneed as usize, Term::nil());
                         // TODO: check heap for heapneed space!
                         context.stack.push(Term::cp(&context.heap, context.cp));
                     } else {
@@ -717,9 +715,7 @@ impl Machine {
                 Opcode::AllocateZero => {
                     // literal stackneed, literal live
                     if let [LValue::Literal(need), LValue::Literal(_live)] = &ins.args[..] {
-                        for _ in 0..*need {
-                            context.stack.push(Term::nil())
-                        }
+                        context.stack.resize(context.stack.len() + *need as usize, Term::nil());
                         context.stack.push(Term::cp(&context.heap, context.cp));
                     } else {
                         unreachable!()
@@ -732,9 +728,7 @@ impl Machine {
                     if let [LValue::Literal(stackneed), LValue::Literal(_heapneed), LValue::Literal(_live)] =
                         &ins.args[..]
                     {
-                        for _ in 0..*stackneed {
-                            context.stack.push(Term::nil())
-                        }
+                        context.stack.resize(context.stack.len() + *stackneed as usize, Term::nil());
                         // TODO: check heap for heapneed space!
                         context.stack.push(Term::cp(&context.heap, context.cp));
                     } else {
