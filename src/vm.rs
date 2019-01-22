@@ -519,8 +519,8 @@ impl Machine {
             let module = unsafe { &(*context.ip.module) };
             context.ip.ptr += 1;
 
-            debug!(
-                "running proc pid {:?} reds: {:?}, mod: {:?}, ins {:?}, args: {:?}",
+            println!(
+                "proc pid={:?} reds={:?} mod={:?} ins={:?} args={:?}",
                 process.pid,
                 reductions,
                 atom::to_str(module.name).unwrap(),
