@@ -16,6 +16,8 @@ use once_cell::sync::Lazy;
 use std::i32;
 use std::ops::{Add, Mul, Sub};
 
+extern crate statrs;
+
 mod chrono;
 mod map;
 
@@ -335,6 +337,36 @@ fn bif_math_atan_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Bi
 
 fn bif_math_atanh_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     trig_func!(args[0], atanh)
+}
+
+fn bif_math_erf_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    let res = match args[0] {
+        Value::Integer(i) => i as f64, // TODO: potentially unsafe
+        Value::Float(value::Float(f)) => f,
+        Value::BigInt(..) => unimplemented!(),
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    Ok(Value::Float(value::Float(statrs::function::erf::erf(res))))
+}
+
+fn bif_math_erfc_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    let res = match args[0] {
+        Value::Integer(i) => i as f64, // TODO: potentially unsafe
+        Value::Float(value::Float(f)) => f,
+        Value::BigInt(..) => unimplemented!(),
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    Ok(Value::Float(value::Float(1.0_f64 - statrs::function::erf::erf(res))))
+}
+
+fn bif_math_exp_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Value]) -> BifResult {
+    let res: f64 = match args[0] {
+        Value::Integer(i) => i as f64, // TODO: potentially unsafe
+        Value::Float(value::Float(f)) => f,
+        Value::BigInt(..) => unimplemented!(),
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    Ok(Value::Float(value::Float(res.powf(std::f64::consts::E))))
 }
 
 fn bif_math_log_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
