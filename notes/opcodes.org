@@ -1,4 +1,4 @@
-* Opcodes [88/138]
+* Opcodes [90/138]
 - [X] Label = 1
 - [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -8,8 +8,8 @@
 - [X] CallExt = 7
 - [X] CallExtLast = 8
 - [X] Bif0 = 9
-- [ ] Bif1 = 10
-- [ ] Bif2 = 11
+- [X] Bif1 = 10
+- [X] Bif2 = 11
 - [X] Allocate = 12
 - [X] AllocateHeap = 13
 - [X] AllocateZero = 14
