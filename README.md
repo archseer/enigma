@@ -1,5 +1,6 @@
+![Enigma](/enigma.png)
 
-![Enigma](/enigma.png) Enigma VM
+Enigma VM
 =========
 
 An implementation of the Erlang VM in Rust. We aim to be complete, correct and fast (in that order of importance). However my TotallySerious™ fibonacci microbenchmarks are currently on-par with OTP (but I'm missing 99% of the runtime :)

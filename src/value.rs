@@ -714,7 +714,18 @@ impl std::fmt::Display for Variant {
                     }
                     BOXED_REF => write!(f, "#Ref<>"),
                     BOXED_BINARY => write!(f, "#Binary<>"),
-                    BOXED_MAP => write!(f, "#Map<>"),
+                    BOXED_MAP => {
+                        let map = &*(*ptr as *const map::Map);
+                        write!(f, "%{{")?;
+                        let mut iter = map.map.iter().peekable();
+                        while let Some((key, val)) = iter.next() {
+                            write!(f, "{} => {}", key, val)?;
+                            if iter.peek().is_some() {
+                                write!(f, ", ")?;
+                            }
+                        }
+                        write!(f, "}}")
+                    },
                     BOXED_BIGINT => write!(f, "#BigInt<>"),
                     BOXED_CLOSURE => write!(f, "#Closure<>"),
                     _ => unimplemented!(),
