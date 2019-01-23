@@ -1476,6 +1476,7 @@ impl Machine {
                     }
                 }
                 Opcode::GetHd => {
+                    debug_assert_eq!(ins.args.len(), 2);
                     // source head
                     if let Ok(value::Cons { head, .. }) =
                         context.expand_arg(&ins.args[0]).try_into()
@@ -1486,6 +1487,7 @@ impl Machine {
                     }
                 }
                 Opcode::GetTl => {
+                    debug_assert_eq!(ins.args.len(), 2);
                     // source head
                     if let Ok(value::Cons { tail, .. }) =
                         context.expand_arg(&ins.args[0]).try_into()
@@ -1512,6 +1514,30 @@ impl Machine {
                             map = map.plus(key.to_term(), value.to_term())
                         }
                         set_register!(context, dest, Term::map(&context.heap, map))
+                    }
+                }
+                Opcode::GetMapElements => {
+                    debug_assert_eq!(ins.args.len(), 3);
+                    // fail src N
+                    // TODO: make a macro or make the try_into() return an Exception so we can use ?
+                    if let [LValue::Label(fail), map, LValue::ExtendedList(list)] = &ins.args[..] {
+                        let map = match context.expand_arg(map).try_into() {
+                            Ok(value::Map { map, .. }) => map.clone(),
+                            _ => unreachable!(),
+                        };
+
+                        // N is a list of the type [key => dest_reg], if any of these fields don't
+                        // exist, jump to fail label.
+                        let mut iter = list.chunks_exact(2);
+                        while let Some([key, dest]) = iter.next() {
+                            // TODO: optimize by having the ExtendedList store Term instead of LValue
+                            if let Some(&val) = map.find(&key.to_term()) {
+                                set_register!(context, dest, val)
+                            } else {
+                                op_jump!(context, *fail);
+                                break // TODO: original impl loops over everything
+                            }
+                        }
                     }
                 }
                 Opcode::IsTaggedTuple => {
