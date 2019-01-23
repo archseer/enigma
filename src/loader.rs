@@ -69,6 +69,14 @@ impl LValue {
             _ => unimplemented!("to_u32 for {:?}", self),
         }
     }
+
+    pub fn to_term(&self) -> Term {
+       match *self {
+           LValue::Atom(i) => Term::atom(i),
+           LValue::Integer(i) => Term::int(i as i32), // unsafe cast
+           _ => unimplemented!("to_term for {:?}", self),
+       }
+    }
 }
 
 impl<'a> Loader<'a> {

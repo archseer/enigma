@@ -261,10 +261,7 @@ macro_rules! op_fixed_apply {
             $context.x[1] = func;
             $context.x[2] = Term::nil();
 
-            return Err(Exception::new(
-                Reason::EXC_BADARG,
-                // value, TODO: with value?
-            ));
+            return Err(Exception::new(Reason::EXC_BADARG));
         }
 
         // Handle apply of apply/3...
@@ -515,8 +512,8 @@ impl Machine {
         let context = process.context_mut();
 
         loop {
-            let ins = unsafe { &(*context.ip.module).instructions[context.ip.ptr as usize] };
             let module = unsafe { &(*context.ip.module) };
+            let ins = &module.instructions[context.ip.ptr as usize];
             context.ip.ptr += 1;
 
             println!(
@@ -1496,6 +1493,25 @@ impl Machine {
                         set_register!(context, &ins.args[1], *tail);
                     } else {
                         unreachable!()
+                    }
+                }
+                Opcode::PutMapExact => {
+                    debug_assert_eq!(ins.args.len(), 5);
+                    // F Map Dst Live Rest=* (atom with module name??)
+                    if let [LValue::Label(fail), map, dest, live, LValue::ExtendedList(list)] =
+                        &ins.args[..]
+                    {
+                        let mut map = match context.expand_arg(map).try_into() {
+                            Ok(value::Map { map, .. }) => map.clone(),
+                            _ => unreachable!(),
+                        };
+
+                        let mut iter = list.chunks_exact(2);
+                        while let Some([key, value]) = iter.next() {
+                            // TODO: optimize by having the ExtendedList store Term instead of LValue
+                            map = map.plus(key.to_term(), value.to_term())
+                        }
+                        set_register!(context, dest, Term::map(&context.heap, map))
                     }
                 }
                 Opcode::IsTaggedTuple => {
