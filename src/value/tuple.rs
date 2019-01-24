@@ -10,8 +10,6 @@ pub struct Tuple {
     pub len: u32,
 }
 
-const TUPLE_SIZE: usize = std::mem::size_of::<Tuple>();
-
 impl Tuple {
     pub fn as_slice(&self) -> &[Term] {
         &self[..]
@@ -23,7 +21,7 @@ impl Deref for Tuple {
     fn deref(&self) -> &[Term] {
         unsafe {
             ::std::slice::from_raw_parts(
-                (self as *const Tuple).add(TUPLE_SIZE) as *const Term,
+                (self as *const Self).add(1) as *const Term,
                 self.len as usize,
             )
         }
@@ -34,7 +32,7 @@ impl DerefMut for Tuple {
     fn deref_mut(&mut self) -> &mut [Term] {
         unsafe {
             ::std::slice::from_raw_parts_mut(
-                (self as *mut Tuple).add(TUPLE_SIZE) as *mut Term,
+                (self as *mut Self).add(1) as *mut Term,
                 self.len as usize,
             )
         }
