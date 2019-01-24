@@ -548,6 +548,10 @@ mod tests {
     #[should_panic]
     #[test]
     fn invalid_pointer() {
-        ((1usize << TAG_SHIFT) as *const ()).into_nan_box();
+        #[cfg(target_pointer_width = "64")]
+        ((1u64 << TAG_SHIFT) as *const ()).into_nan_box();
+
+        #[cfg(target_pointer_width = "32")]
+        ((1u64 << 32) as *const ()).into_nan_box();
     }
 }
