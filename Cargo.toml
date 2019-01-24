@@ -32,6 +32,7 @@ hamt-rs = { git = "https://github.com/michaelwoerister/hamt-rs/" }
 log = "0.4"
 hashbrown = "0.1.7"
 nodrop = "0.1.13"
+statrs = "0.10.0"
 
 [dev-dependencies]
 quickcheck = "0.8.0"
