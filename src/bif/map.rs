@@ -403,20 +403,11 @@ mod tests {
             map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let args = vec![map];
 
-        if let Ok(value::Cons { head, tail }) =
-            bif_maps_keys_1(&vm, &process, &args).unwrap().try_into()
-        {
-            unsafe {
-                let key1 = head;
-                // TODO Use a better way to do the assert
-                assert!(key1 == &str_to_atom!("test") || key1 == &str_to_atom!("test2"));
-                if let Ok(value::Cons { head, .. }) = tail.try_into() {
-                    let key2 = head;
-                    assert!(key2 == &str_to_atom!("test2") || key2 == &str_to_atom!("test2"));
-                } else {
-                    panic!();
-                }
-            }
+        if let Ok(cons) = bif_maps_keys_1(&vm, &process, &args).unwrap().try_into() {
+            let cons: &value::Cons = cons;
+            assert!(cons.iter().any(|&v| v == str_to_atom!("test")));
+            assert!(cons.iter().any(|&v| v == str_to_atom!("test2")));
+            assert_eq!(cons.iter().count(), 2);
         } else {
             panic!();
         }
@@ -661,20 +652,11 @@ mod tests {
             map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let args = vec![map];
 
-        if let Ok(value::Cons { head, tail }) =
-            bif_maps_values_1(&vm, &process, &args).unwrap().try_into()
-        {
-            unsafe {
-                let key1 = head;
-                // TODO Use a better way to do the assert
-                assert!(key1 == &Term::int(1) || key1 == &Term::int(2));
-                if let Ok(value::Cons { head, .. }) = tail.try_into() {
-                    let key2 = head;
-                    assert!(key2 == &Term::int(2) || key2 == &Term::int(1));
-                } else {
-                    panic!();
-                }
-            }
+        if let Ok(cons) = bif_maps_values_1(&vm, &process, &args).unwrap().try_into() {
+            let cons: &value::Cons = cons; // type annotation
+            assert!(cons.iter().any(|&val| val == Term::int(1)));
+            assert!(cons.iter().any(|&val| val == Term::int(2)));
+            assert_eq!(cons.iter().count(), 2);
         } else {
             panic!();
         }

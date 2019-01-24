@@ -15,8 +15,7 @@ use num::traits::Signed;
 use once_cell::sync::Lazy;
 use std::i32;
 use std::ops::{Add, Mul, Sub};
-
-extern crate statrs;
+use statrs;
 
 mod chrono;
 mod map;
@@ -407,13 +406,13 @@ fn bif_math_atan2_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> B
 
 fn bif_math_pow_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     let base = match args[0].into_number() {
-        Ok(value::Num::Integer(i)) => i as f64, // TODO: potentially unsafe
+        Ok(value::Num::Integer(i)) => f64::from(i),
         Ok(value::Num::Float(f)) => f,
         Ok(value::Num::Bignum(..)) => unimplemented!(),
         Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     let index = match args[1].into_number() {
-        Ok(value::Num::Integer(i)) => i as f64, // TODO: potentially unsafe
+        Ok(value::Num::Integer(i)) => f64::from(i),
         Ok(value::Num::Float(f)) => f,
         Ok(value::Num::Bignum(..)) => unimplemented!(),
         Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
