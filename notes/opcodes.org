@@ -1,4 +1,4 @@
-* Opcodes [92/138]
+* Opcodes [94/138]
 - [X] Label = 1
 - [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -122,10 +122,10 @@
 - [ ] RecvSet = 151
 - [X] GcBif3 = 152
 - [X] Line = 153
-- [ ] PutMapAssoc = 154
+- [X] PutMapAssoc = 154
 - [X] PutMapExact = 155
 - [X] IsMap = 156
-- [ ] HasMapFields = 157
+- [X] HasMapFields = 157
 - [X] GetMapElements = 158
 - [X] IsTaggedTuple = 159
 - [X] BuildStacktrace = 160

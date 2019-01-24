@@ -727,7 +727,7 @@ impl std::fmt::Display for Variant {
                         write!(f, "}}")
                     },
                     BOXED_BIGINT => write!(f, "#BigInt<>"),
-                    BOXED_CLOSURE => write!(f, "#Closure<>"),
+                    BOXED_CLOSURE => write!(f, "#Fun<>"),
                     _ => unimplemented!(),
                 }
             },

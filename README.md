@@ -77,7 +77,7 @@ Features:
 - [ ] Maps
   - [x] Basic type implementation
   - [x] BIF functions
-  - [ ] Map specific opcodes
+  - [x] Map specific opcodes
 - [ ] Binaries
   - [x] Basic type implementation
   - [ ] Binary building

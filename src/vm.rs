@@ -1497,7 +1497,7 @@ impl Machine {
                         unreachable!()
                     }
                 }
-                Opcode::PutMapExact => {
+                Opcode::PutMapAssoc => {
                     debug_assert_eq!(ins.args.len(), 5);
                     // F Map Dst Live Rest=* (atom with module name??)
                     if let [LValue::Label(fail), map, dest, live, LValue::ExtendedList(list)] =
@@ -1516,6 +1516,29 @@ impl Machine {
                         set_register!(context, dest, Term::map(&context.heap, map))
                     }
                 }
+                Opcode::HasMapFields => {
+                    debug_assert_eq!(ins.args.len(), 3);
+                    // fail src N
+                    // TODO: make a macro or make the try_into() return an Exception so we can use ?
+                    if let [LValue::Label(fail), map, LValue::ExtendedList(list)] = &ins.args[..] {
+                        let map = match context.expand_arg(map).try_into() {
+                            Ok(value::Map { map, .. }) => map.clone(),
+                            _ => unreachable!(),
+                        };
+
+                        // N is a list of the type [key => dest_reg], if any of these fields don't
+                        // exist, jump to fail label.
+                        let mut iter = list.chunks_exact(2);
+                        while let Some([key, _dest]) = iter.next() {
+                            if let Some(_) = map.find(&key.to_term()) {
+                                // ok
+                            } else {
+                                op_jump!(context, *fail);
+                                break
+                            }
+                        }
+                    }
+                }
                 Opcode::GetMapElements => {
                     debug_assert_eq!(ins.args.len(), 3);
                     // fail src N
@@ -1530,7 +1553,6 @@ impl Machine {
                         // exist, jump to fail label.
                         let mut iter = list.chunks_exact(2);
                         while let Some([key, dest]) = iter.next() {
-                            // TODO: optimize by having the ExtendedList store Term instead of LValue
                             if let Some(&val) = map.find(&key.to_term()) {
                                 set_register!(context, dest, val)
                             } else {
@@ -1538,6 +1560,28 @@ impl Machine {
                                 break // TODO: original impl loops over everything
                             }
                         }
+                    }
+                }
+                Opcode::PutMapExact => {
+                    // TODO: in the future, put_map_exact is an optimization for flatmaps (tuple
+                    // maps), where the keys in the tuple stay the same, since you can memcpy the
+                    // key tuple (and other optimizations)
+                    debug_assert_eq!(ins.args.len(), 5);
+                    // F Map Dst Live Rest=* (atom with module name??)
+                    if let [LValue::Label(fail), map, dest, live, LValue::ExtendedList(list)] =
+                        &ins.args[..]
+                    {
+                        let mut map = match context.expand_arg(map).try_into() {
+                            Ok(value::Map { map, .. }) => map.clone(),
+                            _ => unreachable!(),
+                        };
+
+                        let mut iter = list.chunks_exact(2);
+                        while let Some([key, value]) = iter.next() {
+                            // TODO: optimize by having the ExtendedList store Term instead of LValue
+                            map = map.plus(key.to_term(), value.to_term())
+                        }
+                        set_register!(context, dest, Term::map(&context.heap, map))
                     }
                 }
                 Opcode::IsTaggedTuple => {
