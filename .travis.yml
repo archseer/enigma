@@ -12,7 +12,7 @@ sudo: required
 env:
   global:
     - CRATE_NAME=enigma
-    - RUST_BACKTRACE: full
+    - RUST_BACKTRACE=full
 
 matrix:
   include:
