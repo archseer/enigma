@@ -13,9 +13,9 @@ use num::bigint::BigInt;
 use num::bigint::ToBigInt;
 use num::traits::Signed;
 use once_cell::sync::Lazy;
+use statrs;
 use std::i32;
 use std::ops::{Add, Mul, Sub};
-use statrs;
 
 mod chrono;
 mod map;
@@ -91,6 +91,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((math, atom::from_str("atanh"), 1), bif_math_atanh_1);
     bifs.insert((math, atom::from_str("erf"), 1), bif_math_erf_1);
     bifs.insert((math, atom::from_str("erfc"), 1), bif_math_erfc_1);
+    bifs.insert((math, atom::from_str("exp"), 1), bif_math_exp_1);
     bifs.insert((math, atom::from_str("log"), 1), bif_math_log_1);
     bifs.insert((math, atom::from_str("log"), 1), bif_math_log_1);
     bifs.insert((math, atom::from_str("log2"), 1), bif_math_log2_1);
@@ -543,7 +544,7 @@ fn bif_erlang_register_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
 
 fn bif_erlang_function_exported_3(
     vm: &vm::Machine,
-    process: &RcProcess,
+    _process: &RcProcess,
     args: &[Term],
 ) -> BifResult {
     if !args[0].is_atom() || !args[1].is_atom() || !args[2].is_smallint() {
@@ -643,7 +644,7 @@ fn bif_erlang_erase_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     Ok(pdict.remove(&(args[0])).unwrap_or_else(|| atom!(UNDEFINED)))
 }
 
-fn bif_lists_member_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+fn bif_lists_member_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     // need to bump reductions as we go
     let reds_left = 1; // read from process
     let mut max_iter = 16 * reds_left;
