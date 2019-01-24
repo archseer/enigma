@@ -297,7 +297,6 @@ mod tests {
         );
         let args = vec![list];
         let res = bif_maps_from_list_1(&vm, &process, &args);
-        println!("aaa");
     }
 
     #[test]
