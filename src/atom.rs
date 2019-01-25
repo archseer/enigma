@@ -65,25 +65,38 @@ impl AtomTable {
 
     pub fn reserve(&self, _len: u32) {}
 
-    pub fn register_atom(&self, s: &str) -> u32 {
+    pub fn register_atom(&self, val: &str) -> u32 {
+        // TODO: probably keep a single lock for both
         let mut index_r = self.index_r.write();
         let index = index_r.len() as u32;
-        self.index.write().insert(s.to_string(), index);
-        index_r.push(Atom::new(s));
+        self.index.write().insert(val.to_string(), index);
+        index_r.push(Atom::new(val));
         index
+    }
+
+    pub fn lookup(&self, val: &str) -> Option<u32> {
+        let atoms = self.index.read();
+
+        if atoms.contains_key(val) {
+            return Some(atoms[val]);
+        }
+        None
     }
 
     /// Allocate new atom in the atom table or find existing.
     pub fn from_str(&self, val: &str) -> u32 {
-        {
-            let atoms = self.index.read();
+        // unfortunately, cache hits need the write lock to avoid race conditions
+        let atoms = self.index.write();
 
-            if atoms.contains_key(val) {
-                return atoms[val];
-            }
-        } // drop read lock
+        if atoms.contains_key(val) {
+            return atoms[val];
+        }
 
-        self.register_atom(val)
+        let mut index_r = self.index_r.write();
+        let index = index_r.len() as u32;
+        atoms.insert(val.to_string(), index);
+        index_r.push(Atom::new(val));
+        index
     }
 
     pub fn to_str(&self, index: u32) -> Option<*const Atom> {
