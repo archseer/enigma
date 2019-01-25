@@ -1229,7 +1229,8 @@ mod tests {
         let process = process::allocate(&vm.state, module).unwrap();
         let heap = &process.context_mut().heap;
 
-        let map = map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(3));
+        let map =
+            map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(3));
         let args = vec![map];
         let res = bif_erlang_map_size_1(&vm, &process, &args);
 

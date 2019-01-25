@@ -5,6 +5,10 @@ authors = ["Blaž Hrastnik <blaz@mxxn.io>"]
 license = "MPL-2.0"
 edition = "2018"
 
+[badges]
+travis-ci = { repository = "archseer/enigma" }
+appveyor = { repository = "archseer/enigma" }
+
 [lib]
 name = "libenigma"
 doctest = false

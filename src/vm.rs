@@ -1534,7 +1534,7 @@ impl Machine {
                                 // ok
                             } else {
                                 op_jump!(context, *fail);
-                                break
+                                break;
                             }
                         }
                     }
@@ -1557,7 +1557,7 @@ impl Machine {
                                 set_register!(context, dest, val)
                             } else {
                                 op_jump!(context, *fail);
-                                break // TODO: original impl loops over everything
+                                break; // TODO: original impl loops over everything
                             }
                         }
                     }

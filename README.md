@@ -26,7 +26,7 @@ Only prerequisite to building Enigma is Rust. Use [rustup](https://rustup.rs/) (
 Run `cargo install` to install the dependencies, `cargo run` to build and run the VM. Expect heavy
 crashes, but a basic spawn + send multi-process model already works.
 
-A CI & release build system will be set up to distribute binaries for various platforms, once we reach a certain level of usability.
+We will distribute binaries for various platforms, once we reach a certain level of usability.
 
 # Goals / ideas / experiments
 
@@ -46,7 +46,7 @@ Until we can run a large subset of OTP code, it doesn't make sense to consider t
 
 - Distributed Erlang nodes
 - Tracing / debugging support
-- NIFs / FFI
+- BEAM compatible NIFs / FFI
 
 Note: NIF/FFI compatibility with OTP is going to be quite some work. At the moment I plan to trick the inet & file implementations by fake-loading the internal NIFs, then re-implementing those via a compatible Rust / BIF interface.
 
@@ -77,7 +77,7 @@ Features:
 - [ ] error_handler system hooks (export stubs)
 - [ ] Deep term comparison (lists, tuples, maps)
 - [ ] Timers
-- [ ] Maps
+- [x] Maps
   - [x] Basic type implementation
   - [x] BIF functions
   - [x] Map specific opcodes
@@ -109,11 +109,11 @@ Features:
 
 Contributors are very welcome!
 
-The easiest way to get started is to look at the `notes` folder and pick a BIF or an opcode to implement. Take a look at `src/bif.rs` and the `bif` folder on how other BIFs are implemented.
+The easiest way to get started is to look at the `notes` folder and pick a BIF or an opcode to implement. Take a look at `src/bif.rs` and the `bif` folder on how other BIFs are implemented. There's also a few issues open with the `good first issue` tag, which would be a good introduction to the codebase.
 
 Test coverage is currently lacking, and there's varying levels of documentation; I will be addressing these as soon as I solidify the core data structures.
 
-I'm also relying on a few external rust crates for various parts of implementation, I'd like to bring the dependency count down once I'm able to run the OTP emulator tests.
+I'm also relying on a few external rust crates for various parts of implementation, I'd like to bring the dependency count down once we are able to run the OTP emulator tests.
 
 # Acknowledgements
 
