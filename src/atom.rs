@@ -86,7 +86,7 @@ impl AtomTable {
     /// Allocate new atom in the atom table or find existing.
     pub fn from_str(&self, val: &str) -> u32 {
         // unfortunately, cache hits need the write lock to avoid race conditions
-        let atoms = self.index.write();
+        let mut atoms = self.index.write();
 
         if atoms.contains_key(val) {
             return atoms[val];
