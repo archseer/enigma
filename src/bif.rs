@@ -17,9 +17,9 @@ use statrs;
 use std::i32;
 use std::ops::{Add, Mul, Sub};
 
+mod erlang;
 mod chrono;
 mod map;
-mod erlang;
 
 // maybe use https://github.com/sfackler/rust-phf
 
