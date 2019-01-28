@@ -4,8 +4,19 @@ use crate::value::{self, Term, TryInto, Tuple};
 use crate::exception::{Exception, Reason};
 use crate::vm;
 
-pub fn bif_erlang_make_tuple_2(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> BifResult {
-    unimplemented!()
+pub fn bif_erlang_make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    let num = match args[0].into_number() {
+        Ok(value::Num::Integer(i)) if ! i < 0 => i,
+        _ => return Err(Exception::new(Reason::EXC_BADARG))
+    };
+    let heap = &process.context_mut().heap;
+    let tuple = value::tuple(&heap, num as u32);
+    for i in 0..num {
+        unsafe {
+            std::ptr::write(&mut tuple[i as usize], args[1].clone());
+        }
+    }
+    Ok(Term::from(tuple))
 }
 
 pub fn bif_erlang_make_tuple_3(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> BifResult {

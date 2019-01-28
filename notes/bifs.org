@@ -190,8 +190,8 @@
 - [ ] bif erlang:cancel_timer/2
 - [ ] bif erlang:read_timer/1
 - [ ] bif erlang:read_timer/2
-** Tuples [0/3]
-- [ ] bif erlang:make_tuple/2
+** Tuples [1/3]
+- [X] bif erlang:make_tuple/2
 - [ ] bif erlang:append_element/2
 - [ ] bif erlang:make_tuple/3
 ** System [0/2]
