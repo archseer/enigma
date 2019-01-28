@@ -1,10 +1,10 @@
-use crate::value::{self, Term, TryInto};
+use crate::process::RcProcess;
 use crate::servo_arc::Arc;
+use crate::value::{self, Term, TryInto};
 use parking_lot::Mutex;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
-use crate::process::{RcProcess};
 
 /// make_mask(n) constructs a mask with n bits.
 /// Example: make_mask!(3) returns the binary number 00000111.
@@ -178,11 +178,48 @@ const NATIVE_ENDIAN: Flag = Flag::BSF_LITTLE;
 #[cfg(target_endian = "big")]
 const NATIVE_ENDIAN: Flag = Flag::BSF_NONE;
 
-// #define BIT_IS_MACHINE_ENDIAN(x) (((x)&BSF_LITTLE) == BIT_ENDIAN_MACHINE)
 macro_rules! bit_is_machine_endian {
-    ($x:expr) => ($x & Flag::BSF_LITTLE == NATIVE_ENDIAN);
+    ($x:expr) => {
+        $x & Flag::BSF_LITTLE == NATIVE_ENDIAN
+    };
 }
 
+// Eterm
+pub fn start_match_2(process: &RcProcess, binary: Term, max: u32) -> Term {
+    assert!(binary.is_binary());
+
+    // TODO: BEAM allocates size on all binary types right after the header so we can grab it
+    // without needing the binary subtype.
+    let total_bin_size = binary_size(binary);
+    
+    if (total_bin_size >> (8 * std::mem::size_of::<usize>() - 3)) != 0 { // Uint => maybe u8??
+        return Term::none();
+    }
+
+    //     NeededSize = ERL_BIN_MATCHSTATE_SIZE(Max);
+    //     hp = HeapOnlyAlloc(p, NeededSize);
+    //     ms = (ErlBinMatchState *) hp;
+
+    //     ERTS_GET_REAL_BIN(Binary, Orig, offs, bitoffs, bitsize);
+    //     pb = (ProcBin *) boxed_val(Orig);
+    //     if (pb->thing_word == HEADER_PROC_BIN && pb->flags != 0) {
+    // 	erts_emasculate_writable_binary(pb);
+    //     }
+
+    // ms->thing_word = HEADER_BIN_MATCHSTATE(Max); TODO use max once we have heap vecs
+
+    let offset = 8 * offs + bitoffs;
+
+    Term::matchstate(&process.context_mut().heap, MatchState{
+        mb: MatchBuffer{
+            original,
+            base: binary_bytes(original),
+            offset,
+            size: total_bin_size * 8 + offset + bitsize
+        },
+        saved_offsets: vec![offset]
+    })
+}
 
 // #ifdef DEBUG
 // # define CHECK_MATCH_BUFFER(MB) check_match_buffer(MB)
@@ -206,8 +243,8 @@ macro_rules! bit_is_machine_endian {
 
 impl MatchBuffer {
     fn get_float(&mut self, process: &RcProcess, num_bits: usize, flags: Flag) -> Term {
-        let fl32: f32 = 0.0;
-        let fl64: f64 = 0.0;
+        let mut fl32: f32 = 0.0;
+        let mut fl64: f64 = 0.0;
         let non_value = Term::none();
 
         // CHECK_MATCH_BUFFER(mb);
@@ -228,9 +265,29 @@ impl MatchBuffer {
         };
 
         if bit_is_machine_endian!(flags) {
-            copy_bits(self.base, self.offset, 1, fptr, 0, 1, num_bits);
+            unsafe {
+                copy_bits(
+                    self.original.data.as_ptr(),
+                    self.offset,
+                    1,
+                    fptr,
+                    0,
+                    1,
+                    num_bits,
+                )
+            };
         } else {
-            copy_bits(self.base, self.offset, 1, fptr.add(nbytes!(num_bits) - 1), 0, -1, num_bits);
+            unsafe {
+                copy_bits(
+                    self.original.data.as_ptr(),
+                    self.offset,
+                    1,
+                    fptr.add(nbytes!(num_bits) - 1),
+                    0,
+                    -1,
+                    num_bits,
+                )
+            };
         }
 
         let f = if num_bits == 32 {
@@ -272,7 +329,6 @@ impl MatchBuffer {
 // bitstring is the base model, binary is an 8-bit aligned bitstring
 // https://www.reddit.com/r/rust/comments/2d7rrj/bit_level_pattern_matching/
 // https://docs.rs/bitstring/0.1.1/bitstring/bit_string/trait.BitString.html
-
 
 /// The basic bit copy operation. Copies n bits from the source buffer to
 /// the destination buffer. Depending on the directions, it can reverse the
@@ -469,7 +525,6 @@ pub unsafe fn copy_bits(
 //          * (except for the first and last bytes). Note that the directions
 //          * might be different, so we can't just use memcpy().
 //          */
-
 //         if lmask > 0 {
 //             dst[dsti] = mask_bits!(src[srci], dst[dsti], lmask);
 //             dst.offset(ddir);

@@ -11,7 +11,7 @@ fn run() -> i32 {
 
     vm.preload_modules();
 
-    vm.start("./examples/Elixir.Maps.beam");
+    vm.start("./examples/Elixir.Bin.beam");
     // vm.start("./examples/fib.beam");
 
     println!("execution time: {:?}", vm.elapsed_time());

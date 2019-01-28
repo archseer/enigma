@@ -214,6 +214,8 @@ pub const BOXED_CP: u8 = 6;
 pub const BOXED_CATCH: u8 = 7;
 pub const BOXED_STACKTRACE: u8 = 8;
 
+pub const BOXED_MATCHSTATE: u8 = 9;
+
 #[derive(Debug)]
 #[repr(C)]
 pub struct Boxed<T> {
@@ -256,6 +258,7 @@ pub enum Type {
     // runtime values
     CP,
     Catch,
+    MatchState,
 }
 
 pub enum Num {
@@ -353,6 +356,13 @@ impl Term {
         }))
     }
 
+    pub fn matchstate(heap: &Heap, value: bitstring::MatchState) -> Self {
+        Term::from(heap.alloc(Boxed {
+            header: BOXED_MATCHSTATE,
+            value,
+        }))
+    }
+
     pub fn cp(heap: &Heap, value: Option<InstrPtr>) -> Self {
         Term::from(heap.alloc(Boxed {
             header: BOXED_CP,
@@ -441,6 +451,7 @@ impl Term {
                 BOXED_CLOSURE => Type::Closure,
                 BOXED_CP => Type::CP,
                 BOXED_CATCH => Type::Catch,
+                BOXED_MATCHBUFFER => Type::MatchState,
                 _ => unimplemented!(),
             },
             _ => unreachable!(),
@@ -725,7 +736,7 @@ impl std::fmt::Display for Variant {
                             }
                         }
                         write!(f, "}}")
-                    },
+                    }
                     BOXED_BIGINT => write!(f, "#BigInt<>"),
                     BOXED_CLOSURE => write!(f, "#Fun<>"),
                     _ => unimplemented!(),

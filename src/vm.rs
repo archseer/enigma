@@ -1336,7 +1336,78 @@ impl Machine {
                 }
                 Opcode::BsStartMatch2 => {
                     debug_assert_eq!(ins.args.len(), 5);
-                    unimplemented!() // TODO
+                    // fail, src, live, slots?, dst
+                    // check if src is a match context with space for n slots (matches) else
+                    // allocate one. if we can't, jump to fail.
+                    // ibsstartmatch2 rxy f I I d
+                    // Checks that Arg0 is the matching context with enough slots for saved
+                    // offsets. The number of slots needed is given by Arg3. If there not enough
+                    // slots of if Arg0 is a regular binary then recreates the matching context and
+                    // saves it to Arg4. If something does not work jumps to Arg1. Arg2 is Live.
+
+                    // Uint slots;
+                    // Uint live;
+                    // Eterm header;
+
+                    let cxt = context.expand_arg(&ins.args[1]);
+
+                    if !cxt.is_pointer() {
+                        let fail = ins.args[0].to_u32();
+                        op_jump!(context, fail);
+                        continue;
+                    }
+                    
+                    let header = cxt.get_boxed_header();
+
+                    // Reserve a slot for the start position.
+                    let slots = ins.args[3].to_u32() + 1;
+                    let live = ins.args[2].to_u32();
+
+                    match header {
+                        value::BOXED_MATCHSTATE => {
+                            // ErlBinMatchState* ms = (ErlBinMatchState *) boxed_val(context);
+                            // Uint actual_slots = HEADER_NUM_SLOTS(header);
+
+                            // /* We're not compatible with contexts created by bs_start_match3. */
+                            // ASSERT(actual_slots >= 1);
+
+                            // ms->save_offset[0] = ms->mb.offset;
+                            // if (ERTS_UNLIKELY(actual_slots < slots)) {
+                            //     ErlBinMatchState* expanded;
+                            //     Uint live = $Live;
+                            //     Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
+                            //     $GC_TEST_PRESERVE(wordsneeded, live, context);
+                            //     ms = (ErlBinMatchState *) boxed_val(context);
+                            //     expanded = (ErlBinMatchState *) HTOP;
+                            //     *expanded = *ms;
+                            //     *HTOP = HEADER_BIN_MATCHSTATE(slots);
+                            //     HTOP += wordsneeded;
+                            //     HEAP_SPACE_VERIFIED(0);
+                            //     context = make_matchstate(expanded);
+                            //     $REFRESH_GEN_DEST();
+                            // }
+                            // $Dst = context;
+                            unimplemented!();
+                        }
+                        value::BOXED_BINARY => {
+                            // Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
+                            // $GC_TEST_PRESERVE(wordsneeded, live, context);
+
+                            let result = bitstring::start_match_2(&process, cxt, slots);
+
+                            if result.is_none() { // TODO: just use Result<>'s None instead of THE_NON_VALUE for most of these cases.
+                                let fail = ins.args[0].to_u32();
+                                op_jump!(context, fail);
+                                continue;
+                            }
+                            set_register!(context, &ins.args[4], result)
+                        }
+                        _ => {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                            continue;
+                        }
+                    }
                 }
                 Opcode::BsGetInteger2 => {
                     debug_assert_eq!(ins.args.len(), 7);
@@ -1368,8 +1439,9 @@ impl Machine {
                     let size = size * (flags as i64 >> 3);
                     let mb = context.expand_arg(&ins.args[1]);
                     // _mb = ms_matchbuffer($Ms);
-                    let res = mb.get_float(&process, size, flags);
-                    if res.is_none {
+                    //let res = mb.get_float(&process, size, flags);
+                    let res = mb;
+                    if res.is_none() {
                         let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
                     } else {
