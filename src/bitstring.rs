@@ -6,6 +6,40 @@ use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 use crate::process::{RcProcess};
 
+/// make_mask(n) constructs a mask with n bits.
+/// Example: make_mask!(3) returns the binary number 00000111.
+macro_rules! make_mask {
+    ($n:expr) => {
+        ((1 as u8) << $n) - 1
+    };
+}
+
+/// mask_bits assigns src to dst, but preserves the dst bits outside the mask.
+macro_rules! mask_bits {
+    ($src:expr, $dst:expr, $mask:expr) => {
+        ($src & $mask) | ($dst & !$mask)
+    };
+}
+
+/// nbytes!(x) returns the number of bytes needed to store x bits.
+macro_rules! nbytes {
+    ($x:expr) => {
+        ($x as usize + 7 as usize) >> 3
+    };
+}
+
+macro_rules! byte_offset {
+    ($ofs:expr) => {
+        $ofs as usize >> 3
+    };
+}
+
+macro_rules! bit_offset {
+    ($ofs:expr) => {
+        $ofs & 7
+    };
+}
+
 #[derive(Debug)]
 pub struct Binary {
     pub flags: AtomicUsize,
@@ -171,11 +205,9 @@ macro_rules! bit_is_machine_endian {
 // #endif
 
 impl MatchBuffer {
-    fn get_float(&mut self, _process: &RcProcess, num_bits: usize, flags: Flag) -> Term {
-        // float f32;
-        // double f64;
-        // byte* fptr;
-        // FloatDef f;
+    fn get_float(&mut self, process: &RcProcess, num_bits: usize, flags: Flag) -> Term {
+        let fl32: f32 = 0.0;
+        let fl64: f64 = 0.0;
         let non_value = Term::none();
 
         // CHECK_MATCH_BUFFER(mb);
@@ -189,28 +221,23 @@ impl MatchBuffer {
             return non_value;
         }
 
-        match num_bits {
-            32 => 1, // fptr = (byte *) &f32;
-            64 => 1, // fptr = (byte *) &f64;
+        let fptr: *mut u8 = match num_bits {
+            32 => &mut fl32 as *mut f32 as *mut u8,
+            64 => &mut fl64 as *mut f64 as *mut u8,
             _ => return non_value,
         };
 
         if bit_is_machine_endian!(flags) {
             copy_bits(self.base, self.offset, 1, fptr, 0, 1, num_bits);
-        //    // erts_copy_bits(mb->base, mb->offset, 1,
-        //    	  // fptr, 0, 1,
-        //    	  // num_bits);
         } else {
-            copy_bits(self.base, self.offset, 1, fptr, 0, 1, num_bits);
-        //    // erts_copy_bits(mb->base, mb->offset, 1,
-        //    	  // fptr + NBYTES(num_bits) - 1, 0, -1,
-        //    	  // num_bits);
+            copy_bits(self.base, self.offset, 1, fptr.add(nbytes!(num_bits) - 1), 0, -1, num_bits);
         }
 
-        // ERTS_FP_CHECK_INIT(p); --> just initializer
-        if num_bits == 32 {
-            // ERTS_FP_ERROR_THOROUGH(p, f32, return THE_NON_VALUE);
-            // f.fd = f32;
+        let f = if num_bits == 32 {
+            if !fl32.is_finite() {
+                return non_value;
+            }
+            Term::from(fl32 as f64)
         } else {
             //   #ifdef DOUBLE_MIDDLE_ENDIAN
             //   FloatDef ftmp;
@@ -219,14 +246,15 @@ impl MatchBuffer {
             //   f.fw[1] = ftmp.fw[0];
             //   ERTS_FP_ERROR_THOROUGH(p, f.fd, return THE_NON_VALUE);
             //   #else
-            //   ERTS_FP_ERROR_THOROUGH(p, f64, return THE_NON_VALUE);
-            //   f.fd = f64;
+            //   ...
             //   #endif
-        }
-        // ERTS_FP_ERROR_THOROUGH => check if float is finite, else return non_value
+            if !fl64.is_finite() {
+                return non_value;
+            }
+            Term::from(fl64)
+        };
         self.offset += num_bits;
-        // Term::from(f)
-        unimplemented!()
+        f
     }
 }
 
@@ -245,39 +273,6 @@ impl MatchBuffer {
 // https://www.reddit.com/r/rust/comments/2d7rrj/bit_level_pattern_matching/
 // https://docs.rs/bitstring/0.1.1/bitstring/bit_string/trait.BitString.html
 
-/// make_mask(n) constructs a mask with n bits.
-/// Example: make_mask!(3) returns the binary number 00000111.
-macro_rules! make_mask {
-    ($n:expr) => {
-        ((1 as u8) << $n) - 1
-    };
-}
-
-/// mask_bits assigns src to dst, but preserves the dst bits outside the mask.
-macro_rules! mask_bits {
-    ($src:expr, $dst:expr, $mask:expr) => {
-        ($src & $mask) | ($dst & !$mask)
-    };
-}
-
-/// nbytes!(x) returns the number of bytes needed to store x bits.
-macro_rules! nbytes {
-    ($x:expr) => {
-        ($x as u64 + 7 as u64) >> 3
-    };
-}
-
-macro_rules! byte_offset {
-    ($ofs:expr) => {
-        $ofs as usize >> 3
-    };
-}
-
-macro_rules! bit_offset {
-    ($ofs:expr) => {
-        $ofs & 7
-    };
-}
 
 /// The basic bit copy operation. Copies n bits from the source buffer to
 /// the destination buffer. Depending on the directions, it can reverse the
@@ -409,3 +404,134 @@ pub unsafe fn copy_bits(
         }
     }
 }
+
+// /// The basic bit copy operation. Copies n bits from the source buffer to
+// /// the destination buffer. Depending on the directions, it can reverse the
+// /// copied bits.
+// pub unsafe fn copy_bits2(
+//     mut src: &mut[u8],
+//     soffs: usize,       // Bit offset for source relative to src.
+//     sdir: isize,        // Direction: 1 (forward) or -1 (backward).
+//     mut dst: &[u8],   // Base pointer to destination.
+//     doffs: usize,       // Bit offset for destination relative to dst.
+//     ddir: isize,        // Direction: 1 (forward) or -1 (backward).
+//     n: usize,
+// ) // Number of bits to copy.
+// {
+//     if n == 0 {
+//         return;
+//     }
+
+//     let srci = if sdir < 0 { src.len() - byte_offset!(soffs) } else { byte_offset!(soffs) };
+//     let dsti = if ddir < 0 { dst.len() - byte_offset!(doffs) } else { byte_offset!(doffs) };
+//     let soffs = bit_offset!(soffs);
+//     let doffs = bit_offset!(doffs);
+//     let deoffs = bit_offset!(doffs + n);
+//     let mut lmask = if doffs > 0 { make_mask!(8 - doffs) } else { 0 };
+//     let rmask = if deoffs > 0 {
+//         make_mask!(deoffs) << (8 - deoffs)
+//     } else {
+//         0
+//     };
+
+//     // Take care of the case that all bits are in the same byte.
+
+//     if doffs + n < 8 {
+//         // All bits are in the same byte
+//         lmask = if (lmask & rmask) > 0 {
+//             lmask & rmask
+//         } else {
+//             lmask | rmask
+//         };
+
+//         if soffs == doffs {
+//             dst[dsti] = mask_bits!(*src, *dst, lmask);
+//         } else if soffs > doffs {
+//             let mut bits: u8 = src[srci] << (soffs - doffs); // TODO: is it u8
+//             if soffs + n > 8 {
+//                 srci += sdir;
+//                 bits |= src[srci] >> (8 - (soffs - doffs));
+//             }
+//             dst[dsti] = mask_bits!(bits, dst[dsti], lmask);
+//         } else {
+//             dst[dsti] = mask_bits!((src[srci] >> (doffs - soffs)), *dst, lmask);
+//         }
+//         return; // We are done!
+//     }
+
+//     // At this point, we know that the bits are in 2 or more bytes.
+
+//     let mut count = (if lmask > 0 { n - (8 - doffs) } else { n }) >> 3;
+
+//     if soffs == doffs {
+//         /*
+//          * The bits are aligned in the same way. We can just copy the bytes
+//          * (except for the first and last bytes). Note that the directions
+//          * might be different, so we can't just use memcpy().
+//          */
+
+//         if lmask > 0 {
+//             dst[dsti] = mask_bits!(src[srci], dst[dsti], lmask);
+//             dst.offset(ddir);
+//             src.offset(sdir);
+//         }
+
+//         while count > 0 {
+//             count -= 1;
+//             dst[dsti] = src[srci];
+//             dst.offset(ddir);
+//             src.offset(sdir);
+//         }
+
+//         if rmask > 0 {
+//             dst[dsti] = mask_bits!(src[srci], dst[dsti], rmask);
+//         }
+//     } else {
+//         let mut bits: u8 = 0;
+//         let mut bits1: u8 = 0;
+//         let mut rshift = 0;
+//         let mut lshift = 0;
+
+//         // The tricky case. The bits must be shifted into position.
+
+//         if soffs > doffs {
+//             lshift = soffs - doffs;
+//             rshift = 8 - lshift;
+//             bits = src[srci];
+//             if soffs + n > 8 {
+//                 src.offset(sdir);
+//             }
+//         } else {
+//             rshift = doffs - soffs;
+//             lshift = 8 - rshift;
+//             bits = 0;
+//         }
+
+//         if lmask > 0 {
+//             bits1 = bits << lshift;
+//             bits = *src;
+//             src.offset(sdir);
+//             bits1 |= bits >> rshift;
+//             *dst = mask_bits!(bits1, *dst, lmask);
+//             dst.offset(ddir);
+//         }
+
+//         while count > 0 {
+//             count -= 1;
+//             bits1 = bits << lshift;
+//             bits = *src;
+//             src.offset(sdir);
+//             *dst = bits1 | (bits >> rshift);
+//             dst.offset(ddir);
+//         }
+
+//         if rmask > 0 {
+//             bits1 = bits << lshift;
+//             if (rmask << rshift) & 0xff > 0 {
+//                 bits = *src;
+//                 bits1 |= bits >> rshift;
+//             }
+//             *dst = mask_bits!(bits1, *dst, rmask);
+//         }
+//     }
+// }

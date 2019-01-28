@@ -455,7 +455,7 @@ impl Machine {
     pub fn start_main_process(&self, path: &str) {
         println!("Starting main process...");
         let registry = self.modules.lock();
-        // let module = module::load_module(&self.modules, path).unwrap();
+        //let module = unsafe { &*module::load_module(self, path).unwrap() };
         let module = registry.lookup(atom::from_str("erl_init")).unwrap();
         let process = process::allocate(&self.state, module).unwrap();
 
@@ -1231,15 +1231,10 @@ impl Machine {
                         unreachable!()
                     }
                 }
-                Opcode::BsPutString => {
-                    // BsPutString uses the StrT strings table! needs to be patched in loader
-                    if let LValue::Binary(str) = &ins.args[0] {
-                        unsafe {
-                            (*context.bs).extend_from_slice(&str.data);
-                        }
-                    } else {
-                        unreachable!()
-                    }
+                Opcode::BsPutInteger => {
+                    // gen_put_integer(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
+                    // Size can be atom all
+                    unimplemented!()
                 }
                 Opcode::BsPutBinary => {
                     if let [LValue::Label(fail), size, LValue::Literal(unit), _flags, src] =
@@ -1297,10 +1292,15 @@ impl Machine {
                         unreachable!()
                     }
                 }
-                Opcode::BsPutInteger => {
-                    // gen_put_integer(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
-                    // Size can be atom all
-                    unimplemented!()
+                Opcode::BsPutString => {
+                    // BsPutString uses the StrT strings table! needs to be patched in loader
+                    if let LValue::Binary(str) = &ins.args[0] {
+                        unsafe {
+                            (*context.bs).extend_from_slice(&str.data);
+                        }
+                    } else {
+                        unreachable!()
+                    }
                 }
                 // BsGet and BsSkip should be implemented over an Iterator inside a match context (.skip/take)
                 // maybe we can even use nom for this
@@ -1333,6 +1333,68 @@ impl Machine {
                     // a new shared data, a new ProcBin, and a new subbinary. For all heap
                     // allocation, a space for more Arg1 words are requested. Arg2 is Live. Arg3 is
                     // unit. Saves the resultant subbinary to Arg4.
+                }
+                Opcode::BsStartMatch2 => {
+                    debug_assert_eq!(ins.args.len(), 5);
+                    unimplemented!() // TODO
+                }
+                Opcode::BsGetInteger2 => {
+                    debug_assert_eq!(ins.args.len(), 7);
+                    // bs_get_integer2 Fail=f Ms=xy Live=u Sz=sq Unit=u Flags=u Dst=d
+                    // ms == context
+                    // match bits {
+                    //     8 => unimplemented!()
+                    //     16 => unimplemented!()
+                    //     32 => unimplemented!()
+                    //     _ => unimplemented!() // slow fallback
+                    // }
+
+                    unimplemented!() // TODO
+                }
+                Opcode::BsGetFloat2 => {
+                    debug_assert_eq!(ins.args.len(), 7);
+                    // bs_get_float2 Fail=f Ms=xy Live=u Sz=sq Unit=u Flags=u Dst=d
+
+                    let size = match ins.args[3] {
+                        LValue::Integer(size) if size < 64 => size,
+                        _ => {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                            continue;
+                        }
+                    };
+
+                    let flags = ins.args[5].to_u32();
+                    let size = size * (flags as i64 >> 3);
+                    let mb = context.expand_arg(&ins.args[1]);
+                    // _mb = ms_matchbuffer($Ms);
+                    let res = mb.get_float(&process, size, flags);
+                    if res.is_none {
+                        let fail = ins.args[0].to_u32();
+                        op_jump!(context, fail);
+                    } else {
+                        set_register!(context, &ins.args[6], res)
+                    }
+                }
+                Opcode::BsGetBinary2 => {
+                    debug_assert_eq!(ins.args.len(), 7);
+                    unimplemented!() // TODO
+                }
+                Opcode::BsSkipBits2 => {
+                    debug_assert_eq!(ins.args.len(), 5);
+                    unimplemented!() // TODO
+                }
+                Opcode::BsTestTail2 => {
+                    debug_assert_eq!(ins.args.len(), 3);
+                    unimplemented!() // TODO
+                }
+                Opcode::BsSave2 => {
+                    debug_assert_eq!(ins.args.len(), 2);
+                    unimplemented!() // TODO
+                }
+                Opcode::BsRestore2 => {
+                    debug_assert_eq!(ins.args.len(), 2);
+                    unimplemented!() // TODO
                 }
                 Opcode::Fclearerror => {
                     // src, dest
