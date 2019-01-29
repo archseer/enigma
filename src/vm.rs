@@ -1471,7 +1471,42 @@ impl Machine {
                 }
                 Opcode::BsTestTail2 => {
                     debug_assert_eq!(ins.args.len(), 3);
-                    unimplemented!() // TODO
+                    // fail, ms, bits
+                    // TODO: beam specializes bits 0
+                    // Checks that the matching context Arg1 has exactly Arg2 unmatched bits. Jumps
+                    // to the label Arg0 if it is not so.
+                    // if size 0 == Jumps to the label in Arg0 if the matching context Arg1 still have unmatched bits.
+
+                    // bs_test_zero_tail2(Fail, Ctx) {
+                    //     ErlBinMatchBuffer *_mb;
+                    //     _mb = (ErlBinMatchBuffer*) ms_matchbuffer($Ctx);
+                    //     if (_mb->size != _mb->offset) {
+                    //         $FAIL($Fail);
+                    //     }
+                    // }
+
+                    // bs_test_tail_imm2(Fail, Ctx, Offset) {
+                    //     ErlBinMatchBuffer *_mb;
+                    //     _mb = ms_matchbuffer($Ctx);
+                    //     if (_mb->size - _mb->offset != $Offset) {
+                    //         $FAIL($Fail);
+                    //     }
+                    // }
+                    let offset = ins.args[2].to_u32() as usize;
+
+                    if let Ok(value::Boxed { value, .. }) =
+                        context.expand_arg(&ins.args[1]).try_into()
+                    {
+                        let ms: &bitstring::MatchState = value; // ughh type annotation
+                        let mb = &ms.mb;
+
+                        if mb.size - mb.offset != offset {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                        }
+                    } else {
+                        unreachable!()
+                    }
                 }
                 Opcode::BsSave2 => {
                     debug_assert_eq!(ins.args.len(), 2);

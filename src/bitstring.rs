@@ -145,9 +145,9 @@ pub struct MatchBuffer {
     /// Current position in binary
     // base: usize, // TODO: actually a ptr?
     /// Offset in bits
-    offset: usize,
+    pub offset: usize, // TODO: maybe don't make these pub, add a remainder method
     /// Size of binary in bits
-    size: usize,
+    pub size: usize,
 }
 
 pub struct MatchState {
@@ -233,8 +233,9 @@ pub fn start_match_2(process: &RcProcess, binary: Term, max: u32) -> Term {
     // TODO: BEAM allocates size on all binary types right after the header so we can grab it
     // without needing the binary subtype.
     let total_bin_size = binary_size!(binary);
-    
-    if (total_bin_size >> (8 * std::mem::size_of::<usize>() - 3)) != 0 { // Uint => maybe u8??
+
+    if (total_bin_size >> (8 * std::mem::size_of::<usize>() - 3)) != 0 {
+        // Uint => maybe u8??
         return Term::none();
     }
 
@@ -250,11 +251,14 @@ pub fn start_match_2(process: &RcProcess, binary: Term, max: u32) -> Term {
     // }
 
     let original: RcBinary = match binary.try_into() {
-        Ok(value::Boxed { value, header: value::BOXED_BINARY }) => {
+        Ok(value::Boxed {
+            value,
+            header: value::BOXED_BINARY,
+        }) => {
             let value: &RcBinary = value;
             value.clone()
-        },
-        _ => unreachable!()
+        }
+        _ => unreachable!(),
     };
 
     let (original, offs, bitoffs, bitsize) = (original, 0, 0, 0);
@@ -268,15 +272,18 @@ pub fn start_match_2(process: &RcProcess, binary: Term, max: u32) -> Term {
 
     let offset = 8 * offs + bitoffs;
 
-    Term::matchstate(&process.context_mut().heap, MatchState{
-        mb: MatchBuffer{
-            original,
-            //base: binary_bytes(original),
-            offset,
-            size: total_bin_size * 8 + offset + bitsize
+    Term::matchstate(
+        &process.context_mut().heap,
+        MatchState {
+            mb: MatchBuffer {
+                original,
+                //base: binary_bytes(original),
+                offset,
+                size: total_bin_size * 8 + offset + bitsize,
+            },
+            saved_offsets: vec![offset],
         },
-        saved_offsets: vec![offset]
-    })
+    )
 }
 
 // #ifdef DEBUG
