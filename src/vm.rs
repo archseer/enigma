@@ -1456,7 +1456,6 @@ impl Machine {
                             let fail = ins.args[0].to_u32();
                             op_jump!(context, fail);
                         } else {
-                            println!("float! {:?}", res);
                             set_register!(context, &ins.args[6], res)
                         }
                     };

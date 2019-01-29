@@ -139,6 +139,7 @@ pub struct SubBinary {
 }
 
 // TODO: let's use nom to handle offsets & matches, and keep a reference to the binary
+#[derive(Debug)]
 pub struct MatchBuffer {
     /// Original binary
     original: RcBinary,
@@ -223,7 +224,10 @@ macro_rules! native_endian {
 
 macro_rules! binary_size {
     ($str:expr) => {
-        $str.get_boxed_value::<Binary>().data.len()
+        $str.get_boxed_value::<value::Boxed<RcBinary>>()
+            .value
+            .data
+            .len()
     };
 }
 
