@@ -8,6 +8,7 @@ use crate::immix::Heap;
 use crate::loader;
 use crate::nanbox::TypedNanBox;
 use crate::process::{self, InstrPtr};
+use crate::servo_arc::Arc;
 use allocator_api::Layout;
 use num::bigint::BigInt;
 use std::cmp::Ordering;
@@ -352,7 +353,7 @@ impl Term {
     pub fn binary(heap: &Heap, value: bitstring::Binary) -> Self {
         Term::from(heap.alloc(Boxed {
             header: BOXED_BINARY,
-            value,
+            value: Arc::new(value),
         }))
     }
 

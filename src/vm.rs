@@ -1250,7 +1250,7 @@ impl Machine {
                             header: value::BOXED_BINARY,
                         }) = context.expand_arg(src).try_into()
                         {
-                            let value: &bitstring::Binary = value;
+                            let value: &bitstring::RcBinary = value;
                             match size {
                                 LValue::Atom(atom::ALL) => unsafe {
                                     (*context.bs).extend_from_slice(&value.data);
@@ -1356,7 +1356,7 @@ impl Machine {
                         op_jump!(context, fail);
                         continue;
                     }
-                    
+
                     let header = cxt.get_boxed_header();
 
                     // Reserve a slot for the start position.
@@ -1395,7 +1395,8 @@ impl Machine {
 
                             let result = bitstring::start_match_2(&process, cxt, slots);
 
-                            if result.is_none() { // TODO: just use Result<>'s None instead of THE_NON_VALUE for most of these cases.
+                            if result.is_none() {
+                                // TODO: just use Result<>'s None instead of THE_NON_VALUE for most of these cases.
                                 let fail = ins.args[0].to_u32();
                                 op_jump!(context, fail);
                                 continue;
@@ -1427,7 +1428,7 @@ impl Machine {
                     // bs_get_float2 Fail=f Ms=xy Live=u Sz=sq Unit=u Flags=u Dst=d
 
                     let size = match ins.args[3] {
-                        LValue::Integer(size) if size < 64 => size,
+                        LValue::Integer(size) if size <= 64 => size as usize,
                         _ => {
                             let fail = ins.args[0].to_u32();
                             op_jump!(context, fail);
@@ -1435,18 +1436,30 @@ impl Machine {
                         }
                     };
 
+                    // TODO: preprocess flags for native endian (remove native_endian and set bsf_little off or on)
+
                     let flags = ins.args[5].to_u32();
-                    let size = size * (flags as i64 >> 3);
-                    let mb = context.expand_arg(&ins.args[1]);
-                    // _mb = ms_matchbuffer($Ms);
-                    //let res = mb.get_float(&process, size, flags);
-                    let res = mb;
-                    if res.is_none() {
-                        let fail = ins.args[0].to_u32();
-                        op_jump!(context, fail);
-                    } else {
-                        set_register!(context, &ins.args[6], res)
-                    }
+                    // let size = size * (flags as usize >> 3); TODO: this was just because flags
+                    // & size were packed together on BEAM
+
+                    // TODO: this cast can fail
+                    if let value::Boxed { value: ms, .. } = context
+                        .expand_arg(&ins.args[1])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
+                        let res = ms.mb.get_float(
+                            &process,
+                            size as usize,
+                            bitstring::Flag::from_bits(flags as u8).unwrap(),
+                        );
+                        if res.is_none() {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                        } else {
+                            println!("float! {:?}", res);
+                            set_register!(context, &ins.args[6], res)
+                        }
+                    };
                 }
                 Opcode::BsGetBinary2 => {
                     debug_assert_eq!(ins.args.len(), 7);

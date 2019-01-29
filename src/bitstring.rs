@@ -51,6 +51,8 @@ pub struct Binary {
     pub write_lock: Mutex<()>,
 }
 
+pub type RcBinary = Arc<Binary>;
+
 impl Binary {
     pub fn new() -> Self {
         Binary {
@@ -104,15 +106,15 @@ impl Hash for Binary {
 }
 
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryInto<value::Boxed<Binary>> for Term {
+impl TryInto<value::Boxed<RcBinary>> for Term {
     type Error = value::WrongBoxError;
 
     #[inline]
-    fn try_into(&self) -> Result<&value::Boxed<Binary>, value::WrongBoxError> {
+    fn try_into(&self) -> Result<&value::Boxed<RcBinary>, value::WrongBoxError> {
         if let value::Variant::Pointer(ptr) = self.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_BINARY {
-                    return Ok(&*(ptr as *const value::Boxed<Binary>));
+                    return Ok(&*(ptr as *const value::Boxed<RcBinary>));
                 }
             }
         }
@@ -133,26 +135,43 @@ pub struct SubBinary {
     /// Is the underlying binary writable?
     is_writable: bool,
     /// Original binary (refc or heap)
-    original: Arc<Binary>,
+    original: RcBinary,
 }
 
 // TODO: let's use nom to handle offsets & matches, and keep a reference to the binary
 pub struct MatchBuffer {
     /// Original binary
-    original: Arc<Binary>,
+    original: RcBinary,
     /// Current position in binary
-    base: usize, // TODO: actually a ptr?
+    // base: usize, // TODO: actually a ptr?
     /// Offset in bits
     offset: usize,
     /// Size of binary in bits
     size: usize,
 }
 
-pub struct MatchState<'a> {
+pub struct MatchState {
     // TODO: wrap into value
-    mb: MatchBuffer,
+    pub mb: MatchBuffer,
     /// Saved offsets, only valid for contexts created through bs_start_match2.
-    saved_offsets: &'a [Term],
+    saved_offsets: Vec<usize>,
+} // TODO: Dump start_match_2 support. use MatchBuffer directly
+
+// TODO: to be TryFrom once rust stabilizes the trait
+impl TryInto<value::Boxed<MatchState>> for Term {
+    type Error = value::WrongBoxError;
+
+    #[inline]
+    fn try_into(&self) -> Result<&value::Boxed<MatchState>, value::WrongBoxError> {
+        if let value::Variant::Pointer(ptr) = self.into_variant() {
+            unsafe {
+                if *ptr == value::BOXED_MATCHSTATE {
+                    return Ok(&*(ptr as *const value::Boxed<MatchState>));
+                }
+            }
+        }
+        Err(value::WrongBoxError)
+    }
 }
 
 bitflags! {
@@ -184,13 +203,36 @@ macro_rules! bit_is_machine_endian {
     };
 }
 
-// Eterm
+#[cfg(target_endian = "little")]
+macro_rules! native_endian {
+    ($x:expr) => {
+        if $x.contains(Flag::BSF_NATIVE) {
+            $x.remove(Flag::BSF_NATIVE);
+            $x.insert(Flag::BSF_LITTLE);
+        }
+    };
+}
+
+#[cfg(target_endian = "big")]
+macro_rules! native_endian {
+        if $x.contains(Flag::BSF_NATIVE) {
+            $x.remove(Flag::BSF_NATIVE);
+            $x.remove(Flag::BSF_LITTLE);
+        }
+}
+
+macro_rules! binary_size {
+    ($str:expr) => {
+        $str.get_boxed_value::<Binary>().data.len()
+    };
+}
+
 pub fn start_match_2(process: &RcProcess, binary: Term, max: u32) -> Term {
     assert!(binary.is_binary());
 
     // TODO: BEAM allocates size on all binary types right after the header so we can grab it
     // without needing the binary subtype.
-    let total_bin_size = binary_size(binary);
+    let total_bin_size = binary_size!(binary);
     
     if (total_bin_size >> (8 * std::mem::size_of::<usize>() - 3)) != 0 { // Uint => maybe u8??
         return Term::none();
@@ -200,7 +242,23 @@ pub fn start_match_2(process: &RcProcess, binary: Term, max: u32) -> Term {
     //     hp = HeapOnlyAlloc(p, NeededSize);
     //     ms = (ErlBinMatchState *) hp;
 
-    //     ERTS_GET_REAL_BIN(Binary, Orig, offs, bitoffs, bitsize);
+    // let (orig, offs, bitoffs, bitsize) = if let SubBinary{original, offset: offs, bit_offset: bitoffs, bitsize} {
+    //     (original, offs, bifoffs, bitsize)
+    // } else {
+    //     // TODO: extract RcBinary
+    //     (original, 0, 0, 0)
+    // }
+
+    let original: RcBinary = match binary.try_into() {
+        Ok(value::Boxed { value, header: value::BOXED_BINARY }) => {
+            let value: &RcBinary = value;
+            value.clone()
+        },
+        _ => unreachable!()
+    };
+
+    let (original, offs, bitoffs, bitsize) = (original, 0, 0, 0);
+
     //     pb = (ProcBin *) boxed_val(Orig);
     //     if (pb->thing_word == HEADER_PROC_BIN && pb->flags != 0) {
     // 	erts_emasculate_writable_binary(pb);
@@ -213,7 +271,7 @@ pub fn start_match_2(process: &RcProcess, binary: Term, max: u32) -> Term {
     Term::matchstate(&process.context_mut().heap, MatchState{
         mb: MatchBuffer{
             original,
-            base: binary_bytes(original),
+            //base: binary_bytes(original),
             offset,
             size: total_bin_size * 8 + offset + bitsize
         },
@@ -242,15 +300,18 @@ pub fn start_match_2(process: &RcProcess, binary: Term, max: u32) -> Term {
 // #endif
 
 impl MatchBuffer {
-    fn get_float(&mut self, process: &RcProcess, num_bits: usize, flags: Flag) -> Term {
+    pub fn get_float(&mut self, process: &RcProcess, num_bits: usize, mut flags: Flag) -> Term {
         let mut fl32: f32 = 0.0;
         let mut fl64: f64 = 0.0;
         let non_value = Term::none();
 
+        // TODO: preprocess flags for native endian in loader(remove native_endian and set bsf_little off or on)
+        native_endian!(flags);
+
         // CHECK_MATCH_BUFFER(mb);
 
         if num_bits == 0 {
-            return Term::from(0);
+            return Term::from(0.0);
         }
 
         if (self.size - self.offset) < num_bits {
@@ -374,7 +435,7 @@ pub unsafe fn copy_bits(
         } else if soffs > doffs {
             let mut bits: u8 = *src << (soffs - doffs); // TODO: is it u8
             if soffs + n > 8 {
-                src.offset(sdir);
+                src = src.offset(sdir);
                 bits |= *src >> (8 - (soffs - doffs));
             }
             *dst = mask_bits!(bits, *dst, lmask);
@@ -397,15 +458,15 @@ pub unsafe fn copy_bits(
 
         if lmask > 0 {
             *dst = mask_bits!(*src, *dst, lmask);
-            dst.offset(ddir);
-            src.offset(sdir);
+            dst = dst.offset(ddir);
+            src = src.offset(sdir);
         }
 
         while count > 0 {
             count -= 1;
             *dst = *src;
-            dst.offset(ddir);
-            src.offset(sdir);
+            dst = dst.offset(ddir);
+            src = src.offset(sdir);
         }
 
         if rmask > 0 {
@@ -424,7 +485,7 @@ pub unsafe fn copy_bits(
             rshift = 8 - lshift;
             bits = *src;
             if soffs + n > 8 {
-                src.offset(sdir);
+                src = src.offset(sdir);
             }
         } else {
             rshift = doffs - soffs;
@@ -435,19 +496,19 @@ pub unsafe fn copy_bits(
         if lmask > 0 {
             bits1 = bits << lshift;
             bits = *src;
-            src.offset(sdir);
+            src = src.offset(sdir);
             bits1 |= bits >> rshift;
             *dst = mask_bits!(bits1, *dst, lmask);
-            dst.offset(ddir);
+            dst = dst.offset(ddir);
         }
 
         while count > 0 {
             count -= 1;
             bits1 = bits << lshift;
             bits = *src;
-            src.offset(sdir);
+            src = src.offset(sdir);
             *dst = bits1 | (bits >> rshift);
-            dst.offset(ddir);
+            dst = dst.offset(ddir);
         }
 
         if rmask > 0 {

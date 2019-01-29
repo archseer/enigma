@@ -435,7 +435,7 @@ fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]
             header: value::BOXED_BINARY,
             value: str,
         }) => {
-            let str: &bitstring::Binary = str; // type annotation
+            let str: &bitstring::RcBinary = str; // type annotation
             str.data.len()
         }
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
