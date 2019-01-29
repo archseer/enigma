@@ -1365,29 +1365,31 @@ impl Machine {
 
                     match header {
                         value::BOXED_MATCHSTATE => {
-                            // ErlBinMatchState* ms = (ErlBinMatchState *) boxed_val(context);
-                            // Uint actual_slots = HEADER_NUM_SLOTS(header);
+                            if let value::Boxed { value: ms, .. } = cxt.get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>() {
+                                // Uint actual_slots = HEADER_NUM_SLOTS(header);
+                                let actual_slots = ms.saved_offsets.len();
 
-                            // /* We're not compatible with contexts created by bs_start_match3. */
-                            // ASSERT(actual_slots >= 1);
+                                // We're not compatible with contexts created by bs_start_match3.
+                                assert!(actual_slots >= 2);
 
-                            // ms->save_offset[0] = ms->mb.offset;
-                            // if (ERTS_UNLIKELY(actual_slots < slots)) {
-                            //     ErlBinMatchState* expanded;
-                            //     Uint live = $Live;
-                            //     Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
-                            //     $GC_TEST_PRESERVE(wordsneeded, live, context);
-                            //     ms = (ErlBinMatchState *) boxed_val(context);
-                            //     expanded = (ErlBinMatchState *) HTOP;
-                            //     *expanded = *ms;
-                            //     *HTOP = HEADER_BIN_MATCHSTATE(slots);
-                            //     HTOP += wordsneeded;
-                            //     HEAP_SPACE_VERIFIED(0);
-                            //     context = make_matchstate(expanded);
-                            //     $REFRESH_GEN_DEST();
-                            // }
-                            // $Dst = context;
-                            unimplemented!();
+                                ms.saved_offsets[0] = ms.mb.offset;
+                                // TODO: we don't need realloc since Vec handles it for us
+                                // if (ERTS_UNLIKELY(actual_slots < slots)) {
+                                //     ErlBinMatchState* expanded;
+                                //     Uint live = $Live;
+                                //     Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
+                                //     $GC_TEST_PRESERVE(wordsneeded, live, context);
+                                //     ms = (ErlBinMatchState *) boxed_val(context);
+                                //     expanded = (ErlBinMatchState *) HTOP;
+                                //     *expanded = *ms;
+                                //     *HTOP = HEADER_BIN_MATCHSTATE(slots);
+                                //     HTOP += wordsneeded;
+                                //     HEAP_SPACE_VERIFIED(0);
+                                //     context = make_matchstate(expanded);
+                                //     $REFRESH_GEN_DEST();
+                                // }
+                                set_register!(context, &ins.args[4], cxt);
+                            }
                         }
                         value::BOXED_BINARY => {
                             // Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
@@ -1435,8 +1437,6 @@ impl Machine {
                             continue;
                         }
                     };
-
-                    // TODO: preprocess flags for native endian (remove native_endian and set bsf_little off or on)
 
                     let flags = ins.args[5].to_u32();
                     // let size = size * (flags as usize >> 3); TODO: this was just because flags

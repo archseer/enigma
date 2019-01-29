@@ -155,7 +155,7 @@ pub struct MatchState {
     // TODO: wrap into value
     pub mb: MatchBuffer,
     /// Saved offsets, only valid for contexts created through bs_start_match2.
-    saved_offsets: Vec<usize>,
+    pub saved_offsets: Vec<usize>,
 } // TODO: Dump start_match_2 support. use MatchBuffer directly
 
 // TODO: to be TryFrom once rust stabilizes the trait
