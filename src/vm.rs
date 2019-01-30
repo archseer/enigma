@@ -1452,11 +1452,11 @@ impl Machine {
                             size as usize,
                             bitstring::Flag::from_bits(flags as u8).unwrap(),
                         );
-                        if res.is_none() {
+                        if let Some(res) = res {
+                            set_register!(context, &ins.args[6], res)
+                        } else {
                             let fail = ins.args[0].to_u32();
                             op_jump!(context, fail);
-                        } else {
-                            set_register!(context, &ins.args[6], res)
                         }
                     };
                 }
@@ -1486,11 +1486,11 @@ impl Machine {
                             size as usize,
                             bitstring::Flag::from_bits(flags as u8).unwrap(),
                         );
-                        if res.is_none() {
+                        if let Some(res) = res {
+                            set_register!(context, &ins.args[6], res)
+                        } else {
                             let fail = ins.args[0].to_u32();
                             op_jump!(context, fail);
-                        } else {
-                            set_register!(context, &ins.args[6], res)
                         }
                     };
                 }

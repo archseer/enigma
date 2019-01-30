@@ -328,10 +328,14 @@ pub fn start_match_2(process: &RcProcess, binary: Term, max: u32) -> Term {
 // #endif
 
 impl MatchBuffer {
-    pub fn get_float(&mut self, _process: &RcProcess, num_bits: usize, mut flags: Flag) -> Term {
+    pub fn get_float(
+        &mut self,
+        _process: &RcProcess,
+        num_bits: usize,
+        mut flags: Flag,
+    ) -> Option<Term> {
         let mut fl32: f32 = 0.0;
         let mut fl64: f64 = 0.0;
-        let non_value = Term::none();
 
         // TODO: preprocess flags for native endian in loader(remove native_endian and set bsf_little off or on)
         native_endian!(flags);
@@ -339,18 +343,18 @@ impl MatchBuffer {
         // CHECK_MATCH_BUFFER(mb);
 
         if num_bits == 0 {
-            return Term::from(0.0);
+            return Some(Term::from(0.0));
         }
 
         if (self.size - self.offset) < num_bits {
             // Asked for too many bits.
-            return non_value;
+            return None;
         }
 
         let fptr: *mut u8 = match num_bits {
             32 => &mut fl32 as *mut f32 as *mut u8,
             64 => &mut fl64 as *mut f64 as *mut u8,
-            _ => return non_value,
+            _ => return None,
         };
 
         if bit_is_machine_endian!(flags) {
@@ -381,7 +385,7 @@ impl MatchBuffer {
 
         let f = if num_bits == 32 {
             if !fl32.is_finite() {
-                return non_value;
+                return None;
             }
             Term::from(fl32 as f64)
         } else {
@@ -395,35 +399,43 @@ impl MatchBuffer {
             //   ...
             //   #endif
             if !fl64.is_finite() {
-                return non_value;
+                return None;
             }
             Term::from(fl64)
         };
         self.offset += num_bits;
-        f
+        Some(f)
     }
 
-    pub fn get_binary(&mut self, process: &RcProcess, num_bits: usize, mut flags: Flag) -> Term {
+    pub fn get_binary(
+        &mut self,
+        process: &RcProcess,
+        num_bits: usize,
+        mut flags: Flag,
+    ) -> Option<Term> {
         // CHECK_MATCH_BUFFER(mb);
 
         // Reduce the use of none by using Result.
         if (self.size - self.offset) < num_bits {
             // Asked for too many bits.
-            return Term::none();
+            return None;
         }
 
         // From now on, we can't fail.
 
-        let binary = Term::subbinary(&process.context_mut().heap, SubBinary {
-            original: self.original.clone(),
-            size: byte_offset!(num_bits),
-            bitsize: bit_offset!(num_bits),
-            offset: byte_offset!(self.offset),
-            bit_offset: bit_offset!(self.offset),
-            is_writable: false,
-        });
+        let binary = Term::subbinary(
+            &process.context_mut().heap,
+            SubBinary {
+                original: self.original.clone(),
+                size: byte_offset!(num_bits),
+                bitsize: bit_offset!(num_bits),
+                offset: byte_offset!(self.offset),
+                bit_offset: bit_offset!(self.offset),
+                is_writable: false,
+            },
+        );
         self.offset += num_bits;
-        binary
+        Some(binary)
     }
 }
 
