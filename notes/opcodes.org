@@ -1,4 +1,4 @@
-* Opcodes [102/138]
+* Opcodes [103/138]
 - [X] Label = 1
 - [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -97,7 +97,7 @@
 - [X] BsRestore2 = 123
 - [X] GcBif1 = 124
 - [X] GcBif2 = 125
-- [ ] IsBitstr = 129
+- [X] IsBitstr = 129
 - [ ] BsContextToBinary = 130
 - [X] BsTestUnit = 131
 - [ ] BsMatchString = 132

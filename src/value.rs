@@ -544,8 +544,24 @@ impl Term {
         self.get_type() == Type::Ref
     }
 
-    pub fn is_binary(self) -> bool {
+    #[inline]
+    pub fn is_bitstring(self) -> bool {
         self.get_type() == Type::Binary
+    }
+
+    #[inline]
+    pub fn is_binary(self) -> bool {
+        if let Variant::Pointer(ptr) = self.into_variant() {
+            return match *ptr {
+                BOXED_SUBBINARY => unsafe {
+                    let Boxed { value: binary, .. } = &*(ptr as *const Boxed<bitstring::SubBinary>);
+                    return binary.is_binary();
+                },
+                BOXED_BINARY => true,
+                _ => false,
+            };
+        }
+        false
     }
 
     #[inline]

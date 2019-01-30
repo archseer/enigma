@@ -389,8 +389,8 @@
 - [ ] bif erlang:iolist_to_binary/1
 - [ ] bif erlang:list_to_existing_atom/1
 
-** New Bifs in R12B-0 [2/6]
-- [ ] ubif erlang:is_bitstring/1
+** New Bifs in R12B-0 [3/6]
+- [X] ubif erlang:is_bitstring/1
 - [X] ubif erlang:tuple_size/1
 - [X] ubif erlang:byte_size/1
 - [ ] ubif erlang:bit_size/1

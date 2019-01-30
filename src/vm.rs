@@ -863,6 +863,7 @@ impl Machine {
                 Opcode::IsPort => op_is_type!(context, ins.args, is_port),
                 Opcode::IsNil => op_is_type!(context, ins.args, is_nil),
                 Opcode::IsBinary => op_is_type!(context, ins.args, is_binary),
+                Opcode::IsBitstr => op_is_type!(context, ins.args, is_bitstring),
                 Opcode::IsList => op_is_type!(context, ins.args, is_list),
                 Opcode::IsNonemptyList => op_is_type!(context, ins.args, is_non_empty_list),
                 Opcode::IsTuple => op_is_type!(context, ins.args, is_tuple),
@@ -1365,7 +1366,9 @@ impl Machine {
 
                     match header {
                         value::BOXED_MATCHSTATE => {
-                            if let value::Boxed { value: ms, .. } = cxt.get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>() {
+                            if let value::Boxed { value: ms, .. } =
+                                cxt.get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>()
+                            {
                                 // Uint actual_slots = HEADER_NUM_SLOTS(header);
                                 let actual_slots = ms.saved_offsets.len();
 
@@ -1544,14 +1547,14 @@ impl Machine {
                 Opcode::BsSave2 => {
                     debug_assert_eq!(ins.args.len(), 2);
                     // cxt slot
-                    if let value::Boxed { value: ms, .. } =
-                        context.expand_arg(&ins.args[0])
-                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>()
-                    {
+                    if let value::Boxed { value: ms, .. } = context
+                        .expand_arg(&ins.args[0])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
                         let slot = match ins.args[1] {
                             LValue::Integer(i) => i as usize,
                             LValue::Atom(atom::START) => 0,
-                            _ => unreachable!()
+                            _ => unreachable!(),
                         };
                         ms.saved_offsets[slot] = ms.mb.offset;
                     } else {
@@ -1561,14 +1564,14 @@ impl Machine {
                 Opcode::BsRestore2 => {
                     debug_assert_eq!(ins.args.len(), 2);
                     // cxt slot
-                    if let value::Boxed { value: ms, .. } =
-                        context.expand_arg(&ins.args[0])
-                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>()
-                    {
+                    if let value::Boxed { value: ms, .. } = context
+                        .expand_arg(&ins.args[0])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
                         let slot = match ins.args[1] {
                             LValue::Integer(i) => i as usize,
                             LValue::Atom(atom::START) => 0,
-                            _ => unreachable!()
+                            _ => unreachable!(),
                         };
                         ms.mb.offset = ms.saved_offsets[slot];
                     } else {

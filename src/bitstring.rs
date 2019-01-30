@@ -122,6 +122,7 @@ impl TryInto<value::Boxed<RcBinary>> for Term {
     }
 }
 
+/// Binaries are bitstrings by default, byte aligned ones are binaries.
 pub struct SubBinary {
     // TODO: wrap into value
     /// Binary size in bytes
@@ -152,6 +153,12 @@ impl TryInto<value::Boxed<SubBinary>> for Term {
             }
         }
         Err(value::WrongBoxError)
+    }
+}
+
+impl SubBinary {
+    pub fn is_binary(&self) -> bool {
+        self.bitsize != 0
     }
 }
 
