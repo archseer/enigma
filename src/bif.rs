@@ -447,7 +447,7 @@ fn bif_erlang_map_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term])
     if let Ok(value::Map { map, .. }) = &args[0].try_into() {
         return Ok(Term::int(map.len() as i32));
     }
-    Err(Exception::with_value(Reason::EXC_BADARG, args[0].clone()))
+    Err(Exception::with_value(Reason::EXC_BADARG, args[0]))
 }
 
 fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {

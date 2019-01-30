@@ -216,6 +216,7 @@ pub const BOXED_CATCH: u8 = 7;
 pub const BOXED_STACKTRACE: u8 = 8;
 
 pub const BOXED_MATCHSTATE: u8 = 9;
+pub const BOXED_SUBBINARY: u8 = 10;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -357,6 +358,13 @@ impl Term {
         }))
     }
 
+    pub fn subbinary(heap: &Heap, value: bitstring::SubBinary) -> Self {
+        Term::from(heap.alloc(Boxed {
+            header: BOXED_SUBBINARY,
+            value,
+        }))
+    }
+
     pub fn matchstate(heap: &Heap, value: bitstring::MatchState) -> Self {
         Term::from(heap.alloc(Boxed {
             header: BOXED_MATCHSTATE,
@@ -452,7 +460,8 @@ impl Term {
                 BOXED_CLOSURE => Type::Closure,
                 BOXED_CP => Type::CP,
                 BOXED_CATCH => Type::Catch,
-                BOXED_MATCHBUFFER => Type::MatchState,
+                BOXED_MATCHSTATE => Type::MatchState,
+                BOXED_SUBBINARY => Type::Binary,
                 _ => unimplemented!(),
             },
             _ => unreachable!(),

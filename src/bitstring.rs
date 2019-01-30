@@ -138,6 +138,23 @@ pub struct SubBinary {
     original: RcBinary,
 }
 
+// TODO: to be TryFrom once rust stabilizes the trait
+impl TryInto<value::Boxed<SubBinary>> for Term {
+    type Error = value::WrongBoxError;
+
+    #[inline]
+    fn try_into(&self) -> Result<&value::Boxed<SubBinary>, value::WrongBoxError> {
+        if let value::Variant::Pointer(ptr) = self.into_variant() {
+            unsafe {
+                if *ptr == value::BOXED_SUBBINARY {
+                    return Ok(&*(ptr as *const value::Boxed<SubBinary>));
+                }
+            }
+        }
+        Err(value::WrongBoxError)
+    }
+}
+
 // TODO: let's use nom to handle offsets & matches, and keep a reference to the binary
 #[derive(Debug)]
 pub struct MatchBuffer {
@@ -311,7 +328,7 @@ pub fn start_match_2(process: &RcProcess, binary: Term, max: u32) -> Term {
 // #endif
 
 impl MatchBuffer {
-    pub fn get_float(&mut self, process: &RcProcess, num_bits: usize, mut flags: Flag) -> Term {
+    pub fn get_float(&mut self, _process: &RcProcess, num_bits: usize, mut flags: Flag) -> Term {
         let mut fl32: f32 = 0.0;
         let mut fl64: f64 = 0.0;
         let non_value = Term::none();
@@ -385,6 +402,29 @@ impl MatchBuffer {
         self.offset += num_bits;
         f
     }
+
+    pub fn get_binary(&mut self, process: &RcProcess, num_bits: usize, mut flags: Flag) -> Term {
+        // CHECK_MATCH_BUFFER(mb);
+
+        // Reduce the use of none by using Result.
+        if (self.size - self.offset) < num_bits {
+            // Asked for too many bits.
+            return Term::none();
+        }
+
+        // From now on, we can't fail.
+
+        let binary = Term::subbinary(&process.context_mut().heap, SubBinary {
+            original: self.original.clone(),
+            size: byte_offset!(num_bits),
+            bitsize: bit_offset!(num_bits),
+            offset: byte_offset!(self.offset),
+            bit_offset: bit_offset!(self.offset),
+            is_writable: false,
+        });
+        self.offset += num_bits;
+        binary
+    }
 }
 
 // Stores data on the process heap. Small, but expensive to copy.
@@ -426,7 +466,7 @@ pub unsafe fn copy_bits(
     let deoffs = bit_offset!(doffs + n);
     let mut lmask = if doffs > 0 { make_mask!(8 - doffs) } else { 0 };
     let rmask = if deoffs > 0 {
-        make_mask!(deoffs) << (8 - deoffs)
+        (make_mask!(deoffs)) << (8 - deoffs)
     } else {
         0
     };
@@ -532,133 +572,3 @@ pub unsafe fn copy_bits(
         }
     }
 }
-
-// /// The basic bit copy operation. Copies n bits from the source buffer to
-// /// the destination buffer. Depending on the directions, it can reverse the
-// /// copied bits.
-// pub unsafe fn copy_bits2(
-//     mut src: &mut[u8],
-//     soffs: usize,       // Bit offset for source relative to src.
-//     sdir: isize,        // Direction: 1 (forward) or -1 (backward).
-//     mut dst: &[u8],   // Base pointer to destination.
-//     doffs: usize,       // Bit offset for destination relative to dst.
-//     ddir: isize,        // Direction: 1 (forward) or -1 (backward).
-//     n: usize,
-// ) // Number of bits to copy.
-// {
-//     if n == 0 {
-//         return;
-//     }
-
-//     let srci = if sdir < 0 { src.len() - byte_offset!(soffs) } else { byte_offset!(soffs) };
-//     let dsti = if ddir < 0 { dst.len() - byte_offset!(doffs) } else { byte_offset!(doffs) };
-//     let soffs = bit_offset!(soffs);
-//     let doffs = bit_offset!(doffs);
-//     let deoffs = bit_offset!(doffs + n);
-//     let mut lmask = if doffs > 0 { make_mask!(8 - doffs) } else { 0 };
-//     let rmask = if deoffs > 0 {
-//         make_mask!(deoffs) << (8 - deoffs)
-//     } else {
-//         0
-//     };
-
-//     // Take care of the case that all bits are in the same byte.
-
-//     if doffs + n < 8 {
-//         // All bits are in the same byte
-//         lmask = if (lmask & rmask) > 0 {
-//             lmask & rmask
-//         } else {
-//             lmask | rmask
-//         };
-
-//         if soffs == doffs {
-//             dst[dsti] = mask_bits!(*src, *dst, lmask);
-//         } else if soffs > doffs {
-//             let mut bits: u8 = src[srci] << (soffs - doffs); // TODO: is it u8
-//             if soffs + n > 8 {
-//                 srci += sdir;
-//                 bits |= src[srci] >> (8 - (soffs - doffs));
-//             }
-//             dst[dsti] = mask_bits!(bits, dst[dsti], lmask);
-//         } else {
-//             dst[dsti] = mask_bits!((src[srci] >> (doffs - soffs)), *dst, lmask);
-//         }
-//         return; // We are done!
-//     }
-
-//     // At this point, we know that the bits are in 2 or more bytes.
-
-//     let mut count = (if lmask > 0 { n - (8 - doffs) } else { n }) >> 3;
-
-//     if soffs == doffs {
-//         /*
-//          * The bits are aligned in the same way. We can just copy the bytes
-//          * (except for the first and last bytes). Note that the directions
-//          * might be different, so we can't just use memcpy().
-//          */
-//         if lmask > 0 {
-//             dst[dsti] = mask_bits!(src[srci], dst[dsti], lmask);
-//             dst.offset(ddir);
-//             src.offset(sdir);
-//         }
-
-//         while count > 0 {
-//             count -= 1;
-//             dst[dsti] = src[srci];
-//             dst.offset(ddir);
-//             src.offset(sdir);
-//         }
-
-//         if rmask > 0 {
-//             dst[dsti] = mask_bits!(src[srci], dst[dsti], rmask);
-//         }
-//     } else {
-//         let mut bits: u8 = 0;
-//         let mut bits1: u8 = 0;
-//         let mut rshift = 0;
-//         let mut lshift = 0;
-
-//         // The tricky case. The bits must be shifted into position.
-
-//         if soffs > doffs {
-//             lshift = soffs - doffs;
-//             rshift = 8 - lshift;
-//             bits = src[srci];
-//             if soffs + n > 8 {
-//                 src.offset(sdir);
-//             }
-//         } else {
-//             rshift = doffs - soffs;
-//             lshift = 8 - rshift;
-//             bits = 0;
-//         }
-
-//         if lmask > 0 {
-//             bits1 = bits << lshift;
-//             bits = *src;
-//             src.offset(sdir);
-//             bits1 |= bits >> rshift;
-//             *dst = mask_bits!(bits1, *dst, lmask);
-//             dst.offset(ddir);
-//         }
-
-//         while count > 0 {
-//             count -= 1;
-//             bits1 = bits << lshift;
-//             bits = *src;
-//             src.offset(sdir);
-//             *dst = bits1 | (bits >> rshift);
-//             dst.offset(ddir);
-//         }
-
-//         if rmask > 0 {
-//             bits1 = bits << lshift;
-//             if (rmask << rshift) & 0xff > 0 {
-//                 bits = *src;
-//                 bits1 |= bits >> rshift;
-//             }
-//             *dst = mask_bits!(bits1, *dst, rmask);
-//         }
-//     }
-// }

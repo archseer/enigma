@@ -1395,7 +1395,7 @@ impl Machine {
                             // Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
                             // $GC_TEST_PRESERVE(wordsneeded, live, context);
 
-                            let result = bitstring::start_match_2(&process, cxt, slots);
+                            let result = bitstring::start_match_2(process, cxt, slots);
 
                             if result.is_none() {
                                 // TODO: just use Result<>'s None instead of THE_NON_VALUE for most of these cases.
@@ -1448,7 +1448,7 @@ impl Machine {
                         .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
                     ) {
                         let res = ms.mb.get_float(
-                            &process,
+                            process,
                             size as usize,
                             bitstring::Flag::from_bits(flags as u8).unwrap(),
                         );
@@ -1462,7 +1462,37 @@ impl Machine {
                 }
                 Opcode::BsGetBinary2 => {
                     debug_assert_eq!(ins.args.len(), 7);
-                    unimplemented!() // TODO
+
+                    let size = match ins.args[3] {
+                        LValue::Integer(size) => size as usize,
+                        _ => {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                            continue;
+                        }
+                    };
+
+                    let flags = ins.args[5].to_u32();
+                    // let size = size * (flags as usize >> 3); TODO: this was just because flags
+                    // & size were packed together on BEAM
+
+                    // TODO: this cast can fail
+                    if let value::Boxed { value: ms, .. } = context
+                        .expand_arg(&ins.args[1])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
+                        let res = ms.mb.get_binary(
+                            process,
+                            size as usize,
+                            bitstring::Flag::from_bits(flags as u8).unwrap(),
+                        );
+                        if res.is_none() {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                        } else {
+                            set_register!(context, &ins.args[6], res)
+                        }
+                    };
                 }
                 Opcode::BsSkipBits2 => {
                     debug_assert_eq!(ins.args.len(), 5);
@@ -1711,7 +1741,7 @@ impl Machine {
                         // exist, jump to fail label.
                         let mut iter = list.chunks_exact(2);
                         while let Some([key, _dest]) = iter.next() {
-                            if let Some(_) = map.find(&key.to_term()) {
+                            if map.find(&key.to_term()).is_some() {
                                 // ok
                             } else {
                                 op_jump!(context, *fail);
