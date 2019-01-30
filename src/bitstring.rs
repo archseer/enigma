@@ -430,7 +430,7 @@ impl MatchBuffer {
                 size: byte_offset!(num_bits),
                 bitsize: bit_offset!(num_bits),
                 offset: byte_offset!(self.offset),
-                bit_offset: bit_offset!(self.offset),
+                bit_offset: bit_offset!(self.offset as u8), // TODO looks wrong
                 is_writable: false,
             },
         );

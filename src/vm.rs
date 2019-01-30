@@ -1555,6 +1555,32 @@ impl Machine {
                     // i bs get binary all reuse rx f I.
                     unimplemented!() // TODO
                 }
+                Opcode::BsTestUnit => {
+                    debug_assert_eq!(ins.args.len(), 3);
+                    // fail cxt unit
+                    // Checks that the size of the remainder of the matching context is divisible
+                    // by unit, else jump to fail
+
+                    if let Ok(value::Boxed { value, .. }) =
+                        context.expand_arg(&ins.args[1]).try_into()
+                    {
+                        let ms: &bitstring::MatchState = value; // ughh type annotation
+                        let mb = &ms.mb;
+
+                        if mb.size - mb.offset % offset != 0 {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                        }
+                    } else {
+                        unreachable!()
+                    }
+                    unimplemented!() // TODO
+                }
+                Opcode::BsMatchString => {
+                    debug_assert_eq!(ins.args.len(), 4);
+                    // fail cxt bits ptr (literal val? use val - 1 as a string_heap offs)
+                    unimplemented!() // TODO
+                }
                 Opcode::Fclearerror => {
                     // src, dest
                     // TODO: we currently don't have a separate flag
