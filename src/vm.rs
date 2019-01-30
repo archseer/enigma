@@ -1543,11 +1543,37 @@ impl Machine {
                 }
                 Opcode::BsSave2 => {
                     debug_assert_eq!(ins.args.len(), 2);
-                    unimplemented!() // TODO
+                    // cxt slot
+                    if let value::Boxed { value: ms, .. } =
+                        context.expand_arg(&ins.args[0])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>()
+                    {
+                        let slot = match ins.args[1] {
+                            LValue::Integer(i) => i as usize,
+                            LValue::Atom(atom::START) => 0,
+                            _ => unreachable!()
+                        };
+                        ms.saved_offsets[slot] = ms.mb.offset;
+                    } else {
+                        unreachable!()
+                    }
                 }
                 Opcode::BsRestore2 => {
                     debug_assert_eq!(ins.args.len(), 2);
-                    unimplemented!() // TODO
+                    // cxt slot
+                    if let value::Boxed { value: ms, .. } =
+                        context.expand_arg(&ins.args[0])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>()
+                    {
+                        let slot = match ins.args[1] {
+                            LValue::Integer(i) => i as usize,
+                            LValue::Atom(atom::START) => 0,
+                            _ => unreachable!()
+                        };
+                        ms.mb.offset = ms.saved_offsets[slot];
+                    } else {
+                        unreachable!()
+                    }
                 }
                 Opcode::BsContextToBinary => {
                     debug_assert_eq!(ins.args.len(), 1);
@@ -1567,7 +1593,9 @@ impl Machine {
                         let ms: &bitstring::MatchState = value; // ughh type annotation
                         let mb = &ms.mb;
 
-                        if mb.size - mb.offset % offset != 0 {
+                        let unit = ins.args[2].to_u32() as usize;
+
+                        if mb.size - mb.offset % unit != 0 {
                             let fail = ins.args[0].to_u32();
                             op_jump!(context, fail);
                         }
