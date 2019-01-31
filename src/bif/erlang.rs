@@ -57,8 +57,23 @@ pub fn bif_erlang_make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[T
     Ok(Term::from(tuple))
 }
 
-pub fn bif_erlang_append_element_2(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> BifResult {
-    unimplemented!()
+pub fn bif_erlang_append_element_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    if !args[0].is_tuple() {
+        return Err(Exception::new(Reason::EXC_BADARG));
+    }
+    let t: &Tuple = match args[0].try_into() {
+        Ok(tuple) => tuple,
+        _ => return Err(Exception::new(Reason::EXC_BADARG))
+    };
+    let heap = &process.context_mut().heap;
+    let mut new_tuple = value::tuple(&heap, (t.len() + 1) as u32);
+    unsafe {
+        for num in 0..t.len() {
+            std::ptr::write(&mut new_tuple[num], t[num])
+        }
+        std::ptr::write(&mut new_tuple[t.len()], args[1]);
+    }
+    Ok(Term::from(new_tuple))
 }
 
 pub fn bif_erlang_setelement_3(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> BifResult {
