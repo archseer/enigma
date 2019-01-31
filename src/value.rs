@@ -8,6 +8,7 @@ use crate::immix::Heap;
 use crate::loader;
 use crate::nanbox::TypedNanBox;
 use crate::process::{self, InstrPtr};
+use crate::servo_arc::Arc;
 use allocator_api::Layout;
 use num::bigint::BigInt;
 use std::cmp::Ordering;
@@ -214,6 +215,9 @@ pub const BOXED_CP: u8 = 6;
 pub const BOXED_CATCH: u8 = 7;
 pub const BOXED_STACKTRACE: u8 = 8;
 
+pub const BOXED_MATCHSTATE: u8 = 9;
+pub const BOXED_SUBBINARY: u8 = 10;
+
 #[derive(Debug)]
 #[repr(C)]
 pub struct Boxed<T> {
@@ -256,6 +260,7 @@ pub enum Type {
     // runtime values
     CP,
     Catch,
+    MatchState,
 }
 
 pub enum Num {
@@ -349,6 +354,20 @@ impl Term {
     pub fn binary(heap: &Heap, value: bitstring::Binary) -> Self {
         Term::from(heap.alloc(Boxed {
             header: BOXED_BINARY,
+            value: Arc::new(value),
+        }))
+    }
+
+    pub fn subbinary(heap: &Heap, value: bitstring::SubBinary) -> Self {
+        Term::from(heap.alloc(Boxed {
+            header: BOXED_SUBBINARY,
+            value,
+        }))
+    }
+
+    pub fn matchstate(heap: &Heap, value: bitstring::MatchState) -> Self {
+        Term::from(heap.alloc(Boxed {
+            header: BOXED_MATCHSTATE,
             value,
         }))
     }
@@ -441,6 +460,8 @@ impl Term {
                 BOXED_CLOSURE => Type::Closure,
                 BOXED_CP => Type::CP,
                 BOXED_CATCH => Type::Catch,
+                BOXED_MATCHSTATE => Type::MatchState,
+                BOXED_SUBBINARY => Type::Binary,
                 _ => unimplemented!(),
             },
             _ => unreachable!(),
@@ -454,18 +475,18 @@ impl Term {
         panic!("Not a boxed type!")
     }
 
-    pub fn get_boxed_value<T>(&self) -> &T {
+    pub fn get_boxed_value<T>(&self) -> Result<&T, &str> {
         if let Variant::Pointer(ptr) = self.into_variant() {
-            unsafe { return &*(ptr as *const T) }
+            unsafe { return Ok(&*(ptr as *const T)) }
         }
-        panic!("Not a boxed type!")
+        Err("Not a boxed type!")
     }
 
-    pub fn get_boxed_value_mut<T>(&self) -> &mut T {
+    pub fn get_boxed_value_mut<T>(&self) -> Result<&mut T, &str> {
         if let Variant::Pointer(ptr) = self.into_variant() {
-            unsafe { return &mut *(ptr as *mut T) }
+            unsafe { return Ok(&mut *(ptr as *mut T)) }
         }
-        panic!("Not a boxed type!")
+        Err("Not a boxed type!")
     }
 
     /// A method that's optimized for retrieving number types.
@@ -523,8 +544,24 @@ impl Term {
         self.get_type() == Type::Ref
     }
 
-    pub fn is_binary(self) -> bool {
+    #[inline]
+    pub fn is_bitstring(self) -> bool {
         self.get_type() == Type::Binary
+    }
+
+    #[inline]
+    pub fn is_binary(self) -> bool {
+        if let Variant::Pointer(ptr) = self.into_variant() {
+            return match unsafe { *ptr } {
+                BOXED_SUBBINARY => unsafe {
+                    let Boxed { value: binary, .. } = &*(ptr as *const Boxed<bitstring::SubBinary>);
+                    return binary.is_binary();
+                },
+                BOXED_BINARY => true,
+                _ => false,
+            };
+        }
+        false
     }
 
     #[inline]
@@ -725,7 +762,7 @@ impl std::fmt::Display for Variant {
                             }
                         }
                         write!(f, "}}")
-                    },
+                    }
                     BOXED_BIGINT => write!(f, "#BigInt<>"),
                     BOXED_CLOSURE => write!(f, "#Fun<>"),
                     _ => unimplemented!(),

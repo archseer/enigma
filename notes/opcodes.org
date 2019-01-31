@@ -1,4 +1,4 @@
-* Opcodes [94/138]
+* Opcodes [104/138]
 - [X] Label = 1
 - [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -87,19 +87,19 @@
 - [X] ApplyLast = 113
 - [X] IsBoolean = 114
 - [X] IsFunction2 = 115
-- [ ] BsStartMatch2 = 116
+- [X] BsStartMatch2 = 116
 - [ ] BsGetInteger2 = 117
-- [ ] BsGetFloat2 = 118
-- [ ] BsGetBinary2 = 119
-- [ ] BsSkipBits2 = 120
-- [ ] BsTestTail2 = 121
-- [ ] BsSave2 = 122
-- [ ] BsRestore2 = 123
+- [X] BsGetFloat2 = 118
+- [X] BsGetBinary2 = 119
+- [X] BsSkipBits2 = 120
+- [X] BsTestTail2 = 121
+- [X] BsSave2 = 122
+- [X] BsRestore2 = 123
 - [X] GcBif1 = 124
 - [X] GcBif2 = 125
-- [ ] IsBitstr = 129
-- [ ] BsContextToBinary = 130
-- [ ] BsTestUnit = 131
+- [X] IsBitstr = 129
+- [X] BsContextToBinary = 130
+- [X] BsTestUnit = 131
 - [ ] BsMatchString = 132
 - [ ] BsInitWritable = 133
 - [ ] BsAppend = 134

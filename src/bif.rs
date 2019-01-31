@@ -52,6 +52,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
     bifs.insert((erlang, atom::from_str("is_port"), 1), bif_erlang_is_port_1);
     bifs.insert((erlang, atom::from_str("is_reference"), 1), bif_erlang_is_reference_1);
     bifs.insert((erlang, atom::from_str("is_binary"), 1), bif_erlang_is_binary_1);
+    bifs.insert((erlang, atom::from_str("is_bitstring"), 1), bif_erlang_is_bitstring_1);
     bifs.insert((erlang, atom::from_str("is_function"), 1), bif_erlang_is_function_1);
     bifs.insert((erlang, atom::from_str("is_boolean"), 1), bif_erlang_is_boolean_1);
     bifs.insert((erlang, atom::from_str("is_map"), 1), bif_erlang_is_map_1);
@@ -266,6 +267,10 @@ fn bif_erlang_is_binary_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]
     Ok(Term::boolean(args[0].is_binary()))
 }
 
+fn bif_erlang_is_bitstring_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+    Ok(Term::boolean(args[0].is_bitstring()))
+}
+
 fn bif_erlang_is_function_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     Ok(Term::boolean(args[0].is_function()))
 }
@@ -435,7 +440,7 @@ fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]
             header: value::BOXED_BINARY,
             value: str,
         }) => {
-            let str: &bitstring::Binary = str; // type annotation
+            let str: &bitstring::RcBinary = str; // type annotation
             str.data.len()
         }
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -447,7 +452,7 @@ fn bif_erlang_map_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term])
     if let Ok(value::Map { map, .. }) = &args[0].try_into() {
         return Ok(Term::int(map.len() as i32));
     }
-    Err(Exception::with_value(Reason::EXC_BADARG, args[0].clone()))
+    Err(Exception::with_value(Reason::EXC_BADARG, args[0]))
 }
 
 fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
@@ -1139,6 +1144,24 @@ mod tests {
         let res = bif_erlang_is_binary_1(&vm, &process, &args);
         assert_eq!(res, Ok(atom!(FALSE)));
     }
+
+    #[test]
+    fn test_bif_erlang_is_bitstring_1() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm.state, module).unwrap();
+        let heap = &process.context_mut().heap;
+
+        let str = bitstring::Binary::new();
+        let args = vec![Term::binary(heap, str)];
+        let res = bif_erlang_is_bitstring_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(TRUE)));
+
+        let args = vec![Term::atom(3)];
+        let res = bif_erlang_is_bitstring_1(&vm, &process, &args);
+        assert_eq!(res, Ok(atom!(FALSE)));
+    }
+
     #[test]
     fn test_bif_erlang_is_function_1() {
         let vm = vm::Machine::new();

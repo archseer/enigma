@@ -4,7 +4,17 @@ defmodule Bin do
     # a = <<>>
     # a <> str <> "5"
     # add("2")
-    interpol("2")
+    parse(<<63, 244, 0, 0, 0, 0, 0, 0>>)
+    parse("hello world")
+    #interpol("2")
+  end
+
+  def parse("hello " <> rest) do
+    rest
+  end
+
+  def parse(<< float :: float >>) do
+    float
   end
 
   def str do

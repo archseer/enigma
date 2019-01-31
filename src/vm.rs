@@ -455,7 +455,7 @@ impl Machine {
     pub fn start_main_process(&self, path: &str) {
         println!("Starting main process...");
         let registry = self.modules.lock();
-        // let module = module::load_module(&self.modules, path).unwrap();
+        //let module = unsafe { &*module::load_module(self, path).unwrap() };
         let module = registry.lookup(atom::from_str("erl_init")).unwrap();
         let process = process::allocate(&self.state, module).unwrap();
 
@@ -863,6 +863,7 @@ impl Machine {
                 Opcode::IsPort => op_is_type!(context, ins.args, is_port),
                 Opcode::IsNil => op_is_type!(context, ins.args, is_nil),
                 Opcode::IsBinary => op_is_type!(context, ins.args, is_binary),
+                Opcode::IsBitstr => op_is_type!(context, ins.args, is_bitstring),
                 Opcode::IsList => op_is_type!(context, ins.args, is_list),
                 Opcode::IsNonemptyList => op_is_type!(context, ins.args, is_non_empty_list),
                 Opcode::IsTuple => op_is_type!(context, ins.args, is_tuple),
@@ -1231,15 +1232,10 @@ impl Machine {
                         unreachable!()
                     }
                 }
-                Opcode::BsPutString => {
-                    // BsPutString uses the StrT strings table! needs to be patched in loader
-                    if let LValue::Binary(str) = &ins.args[0] {
-                        unsafe {
-                            (*context.bs).extend_from_slice(&str.data);
-                        }
-                    } else {
-                        unreachable!()
-                    }
+                Opcode::BsPutInteger => {
+                    // gen_put_integer(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
+                    // Size can be atom all
+                    unimplemented!()
                 }
                 Opcode::BsPutBinary => {
                     if let [LValue::Label(fail), size, LValue::Literal(unit), _flags, src] =
@@ -1255,7 +1251,7 @@ impl Machine {
                             header: value::BOXED_BINARY,
                         }) = context.expand_arg(src).try_into()
                         {
-                            let value: &bitstring::Binary = value;
+                            let value: &bitstring::RcBinary = value;
                             match size {
                                 LValue::Atom(atom::ALL) => unsafe {
                                     (*context.bs).extend_from_slice(&value.data);
@@ -1297,10 +1293,15 @@ impl Machine {
                         unreachable!()
                     }
                 }
-                Opcode::BsPutInteger => {
-                    // gen_put_integer(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
-                    // Size can be atom all
-                    unimplemented!()
+                Opcode::BsPutString => {
+                    // BsPutString uses the StrT strings table! needs to be patched in loader
+                    if let LValue::Binary(str) = &ins.args[0] {
+                        unsafe {
+                            (*context.bs).extend_from_slice(&str.data);
+                        }
+                    } else {
+                        unreachable!()
+                    }
                 }
                 // BsGet and BsSkip should be implemented over an Iterator inside a match context (.skip/take)
                 // maybe we can even use nom for this
@@ -1333,6 +1334,306 @@ impl Machine {
                     // a new shared data, a new ProcBin, and a new subbinary. For all heap
                     // allocation, a space for more Arg1 words are requested. Arg2 is Live. Arg3 is
                     // unit. Saves the resultant subbinary to Arg4.
+                }
+                Opcode::BsStartMatch2 => {
+                    debug_assert_eq!(ins.args.len(), 5);
+                    // fail, src, live, slots?, dst
+                    // check if src is a match context with space for n slots (matches) else
+                    // allocate one. if we can't, jump to fail.
+                    // ibsstartmatch2 rxy f I I d
+                    // Checks that Arg0 is the matching context with enough slots for saved
+                    // offsets. The number of slots needed is given by Arg3. If there not enough
+                    // slots of if Arg0 is a regular binary then recreates the matching context and
+                    // saves it to Arg4. If something does not work jumps to Arg1. Arg2 is Live.
+
+                    // Uint slots;
+                    // Uint live;
+                    // Eterm header;
+
+                    let cxt = context.expand_arg(&ins.args[1]);
+
+                    if !cxt.is_pointer() {
+                        let fail = ins.args[0].to_u32();
+                        op_jump!(context, fail);
+                        continue;
+                    }
+
+                    let header = cxt.get_boxed_header();
+
+                    // Reserve a slot for the start position.
+                    let slots = ins.args[3].to_u32() + 1;
+                    let live = ins.args[2].to_u32();
+
+                    match header {
+                        value::BOXED_MATCHSTATE => {
+                            if let Ok(value::Boxed { value: ms, .. }) =
+                                cxt.get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>()
+                            {
+                                // Uint actual_slots = HEADER_NUM_SLOTS(header);
+                                let actual_slots = ms.saved_offsets.len();
+
+                                // We're not compatible with contexts created by bs_start_match3.
+                                assert!(actual_slots >= 2);
+
+                                ms.saved_offsets[0] = ms.mb.offset;
+                                // TODO: we don't need realloc since Vec handles it for us
+                                // if (ERTS_UNLIKELY(actual_slots < slots)) {
+                                //     ErlBinMatchState* expanded;
+                                //     Uint live = $Live;
+                                //     Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
+                                //     $GC_TEST_PRESERVE(wordsneeded, live, context);
+                                //     ms = (ErlBinMatchState *) boxed_val(context);
+                                //     expanded = (ErlBinMatchState *) HTOP;
+                                //     *expanded = *ms;
+                                //     *HTOP = HEADER_BIN_MATCHSTATE(slots);
+                                //     HTOP += wordsneeded;
+                                //     HEAP_SPACE_VERIFIED(0);
+                                //     context = make_matchstate(expanded);
+                                //     $REFRESH_GEN_DEST();
+                                // }
+                                set_register!(context, &ins.args[4], cxt);
+                            }
+                        }
+                        value::BOXED_BINARY => {
+                            // Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
+                            // $GC_TEST_PRESERVE(wordsneeded, live, context);
+
+                            let result = bitstring::start_match_2(process, cxt, slots);
+
+                            if result.is_none() {
+                                // TODO: just use Result<>'s None instead of THE_NON_VALUE for most of these cases.
+                                let fail = ins.args[0].to_u32();
+                                op_jump!(context, fail);
+                                continue;
+                            }
+                            set_register!(context, &ins.args[4], result)
+                        }
+                        _ => {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                            continue;
+                        }
+                    }
+                }
+                Opcode::BsGetInteger2 => {
+                    debug_assert_eq!(ins.args.len(), 7);
+                    // bs_get_integer2 Fail=f Ms=xy Live=u Sz=sq Unit=u Flags=u Dst=d
+                    // ms == context
+                    // match bits {
+                    //     8 => unimplemented!()
+                    //     16 => unimplemented!()
+                    //     32 => unimplemented!()
+                    //     _ => unimplemented!() // slow fallback
+                    // }
+
+                    unimplemented!() // TODO
+                }
+                Opcode::BsGetFloat2 => {
+                    debug_assert_eq!(ins.args.len(), 7);
+                    // bs_get_float2 Fail=f Ms=xy Live=u Sz=sq Unit=u Flags=u Dst=d
+
+                    let size = match ins.args[3] {
+                        LValue::Integer(size) if size <= 64 => size as usize,
+                        _ => {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                            continue;
+                        }
+                    };
+
+                    let flags = ins.args[5].to_u32();
+                    // let size = size * (flags as usize >> 3); TODO: this was just because flags
+                    // & size were packed together on BEAM
+
+                    // TODO: this cast can fail
+                    if let Ok(value::Boxed { value: ms, .. }) = context
+                        .expand_arg(&ins.args[1])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
+                        let res = ms.mb.get_float(
+                            process,
+                            size as usize,
+                            bitstring::Flag::from_bits(flags as u8).unwrap(),
+                        );
+                        if let Some(res) = res {
+                            set_register!(context, &ins.args[6], res)
+                        } else {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                        }
+                    };
+                }
+                Opcode::BsGetBinary2 => {
+                    debug_assert_eq!(ins.args.len(), 7);
+
+                    let size = match ins.args[3] {
+                        LValue::Integer(size) => size as usize,
+                        _ => {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                            continue;
+                        }
+                    };
+
+                    let flags = ins.args[5].to_u32();
+                    // let size = size * (flags as usize >> 3); TODO: this was just because flags
+                    // & size were packed together on BEAM
+
+                    // TODO: this cast can fail
+                    if let Ok(value::Boxed { value: ms, .. }) = context
+                        .expand_arg(&ins.args[1])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
+                        let res = ms.mb.get_binary(
+                            process,
+                            size as usize,
+                            bitstring::Flag::from_bits(flags as u8).unwrap(),
+                        );
+                        if let Some(res) = res {
+                            set_register!(context, &ins.args[6], res)
+                        } else {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                        }
+                    };
+                }
+                Opcode::BsSkipBits2 => {
+                    debug_assert_eq!(ins.args.len(), 5);
+                    // fail, ms, size, unit, flags
+
+                    if let Ok(value::Boxed { value, .. }) =
+                        context.expand_arg(&ins.args[1]).try_into()
+                    {
+                        let ms: &bitstring::MatchState = value; // ughh type annotation
+                        let mb = &ms.mb;
+
+                        let size = ins.args[2].to_u32();
+                        let unit = ins.args[3].to_u32();
+
+                        let new_offset = mb.offset + (size * unit) as usize;
+
+                        if new_offset <= mb.size {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                        }
+                    } else {
+                        unreachable!()
+                    }
+                }
+                Opcode::BsTestTail2 => {
+                    debug_assert_eq!(ins.args.len(), 3);
+                    // fail, ms, bits
+                    // TODO: beam specializes bits 0
+                    // Checks that the matching context Arg1 has exactly Arg2 unmatched bits. Jumps
+                    // to the label Arg0 if it is not so.
+                    // if size 0 == Jumps to the label in Arg0 if the matching context Arg1 still have unmatched bits.
+
+                    let offset = ins.args[2].to_u32() as usize;
+
+                    if let Ok(value::Boxed { value, .. }) =
+                        context.expand_arg(&ins.args[1]).try_into()
+                    {
+                        let ms: &bitstring::MatchState = value; // ughh type annotation
+                        let mb = &ms.mb;
+
+                        if mb.size - mb.offset != offset {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                        }
+                    } else {
+                        unreachable!()
+                    }
+                }
+                Opcode::BsSave2 => {
+                    debug_assert_eq!(ins.args.len(), 2);
+                    // cxt slot
+                    if let Ok(value::Boxed { value: ms, .. }) = context
+                        .expand_arg(&ins.args[0])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
+                        let slot = match ins.args[1] {
+                            LValue::Integer(i) => i as usize,
+                            LValue::Atom(atom::START) => 0,
+                            _ => unreachable!(),
+                        };
+                        ms.saved_offsets[slot] = ms.mb.offset;
+                    } else {
+                        unreachable!()
+                    }
+                }
+                Opcode::BsRestore2 => {
+                    debug_assert_eq!(ins.args.len(), 2);
+                    // cxt slot
+                    if let Ok(value::Boxed { value: ms, .. }) = context
+                        .expand_arg(&ins.args[0])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
+                        let slot = match ins.args[1] {
+                            LValue::Integer(i) => i as usize,
+                            LValue::Atom(atom::START) => 0,
+                            _ => unreachable!(),
+                        };
+                        ms.mb.offset = ms.saved_offsets[slot];
+                    } else {
+                        unreachable!()
+                    }
+                }
+                Opcode::BsContextToBinary => {
+                    debug_assert_eq!(ins.args.len(), 1);
+                    // Converts the matching context to a (sub)binary using almost the same code as
+                    // i bs get binary all reuse rx f I.
+
+                    // cxt slot
+                    if let Ok(value::Boxed { value: ms, .. }) = context
+                        .expand_arg(&ins.args[0])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
+                        let offs = ms.saved_offsets[0];
+                        let size = ms.mb.size - offs;
+                        // TODO; original calculated the hole size and overwrote MatchState mem in
+                        // place.
+                        let res = Term::subbinary(
+                            &context.heap,
+                            bitstring::SubBinary::new(ms.mb.original.clone(), size, offs),
+                        );
+                        set_register!(context, &ins.args[0], res);
+                    } else {
+                        // next0
+                        unreachable!()
+                    }
+                }
+                Opcode::BsTestUnit => {
+                    debug_assert_eq!(ins.args.len(), 3);
+                    // fail cxt unit
+                    // Checks that the size of the remainder of the matching context is divisible
+                    // by unit, else jump to fail
+
+                    if let Ok(value::Boxed { value, .. }) =
+                        context.expand_arg(&ins.args[1]).try_into()
+                    {
+                        let ms: &bitstring::MatchState = value; // ughh type annotation
+                        let mb = &ms.mb;
+
+                        let unit = ins.args[2].to_u32() as usize;
+
+                        if mb.size - mb.offset % unit != 0 {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                        }
+                    } else {
+                        unreachable!()
+                    }
+                    unimplemented!() // TODO
+                }
+                Opcode::BsMatchString => {
+                    debug_assert_eq!(ins.args.len(), 4);
+                    // fail cxt bits ptr (literal val? use val - 1 as a string_heap offs)
+                    unimplemented!() // TODO
+                }
+                Opcode::BsInitWritable => {
+                    debug_assert_eq!(ins.args.len(), 0);
+                    // fail cxt bits ptr (literal val? use val - 1 as a string_heap offs)
+                    unimplemented!() // TODO
                 }
                 Opcode::Fclearerror => {
                     // src, dest
@@ -1530,7 +1831,7 @@ impl Machine {
                         // exist, jump to fail label.
                         let mut iter = list.chunks_exact(2);
                         while let Some([key, _dest]) = iter.next() {
-                            if let Some(_) = map.find(&key.to_term()) {
+                            if map.find(&key.to_term()).is_some() {
                                 // ok
                             } else {
                                 op_jump!(context, *fail);
