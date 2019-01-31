@@ -157,6 +157,17 @@ impl TryInto<value::Boxed<SubBinary>> for Term {
 }
 
 impl SubBinary {
+    pub fn new(original: RcBinary, num_bits: usize, offset: usize) -> Self {
+        SubBinary {
+            original,
+            size: byte_offset!(num_bits),
+            bitsize: bit_offset!(num_bits),
+            offset: byte_offset!(offset),
+            bit_offset: bit_offset!(offset as u8), // TODO looks wrong
+            is_writable: false,
+        }
+    }
+
     pub fn is_binary(&self) -> bool {
         self.bitsize != 0
     }
@@ -166,7 +177,7 @@ impl SubBinary {
 #[derive(Debug)]
 pub struct MatchBuffer {
     /// Original binary
-    original: RcBinary,
+    pub original: RcBinary,
     /// Current position in binary
     // base: usize, // TODO: actually a ptr?
     /// Offset in bits
@@ -432,14 +443,11 @@ impl MatchBuffer {
 
         let binary = Term::subbinary(
             &process.context_mut().heap,
-            SubBinary {
-                original: self.original.clone(),
-                size: byte_offset!(num_bits),
-                bitsize: bit_offset!(num_bits),
-                offset: byte_offset!(self.offset),
-                bit_offset: bit_offset!(self.offset as u8), // TODO looks wrong
-                is_writable: false,
-            },
+            SubBinary::new(
+                self.original.clone(),
+                num_bits,
+                self.offset,
+            ),
         );
         self.offset += num_bits;
         Some(binary)

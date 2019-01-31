@@ -1582,7 +1582,22 @@ impl Machine {
                     debug_assert_eq!(ins.args.len(), 1);
                     // Converts the matching context to a (sub)binary using almost the same code as
                     // i bs get binary all reuse rx f I.
-                    unimplemented!() // TODO
+
+                    // cxt slot
+                    if let value::Boxed { value: ms, .. } = context
+                        .expand_arg(&ins.args[0])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
+                        let offs = ms.saved_offsets[0];
+                        let size = ms.mb.size - offs;
+                        // TODO; original calculated the hole size and overwrote MatchState mem in
+                        // place.
+                        let res = Term::subbinary(&context.heap, bitstring::SubBinary::new(ms.mb.original.clone(), size, offs));
+                        set_register!(context, &ins.args[0], res);
+                    } else {
+                        // next0
+                        unreachable!()
+                    }
                 }
                 Opcode::BsTestUnit => {
                     debug_assert_eq!(ins.args.len(), 3);
