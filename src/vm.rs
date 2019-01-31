@@ -1627,6 +1627,11 @@ impl Machine {
                     // fail cxt bits ptr (literal val? use val - 1 as a string_heap offs)
                     unimplemented!() // TODO
                 }
+                Opcode::BsInitWritable => {
+                    debug_assert_eq!(ins.args.len(), 0);
+                    // fail cxt bits ptr (literal val? use val - 1 as a string_heap offs)
+                    unimplemented!() // TODO
+                }
                 Opcode::Fclearerror => {
                     // src, dest
                     // TODO: we currently don't have a separate flag
