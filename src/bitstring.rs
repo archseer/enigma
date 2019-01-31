@@ -260,6 +260,7 @@ macro_rules! native_endian {
 macro_rules! binary_size {
     ($str:expr) => {
         $str.get_boxed_value::<value::Boxed<RcBinary>>()
+            .unwrap()
             .value
             .data
             .len()
@@ -443,11 +444,7 @@ impl MatchBuffer {
 
         let binary = Term::subbinary(
             &process.context_mut().heap,
-            SubBinary::new(
-                self.original.clone(),
-                num_bits,
-                self.offset,
-            ),
+            SubBinary::new(self.original.clone(), num_bits, self.offset),
         );
         self.offset += num_bits;
         Some(binary)

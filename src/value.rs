@@ -475,18 +475,18 @@ impl Term {
         panic!("Not a boxed type!")
     }
 
-    pub fn get_boxed_value<T>(&self) -> &T {
+    pub fn get_boxed_value<T>(&self) -> Result<&T, &str> {
         if let Variant::Pointer(ptr) = self.into_variant() {
-            unsafe { return &*(ptr as *const T) }
+            unsafe { return Ok(&*(ptr as *const T)) }
         }
-        panic!("Not a boxed type!")
+        Err("Not a boxed type!")
     }
 
-    pub fn get_boxed_value_mut<T>(&self) -> &mut T {
+    pub fn get_boxed_value_mut<T>(&self) -> Result<&mut T, &str> {
         if let Variant::Pointer(ptr) = self.into_variant() {
-            unsafe { return &mut *(ptr as *mut T) }
+            unsafe { return Ok(&mut *(ptr as *mut T)) }
         }
-        panic!("Not a boxed type!")
+        Err("Not a boxed type!")
     }
 
     /// A method that's optimized for retrieving number types.
@@ -552,7 +552,7 @@ impl Term {
     #[inline]
     pub fn is_binary(self) -> bool {
         if let Variant::Pointer(ptr) = self.into_variant() {
-            return match *ptr {
+            return match unsafe { *ptr } {
                 BOXED_SUBBINARY => unsafe {
                     let Boxed { value: binary, .. } = &*(ptr as *const Boxed<bitstring::SubBinary>);
                     return binary.is_binary();

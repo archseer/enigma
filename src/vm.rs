@@ -1366,7 +1366,7 @@ impl Machine {
 
                     match header {
                         value::BOXED_MATCHSTATE => {
-                            if let value::Boxed { value: ms, .. } =
+                            if let Ok(value::Boxed { value: ms, .. }) =
                                 cxt.get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>()
                             {
                                 // Uint actual_slots = HEADER_NUM_SLOTS(header);
@@ -1446,7 +1446,7 @@ impl Machine {
                     // & size were packed together on BEAM
 
                     // TODO: this cast can fail
-                    if let value::Boxed { value: ms, .. } = context
+                    if let Ok(value::Boxed { value: ms, .. }) = context
                         .expand_arg(&ins.args[1])
                         .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
                     ) {
@@ -1480,7 +1480,7 @@ impl Machine {
                     // & size were packed together on BEAM
 
                     // TODO: this cast can fail
-                    if let value::Boxed { value: ms, .. } = context
+                    if let Ok(value::Boxed { value: ms, .. }) = context
                         .expand_arg(&ins.args[1])
                         .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
                     ) {
@@ -1547,7 +1547,7 @@ impl Machine {
                 Opcode::BsSave2 => {
                     debug_assert_eq!(ins.args.len(), 2);
                     // cxt slot
-                    if let value::Boxed { value: ms, .. } = context
+                    if let Ok(value::Boxed { value: ms, .. }) = context
                         .expand_arg(&ins.args[0])
                         .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
                     ) {
@@ -1564,7 +1564,7 @@ impl Machine {
                 Opcode::BsRestore2 => {
                     debug_assert_eq!(ins.args.len(), 2);
                     // cxt slot
-                    if let value::Boxed { value: ms, .. } = context
+                    if let Ok(value::Boxed { value: ms, .. }) = context
                         .expand_arg(&ins.args[0])
                         .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
                     ) {
@@ -1584,7 +1584,7 @@ impl Machine {
                     // i bs get binary all reuse rx f I.
 
                     // cxt slot
-                    if let value::Boxed { value: ms, .. } = context
+                    if let Ok(value::Boxed { value: ms, .. }) = context
                         .expand_arg(&ins.args[0])
                         .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
                     ) {
@@ -1592,7 +1592,10 @@ impl Machine {
                         let size = ms.mb.size - offs;
                         // TODO; original calculated the hole size and overwrote MatchState mem in
                         // place.
-                        let res = Term::subbinary(&context.heap, bitstring::SubBinary::new(ms.mb.original.clone(), size, offs));
+                        let res = Term::subbinary(
+                            &context.heap,
+                            bitstring::SubBinary::new(ms.mb.original.clone(), size, offs),
+                        );
                         set_register!(context, &ins.args[0], res);
                     } else {
                         // next0
