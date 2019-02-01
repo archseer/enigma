@@ -1636,15 +1636,16 @@ impl Machine {
                     unimplemented!() // TODO
                 }
                 Opcode::Fclearerror => {
-                    // src, dest
-                    // TODO: we currently don't have a separate flag
+                    debug_assert_eq!(ins.args.len(), 0);
+                    // TODO: BEAM checks for unhandled errors
+                    context.f[0] = 0.0;
                 }
                 Opcode::Fcheckerror => {
+                    debug_assert_eq!(ins.args.len(), 1);
                     // I think it always checks register fr0
-                    // let f = expand_float!(context, &ins.args[0]);
-                    // if !f.is_finite() {
-                    //     panic!("badarith: TODO raise as exception")
-                    // }
+                    if !context.f[0].is_finite() {
+                        return Err(Exception::new(Reason::EXC_BADARITH));
+                    }
                 }
                 Opcode::Fmove => {
                     // src, dest
