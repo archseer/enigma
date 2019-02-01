@@ -462,9 +462,107 @@ impl MatchBuffer {
 // data is always append only, so maybe have an atomic bool for the writable bit and keep the
 // normal structure lockless.
 
-// bitstring is the base model, binary is an 8-bit aligned bitstring
-// https://www.reddit.com/r/rust/comments/2d7rrj/bit_level_pattern_matching/
 // https://docs.rs/bitstring/0.1.1/bitstring/bit_string/trait.BitString.html
+
+/// Compare unaligned bitstrings. Much slower than memcmp, so only use when necessary.
+// pub fn cmp_bits(a_ptr: *const u8, a_offs: usize, b_ptr: *const u8, b_offs: usize, size: usize) -> bool {
+//     // byte a;
+//     // byte b;
+//     // byte a_bit;
+//     // byte b_bit;
+//     // Uint lshift;
+//     // Uint rshift;
+//     // int cmp;
+
+//     assert!(a_offs < 8 && b_offs < 8);
+
+//     if size == 0 {
+//         return false;
+//     }
+
+//     if ((a_offs | b_offs | size) & 7) == 0 {
+// 	let byte_size = size >> 3;
+//         // compare as slices
+// 	return sys_memcmp(a_ptr, b_ptr, byte_size);
+//     }
+
+//     // Compare bit by bit until a_ptr is aligned on byte boundary
+//     a = *a_ptr++;
+//     b = *b_ptr++;
+//     if a_offs {
+// 	loop {
+// 	    let a_bit: u8 = get_bit(a, a_offs);
+// 	    let b_bit: u8 = get_bit(b, b_offs);
+// 	    if (cmp = (a_bit-b_bit)) != 0 {
+// 		return cmp;
+// 	    }
+// 	    if --size == 0 {
+// 		return false;
+//             }
+
+// 	    b_offs++;
+// 	    if b_offs == 8 {
+// 		b_offs = 0;
+// 		b = *b_ptr++;
+// 	    }
+// 	    a_offs++;
+// 	    if a_offs == 8 {
+// 		a_offs = 0;
+// 		a = *a_ptr++;
+// 		break;
+// 	    }
+// 	}
+//     }
+
+//     // Compare byte by byte as long as at least 8 bits remain
+//     if size >= 8 {
+//         lshift = b_offs;
+//         rshift = 8 - lshift;
+//         loop {
+//             let b_cmp: u8 = (b << lshift);
+//             b = *b_ptr++;
+//             b_cmp |= b >> rshift;
+//             if (cmp = (a - b_cmp)) != 0 {
+//                 return cmp;
+//             }
+//             size -= 8;
+// 	    if size < 8 {
+// 		break;
+//             }
+//             a = *a_ptr++;
+//         }
+
+// 	if size == 0 {
+// 	    return 0;
+//         }
+// 	a = *a_ptr++;
+//     }
+
+//     // Compare the remaining bits bit by bit
+//     if size > 0 {
+//         loop {
+//             let a_bit: u8 = get_bit(a, a_offs);
+//             let b_bit: u8 = get_bit(b, b_offs);
+//             if (cmp = (a_bit-b_bit)) != 0 {
+//                 return cmp;
+//             }
+//             if --size == 0 {
+//                 return false;
+//             }
+
+//             a_offs++;
+// 	    assert!(a_offs < 8);
+
+//             b_offs++;
+//             if b_offs == 8 {
+//                 b_offs = 0;
+//                 b = *b_ptr++;
+//             }
+//         }
+//     }
+
+//     false
+// }
 
 /// The basic bit copy operation. Copies n bits from the source buffer to
 /// the destination buffer. Depending on the directions, it can reverse the
