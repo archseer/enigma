@@ -1664,6 +1664,29 @@ impl Machine {
                     };
                     unimplemented!() // TODO
                 }
+                Opcode::BsGetUtf16 => {
+                    debug_assert_eq!(ins.args.len(), 5);
+                    // fail ms u flags dest
+
+                    let flags = ins.args[5].to_u32();
+
+                    // TODO: this cast can fail
+                    if let Ok(value::Boxed { value: ms, .. }) = context
+                        .expand_arg(&ins.args[1])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
+                        let res = ms
+                            .mb
+                            .get_utf16(bitstring::Flag::from_bits(flags as u8).unwrap());
+                        if let Some(res) = res {
+                            set_register!(context, &ins.args[4], res)
+                        } else {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                        }
+                    };
+                    unimplemented!() // TODO
+                }
                 Opcode::Fclearerror => {
                     debug_assert_eq!(ins.args.len(), 0);
                     // TODO: BEAM checks for unhandled errors

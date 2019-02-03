@@ -560,6 +560,70 @@ impl MatchBuffer {
 
         Some(Term::int(result as i32)) // potentionally unsafe?
     }
+
+    pub fn get_utf16(&mut self, flags: Flag) -> Option<Term> {
+        let remaining_bits = self.size - self.offset;
+        if remaining_bits < 16 {
+            return None;
+        }
+
+        let mut tmp_buf: [u8; 4] = [0; 4];
+
+        // CHECK_MATCH_BUFFER(mb);
+        // Set up the pointer to the source bytes.
+        let src: &[u8] = if bit_offset!(self.offset) == 0 {
+            /* We can access the binary directly because the bytes are aligned. */
+            let offset = byte_offset!(self.offset);
+            &self.original.data[offset..]
+        } else {
+            /*
+             * We must copy the data to a temporary buffer. If possible,
+             * get 4 bytes, otherwise two bytes.
+             */
+            let n = if remaining_bits < 32 { 16 } else { 32 };
+            unsafe {
+                copy_bits(
+                    self.original.data.as_ptr(),
+                    self.offset,
+                    1,
+                    tmp_buf.as_mut_ptr(),
+                    0,
+                    1,
+                    n,
+                )
+            };
+            &tmp_buf[..]
+        };
+
+        // Get the first (and maybe only) 16-bit word. See if we are done.
+        let w1: u16 = if flags.contains(Flag::BSF_LITTLE) {
+            u16::from(src[0]) | (u16::from(src[1]) << 8)
+        } else {
+            (u16::from(src[0]) << 8) | u16::from(src[1])
+        };
+        if w1 < 0xD800 || w1 > 0xDFFF {
+            self.offset += 16;
+            return Some(Term::int(i32::from(w1)));
+        } else if w1 > 0xDBFF {
+            return None;
+        }
+
+        // Get the second 16-bit word and combine it with the first.
+        let w2: u16 = if remaining_bits < 32 {
+            return None;
+        } else if flags.contains(Flag::BSF_LITTLE) {
+            u16::from(src[2]) | (u16::from(src[3]) << 8)
+        } else {
+            (u16::from(src[2]) << 8) | u16::from(src[3])
+        };
+        if !(0xDC00 <= w2 && w2 <= 0xDFFF) {
+            return None;
+        }
+        self.offset += 32;
+        Some(Term::int(
+            ((((w1 as u32 & 0x3FF) << 10) | (w2 as u32 & 0x3FF)) + 0x10000) as i32, // potentially unsafe
+        ))
+    }
 }
 
 // Stores data on the process heap. Small, but expensive to copy.
