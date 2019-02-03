@@ -22,113 +22,127 @@ mod map;
 
 // maybe use https://github.com/sfackler/rust-phf
 
+macro_rules! bif_map {
+    ($($module:expr => {$($fun:expr, $arity:expr => $rust_fn:path,)*},)*) => {
+        {
+            let mut table: BifTable = HashMap::new();
+            $(
+                let module = atom::from_str($module);
+                $(table.insert((module, atom::from_str($fun), $arity), $rust_fn);)*
+            )*
+            table
+        }
+    };
+}
+
 type BifResult = Result<Term, Exception>;
 pub type BifFn = fn(&vm::Machine, &RcProcess, &[Term]) -> BifResult;
 type BifTable = HashMap<(u32, u32, u32), BifFn>;
 
 pub static BIFS: Lazy<BifTable> = sync_lazy! {
-    let mut bifs: BifTable = HashMap::new();
-    let erlang = atom::from_str("erlang");
-    bifs.insert((erlang, atom::from_str("abs"), 1), bif_erlang_abs_1);
-    bifs.insert((erlang, atom::from_str("date"), 0), chrono::bif_erlang_date_0);
-    bifs.insert((erlang, atom::from_str("localtime"), 0), chrono::bif_erlang_localtime_0);
-    bifs.insert((erlang, atom::from_str("monotonic_time"), 0), chrono::bif_erlang_monotonic_time_0);
-    bifs.insert((erlang, atom::from_str("system_time"), 0), chrono::bif_erlang_system_time_0);
-    bifs.insert((erlang, atom::from_str("universaltime"), 0), chrono::bif_erlang_universaltime_0);
-    bifs.insert((erlang, atom::from_str("+"), 2), bif_erlang_add_2);
-    bifs.insert((erlang, atom::from_str("-"), 2), bif_erlang_sub_2);
-    bifs.insert((erlang, atom::from_str("*"), 2), bif_erlang_mult_2);
-    bifs.insert((erlang, atom::from_str("div"), 2), bif_erlang_intdiv_2);
-    bifs.insert((erlang, atom::from_str("rem"), 2), bif_erlang_mod_2);
-    bifs.insert((erlang, atom::from_str("spawn"), 3), bif_erlang_spawn_3);
-    bifs.insert((erlang, atom::from_str("self"), 0), bif_erlang_self_0);
-    bifs.insert((erlang, atom::from_str("send"), 2), bif_erlang_send_2);
-    bifs.insert((erlang, atom::from_str("is_atom"), 1), bif_erlang_is_atom_1);
-    bifs.insert((erlang, atom::from_str("is_list"), 1), bif_erlang_is_list_1);
-    bifs.insert((erlang, atom::from_str("is_tuple"), 1), bif_erlang_is_tuple_1);
-    bifs.insert((erlang, atom::from_str("is_float"), 1), bif_erlang_is_float_1);
-    bifs.insert((erlang, atom::from_str("is_integer"), 1), bif_erlang_is_integer_1);
-    bifs.insert((erlang, atom::from_str("is_number"), 1), bif_erlang_is_number_1);
-    bifs.insert((erlang, atom::from_str("is_port"), 1), bif_erlang_is_port_1);
-    bifs.insert((erlang, atom::from_str("is_reference"), 1), bif_erlang_is_reference_1);
-    bifs.insert((erlang, atom::from_str("is_binary"), 1), bif_erlang_is_binary_1);
-    bifs.insert((erlang, atom::from_str("is_bitstring"), 1), bif_erlang_is_bitstring_1);
-    bifs.insert((erlang, atom::from_str("is_function"), 1), bif_erlang_is_function_1);
-    bifs.insert((erlang, atom::from_str("is_boolean"), 1), bif_erlang_is_boolean_1);
-    bifs.insert((erlang, atom::from_str("is_map"), 1), bif_erlang_is_map_1);
-    bifs.insert((erlang, atom::from_str("hd"), 1), bif_erlang_hd_1);
-    bifs.insert((erlang, atom::from_str("tl"), 1), bif_erlang_tl_1);
-    bifs.insert((erlang, atom::from_str("trunc"), 1), bif_erlang_trunc_1);
-    bifs.insert((erlang, atom::from_str("tuple_size"), 1), bif_erlang_tuple_size_1);
-    bifs.insert((erlang, atom::from_str("byte_size"), 1), bif_erlang_byte_size_1);
-    bifs.insert((erlang, atom::from_str("map_size"), 1), bif_erlang_map_size_1);
-    bifs.insert((erlang, atom::from_str("error"), 1), bif_erlang_error_1);
-    bifs.insert((erlang, atom::from_str("error"), 2), bif_erlang_error_2);
-    //bifs.insert((erlang, atom::from_str("raise"), 3), bif_erlang_raise_3);
-    bifs.insert((erlang, atom::from_str("throw"), 1), bif_erlang_throw_1);
-    bifs.insert((erlang, atom::from_str("exit"), 1), bif_erlang_exit_1);
-    bifs.insert((erlang, atom::from_str("nif_error"), 1), bif_erlang_nif_error_1);
-    bifs.insert((erlang, atom::from_str("nif_error"), 2), bif_erlang_nif_error_2);
+    bif_map![
+        "erlang" => {
+            "abs", 1 => bif_erlang_abs_1,
+            "date", 0 => chrono::bif_erlang_date_0,
+            "localtime", 0 => chrono::bif_erlang_localtime_0,
+            "monotonic_time", 0 => chrono::bif_erlang_monotonic_time_0,
+            "system_time", 0 => chrono::bif_erlang_system_time_0,
+            "universaltime", 0 => chrono::bif_erlang_universaltime_0,
+            "+", 2 => bif_erlang_add_2,
+            "-", 2 => bif_erlang_sub_2,
+            "*", 2 => bif_erlang_mult_2,
+            "div", 2 => bif_erlang_intdiv_2,
+            "rem", 2 => bif_erlang_mod_2,
+            "spawn", 3 => bif_erlang_spawn_3,
+            "self", 0 => bif_erlang_self_0,
+            "send", 2 => bif_erlang_send_2,
+            "is_atom", 1 => bif_erlang_is_atom_1,
+            "is_list", 1 => bif_erlang_is_list_1,
+            "is_tuple", 1 => bif_erlang_is_tuple_1,
+            "is_float", 1 => bif_erlang_is_float_1,
+            "is_integer", 1 => bif_erlang_is_integer_1,
+            "is_number", 1 => bif_erlang_is_number_1,
+            "is_port", 1 => bif_erlang_is_port_1,
+            "is_reference" , 1 => bif_erlang_is_reference_1,
+            "is_binary", 1 => bif_erlang_is_binary_1,
+            "is_bitstring", 1 => bif_erlang_is_bitstring_1,
+            "is_function", 1 => bif_erlang_is_function_1,
+            "is_boolean", 1 => bif_erlang_is_boolean_1,
+            "is_map", 1 => bif_erlang_is_map_1,
+            "hd", 1 => bif_erlang_hd_1,
+            "tl", 1 => bif_erlang_tl_1,
+            "trunc", 1 => bif_erlang_trunc_1,
+            "tuple_size", 1 => bif_erlang_tuple_size_1,
+            "byte_size", 1 => bif_erlang_byte_size_1,
+            "map_size", 1 => bif_erlang_map_size_1,
+            "error", 1 => bif_erlang_error_1,
+            "error", 2 => bif_erlang_error_2,
+            //"raise", 3 => bif_erlang_raise_3,
+            "throw", 1 => bif_erlang_throw_1,
+            "exit", 1 => bif_erlang_exit_1,
+            "nif_error", 1 => bif_erlang_nif_error_1,
+            "nif_error", 2 => bif_erlang_nif_error_2,
+            "load_nif", 2 => bif_erlang_load_nif_2,
+            "apply", 2 => bif_erlang_apply_2,
+            "apply", 3 => bif_erlang_apply_3,
+            "register", 2 => bif_erlang_register_2,
+            "function_exported", 3 => bif_erlang_function_exported_3,
+            "process_flag", 2 => bif_erlang_process_flag_2,
 
-    bifs.insert((erlang, atom::from_str("load_nif"), 2), bif_erlang_load_nif_2);
-    bifs.insert((erlang, atom::from_str("apply"), 2), bif_erlang_apply_2);
-    bifs.insert((erlang, atom::from_str("apply"), 3), bif_erlang_apply_3);
-    bifs.insert((erlang, atom::from_str("register"), 2), bif_erlang_register_2);
-    bifs.insert((erlang, atom::from_str("function_exported"), 3), bif_erlang_function_exported_3);
-    bifs.insert((erlang, atom::from_str("process_flag"), 2), bif_erlang_process_flag_2);
-    // math
-    let math = atom::from_str("math");
-    bifs.insert((math, atom::from_str("cos"), 1), bif_math_cos_1);
-    bifs.insert((math, atom::from_str("cosh"), 1), bif_math_cosh_1);
-    bifs.insert((math, atom::from_str("sin"), 1), bif_math_sin_1);
-    bifs.insert((math, atom::from_str("sinh"), 1), bif_math_sinh_1);
-    bifs.insert((math, atom::from_str("tan"), 1), bif_math_tan_1);
-    bifs.insert((math, atom::from_str("tanh"), 1), bif_math_tanh_1);
-    bifs.insert((math, atom::from_str("acos"), 1), bif_math_acos_1);
-    bifs.insert((math, atom::from_str("acosh"), 1), bif_math_acosh_1);
-    bifs.insert((math, atom::from_str("asin"), 1), bif_math_asin_1);
-    bifs.insert((math, atom::from_str("asinh"), 1), bif_math_asinh_1);
-    bifs.insert((math, atom::from_str("atan"), 1), bif_math_atan_1);
-    bifs.insert((math, atom::from_str("atanh"), 1), bif_math_atanh_1);
-    bifs.insert((math, atom::from_str("erf"), 1), bif_math_erf_1);
-    bifs.insert((math, atom::from_str("erfc"), 1), bif_math_erfc_1);
-    bifs.insert((math, atom::from_str("exp"), 1), bif_math_exp_1);
-    bifs.insert((math, atom::from_str("log"), 1), bif_math_log_1);
-    bifs.insert((math, atom::from_str("log"), 1), bif_math_log_1);
-    bifs.insert((math, atom::from_str("log2"), 1), bif_math_log2_1);
-    bifs.insert((math, atom::from_str("log10"), 1), bif_math_log10_1);
-    bifs.insert((math, atom::from_str("sqrt"), 1), bif_math_sqrt_1);
-    bifs.insert((math, atom::from_str("atan2"), 2), bif_math_atan2_2);
-    bifs.insert((math, atom::from_str("pow"), 2), bif_math_pow_2);
-    // pdict
-    bifs.insert((erlang, atom::from_str("get"), 0), bif_erlang_get_0);
-    bifs.insert((erlang, atom::from_str("get"), 1), bif_erlang_get_1);
-    bifs.insert((erlang, atom::from_str("get_keys"), 0), bif_erlang_get_keys_0);
-    bifs.insert((erlang, atom::from_str("get_keys"), 1), bif_erlang_get_keys_1);
-    bifs.insert((erlang, atom::from_str("put"), 2), bif_erlang_put_2);
-    bifs.insert((erlang, atom::from_str("erase"), 0), bif_erlang_erase_0);
-    bifs.insert((erlang, atom::from_str("erase"), 1), bif_erlang_erase_1);
-    // lists
-    let lists = atom::from_str("lists");
-    bifs.insert((lists, atom::from_str("member"), 2), bif_lists_member_2);
-    bifs.insert((lists, atom::from_str("reverse"), 2), bif_lists_reverse_2);
-    bifs.insert((lists, atom::from_str("keymember"), 3), bif_lists_keymember_3);
-    bifs.insert((lists, atom::from_str("keysearch"), 3), bif_lists_keysearch_3);
-    bifs.insert((lists, atom::from_str("keyfind"), 3), bif_lists_keyfind_3);
-    // maps
-    let maps = atom::from_str("maps");
-    bifs.insert((maps, atom::from_str("find"), 2), map::bif_maps_find_2);
-    bifs.insert((maps, atom::from_str("get"), 2), map::bif_maps_get_2);
-    bifs.insert((maps, atom::from_str("from_list"), 1), map::bif_maps_from_list_1);
-    bifs.insert((maps, atom::from_str("is_key"), 2), map::bif_maps_is_key_2);
-    bifs.insert((maps, atom::from_str("keys"), 1), map::bif_maps_keys_1);
-    bifs.insert((maps, atom::from_str("merge"), 2), map::bif_maps_merge_2);
-    bifs.insert((maps, atom::from_str("put"), 3), map::bif_maps_put_3);
-    bifs.insert((maps, atom::from_str("remove"), 2), map::bif_maps_remove_2);
-    bifs.insert((maps, atom::from_str("update"), 3), map::bif_maps_update_3);
-    bifs.insert((maps, atom::from_str("values"), 1), map::bif_maps_values_1);
-    bifs.insert((maps, atom::from_str("take"), 2), map::bif_maps_take_2);
-    bifs
+            // pdict
+            "get", 0 => bif_erlang_get_0,
+            "get", 1 => bif_erlang_get_1,
+            "get_keys", 0 => bif_erlang_get_keys_0,
+            "get_keys", 1 => bif_erlang_get_keys_1,
+            "put", 2 => bif_erlang_put_2,
+            "erase", 0 => bif_erlang_erase_0,
+            "erase", 1 => bif_erlang_erase_1,
+        },
+        "math" => {
+            "cos", 1 => bif_math_cos_1,
+            "cosh", 1 => bif_math_cosh_1,
+            "sin", 1 => bif_math_sin_1,
+            "sinh", 1 => bif_math_sinh_1,
+            "tan", 1 => bif_math_tan_1,
+            "tanh", 1 => bif_math_tanh_1,
+            "acos", 1 => bif_math_acos_1,
+            "acosh", 1 => bif_math_acosh_1,
+            "asin", 1 => bif_math_asin_1,
+            "asinh", 1 => bif_math_asinh_1,
+            "atan", 1 => bif_math_atan_1,
+            "atanh", 1 => bif_math_atanh_1,
+            "erf", 1 => bif_math_erf_1,
+            "erfc", 1 => bif_math_erfc_1,
+            "exp", 1 => bif_math_exp_1,
+            "log", 1 => bif_math_log_1,
+            "log", 1 => bif_math_log_1,
+            "log2", 1 => bif_math_log2_1,
+            "log10", 1 => bif_math_log10_1,
+            "sqrt", 1 => bif_math_sqrt_1,
+            "atan2", 2 => bif_math_atan2_2,
+            "pow", 2 => bif_math_pow_2,
+        },
+        "lists" => {
+            "member", 2 => bif_lists_member_2,
+            "reverse", 2 => bif_lists_reverse_2,
+            "keymember", 3 => bif_lists_keymember_3,
+            "keysearch", 3 => bif_lists_keysearch_3,
+            "keyfind", 3 => bif_lists_keyfind_3,
+        },
+        "maps" => {
+            "find", 2 => map::bif_maps_find_2,
+            "get", 2 => map::bif_maps_get_2,
+            "from_list", 1 => map::bif_maps_from_list_1,
+            "is_key", 2 => map::bif_maps_is_key_2,
+            "keys", 1 => map::bif_maps_keys_1,
+            "merge", 2 => map::bif_maps_merge_2,
+            "put", 3 => map::bif_maps_put_3,
+            "remove", 2 => map::bif_maps_remove_2,
+            "update", 3 => map::bif_maps_update_3,
+            "values", 1 => map::bif_maps_values_1,
+            "take", 2 => map::bif_maps_take_2,
+        },
+    ]
 };
 
 #[inline]
