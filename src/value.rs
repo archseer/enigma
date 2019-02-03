@@ -656,7 +656,7 @@ impl PartialEq for Variant {
                         BOXED_MAP => unimplemented!(),
                         BOXED_CLOSURE => unreachable!(),
                         // TODO: handle other boxed types
-                        // ref, bigint, cp, catch, stacktrace
+                        // ref, bigint, cp, catch, stacktrace, binary, subbinary
                         _ => unimplemented!(),
                     }
                 } else {

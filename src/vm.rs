@@ -1627,12 +1627,41 @@ impl Machine {
                 }
                 Opcode::BsMatchString => {
                     debug_assert_eq!(ins.args.len(), 4);
-                    // fail cxt bits ptr (literal val? use val - 1 as a string_heap offs)
                     unimplemented!() // TODO
                 }
                 Opcode::BsInitWritable => {
                     debug_assert_eq!(ins.args.len(), 0);
-                    // fail cxt bits ptr (literal val? use val - 1 as a string_heap offs)
+                    unimplemented!() // TODO
+                }
+                Opcode::BsAppend => {
+                    debug_assert_eq!(ins.args.len(), 8);
+                    unimplemented!() // TODO
+                }
+                Opcode::BsPrivateAppend => {
+                    debug_assert_eq!(ins.args.len(), 6);
+                    unimplemented!() // TODO
+                }
+                Opcode::BsInitBits => {
+                    debug_assert_eq!(ins.args.len(), 6);
+                    unimplemented!() // TODO
+                }
+                Opcode::BsGetUtf8 => {
+                    debug_assert_eq!(ins.args.len(), 5);
+                    // fail ms u u dest
+
+                    // TODO: this cast can fail
+                    if let Ok(value::Boxed { value: ms, .. }) = context
+                        .expand_arg(&ins.args[1])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
+                        let res = ms.mb.get_utf8();
+                        if let Some(res) = res {
+                            set_register!(context, &ins.args[4], res)
+                        } else {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                        }
+                    };
                     unimplemented!() // TODO
                 }
                 Opcode::Fclearerror => {

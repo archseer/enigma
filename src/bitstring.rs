@@ -449,6 +449,117 @@ impl MatchBuffer {
         self.offset += num_bits;
         Some(binary)
     }
+
+    /// Copy up to 4 bytes into the supplied buffer.
+    #[inline]
+    fn align_utf8_bytes(&self, buf: *mut u8) {
+        let bits = self.size - self.offset;
+
+        let bits = match bits {
+            0...7 => unreachable!(),
+            8...15 => 8,
+            16...23 => 24,
+            24...31 => 24,
+            _ => 32,
+        };
+
+        unsafe { copy_bits(self.original.data.as_ptr(), self.offset, 1, buf, 0, 1, bits) }
+    }
+
+    pub fn get_utf8(&mut self) -> Option<Term> {
+        // Number of trailing bytes for each value of the first byte.
+        const TRAILING_BYTES_FOR_UTF8: [u8; 256] = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+            9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+            9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2,
+            2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 9, 9, 9, 9, 9, 9, 9, 9,
+        ];
+
+        // CHECK_MATCH_BUFFER(mb);
+        let remaining_bits = self.size - self.offset;
+        if remaining_bits < 8 {
+            return None;
+        }
+
+        let mut tmp_buf: [u8; 4] = [0; 4];
+
+        let pos: &[u8] = if bit_offset!(self.offset) == 0 {
+            let offset = byte_offset!(self.offset);
+            &self.original.data[offset..]
+        } else {
+            self.align_utf8_bytes(tmp_buf.as_mut_ptr());
+            &tmp_buf[..]
+        };
+
+        let result = pos[0] as usize;
+        let result = match TRAILING_BYTES_FOR_UTF8[result] {
+            0 => {
+                // One byte only
+                self.offset += 8;
+                result
+            }
+            1 => {
+                // Two bytes
+                if remaining_bits < 16 {
+                    return None;
+                }
+                let a = pos[1] as usize;
+                if (a & 0xC0) != 0x80 {
+                    return None;
+                }
+                let result = (result << 6) + a - 0x00003080;
+                self.offset += 16;
+                result
+            }
+            2 => {
+                // Three bytes
+                if remaining_bits < 24 {
+                    return None;
+                }
+                let a = pos[1] as usize;
+                let b = pos[2] as usize;
+                if (a & 0xC0) != 0x80 || (b & 0xC0) != 0x80 || (result == 0xE0 && a < 0xA0) {
+                    return None;
+                }
+                let result = (((result << 6) + a) << 6) + b - 0x000E2080;
+                if 0xD800 <= result && result <= 0xDFFF {
+                    return None;
+                }
+                self.offset += 24;
+                result
+            }
+            3 => {
+                // Four bytes
+                if remaining_bits < 32 {
+                    return None;
+                }
+                let a = pos[1] as usize;
+                let b = pos[2] as usize;
+                let c = pos[3] as usize;
+                if (a & 0xC0) != 0x80
+                    || (b & 0xC0) != 0x80
+                    || (c & 0xC0) != 0x80
+                    || (result == 0xF0 && a < 0x90)
+                {
+                    return None;
+                }
+                let result = (((((result << 6) + a) << 6) + b) << 6) + c - 0x03C82080;
+                if result > 0x10FFFF {
+                    return None;
+                }
+                self.offset += 32;
+                result
+            }
+            _ => unreachable!(),
+        };
+
+        Some(Term::int(result as i32)) // potentionally unsafe?
+    }
 }
 
 // Stores data on the process heap. Small, but expensive to copy.

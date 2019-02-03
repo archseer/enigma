@@ -85,6 +85,7 @@ Features:
   - [x] Basic type implementation
   - [ ] Binary building
   - [ ] Binary matching
+    - [ ] Combine repeated utf8 matches so we can auto-vectorize
   - [ ] Binary searching
     - multi pattern via [aho-corasick](https://github.com/BurntSushi/aho-corasick)
     - single pattern via [boyer-moore](https://github.com/killerswan/boyer-moore-search) | [needle booyer-moore](https://docs.rs/needle/0.1.1/needle/) | [regex - booyer-moore](https://github.com/ethanpailes/regex/commit/d2e28f959ac384db62f7cbeba1576cf39a75b294)
