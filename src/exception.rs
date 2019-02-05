@@ -452,8 +452,7 @@ fn expand_error_value(process: &RcProcess, reason: Reason, value: Term) -> Term 
             // Primary exceptions use fvalue as it is
             value
         }
-        // badmatch | case_clause | try_clause | badfun | badarity | badmap | badkey
-        5 | 7 | 16 | 11 | 18 | 19 => {
+        atom::BADMATCH | atom::CASE_CLAUSE | atom::TRY_CLAUSE | atom::BADFUN | atom::BADARITY | atom::BADKEY => {
             let heap = &process.context_mut().heap;
             //Some common exceptions: value -> {atom, value}
             //    ASSERT(is_value(Value)); TODO: check that is not non-value

@@ -430,7 +430,7 @@ impl MatchBuffer {
         &mut self,
         process: &RcProcess,
         num_bits: usize,
-        mut flags: Flag,
+        flags: Flag,
     ) -> Option<Term> {
         // CHECK_MATCH_BUFFER(mb);
 
