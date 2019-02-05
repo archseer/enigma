@@ -1,4 +1,4 @@
-* Opcodes [106/138]
+* Opcodes [110/138]
 - [X] Label = 1
 - [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -106,10 +106,10 @@
 - [ ] BsPrivateAppend = 135
 - [X] Trim = 136
 - [ ] BsInitBits = 137
-- [ ] BsGetUtf8 = 138
-- [ ] BsSkipUtf8 = 139
-- [ ] BsGetUtf16 = 140
-- [ ] BsSkipUtf16 = 141
+- [X] BsGetUtf8 = 138
+- [X] BsSkipUtf8 = 139
+- [X] BsGetUtf16 = 140
+- [X] BsSkipUtf16 = 141
 - [ ] BsGetUtf32 = 142
 - [ ] BsSkipUtf32 = 143
 - [ ] BsUtf8Size = 144

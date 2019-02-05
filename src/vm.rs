@@ -1662,7 +1662,6 @@ impl Machine {
                             op_jump!(context, fail);
                         }
                     };
-                    unimplemented!() // TODO
                 }
                 Opcode::BsGetUtf16 => {
                     debug_assert_eq!(ins.args.len(), 5);
@@ -1685,7 +1684,42 @@ impl Machine {
                             op_jump!(context, fail);
                         }
                     };
-                    unimplemented!() // TODO
+                }
+                Opcode::BsSkipUtf8 => {
+                    debug_assert_eq!(ins.args.len(), 4);
+                    // fail ms u u
+
+                    // TODO: this cast can fail
+                    if let Ok(value::Boxed { value: ms, .. }) = context
+                        .expand_arg(&ins.args[1])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
+                        let res = ms.mb.get_utf8();
+                        if res.is_none() {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                        }
+                    };
+                }
+                Opcode::BsSkipUtf16 => {
+                    debug_assert_eq!(ins.args.len(), 4);
+                    // fail ms u flags
+
+                    let flags = ins.args[5].to_u32();
+
+                    // TODO: this cast can fail
+                    if let Ok(value::Boxed { value: ms, .. }) = context
+                        .expand_arg(&ins.args[1])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
+                        let res = ms
+                            .mb
+                            .get_utf16(bitstring::Flag::from_bits(flags as u8).unwrap());
+                        if res.is_none() {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                        }
+                    };
                 }
                 Opcode::Fclearerror => {
                     debug_assert_eq!(ins.args.len(), 0);
