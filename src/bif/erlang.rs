@@ -68,9 +68,7 @@ pub fn bif_erlang_append_element_2(_vm: &vm::Machine, process: &RcProcess, args:
     let heap = &process.context_mut().heap;
     let mut new_tuple = value::tuple(&heap, (t.len() + 1) as u32);
     unsafe {
-        for num in 0..t.len() {
-            std::ptr::write(&mut new_tuple[num], t[num])
-        }
+        new_tuple[..t.len()].copy_from_slice(&t[..]);
         std::ptr::write(&mut new_tuple[t.len()], args[1]);
     }
     Ok(Term::from(new_tuple))
