@@ -78,8 +78,20 @@ pub fn bif_erlang_setelement_3(_vm: &vm::Machine, _process: &RcProcess, _args: &
     unimplemented!()
 }
 
-pub fn bif_erlang_tuple_to_list_1(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> BifResult {
-    unimplemented!()
+pub fn bif_erlang_tuple_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    if !args[0].is_tuple() {
+        return Err(Exception::new(Reason::EXC_BADARG));
+    }
+    let t: &Tuple = match args[0].try_into() {
+        Ok(tuple) => tuple,
+        _ => return Err(Exception::new(Reason::EXC_BADARG))
+    };
+    let mut cons = vec![];
+    for &item in t.iter() {
+        cons.push(item);
+    }
+    let heap = &process.context_mut().heap;
+    Ok(iter_to_list!(&heap, cons.iter().map(|x| *x)))
 }
 
 #[cfg(test)]
