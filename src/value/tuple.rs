@@ -1,4 +1,5 @@
 use super::{Header, Term, TryInto, Variant, WrongBoxError, BOXED_TUPLE};
+use std::cmp::Ordering;
 use std::ops::{Deref, DerefMut};
 // use std::convert::TryFrom;
 
@@ -41,7 +42,26 @@ impl DerefMut for Tuple {
 
 impl PartialEq for Tuple {
     fn eq(&self, other: &Self) -> bool {
+        // fast path: different lengths means not equal
+        if self.len != other.len {
+            return false;
+        }
         self.as_slice() == other.as_slice()
+    }
+}
+
+impl PartialOrd for Tuple {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Tuple {
+    /// Tuples are ordered by size, two tuples with the same size are compared element by element.
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.len
+            .cmp(&other.len) // fast path: different lengths means not equal
+            .then_with(|| self.as_slice().cmp(&other.as_slice()))
     }
 }
 

@@ -1,8 +1,9 @@
 use super::{Term, TryInto, Variant, WrongBoxError};
 use core::marker::PhantomData;
+use std::cmp::Ordering;
 use std::ptr::NonNull;
 
-#[derive(Debug)]
+#[derive(Debug, Eq)]
 #[repr(C)]
 pub struct Cons {
     pub head: Term,
@@ -13,7 +14,20 @@ unsafe impl Sync for Cons {}
 
 impl PartialEq for Cons {
     fn eq(&self, other: &Self) -> bool {
-        self.iter().zip(other.iter()).all(|(e1, e2)| e1.eq(e2))
+        self.iter().eq(other.iter())
+    }
+}
+
+impl PartialOrd for Cons {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Cons {
+    /// Lists are compared element by element.
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.iter().cmp(other.iter())
     }
 }
 

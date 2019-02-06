@@ -657,6 +657,7 @@ impl PartialEq for Variant {
                         BOXED_CLOSURE => unreachable!(),
                         // TODO: handle other boxed types
                         // ref, bigint, cp, catch, stacktrace, binary, subbinary
+                        // TODO: binary and subbinary need to be compared
                         _ => unimplemented!(),
                     }
                 } else {
@@ -680,6 +681,8 @@ impl Ord for Term {
     fn cmp(&self, other: &Term) -> Ordering {
         // TODO: prevent blowing out the stack from recursion in the future
 
+        // TODO: atom, smallint and float have fastpaths here
+
         // compare types first, if not equal, we can compare them as raw Type casts
         // else, start comparing immediates
         // allow inexact number comparison
@@ -693,7 +696,51 @@ impl Ord for Term {
         }
 
         // types match, let's keep going
-        unimplemented!()
+        self.into_variant().cmp(&other.into_variant())
+    }
+}
+
+impl PartialOrd for Variant {
+    fn partial_cmp(&self, other: &Variant) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Variant {
+    fn cmp(&self, other: &Variant) -> Ordering {
+        match (self, other) {
+            (Variant::Nil(..), Variant::Nil(..)) => Ordering::Equal,
+            (Variant::Integer(i1), Variant::Integer(i2)) => i1.cmp(i2),
+            (Variant::Float(f1), Variant::Float(f2)) => f1.partial_cmp(f2).unwrap(),
+
+            (Variant::Atom(a1), Variant::Atom(a2)) => a1.cmp(a2),
+            (Variant::Pid(p1), Variant::Pid(p2)) => p1.cmp(p2),
+            (Variant::Port(p1), Variant::Port(p2)) => p1.cmp(p2),
+
+            (Variant::Cons(l1), Variant::Cons(l2)) => unsafe { (**l1).cmp(&(**l2)) },
+
+            (Variant::Pointer(p1), Variant::Pointer(p2)) => unsafe {
+                let header = **p1;
+                if header == **p2 {
+                    match header {
+                        BOXED_TUPLE => {
+                            let t1 = &*(*p1 as *const Tuple);
+                            let t2 = &*(*p2 as *const Tuple);
+                            t1.cmp(t2)
+                        }
+                        BOXED_MAP => unimplemented!(),
+                        BOXED_CLOSURE => unreachable!(),
+                        // TODO: handle other boxed types
+                        // ref, bigint, cp, catch, stacktrace, binary, subbinary
+                        // TODO: binary and subbinary need to be compared
+                        _ => unimplemented!(),
+                    }
+                } else {
+                    unimplemented!()
+                }
+            },
+            _ => unimplemented!(),
+        }
     }
 }
 
