@@ -74,8 +74,25 @@ pub fn bif_erlang_append_element_2(_vm: &vm::Machine, process: &RcProcess, args:
     Ok(Term::from(new_tuple))
 }
 
-pub fn bif_erlang_setelement_3(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> BifResult {
-    unimplemented!()
+pub fn bif_erlang_setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    let number = match args[0].into_number() {
+        Ok(value::Num::Integer(i)) if ! i < 1 => i - 1,
+        _ => return Err(Exception::new(Reason::EXC_BADARG))
+    };
+    let t: &Tuple = match args[1].try_into() {
+        Ok(tuple) => tuple,
+        _ => return Err(Exception::new(Reason::EXC_BADARG))
+    };
+    if !(number <= t.len() as i32) {
+        return Err(Exception::new(Reason::EXC_BADARG));
+    }
+    let heap = &process.context_mut().heap;
+    let mut new_tuple = value::tuple(&heap, t.len() as u32);
+    unsafe {
+        new_tuple[..t.len()].copy_from_slice(&t[..]);
+        std::ptr::write(&mut new_tuple[number as usize], args[2]);
+    }
+    Ok(Term::from(new_tuple))
 }
 
 pub fn bif_erlang_tuple_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
@@ -374,7 +391,7 @@ mod tests {
         let process = process::allocate(&vm.state, module).unwrap();
 
         let heap = &process.context_mut().heap;
-        let index = Term::int(1);
+        let index = Term::int(2);
         let tuple = tup3!(&heap, str_to_atom!("test"), Term::from(1), Term::from(2));
         let value = Term::from(99);
         let args = vec![index, tuple, value];
