@@ -639,105 +639,125 @@ impl MatchBuffer {
 
 // https://docs.rs/bitstring/0.1.1/bitstring/bit_string/trait.BitString.html
 
-/// Compare unaligned bitstrings. Much slower than memcmp, so only use when necessary.
-// pub fn cmp_bits(a_ptr: *const u8, a_offs: usize, b_ptr: *const u8, b_offs: usize, size: usize) -> bool {
-//     // byte a;
-//     // byte b;
-//     // byte a_bit;
-//     // byte b_bit;
-//     // Uint lshift;
-//     // Uint rshift;
-//     // int cmp;
+#[inline(always)]
+fn get_bit(b: u8, offs: usize) -> u8 {
+    return (b >> (7-offs)) & 1;
+}
 
-//     assert!(a_offs < 8 && b_offs < 8);
+/// Compare potentially unaligned bitstrings. Much slower than memcmp, so only use when necessary.
+pub unsafe fn cmp_bits(mut a_ptr: *const u8, mut a_offs: usize, mut b_ptr: *const u8, mut b_offs: usize, mut size: usize) -> Ordering {
+    // byte a;
+    // byte b;
+    // byte a_bit;
+    // byte b_bit;
+    // Uint lshift;
+    // Uint rshift;
+    // int cmp;
 
-//     if size == 0 {
-//         return false;
-//     }
+    assert!(a_offs < 8 && b_offs < 8);
 
-//     if ((a_offs | b_offs | size) & 7) == 0 {
-// 	let byte_size = size >> 3;
-//         // compare as slices
-// 	return sys_memcmp(a_ptr, b_ptr, byte_size);
-//     }
+    if size == 0 {
+        return Ordering::Equal;
+    }
 
-//     // Compare bit by bit until a_ptr is aligned on byte boundary
-//     a = *a_ptr++;
-//     b = *b_ptr++;
-//     if a_offs {
-// 	loop {
-// 	    let a_bit: u8 = get_bit(a, a_offs);
-// 	    let b_bit: u8 = get_bit(b, b_offs);
-// 	    if (cmp = (a_bit-b_bit)) != 0 {
-// 		return cmp;
-// 	    }
-// 	    if --size == 0 {
-// 		return false;
-//             }
+    if ((a_offs | b_offs | size) & 7) == 0 {
+        let byte_size = size >> 3;
+        // compare as slices
+        let slice_a = std::slice::from_raw_parts(a_ptr, byte_size);
+        let slice_b = std::slice::from_raw_parts(b_ptr, byte_size);
+        return slice_a.cmp(&slice_b);
+    }
 
-// 	    b_offs++;
-// 	    if b_offs == 8 {
-// 		b_offs = 0;
-// 		b = *b_ptr++;
-// 	    }
-// 	    a_offs++;
-// 	    if a_offs == 8 {
-// 		a_offs = 0;
-// 		a = *a_ptr++;
-// 		break;
-// 	    }
-// 	}
-//     }
+    // Compare bit by bit until a_ptr is aligned on byte boundary
+    let mut a = *a_ptr;
+    a_ptr = a_ptr.offset(1);
+    let mut b = *b_ptr;
+    b_ptr = b_ptr.offset(1);
+    if a_offs > 0 {
+        loop {
+            let a_bit: u8 = get_bit(a, a_offs);
+            let b_bit: u8 = get_bit(b, b_offs);
+            let cmp = a_bit.cmp(&b_bit);
+            if cmp != Ordering::Equal {
+                return cmp;
+            }
+            size -= 1;
+            if size == 0 {
+                return Ordering::Equal;
+            }
 
-//     // Compare byte by byte as long as at least 8 bits remain
-//     if size >= 8 {
-//         lshift = b_offs;
-//         rshift = 8 - lshift;
-//         loop {
-//             let b_cmp: u8 = (b << lshift);
-//             b = *b_ptr++;
-//             b_cmp |= b >> rshift;
-//             if (cmp = (a - b_cmp)) != 0 {
-//                 return cmp;
-//             }
-//             size -= 8;
-// 	    if size < 8 {
-// 		break;
-//             }
-//             a = *a_ptr++;
-//         }
+            b_offs += 1;
+            if b_offs == 8 {
+                b_offs = 0;
+                b = *b_ptr;
+                b_ptr = b_ptr.offset(1);
+            }
+            a_offs += 1;
+            if a_offs == 8 {
+                a_offs = 0;
+                a = *a_ptr;
+                a_ptr = a_ptr.offset(1);
+                break;
+            }
+        }
+    }
 
-// 	if size == 0 {
-// 	    return 0;
-//         }
-// 	a = *a_ptr++;
-//     }
+    // Compare byte by byte as long as at least 8 bits remain
+    if size >= 8 {
+        let lshift = b_offs;
+        let rshift = 8 - lshift;
+        loop {
+            let mut b_cmp: u8 = b << lshift;
+            b = *b_ptr;
+            b_ptr = b_ptr.offset(1);
+            b_cmp |= b >> rshift;
+            let cmp = a.cmp(&b_cmp);
+            if cmp != Ordering::Equal {
+                return cmp;
+            }
+            size -= 8;
+            if size < 8 {
+                break;
+            }
+            a = *a_ptr;
+            a_ptr = a_ptr.offset(1);
+        }
 
-//     // Compare the remaining bits bit by bit
-//     if size > 0 {
-//         loop {
-//             let a_bit: u8 = get_bit(a, a_offs);
-//             let b_bit: u8 = get_bit(b, b_offs);
-//             if (cmp = (a_bit-b_bit)) != 0 {
-//                 return cmp;
-//             }
-//             if --size == 0 {
-//                 return false;
-//             }
+        if size == 0 {
+            return Ordering::Equal;
+        }
+        a = *a_ptr;
+        a_ptr = a_ptr.offset(1);
+    }
 
-//             a_offs++;
-// 	    assert!(a_offs < 8);
+    // Compare the remaining bits bit by bit
+    if size > 0 {
+        loop {
+            let a_bit: u8 = get_bit(a, a_offs);
+            let b_bit: u8 = get_bit(b, b_offs);
+            let cmp = a_bit.cmp(&b_bit);
+            if cmp != Ordering::Equal {
+                return cmp;
+            }
+            size -= 1;
+            if size == 0 {
+                return Ordering::Equal;
+            }
 
-//             b_offs++;
-//             if b_offs == 8 {
-//                 b_offs = 0;
-//                 b = *b_ptr++;
-//             }
-//         }
-//     }
+            a_offs += 1;
+            assert!(a_offs < 8);
 
-//     false
-// }
+            b_offs += 1;
+            if b_offs == 8 {
+                b_offs = 0;
+                b = *b_ptr;
+                b_ptr = b_ptr.offset(1);
+            }
+        }
+    }
+
+    Ordering::Equal
+}
 
 /// The basic bit copy operation. Copies n bits from the source buffer to
 /// the destination buffer. Depending on the directions, it can reverse the
@@ -821,10 +841,10 @@ pub unsafe fn copy_bits(
             *dst = mask_bits!(*src, *dst, rmask);
         }
     } else {
-        let mut bits: u8 = 0;
-        let mut bits1: u8 = 0;
-        let mut rshift = 0;
-        let mut lshift = 0;
+        let mut bits: u8;
+        let mut bits1: u8;
+        let rshift;
+        let lshift;
 
         // The tricky case. The bits must be shifted into position.
 
