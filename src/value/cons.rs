@@ -2,6 +2,7 @@ use super::{Term, TryInto, Variant, WrongBoxError};
 use core::marker::PhantomData;
 use std::cmp::Ordering;
 use std::ptr::NonNull;
+use crate::immix::Heap;
 
 #[derive(Debug, Eq)]
 #[repr(C)]
@@ -85,5 +86,63 @@ impl<'a> IntoIterator for &'a Cons {
 
     fn into_iter(self) -> Iter<'a> {
         self.iter()
+    }
+}
+
+impl Cons {
+    // pub fn from_iter<I: IntoIterator<Item=Term>>(iter: I, heap: &Heap) -> Self
+    //     where I::Item: DoubleEndedIterator {
+    //     iter.rev().fold(Term::nil(), |res, val| value::cons(heap, val, res))
+    // }
+
+    // impl FromIterator<Term> for Cons { can't do this since we need heap
+
+    fn from_iter<'a, I: IntoIterator<Item=&'a Term> + ExactSizeIterator>(iter: I, heap: &Heap) -> Term {
+        let len = iter.len();
+        let mut iter = iter.into_iter();
+        let val = iter.next().unwrap();
+        let c = heap.alloc(Cons {
+            head: *val,
+            tail: Term::nil(),
+        });
+
+        unsafe {
+            (0..len - 1).fold(c as *mut Cons, |cons, _i| {
+                let Cons { ref mut tail, .. } = *cons;
+                let val = iter.next().unwrap();
+                let new_cons = heap.alloc(Cons {
+                    head: *val,
+                    tail: Term::nil(),
+                });
+                let ptr = new_cons as *mut Cons;
+                std::mem::replace(&mut *tail, Term::from(new_cons));
+                ptr
+            });
+        }
+
+        Term::from(c)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::value;
+
+    #[test]
+    fn test_from_iter() {
+        let heap = Heap::new();
+
+        let tup = tup3!(&heap, Term::int(1), Term::int(2), Term::int(3));
+        let t: &value::Tuple = tup.try_into().expect("wasn't a tuple");
+
+        let res = Cons::from_iter(t.as_slice().iter(), &heap);
+        let cons: &Cons = res.try_into().expect("wasn't a cons");
+
+        let mut iter = cons.iter();
+        assert_eq!(Some(&Term::int(1)), iter.next());
+        assert_eq!(Some(&Term::int(2)), iter.next());
+        assert_eq!(Some(&Term::int(3)), iter.next());
+        assert_eq!(None, iter.next());
     }
 }

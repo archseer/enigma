@@ -58,6 +58,7 @@ const TERM_PID: u8 = 5;
 const TERM_CONS: u8 = 6;
 const TERM_POINTER: u8 = 7;
 
+#[derive(Debug)]
 pub struct WrongBoxError;
 
 /// A term is a nanboxed compact representation of a value in 64 bits. It can either be immediate,
