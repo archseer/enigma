@@ -1,5 +1,5 @@
-use crate::process::RcProcess;
 use crate::servo_arc::Arc;
+use crate::immix::Heap;
 use crate::value::{self, Term, TryInto};
 use parking_lot::Mutex;
 use std::cmp::Ordering;
@@ -10,7 +10,8 @@ use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 /// Example: make_mask!(3) returns the binary number 00000111.
 macro_rules! make_mask {
     ($n:expr) => {
-        ((1 as u8) << $n) - 1
+        // we use u16 then go down to u8 because (1 << 8) overflows
+        (((1 as u16) << $n) - 1) as u8
     };
 }
 
@@ -267,7 +268,7 @@ macro_rules! binary_size {
     };
 }
 
-pub fn start_match_2(process: &RcProcess, binary: Term, max: u32) -> Term {
+pub fn start_match_2(heap: &Heap, binary: Term, max: u32) -> Term {
     assert!(binary.is_binary());
 
     // TODO: BEAM allocates size on all binary types right after the header so we can grab it
@@ -313,7 +314,7 @@ pub fn start_match_2(process: &RcProcess, binary: Term, max: u32) -> Term {
     let offset = 8 * offs + bitoffs;
 
     Term::matchstate(
-        &process.context_mut().heap,
+        heap,
         MatchState {
             mb: MatchBuffer {
                 original,
@@ -346,10 +347,270 @@ pub fn start_match_2(process: &RcProcess, binary: Term, max: u32) -> Term {
 // # define CHECK_MATCH_BUFFER(MB)
 // #endif
 
+const SMALL_BITS: usize = 64;
+
 impl MatchBuffer {
+    pub fn get_integer(
+        &mut self,
+        _heap: &Heap,
+        num_bits: usize,
+        mut flags: Flag,
+    ) -> Option<Term> {
+        //    Uint bytes;
+        //    Uint bits;
+        //    Uint offs;
+        //    byte bigbuf[64];
+        //    byte* LSB;
+        //    byte* MSB;
+        //    Uint* hp;
+        //    Uint words_needed;
+        //    Uint actual;
+        //    Uint v32;
+        //    int sgn = 0;
+        //    Eterm res = THE_NON_VALUE;
+
+        // TODO: preprocess flags for native endian in loader(remove native_endian and set bsf_little off or on)
+        native_endian!(flags);
+
+        if num_bits == 0 {
+            return Some(Term::from(0));
+        }
+
+        // CHECK_MATCH_BUFFER(mb);
+
+        if (self.size - self.offset) < num_bits {
+            // Asked for too many bits.
+            return None;
+        }
+
+        // Special cases for field sizes up to the size of Uint.
+
+        let offs = bit_offset!(self.offset);
+
+        if num_bits <= 8 - offs {
+            // All bits are in one byte in the binary. We only need shift them right and mask them.
+
+            let mut b: u8 = self.original.data[byte_offset!(self.offset)];
+            let mask = make_mask!(num_bits);
+            self.offset += num_bits;
+            b >>= 8 - offs - num_bits;
+            b &= mask;
+            // need to transmute to signed (i8)
+            // if ((flags & BSF_SIGNED) && b >> (num_bits-1)) {
+            //     b |= ~mask;
+            // }
+            return Some(Term::int(b as i32));
+        } else if num_bits <= 8 {
+            /*
+             * The bits are in two different bytes. It is easiest to
+             * combine the bytes to a word first, and then shift right and
+             * mask to extract the bits.
+             */
+            let byte_offset = byte_offset!(self.offset);
+            let mut w: u16 = (self.original.data[byte_offset] as u16) << 8
+                | (self.original.data[byte_offset + 1] as u16);
+            let mask = make_mask!(num_bits) as u16;
+            self.offset += num_bits;
+            w >>= 16 - offs - num_bits;
+            w &= mask;
+            // if ((flags & BSF_SIGNED) && w >> (num_bits-1)) {
+            //     w |= ~mask;
+            // }
+            return Some(Term::int(w as i32));
+        } else if num_bits < SMALL_BITS && !flags.contains(Flag::BSF_LITTLE) {
+            /*
+             * Handle field sizes from 9 up to SMALL_BITS-1 bits, big-endian,
+             * stored in at least two bytes.
+             */
+            let mut byte_offset = byte_offset!(self.offset);
+
+            let mut n = num_bits;
+            self.offset += num_bits;
+
+            /*
+             * Handle the most signicant byte if it contains 1 to 7 bits.
+             * It only needs to be masked, not shifted.
+             */
+            let mut w: u32;
+            if offs == 0 {
+                w = 0;
+            } else {
+                let num_bits_in_msb = 8 - offs;
+                w = self.original.data[byte_offset] as u32;
+                byte_offset += 1;
+                n -= num_bits_in_msb;
+                w &= make_mask!(num_bits_in_msb) as u32;
+            }
+
+            /*
+             * Simply shift whole bytes into the result.
+             */
+            for _ in 0..byte_offset!(n) {
+                w = (w << 8) | (self.original.data[byte_offset] as u32);
+                byte_offset += 1;
+            }
+            n = bit_offset!(n);
+
+            /*
+             * Handle the 1 to 7 bits remaining in the last byte (if any).
+             * They need to be shifted right, but there is no need to mask;
+             * then they can be shifted into the word.
+             */
+            if n > 0 {
+                let mut b: u8 = self.original.data[byte_offset];
+                b >>= 8 - n;
+                w = (w << n) | (b as u32);
+            }
+
+            /*
+             * Sign extend the result if the field type is 'signed' and the
+             * most significant bit is 1.
+             */
+            //   if ((flags & BSF_SIGNED) != 0 && (w >> (num_bits-1) != 0)) {
+            //       w |= ~MAKE_MASK(num_bits);
+            //   }
+            return Some(Term::int(w as i32));
+        }
+
+        /*
+         * Handle everything else, that is:
+         *
+         * Big-endian fields >= SMALL_BITS (potentially bignums).
+         * Little-endian fields with 9 or more bits.
+         */
+
+        // bytes = NBYTES(num_bits);
+        // if ((bits = BIT_OFFSET(num_bits)) == 0) {  /* number of bits in MSB */
+        //   bits = 8;
+        // }
+        // offs = 8 - bits;                  /* adjusted offset in MSB */
+        //
+        // if (bytes <= sizeof bigbuf) {
+        //   LSB = bigbuf;
+        // } else {
+        //   LSB = erts_alloc(ERTS_ALC_T_TMP, bytes);
+        // }
+        // MSB = LSB + bytes - 1;
+
+        /*
+         * Move bits to temporary buffer. We want the buffer to be stored in
+         * little-endian order, since bignums are little-endian.
+         */
+
+        // if (flags & BSF_LITTLE) {
+        //   erts_copy_bits(mb->base, mb->offset, 1, LSB, 0, 1, num_bits);
+        //   *MSB >>= offs;		/* adjust msb */
+        // } else {
+        //   *MSB = 0;
+        //   erts_copy_bits(mb->base, mb->offset, 1, MSB, offs, -1, num_bits);
+        // }
+        // mb->offset += num_bits;
+
+        /*
+         * Get the sign bit.
+         */
+        // sgn = 0;
+        // if ((flags & BSF_SIGNED) && (*MSB & (1<<(bits-1)))) {
+        //   byte* ptr = LSB;
+        //   byte c = 1;
+        //
+        //   /* sign extend MSB */
+        //   *MSB |= ~MAKE_MASK(bits);
+        //
+        //   /* two's complement */
+        //   while (ptr <= MSB) {
+        //       byte pd = ~(*ptr);
+        //       byte d = pd + c;
+        //       c = (d < pd);
+        //       *ptr++ = d;
+        //   }
+        //   sgn = 1;
+        // }
+
+        /* normalize */
+        // while ((*MSB == 0) && (MSB > LSB)) {
+        //   MSB--;
+        //   bytes--;
+        // }
+
+        /* check for guaranteed small num */
+        // switch (bytes) {
+        // case 1:
+        //   v32 = LSB[0];
+        //   goto big_small;
+        // case 2:
+        //   v32 = LSB[0] + (LSB[1]<<8);
+        //   goto big_small;
+        // case 3:
+        //   v32 = LSB[0] + (LSB[1]<<8) + (LSB[2]<<16);
+        //   goto big_small;
+        //#if !defined(ARCH_64)
+        // case 4:
+        //   v32 = (LSB[0] + (LSB[1]<<8) + (LSB[2]<<16) + (LSB[3]<<24));
+        //   if (!IS_USMALL(sgn, v32)) {
+        //      goto make_big;
+        //   }
+        //#else
+        // case 4:
+        //   ReadToVariable(v32, LSB, 4);
+        //   goto big_small;
+        // case 5:
+        //   ReadToVariable(v32, LSB, 5);
+        //   goto big_small;
+        // case 6:
+        //   ReadToVariable(v32, LSB, 6);
+        //   goto big_small;
+        // case 7:
+        //   ReadToVariable(v32, LSB, 7);
+        //   goto big_small;
+        // case 8:
+        //   ReadToVariable(v32, LSB, 8);
+        //   if (!IS_USMALL(sgn, v32)) {
+        //   goto make_big;
+        // }
+        //#endif
+        // big_small:			/* v32 loaded with value which fits in fixnum */
+        //   if (sgn) {
+        //       res = make_small(-((Sint)v32));
+        //   } else {
+        //       res = make_small(v32);
+        //   }
+        //   break;
+        // make_big:
+        //   hp = HeapOnlyAlloc(p, BIG_UINT_HEAP_SIZE);
+        //   if (sgn) {
+        //     hp[0] = make_neg_bignum_header(1);
+        //   } else {
+        //     hp[0] = make_pos_bignum_header(1);
+        //   }
+        //   BIG_DIGIT(hp,0) = v32;
+        //   res = make_big(hp);
+        //   break;
+        // default:
+        //   words_needed = 1+WSIZE(bytes);
+        //   hp = HeapOnlyAlloc(p, words_needed);
+        //   res = bytes_to_big(LSB, bytes, sgn, hp);
+        //   if (is_nil(res)) {
+        //       p->htop = hp;
+        //       res = THE_NON_VALUE;
+        //   } else if (is_small(res)) {
+        //       p->htop = hp;
+        //   } else if ((actual = bignum_header_arity(*hp)+1) < words_needed) {
+        //       p->htop = hp + actual;
+        //   }
+        //   break;
+        // }
+        //
+        // if (LSB != bigbuf) {
+        //   erts_free(ERTS_ALC_T_TMP, (void *) LSB);
+        // }
+        // return res;
+        unimplemented!()
+    }
+
     pub fn get_float(
         &mut self,
-        _process: &RcProcess,
+        _heap: &Heap,
         num_bits: usize,
         mut flags: Flag,
     ) -> Option<Term> {
@@ -428,7 +689,7 @@ impl MatchBuffer {
 
     pub fn get_binary(
         &mut self,
-        process: &RcProcess,
+        heap: &Heap,
         num_bits: usize,
         flags: Flag,
     ) -> Option<Term> {
@@ -443,7 +704,7 @@ impl MatchBuffer {
         // From now on, we can't fail.
 
         let binary = Term::subbinary(
-            &process.context_mut().heap,
+            heap,
             SubBinary::new(self.original.clone(), num_bits, self.offset),
         );
         self.offset += num_bits;
@@ -641,11 +902,17 @@ impl MatchBuffer {
 
 #[inline(always)]
 fn get_bit(b: u8, offs: usize) -> u8 {
-    return (b >> (7-offs)) & 1;
+    return (b >> (7 - offs)) & 1;
 }
 
 /// Compare potentially unaligned bitstrings. Much slower than memcmp, so only use when necessary.
-pub unsafe fn cmp_bits(mut a_ptr: *const u8, mut a_offs: usize, mut b_ptr: *const u8, mut b_offs: usize, mut size: usize) -> Ordering {
+pub unsafe fn cmp_bits(
+    mut a_ptr: *const u8,
+    mut a_offs: usize,
+    mut b_ptr: *const u8,
+    mut b_offs: usize,
+    mut size: usize,
+) -> Ordering {
     // byte a;
     // byte b;
     // byte a_bit;
@@ -887,5 +1154,36 @@ pub unsafe fn copy_bits(
             }
             *dst = mask_bits!(bits1, *dst, rmask);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_integer() {
+        // TODO start_match_2 should just be MatchBuffer::from(binary/subbinary)
+        let binary = Arc::new(Binary::from_vec(vec![0xAB, 0xCD, 0xEF]));
+
+        let heap = Heap::new();
+
+        let mut mb = MatchBuffer {
+            original: binary,
+            offset: 0,
+            size: 24,
+        };
+
+        // fits in one byte
+        let res = mb.get_integer(&heap, 4, Flag::BSF_NONE);
+        assert_eq!(Some(Term::int(0xA)), res);
+
+        // fits in two bytes
+        let res = mb.get_integer(&heap, 8, Flag::BSF_NONE);
+        assert_eq!(Some(Term::int(0xBC)), res);
+
+        // num < small_bits & !little
+        let res = mb.get_integer(&heap, 12, Flag::BSF_NONE);
+        assert_eq!(Some(Term::int(0xDEF)), res);
     }
 }
