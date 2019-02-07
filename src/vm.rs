@@ -12,7 +12,7 @@ use crate::process::{self, InstrPtr, RcProcess};
 use crate::process_registry::ProcessRegistry;
 use crate::process_table::ProcessTable;
 use crate::servo_arc::Arc;
-use crate::value::{self, Term, TryInto, Variant};
+use crate::value::{self, Term, TryInto, TryIntoMut, Variant};
 use log::debug;
 use parking_lot::Mutex;
 use std::mem::transmute;
@@ -956,11 +956,13 @@ impl Machine {
                     op_jump!(context, label)
                 }
                 Opcode::Move => {
+                    debug_assert_eq!(ins.args.len(), 2);
                     // arg1 can be either a value or a register
                     let val = context.expand_arg(&ins.args[0]);
                     set_register!(context, &ins.args[1], val)
                 }
                 Opcode::GetList => {
+                    debug_assert_eq!(ins.args.len(), 3);
                     // source, head, tail
                     if let Ok(value::Cons { head, tail }) =
                         context.expand_arg(&ins.args[0]).try_into()
@@ -973,6 +975,7 @@ impl Machine {
                     }
                 }
                 Opcode::GetTupleElement => {
+                    debug_assert_eq!(ins.args.len(), 3);
                     // source, element, dest
                     let source = context.expand_arg(&ins.args[0]);
                     let n = ins.args[1].to_u32();
@@ -983,7 +986,21 @@ impl Machine {
                         panic!("GetTupleElement: source is of wrong type")
                     }
                 }
+                Opcode::SetTupleElement => {
+                    debug_assert_eq!(ins.args.len(), 3);
+                    // new_el tuple pos
+                    let el = context.expand_arg(&ins.args[0]);
+                    let tuple = context.expand_arg(&ins.args[1]);
+                    let pos = ins.args[2].to_u32() as usize;
+                    if let Ok(t) = tuple.try_into_mut() {
+                        let tuple: &mut value::Tuple = t; // annoying, need type annotation
+                        tuple[pos] = el;
+                    } else {
+                        panic!("GetTupleElement: source is of wrong type")
+                    }
+                }
                 Opcode::PutList => {
+                    debug_assert_eq!(ins.args.len(), 3);
                     // put_list H T Dst::slot()
                     // Creates a cons cell with [H|T] and places the value into Dst.
                     let head = context.expand_arg(&ins.args[0]);
@@ -1001,6 +1018,7 @@ impl Machine {
                 }
                 Opcode::Put => unimplemented!("Stray Put that wasn't rewritten by the loader!"),
                 Opcode::PutTuple2 => {
+                    debug_assert_eq!(ins.args.len(), 4);
                     // op: PutTuple2, args: [X(0), ExtendedList([Y(1), Y(0), X(0)])] }
                     if let LValue::ExtendedList(list) = &ins.args[1] {
                         let arity = list.len();
@@ -1046,6 +1064,7 @@ impl Machine {
                     );
                 }
                 Opcode::TryEnd => {
+                    debug_assert_eq!(ins.args.len(), 1);
                     // y
                     context.catches -= 1;
                     set_register!(context, &ins.args[0], Term::nil()) // TODO: make_blank macro
@@ -1086,6 +1105,7 @@ impl Machine {
                     );
                 }
                 Opcode::CatchEnd => {
+                    debug_assert_eq!(ins.args.len(), 1);
                     // y
                     // Pops a “catch” context. Erases the label saved in the Arg0 slot. Noval in R0
                     // indicates that something is caught. If R1 contains atom throw then R0 is set
@@ -1121,6 +1141,7 @@ impl Machine {
                     unimplemented!();
                 }
                 Opcode::Raise => {
+                    debug_assert_eq!(ins.args.len(), 2);
                     // Raises the exception. The instruction is garbled by backward compatibility. Arg0 is a stack trace
                     // and Arg1 is the value accompanying the exception. The reason of the raised exception is dug up
                     // from the stack trace

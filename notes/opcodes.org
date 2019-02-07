@@ -1,4 +1,4 @@
-* Opcodes [110/138]
+* Opcodes [111/138]
 - [X] Label = 1
 - [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -52,7 +52,7 @@
 - [X] Move = 64
 - [X] GetList = 65
 - [X] GetTupleElement = 66
-- [ ] SetTupleElement = 67
+- [X] SetTupleElement = 67
 - [X] PutList = 69
 - [X] PutTuple = 70
 - [X] Put = 71

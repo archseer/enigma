@@ -31,6 +31,14 @@ pub trait TryInto<T>: Sized {
     fn try_into(&self) -> Result<&T, Self::Error>;
 }
 
+pub trait TryIntoMut<T>: Sized {
+    /// The type returned in the event of a conversion error.
+    type Error;
+
+    /// Performs the conversion.
+    fn try_into_mut(&self) -> Result<&mut T, Self::Error>;
+}
+
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 // annoying: we have to wrap Floats to be able to define hash
 pub struct Float(pub f64);

@@ -1,4 +1,4 @@
-use super::{Header, Term, TryInto, Variant, WrongBoxError, BOXED_TUPLE};
+use super::{Header, Term, TryInto, TryIntoMut, Variant, WrongBoxError, BOXED_TUPLE};
 use std::cmp::Ordering;
 use std::ops::{Deref, DerefMut};
 // use std::convert::TryFrom;
@@ -75,6 +75,22 @@ impl TryInto<Tuple> for Term {
             unsafe {
                 if *ptr == BOXED_TUPLE {
                     return Ok(&*(ptr as *const Tuple));
+                }
+            }
+        }
+        Err(WrongBoxError)
+    }
+}
+
+impl TryIntoMut<Tuple> for Term {
+    type Error = WrongBoxError;
+
+    #[inline]
+    fn try_into_mut(&self) -> Result<&mut Tuple, WrongBoxError> {
+        if let Variant::Pointer(ptr) = self.into_variant() {
+            unsafe {
+                if *ptr == BOXED_TUPLE {
+                    return Ok(&mut *(ptr as *mut Tuple));
                 }
             }
         }
