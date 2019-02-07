@@ -31,9 +31,6 @@ pub fn bif_erlang_make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[T
             std::ptr::write(&mut tuple[i as usize], args[1]);
         }
     }
-    if !args[2].is_list() {
-        return Err(Exception::new(Reason::EXC_BADARG));
-    }
     let init: &value::Cons = match args[2].try_into() {
         Ok(cons) => cons,
         _ => return Err(Exception::new(Reason::EXC_BADARG))
@@ -67,8 +64,8 @@ pub fn bif_erlang_append_element_2(_vm: &vm::Machine, process: &RcProcess, args:
     };
     let heap = &process.context_mut().heap;
     let new_tuple = value::tuple(heap, (t.len() + 1) as u32);
+    new_tuple[..t.len()].copy_from_slice(&t[..]);
     unsafe {
-        new_tuple[..t.len()].copy_from_slice(&t[..]);
         std::ptr::write(&mut new_tuple[t.len()], args[1]);
     }
     Ok(Term::from(new_tuple))
@@ -96,19 +93,18 @@ pub fn bif_erlang_setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[T
 }
 
 pub fn bif_erlang_tuple_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
-    if !args[0].is_tuple() {
-        return Err(Exception::new(Reason::EXC_BADARG));
-    }
     let t: &Tuple = match args[0].try_into() {
         Ok(tuple) => tuple,
         _ => return Err(Exception::new(Reason::EXC_BADARG))
     };
-    let mut cons = vec![];
-    for &item in t.iter() {
-        cons.push(item);
-    }
+    let mut n = (t.len() - 1) as i32;
+    let mut list = Term::nil();
     let heap = &process.context_mut().heap;
-    Ok(Cons::from_iter(cons.iter(), heap))
+    while n >= 0 {
+        list = cons!(heap, t[n as usize], list);
+        n -= 1;
+    }
+    Ok(list)
 }
 
 #[cfg(test)]
@@ -129,16 +125,13 @@ mod tests {
         let args = vec![number, default];
 
         let res = bif_erlang_make_tuple_2(&vm, &process, &args);
-        if let Ok(x) = res {
-            assert!(x.is_tuple());
-            if let Ok(tuple) = x.try_into() {
-                let tuple: &Tuple = tuple;
-                tuple.iter()
-                    .for_each(|x| assert_eq!(x, &str_to_atom!("test")));
-                assert_eq!(tuple.len, 2);
-            } else {
-                panic!();
-            }
+        let x = res.unwrap();
+        assert!(x.is_tuple());
+        if let Ok(tuple) = x.try_into() {
+            let tuple: &Tuple = tuple;
+            tuple.iter()
+                .for_each(|x| assert_eq!(x, &str_to_atom!("test")));
+            assert_eq!(tuple.len, 2);
         } else {
             panic!();
         }
@@ -198,23 +191,19 @@ mod tests {
         let args = vec![number, default, init_list];
 
         let res = bif_erlang_make_tuple_3(&vm, &process, &args);
-        if let Ok(x) = res {
-            assert!(x.is_tuple());
-            if let Ok(tuple) = x.try_into() {
-                let tuple: &Tuple = tuple;
-                assert_eq!(tuple.len, 5);
-                assert_eq!(tuple[0], Term::from(1));
-                assert_eq!(tuple[1], str_to_atom!("aa"));
-                assert_eq!(tuple[2], Term::from(1));
-                assert_eq!(tuple[3], Term::from(1));
-                assert_eq!(tuple[4], str_to_atom!("zz"));
-            } else {
-                panic!();
-            }
+        let x = res.unwrap();
+        assert!(x.is_tuple());
+        if let Ok(tuple) = x.try_into() {
+            let tuple: &Tuple = tuple;
+            assert_eq!(tuple.len, 5);
+            assert_eq!(tuple[0], Term::from(1));
+            assert_eq!(tuple[1], str_to_atom!("aa"));
+            assert_eq!(tuple[2], Term::from(1));
+            assert_eq!(tuple[3], Term::from(1));
+            assert_eq!(tuple[4], str_to_atom!("zz"));
         } else {
             panic!();
         }
-
     }
 
     #[test]
@@ -350,16 +339,13 @@ mod tests {
         let args = vec![tuple, append];
 
         let res = bif_erlang_append_element_2(&vm, &process, &args);
-        if let Ok(x) = res {
-            assert!(x.is_tuple());
-            if let Ok(tuple) = x.try_into() {
-                let tuple: &Tuple = tuple;
-                assert_eq!(tuple.len, 3);
-                for (i, x) in tuple.iter().enumerate() {
-                    assert_eq!(x, &Term::int(i as i32));
-                }
-            } else {
-                panic!();
+        let x = res.unwrap();
+        assert!(x.is_tuple());
+        if let Ok(tuple) = x.try_into() {
+            let tuple: &Tuple = tuple;
+            assert_eq!(tuple.len, 3);
+            for (i, x) in tuple.iter().enumerate() {
+                assert_eq!(x, &Term::int(i as i32));
             }
         } else {
             panic!();
@@ -397,17 +383,14 @@ mod tests {
         let args = vec![index, tuple, value];
 
         let res = bif_erlang_setelement_3(&vm, &process, &args);
-        if let Ok(x) = res {
-            assert!(x.is_tuple());
-            if let Ok(tuple) = x.try_into() {
-                let tuple: &Tuple = tuple;
-                assert_eq!(tuple.len, 3);
-                assert_eq!(tuple[0], str_to_atom!("test"));
-                assert_eq!(tuple[1], Term::from(99));
-                assert_eq!(tuple[2], Term::from(2));
-            } else {
-                panic!();
-            }
+        let x = res.unwrap();
+        assert!(x.is_tuple());
+        if let Ok(tuple) = x.try_into() {
+            let tuple: &Tuple = tuple;
+            assert_eq!(tuple.len, 3);
+            assert_eq!(tuple[0], str_to_atom!("test"));
+            assert_eq!(tuple[1], Term::from(99));
+            assert_eq!(tuple[2], Term::from(2));
         } else {
             panic!();
         }
@@ -484,17 +467,14 @@ mod tests {
         let args = vec![tuple];
 
         let res = bif_erlang_tuple_to_list_1(&vm, &process, &args);
-        if let Ok(x) = res {
-            assert!(x.is_list());
-            if let Ok(cons) = x.try_into() {
-                let cons: &value::Cons = cons;
-                assert_eq!(cons.iter().count(), 2);
-                let mut iter = cons.iter();
-                assert_eq!(iter.next().unwrap(), &str_to_atom!("test"));
-                assert_eq!(iter.next().unwrap(), &tup2!(&heap, Term::from(1), Term::from(2)));
-            } else {
-                panic!();
-            }
+        let x = res.unwrap();
+        assert!(x.is_list());
+        if let Ok(cons) = x.try_into() {
+            let cons: &value::Cons = cons;
+            assert_eq!(cons.iter().count(), 2);
+            let mut iter = cons.iter();
+            assert_eq!(iter.next().unwrap(), &str_to_atom!("test"));
+            assert_eq!(iter.next().unwrap(), &tup2!(&heap, Term::from(1), Term::from(2)));
         } else {
             panic!();
         }
