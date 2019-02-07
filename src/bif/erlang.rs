@@ -10,10 +10,10 @@ pub fn bif_erlang_make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[T
         _ => return Err(Exception::new(Reason::EXC_BADARG))
     };
     let heap = &process.context_mut().heap;
-    let tuple = value::tuple(&heap, num as u32);
+    let tuple = value::tuple(heap, num as u32);
     for i in 0..num {
         unsafe {
-            std::ptr::write(&mut tuple[i as usize], args[1].clone());
+            std::ptr::write(&mut tuple[i as usize], args[1]);
         }
     }
     Ok(Term::from(tuple))
@@ -25,10 +25,10 @@ pub fn bif_erlang_make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[T
        _ => return Err(Exception::new(Reason::EXC_BADARG))
     };
     let heap = &process.context_mut().heap;
-    let tuple = value::tuple(&heap, num as u32);
+    let tuple = value::tuple(heap, num as u32);
     for i in 0..num {
         unsafe {
-            std::ptr::write(&mut tuple[i as usize], args[1].clone());
+            std::ptr::write(&mut tuple[i as usize], args[1]);
         }
     }
     if !args[2].is_list() {
@@ -66,7 +66,7 @@ pub fn bif_erlang_append_element_2(_vm: &vm::Machine, process: &RcProcess, args:
         _ => return Err(Exception::new(Reason::EXC_BADARG))
     };
     let heap = &process.context_mut().heap;
-    let mut new_tuple = value::tuple(&heap, (t.len() + 1) as u32);
+    let new_tuple = value::tuple(heap, (t.len() + 1) as u32);
     unsafe {
         new_tuple[..t.len()].copy_from_slice(&t[..]);
         std::ptr::write(&mut new_tuple[t.len()], args[1]);
@@ -83,11 +83,11 @@ pub fn bif_erlang_setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[T
         Ok(tuple) => tuple,
         _ => return Err(Exception::new(Reason::EXC_BADARG))
     };
-    if !(number <= t.len() as i32) {
+    if number > t.len() as i32 {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
     let heap = &process.context_mut().heap;
-    let mut new_tuple = value::tuple(&heap, t.len() as u32);
+    let new_tuple = value::tuple(heap, t.len() as u32);
     unsafe {
         new_tuple[..t.len()].copy_from_slice(&t[..]);
         std::ptr::write(&mut new_tuple[number as usize], args[2]);
@@ -108,7 +108,7 @@ pub fn bif_erlang_tuple_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: 
         cons.push(item);
     }
     let heap = &process.context_mut().heap;
-    Ok(Cons::from_iter(cons.iter(), &heap))
+    Ok(Cons::from_iter(cons.iter(), heap))
 }
 
 #[cfg(test)]
