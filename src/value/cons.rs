@@ -136,7 +136,7 @@ mod tests {
         let tup = tup3!(&heap, Term::int(1), Term::int(2), Term::int(3));
         let t: &value::Tuple = tup.try_into().expect("wasn't a tuple");
 
-        let res = Cons::from_iter(t.as_slice().iter(), &heap);
+        let res = Cons::from_iter(t.into_iter(), &heap);
         let cons: &Cons = res.try_into().expect("wasn't a cons");
 
         let mut iter = cons.iter();

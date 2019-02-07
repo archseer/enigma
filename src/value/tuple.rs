@@ -40,6 +40,15 @@ impl DerefMut for Tuple {
     }
 }
 
+impl<'a> IntoIterator for &'a Tuple {
+    type Item = &'a Term;
+    type IntoIter = ::std::slice::Iter<'a, Term>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().into_iter()
+    }
+}
+
 impl PartialEq for Tuple {
     fn eq(&self, other: &Self) -> bool {
         // fast path: different lengths means not equal
