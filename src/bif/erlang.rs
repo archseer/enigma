@@ -1,6 +1,6 @@
 use crate::bif::BifResult;
 use crate::process::RcProcess;
-use crate::value::{self, Term, TryInto, Tuple};
+use crate::value::{self, Cons, Term, TryInto, Tuple};
 use crate::exception::{Exception, Reason};
 use crate::vm;
 
@@ -108,7 +108,7 @@ pub fn bif_erlang_tuple_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: 
         cons.push(item);
     }
     let heap = &process.context_mut().heap;
-    Ok(iter_to_list!(&heap, cons.iter().map(|x| *x)))
+    Ok(Cons::from_iter(cons.iter(), &heap))
 }
 
 #[cfg(test)]
@@ -188,11 +188,11 @@ mod tests {
 
         let number = Term::int(5);
         let default = Term::from(1);
-        let init_list = iter_to_list!(&heap, vec![
+        let init_list = Cons::from_iter(vec![
             tup2!(&heap, Term::int(2), str_to_atom!("ignored")),
             tup2!(&heap, Term::int(5), str_to_atom!("zz")),
             tup2!(&heap, Term::int(2), str_to_atom!("aa")),
-        ].iter().map(|x| *x));
+        ].iter(), &heap);
 
 
         let args = vec![number, default, init_list];
