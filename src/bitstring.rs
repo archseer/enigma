@@ -370,6 +370,12 @@ pub fn start_match_2(heap: &Heap, binary: Term, max: u32) -> Option<Term> {
 const SMALL_BITS: usize = 64;
 
 impl MatchBuffer {
+
+    #[inline(always)]
+    pub fn remaining(&self) -> usize {
+        self.size - self.offset
+    }
+
     pub fn get_integer(
         &mut self,
         _heap: &Heap,
@@ -398,7 +404,7 @@ impl MatchBuffer {
 
         // CHECK_MATCH_BUFFER(mb);
 
-        if (self.size - self.offset) < num_bits {
+        if self.remaining() < num_bits {
             // Asked for too many bits.
             return None;
         }
@@ -646,7 +652,7 @@ impl MatchBuffer {
             return Some(Term::from(0.0));
         }
 
-        if (self.size - self.offset) < num_bits {
+        if self.remaining() < num_bits {
             // Asked for too many bits.
             return None;
         }
@@ -716,7 +722,7 @@ impl MatchBuffer {
         // CHECK_MATCH_BUFFER(mb);
 
         // Reduce the use of none by using Result.
-        if (self.size - self.offset) < num_bits {
+        if self.remaining() < num_bits {
             // Asked for too many bits.
             return None;
         }
@@ -734,9 +740,7 @@ impl MatchBuffer {
     /// Copy up to 4 bytes into the supplied buffer.
     #[inline]
     fn align_utf8_bytes(&self, buf: *mut u8) {
-        let bits = self.size - self.offset;
-
-        let bits = match bits {
+        let bits = match self.remaining() {
             0...7 => unreachable!(),
             8...15 => 8,
             16...23 => 24,
@@ -762,7 +766,7 @@ impl MatchBuffer {
         ];
 
         // CHECK_MATCH_BUFFER(mb);
-        let remaining_bits = self.size - self.offset;
+        let remaining_bits = self.remaining();
         if remaining_bits < 8 {
             return None;
         }
@@ -843,7 +847,7 @@ impl MatchBuffer {
     }
 
     pub fn get_utf16(&mut self, flags: Flag) -> Option<Term> {
-        let remaining_bits = self.size - self.offset;
+        let remaining_bits = self.remaining();
         if remaining_bits < 16 {
             return None;
         }

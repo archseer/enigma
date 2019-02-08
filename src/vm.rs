@@ -1557,7 +1557,7 @@ impl Machine {
                         let ms: &bitstring::MatchState = value; // ughh type annotation
                         let mb = &ms.mb;
 
-                        if mb.size - mb.offset != offset {
+                        if mb.remaining() != offset {
                             let fail = ins.args[0].to_u32();
                             op_jump!(context, fail);
                         }
@@ -1637,7 +1637,7 @@ impl Machine {
 
                         let unit = ins.args[2].to_u32() as usize;
 
-                        if mb.size - mb.offset % unit != 0 {
+                        if mb.remaining() % unit != 0 {
                             let fail = ins.args[0].to_u32();
                             op_jump!(context, fail);
                         }
