@@ -17,6 +17,7 @@ use statrs;
 use std::i32;
 use std::ops::{Add, Mul, Sub};
 
+mod erlang;
 mod chrono;
 mod map;
 
@@ -88,6 +89,11 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "register", 2 => bif_erlang_register_2,
             "function_exported", 3 => bif_erlang_function_exported_3,
             "process_flag", 2 => bif_erlang_process_flag_2,
+            "make_tuple", 2 => erlang::bif_erlang_make_tuple_2,
+            "make_tuple", 3 => erlang::bif_erlang_make_tuple_3,
+            "append_element", 2 => erlang::bif_erlang_append_element_2,
+            "setelement", 3 => erlang::bif_erlang_setelement_3,
+            "tuple_to_list", 1 => erlang::bif_erlang_tuple_to_list_1,
 
             // pdict
             "get", 0 => bif_erlang_get_0,

@@ -97,7 +97,7 @@ impl Cons {
 
     // impl FromIterator<Term> for Cons { can't do this since we need heap
 
-    fn from_iter<'a, I: IntoIterator<Item=&'a Term> + ExactSizeIterator>(iter: I, heap: &Heap) -> Term {
+    pub fn from_iter<'a, I: IntoIterator<Item=&'a Term> + ExactSizeIterator>(iter: I, heap: &Heap) -> Term {
         let len = iter.len();
         let mut iter = iter.into_iter();
         let val = iter.next().unwrap();
