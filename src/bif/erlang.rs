@@ -1,7 +1,7 @@
 use crate::bif::BifResult;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Term, TryInto, Tuple};
+use crate::value::{self, Cons, Term, TryInto, Tuple};
 use crate::vm;
 
 pub fn bif_erlang_make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
