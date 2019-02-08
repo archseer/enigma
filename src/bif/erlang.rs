@@ -84,7 +84,7 @@ pub fn bif_erlang_setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[T
         Ok(tuple) => tuple,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
-    if number > t.len() as i32 {
+    if number >= t.len() as i32 {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
     let heap = &process.context_mut().heap;
