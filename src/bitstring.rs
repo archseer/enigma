@@ -1,5 +1,5 @@
-use crate::servo_arc::Arc;
 use crate::immix::Heap;
+use crate::servo_arc::Arc;
 use crate::value::{self, Term, TryInto};
 use parking_lot::Mutex;
 use std::cmp::Ordering;
@@ -124,6 +124,7 @@ impl TryInto<value::Boxed<RcBinary>> for Term {
 }
 
 /// Binaries are bitstrings by default, byte aligned ones are binaries.
+#[derive(Clone)]
 pub struct SubBinary {
     // TODO: wrap into value
     /// Binary size in bytes
@@ -194,7 +195,7 @@ impl From<RcBinary> for MatchBuffer {
             original,
             //base: binary_bytes(original),
             offset: 0,
-            size: len * 8
+            size: len * 8,
         }
     }
 }
@@ -208,7 +209,7 @@ impl From<SubBinary> for MatchBuffer {
             original: binary.original,
             //base: binary_bytes(original),
             offset: offset,
-            size: len * 8 + offset + binary.bitsize // todo + offset looks like a bug
+            size: len * 8 + offset + binary.bitsize, // todo + offset looks like a bug
         }
     }
 }
@@ -306,43 +307,39 @@ pub fn start_match_2(heap: &Heap, binary: Term, max: u32) -> Option<Term> {
         return None;
     }
 
-    // let (orig, offs, bitoffs, bitsize) = if let SubBinary{original, offset: offs, bit_offset: bitoffs, bitsize} {
-    //     (original, offs, bifoffs, bitsize)
-    // } else {
-    //     // TODO: extract RcBinary
-    //     (original, 0, 0, 0)
-    // }
-
-    let original: RcBinary = match binary.try_into() {
-        Ok(value::Boxed {
-            value,
-            header: value::BOXED_BINARY,
-        }) => {
-            let value: &RcBinary = value;
-            value.clone()
+    // TODO: this is not nice
+    let mb = match binary.get_boxed_header() {
+        value::BOXED_BINARY => {
+            // TODO use ok_or to cast to some, then use ?
+            let value = binary
+                .get_boxed_value::<value::Boxed<RcBinary>>()
+                .unwrap()
+                .value
+                .clone();
+            MatchBuffer::from(value)
+        }
+        value::BOXED_SUBBINARY => {
+            // TODO use ok_or to cast to some, then use ?
+            let value = binary
+                .get_boxed_value::<value::Boxed<SubBinary>>()
+                .unwrap()
+                .value
+                .clone();
+            MatchBuffer::from(value)
         }
         _ => unreachable!(),
     };
 
-    let (original, offs, bitoffs, bitsize) = (original, 0, 0, 0);
-
-    //     pb = (ProcBin *) boxed_val(Orig);
-    //     if (pb->thing_word == HEADER_PROC_BIN && pb->flags != 0) {
-    // 	erts_emasculate_writable_binary(pb);
-    //     }
-
-    let offset = 8 * offs + bitoffs;
+    // pb = (ProcBin *) boxed_val(Orig);
+    // if (pb->thing_word == HEADER_PROC_BIN && pb->flags != 0) {
+    //  erts_emasculate_writable_binary(pb);
+    // }
 
     Some(Term::matchstate(
         heap,
         MatchState {
-            mb: MatchBuffer {
-                original,
-                //base: binary_bytes(original),
-                offset,
-                size: total_bin_size * 8 + offset + bitsize,
-            },
-            saved_offsets: vec![offset],
+            saved_offsets: vec![mb.offset],
+            mb,
         },
     ))
 }
@@ -370,18 +367,12 @@ pub fn start_match_2(heap: &Heap, binary: Term, max: u32) -> Option<Term> {
 const SMALL_BITS: usize = 64;
 
 impl MatchBuffer {
-
     #[inline(always)]
     pub fn remaining(&self) -> usize {
         self.size - self.offset
     }
 
-    pub fn get_integer(
-        &mut self,
-        _heap: &Heap,
-        num_bits: usize,
-        mut flags: Flag,
-    ) -> Option<Term> {
+    pub fn get_integer(&mut self, _heap: &Heap, num_bits: usize, mut flags: Flag) -> Option<Term> {
         //    Uint bytes;
         //    Uint bits;
         //    Uint offs;
@@ -634,12 +625,7 @@ impl MatchBuffer {
         unimplemented!()
     }
 
-    pub fn get_float(
-        &mut self,
-        _heap: &Heap,
-        num_bits: usize,
-        mut flags: Flag,
-    ) -> Option<Term> {
+    pub fn get_float(&mut self, _heap: &Heap, num_bits: usize, mut flags: Flag) -> Option<Term> {
         let mut fl32: f32 = 0.0;
         let mut fl64: f64 = 0.0;
 
@@ -713,12 +699,7 @@ impl MatchBuffer {
         Some(f)
     }
 
-    pub fn get_binary(
-        &mut self,
-        heap: &Heap,
-        num_bits: usize,
-        flags: Flag,
-    ) -> Option<Term> {
+    pub fn get_binary(&mut self, heap: &Heap, num_bits: usize, flags: Flag) -> Option<Term> {
         // CHECK_MATCH_BUFFER(mb);
 
         // Reduce the use of none by using Result.
