@@ -475,7 +475,7 @@ mod tests {
         let process = process::allocate(&vm.state, module).unwrap();
 
         let heap = &process.context_mut().heap;
-        let index = Term::int(9);
+        let index = Term::int(4);
         let tuple = tup3!(&heap, str_to_atom!("test"), Term::from(1), Term::from(2));
         let value = Term::from(99);
         let args = vec![index, tuple, value];
