@@ -1421,13 +1421,13 @@ impl Machine {
 
                             let result = bitstring::start_match_2(&context.heap, cxt, slots);
 
-                            if result.is_none() {
-                                // TODO: just use Result<>'s None instead of THE_NON_VALUE for most of these cases.
+                            if let Some(res) = result {
+                                set_register!(context, &ins.args[4], res)
+                            } else {
                                 let fail = ins.args[0].to_u32();
                                 op_jump!(context, fail);
                                 continue;
                             }
-                            set_register!(context, &ins.args[4], result)
                         }
                         _ => {
                             let fail = ins.args[0].to_u32();

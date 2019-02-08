@@ -187,6 +187,32 @@ pub struct MatchBuffer {
     pub size: usize,
 }
 
+impl From<RcBinary> for MatchBuffer {
+    fn from(original: RcBinary) -> Self {
+        let len = original.data.len();
+        MatchBuffer {
+            original,
+            //base: binary_bytes(original),
+            offset: 0,
+            size: len * 8
+        }
+    }
+}
+
+impl From<SubBinary> for MatchBuffer {
+    fn from(binary: SubBinary) -> Self {
+        let len = binary.original.data.len();
+        let offset = 8 * binary.offset + binary.bit_offset as usize;
+
+        MatchBuffer {
+            original: binary.original,
+            //base: binary_bytes(original),
+            offset: offset,
+            size: len * 8 + offset + binary.bitsize // todo + offset looks like a bug
+        }
+    }
+}
+
 pub struct MatchState {
     // TODO: wrap into value
     pub mb: MatchBuffer,
@@ -268,7 +294,7 @@ macro_rules! binary_size {
     };
 }
 
-pub fn start_match_2(heap: &Heap, binary: Term, max: u32) -> Term {
+pub fn start_match_2(heap: &Heap, binary: Term, max: u32) -> Option<Term> {
     assert!(binary.is_binary());
 
     // TODO: BEAM allocates size on all binary types right after the header so we can grab it
@@ -277,12 +303,8 @@ pub fn start_match_2(heap: &Heap, binary: Term, max: u32) -> Term {
 
     if (total_bin_size >> (8 * std::mem::size_of::<usize>() - 3)) != 0 {
         // Uint => maybe u8??
-        return Term::none();
+        return None;
     }
-
-    //     NeededSize = ERL_BIN_MATCHSTATE_SIZE(Max);
-    //     hp = HeapOnlyAlloc(p, NeededSize);
-    //     ms = (ErlBinMatchState *) hp;
 
     // let (orig, offs, bitoffs, bitsize) = if let SubBinary{original, offset: offs, bit_offset: bitoffs, bitsize} {
     //     (original, offs, bifoffs, bitsize)
@@ -309,11 +331,9 @@ pub fn start_match_2(heap: &Heap, binary: Term, max: u32) -> Term {
     // 	erts_emasculate_writable_binary(pb);
     //     }
 
-    // ms->thing_word = HEADER_BIN_MATCHSTATE(Max); TODO use max once we have heap vecs
-
     let offset = 8 * offs + bitoffs;
 
-    Term::matchstate(
+    Some(Term::matchstate(
         heap,
         MatchState {
             mb: MatchBuffer {
@@ -324,7 +344,7 @@ pub fn start_match_2(heap: &Heap, binary: Term, max: u32) -> Term {
             },
             saved_offsets: vec![offset],
         },
-    )
+    ))
 }
 
 // #ifdef DEBUG
@@ -1168,11 +1188,7 @@ mod tests {
 
         let heap = Heap::new();
 
-        let mut mb = MatchBuffer {
-            original: binary,
-            offset: 0,
-            size: 24,
-        };
+        let mut mb = MatchBuffer::from(binary);
 
         // fits in one byte
         let res = mb.get_integer(&heap, 4, Flag::BSF_NONE);
@@ -1185,5 +1201,7 @@ mod tests {
         // num < small_bits & !little
         let res = mb.get_integer(&heap, 12, Flag::BSF_NONE);
         assert_eq!(Some(Term::int(0xDEF)), res);
+
+        // TODO: signed, bigints
     }
 }
