@@ -1,13 +1,13 @@
 use crate::bif::BifResult;
-use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, TryInto, Tuple};
 use crate::exception::{Exception, Reason};
+use crate::process::RcProcess;
+use crate::value::{self, Term, TryInto, Tuple};
 use crate::vm;
 
 pub fn bif_erlang_make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let num = match args[0].into_number() {
-        Ok(value::Num::Integer(i)) if ! i < 0 => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG))
+        Ok(value::Num::Integer(i)) if !i < 0 => i,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     let heap = &process.context_mut().heap;
     let tuple = value::tuple(heap, num as u32);
@@ -21,8 +21,8 @@ pub fn bif_erlang_make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[T
 
 pub fn bif_erlang_make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let num = match args[0].into_number() {
-       Ok(value::Num::Integer(i)) if ! i < 0 => i,
-       _ => return Err(Exception::new(Reason::EXC_BADARG))
+        Ok(value::Num::Integer(i)) if !i < 0 => i,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     let heap = &process.context_mut().heap;
     let tuple = value::tuple(heap, num as u32);
@@ -33,19 +33,19 @@ pub fn bif_erlang_make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[T
     }
     let init: &value::Cons = match args[2].try_into() {
         Ok(cons) => cons,
-        _ => return Err(Exception::new(Reason::EXC_BADARG))
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     for item in init.iter() {
         let t: &Tuple = match item.try_into() {
             Ok(tuple) => tuple, // FIXME do the len checking here
-            _ => return Err(Exception::new(Reason::EXC_BADARG))
+            _ => return Err(Exception::new(Reason::EXC_BADARG)),
         };
         if t.len != 2 {
-            return Err(Exception::new(Reason::EXC_BADARG))
+            return Err(Exception::new(Reason::EXC_BADARG));
         }
         let n = match t[0].into_number() {
-            Ok(value::Num::Integer(i)) if ! i < 1 && i - 1 < num => i - 1,
-            _ => return Err(Exception::new(Reason::EXC_BADARG))
+            Ok(value::Num::Integer(i)) if !i < 1 && i - 1 < num => i - 1,
+            _ => return Err(Exception::new(Reason::EXC_BADARG)),
         };
         unsafe {
             std::ptr::write(&mut tuple[n as usize], t[1]);
@@ -54,13 +54,17 @@ pub fn bif_erlang_make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[T
     Ok(Term::from(tuple))
 }
 
-pub fn bif_erlang_append_element_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn bif_erlang_append_element_2(
+    _vm: &vm::Machine,
+    process: &RcProcess,
+    args: &[Term],
+) -> BifResult {
     if !args[0].is_tuple() {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
     let t: &Tuple = match args[0].try_into() {
         Ok(tuple) => tuple,
-        _ => return Err(Exception::new(Reason::EXC_BADARG))
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     let heap = &process.context_mut().heap;
     let new_tuple = value::tuple(heap, (t.len() + 1) as u32);
@@ -73,12 +77,12 @@ pub fn bif_erlang_append_element_2(_vm: &vm::Machine, process: &RcProcess, args:
 
 pub fn bif_erlang_setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let number = match args[0].into_number() {
-        Ok(value::Num::Integer(i)) if ! i < 1 => i - 1,
-        _ => return Err(Exception::new(Reason::EXC_BADARG))
+        Ok(value::Num::Integer(i)) if !i < 1 => i - 1,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     let t: &Tuple = match args[1].try_into() {
         Ok(tuple) => tuple,
-        _ => return Err(Exception::new(Reason::EXC_BADARG))
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     if number > t.len() as i32 {
         return Err(Exception::new(Reason::EXC_BADARG));
@@ -92,10 +96,14 @@ pub fn bif_erlang_setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[T
     Ok(Term::from(new_tuple))
 }
 
-pub fn bif_erlang_tuple_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn bif_erlang_tuple_to_list_1(
+    _vm: &vm::Machine,
+    process: &RcProcess,
+    args: &[Term],
+) -> BifResult {
     let t: &Tuple = match args[0].try_into() {
         Ok(tuple) => tuple,
-        _ => return Err(Exception::new(Reason::EXC_BADARG))
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     let mut n = (t.len() - 1) as i32;
     let mut list = Term::nil();
@@ -110,9 +118,9 @@ pub fn bif_erlang_tuple_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::process::{self};
-    use crate::module;
     use crate::atom;
+    use crate::module;
+    use crate::process;
 
     #[test]
     fn test_bif_erlang_make_tuple_2() {
@@ -129,7 +137,8 @@ mod tests {
         assert!(x.is_tuple());
         if let Ok(tuple) = x.try_into() {
             let tuple: &Tuple = tuple;
-            tuple.iter()
+            tuple
+                .iter()
                 .for_each(|x| assert_eq!(x, &str_to_atom!("test")));
             assert_eq!(tuple.len, 2);
         } else {
@@ -181,12 +190,15 @@ mod tests {
 
         let number = Term::int(5);
         let default = Term::from(1);
-        let init_list = Cons::from_iter(vec![
-            tup2!(&heap, Term::int(2), str_to_atom!("ignored")),
-            tup2!(&heap, Term::int(5), str_to_atom!("zz")),
-            tup2!(&heap, Term::int(2), str_to_atom!("aa")),
-        ].iter(), &heap);
-
+        let init_list = Cons::from_iter(
+            vec![
+                tup2!(&heap, Term::int(2), str_to_atom!("ignored")),
+                tup2!(&heap, Term::int(5), str_to_atom!("zz")),
+                tup2!(&heap, Term::int(2), str_to_atom!("aa")),
+            ]
+            .iter(),
+            &heap,
+        );
 
         let args = vec![number, default, init_list];
 
@@ -215,11 +227,16 @@ mod tests {
 
         let number = Term::from(2.1);
         let default = Term::from(1);
-        let init_list = iter_to_list!(&heap, vec![
-            tup2!(&heap, Term::int(2), str_to_atom!("ignored")),
-            tup2!(&heap, Term::int(4), str_to_atom!("zz")),
-            tup2!(&heap, Term::int(2), str_to_atom!("aa")),
-        ].iter().map(|x| *x));
+        let init_list = iter_to_list!(
+            &heap,
+            vec![
+                tup2!(&heap, Term::int(2), str_to_atom!("ignored")),
+                tup2!(&heap, Term::int(4), str_to_atom!("zz")),
+                tup2!(&heap, Term::int(2), str_to_atom!("aa")),
+            ]
+            .iter()
+            .map(|x| *x)
+        );
 
         let args = vec![number, default, init_list];
 
@@ -240,11 +257,16 @@ mod tests {
 
         let number = Term::int(-1);
         let default = Term::from(1);
-        let init_list = iter_to_list!(&heap, vec![
-            tup2!(&heap, Term::int(2), str_to_atom!("ignored")),
-            tup2!(&heap, Term::int(4), str_to_atom!("zz")),
-            tup2!(&heap, Term::int(2), str_to_atom!("aa")),
-        ].iter().map(|x| *x));
+        let init_list = iter_to_list!(
+            &heap,
+            vec![
+                tup2!(&heap, Term::int(2), str_to_atom!("ignored")),
+                tup2!(&heap, Term::int(4), str_to_atom!("zz")),
+                tup2!(&heap, Term::int(2), str_to_atom!("aa")),
+            ]
+            .iter()
+            .map(|x| *x)
+        );
 
         let args = vec![number, default, init_list];
 
@@ -286,11 +308,16 @@ mod tests {
 
         let number = Term::int(5);
         let default = Term::from(1);
-        let init_list = iter_to_list!(&heap, vec![
-            tup2!(&heap, Term::int(2), str_to_atom!("ignored")),
-            tup3!(&heap, Term::int(4), str_to_atom!("zz"), Term::from(1)),
-            tup2!(&heap, Term::from(2.0), str_to_atom!("aa")),
-        ].iter().map(|x| *x));
+        let init_list = iter_to_list!(
+            &heap,
+            vec![
+                tup2!(&heap, Term::int(2), str_to_atom!("ignored")),
+                tup3!(&heap, Term::int(4), str_to_atom!("zz"), Term::from(1)),
+                tup2!(&heap, Term::from(2.0), str_to_atom!("aa")),
+            ]
+            .iter()
+            .map(|x| *x)
+        );
 
         let args = vec![number, default, init_list];
 
@@ -311,11 +338,16 @@ mod tests {
 
         let number = Term::int(5);
         let default = Term::from(1);
-        let init_list = iter_to_list!(&heap, vec![
-            tup2!(&heap, Term::int(2), str_to_atom!("ignored")),
-            tup2!(&heap, Term::int(4), str_to_atom!("zz")),
-            tup2!(&heap, Term::int(10), str_to_atom!("aa")),
-        ].iter().map(|x| *x));
+        let init_list = iter_to_list!(
+            &heap,
+            vec![
+                tup2!(&heap, Term::int(2), str_to_atom!("ignored")),
+                tup2!(&heap, Term::int(4), str_to_atom!("zz")),
+                tup2!(&heap, Term::int(10), str_to_atom!("aa")),
+            ]
+            .iter()
+            .map(|x| *x)
+        );
 
         let args = vec![number, default, init_list];
 
@@ -463,7 +495,11 @@ mod tests {
         let process = process::allocate(&vm.state, module).unwrap();
 
         let heap = &process.context_mut().heap;
-        let tuple = tup2!(&heap, str_to_atom!("test"), tup2!(&heap, Term::from(1), Term::from(2)));
+        let tuple = tup2!(
+            &heap,
+            str_to_atom!("test"),
+            tup2!(&heap, Term::from(1), Term::from(2))
+        );
         let args = vec![tuple];
 
         let res = bif_erlang_tuple_to_list_1(&vm, &process, &args);
@@ -474,7 +510,10 @@ mod tests {
             assert_eq!(cons.iter().count(), 2);
             let mut iter = cons.iter();
             assert_eq!(iter.next().unwrap(), &str_to_atom!("test"));
-            assert_eq!(iter.next().unwrap(), &tup2!(&heap, Term::from(1), Term::from(2)));
+            assert_eq!(
+                iter.next().unwrap(),
+                &tup2!(&heap, Term::from(1), Term::from(2))
+            );
         } else {
             panic!();
         }
