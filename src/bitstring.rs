@@ -1,4 +1,5 @@
 use crate::immix::Heap;
+use crate::process::RcProcess;
 use crate::servo_arc::Arc;
 use crate::value::{self, Term, TryInto};
 use parking_lot::Mutex;
@@ -676,10 +677,7 @@ impl MatchBuffer {
         }
 
         let f = if num_bits == 32 {
-            if !fl32.is_finite() {
-                return None;
-            }
-            Term::from(fl32 as f64)
+            fl32 as f64
         } else {
             //   #ifdef DOUBLE_MIDDLE_ENDIAN
             //   FloatDef ftmp;
@@ -690,13 +688,13 @@ impl MatchBuffer {
             //   #else
             //   ...
             //   #endif
-            if !fl64.is_finite() {
-                return None;
-            }
-            Term::from(fl64)
+            fl64
         };
+        if !f.is_finite() {
+            return None;
+        }
         self.offset += num_bits;
-        Some(f)
+        Some(Term::from(f))
     }
 
     pub fn get_binary(&mut self, heap: &Heap, num_bits: usize, flags: Flag) -> Option<Term> {
