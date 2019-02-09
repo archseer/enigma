@@ -1324,38 +1324,6 @@ impl Machine {
                         unreachable!()
                     }
                 }
-                // BsGet and BsSkip should be implemented over an Iterator inside a match context (.skip/take)
-                // maybe we can even use nom for this
-                Opcode::BsAppend => {
-                    // append and init also sets the string as current (state.current_binary) [seems to be used to copy string literals too]
-
-                    // bs_append Fail Size Extra Live Unit Bin Flags Dst => \
-                    //   move Bin x | i_bs_append Fail Extra Live Unit Size Dst
-
-                    if let [LValue::Label(fail), LValue::Integer(size), LValue::Literal(extra_heap), LValue::Literal(live), LValue::Literal(unit), src, _flags, dest] =
-                        &ins.args[..]
-                    {
-                        // TODO: execute fail if non zero
-                        // unit: byte alignment (8 for binary)
-                        //
-                        // size * unit = total_bytes?
-
-                        // make sure it's a binary otherwise badarg
-                        // make sure it's a sub binary and it's writable
-                        // if so, expand the current string and make it non-writable
-                        // else, copy it into a new string, append and return a sub-binary refering to it
-
-                    } else {
-                        panic!("badarg for BsAppend")
-                    }
-
-                    // If the binary is a writable subbinary
-                    // referencing a ProcBin with enough empty space then a new writable subbinary
-                    // is created and the old one is made non-writable. In other cases, creates
-                    // a new shared data, a new ProcBin, and a new subbinary. For all heap
-                    // allocation, a space for more Arg1 words are requested. Arg2 is Live. Arg3 is
-                    // unit. Saves the resultant subbinary to Arg4.
-                }
                 Opcode::BsStartMatch2 => {
                     debug_assert_eq!(ins.args.len(), 5);
                     // fail, src, live, slots?, dst
@@ -1654,12 +1622,53 @@ impl Machine {
                     debug_assert_eq!(ins.args.len(), 0);
                     unimplemented!() // TODO
                 }
+                // BsGet and BsSkip should be implemented over an Iterator inside a match context (.skip/take)
+                // maybe we can even use nom for this
                 Opcode::BsAppend => {
                     debug_assert_eq!(ins.args.len(), 8);
+                    // append and init also sets the string as current (state.current_binary) [seems to be used to copy string literals too]
+
+                    // bs_append Fail Size Extra Live Unit Bin Flags Dst => \
+                    //   move Bin x | i_bs_append Fail Extra Live Unit Size Dst
+
+                    if let [LValue::Label(fail), LValue::Integer(size), LValue::Literal(extra_heap), LValue::Literal(live), LValue::Literal(unit), src, _flags, dest] =
+                        &ins.args[..]
+                    {
+                        // TODO: execute fail if non zero
+                        // unit: byte alignment (8 for binary)
+                        //
+                        // size * unit = total_bytes?
+
+                        // make sure it's a binary otherwise badarg
+                        // make sure it's a sub binary and it's writable
+                        // if so, expand the current string and make it non-writable
+                        // else, copy it into a new string, append and return a sub-binary refering to it
+
+                    } else {
+                        panic!("badarg for BsAppend")
+                    }
+
+                    // If the binary is a writable subbinary
+                    // referencing a ProcBin with enough empty space then a new writable subbinary
+                    // is created and the old one is made non-writable. In other cases, creates
+                    // a new shared data, a new ProcBin, and a new subbinary. For all heap
+                    // allocation, a space for more Arg1 words are requested. Arg2 is Live. Arg3 is
+                    // unit. Saves the resultant subbinary to Arg4.
                     unimplemented!() // TODO
                 }
                 Opcode::BsPrivateAppend => {
                     debug_assert_eq!(ins.args.len(), 6);
+                    // Fail, ExtraHeap, Live, Unit, Size, Dst
+
+                    let res = bitstring::private_append(c_p, $Src, $Size, $Unit);
+
+                    if let Some(res) = res {
+
+                    } else {
+                        /* TODO not yet: c_p->freason is already set (to BADARG or SYSTEM_LIMIT). */
+                        let fail = ins.args[0].to_u32();
+                        op_jump!(context, fail);
+                    }
                     unimplemented!() // TODO
                 }
                 Opcode::BsInitBits => {

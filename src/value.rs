@@ -678,7 +678,6 @@ impl PartialEq for Variant {
     }
 }
 
-// TODO: make faster by not doing into_variant in some cases
 impl PartialOrd for Term {
     fn partial_cmp(&self, other: &Term) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -835,7 +834,7 @@ pub fn tuple(heap: &Heap, len: u32) -> &mut Tuple {
         len,
     });
     let layout = Layout::new::<Term>().repeat(len as usize).unwrap().0;
-    heap.alloc_layout(layout); // TODO: do something with the ptr
+    heap.alloc_layout(layout);
     tuple
 }
 

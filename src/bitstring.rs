@@ -903,6 +903,53 @@ impl MatchBuffer {
 
 // https://docs.rs/bitstring/0.1.1/bitstring/bit_string/trait.BitString.html
 
+fn erts_bs_private_append(
+    process: &RcProcess,
+    binary: Term,
+    build_size: Term,
+    unit: usize,
+) -> Option<Term> {
+    // Check and untag the requested build size.
+    // if size < 0 || not smallint
+    let build_size_in_bits = match build_size.into_variant() {
+        value::Variant::Integer(i) if !i < 0 => i,
+        // TODO: return err reason probs instead of tweaking freason
+        // _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return None,
+        // p->freason = BADARG;
+    };
+
+    let sb = binary
+        .get_boxed_value_mut::<value::Boxed<SubBinary>>()
+        .unwrap()
+        .value;
+    assert!(sb.is_writable);
+
+    let pb = &mut sb.original;
+
+    // Calculate size in bytes.
+    let bin_size = 8 * sb.size + sb.bitsize;
+
+    let size_in_bits_after_build = bin_size + build_size_in_bits as usize;
+    let size = (size_in_bits_after_build + 7) >> 3;
+    // pb.flags |= PB_ACTIVE_WRITER; // TODO atomic set
+
+    //if (ERTS_UINT_MAX - build_size_in_bits) < bin_size {
+    //    //p->freason = SYSTEM_LIMIT;
+    //    return None;
+    //}
+
+    // Reserve extra capacity if needed.
+    if pb.data.capacity() < size {
+        pb.data.reserve(2 * size); // why 2*?
+    }
+    process.context_mut().bs = &mut pb.data;
+
+    sb.size = size_in_bits_after_build >> 3;
+    sb.bitsize = size_in_bits_after_build & 7;
+    return Some(binary);
+}
+
 #[inline(always)]
 fn get_bit(b: u8, offs: usize) -> u8 {
     return (b >> (7 - offs)) & 1;
