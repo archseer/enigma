@@ -902,6 +902,226 @@ impl MatchBuffer {
 // normal structure lockless.
 
 // https://docs.rs/bitstring/0.1.1/bitstring/bit_string/trait.BitString.html
+//
+fn erts_bs_append(
+    process: &RcProcess,
+    reg: Term,
+    live: usize,
+    build_size: Term,
+    extra_words: usize,
+    unit: usize
+) -> Option<Term> {
+    // Eterm bin;			/* Given binary */
+    // Eterm* ptr;
+    // Eterm hdr;
+    // ErlSubBin* sb;
+    // ProcBin* pb;
+    // Binary* binp;
+    // Uint heap_need;
+    // Uint build_size_in_bits;
+    // Uint used_size_in_bits;
+    // Uint unsigned_bits;
+    // ERL_BITS_DEFINE_STATEP(c_p);
+
+    // Check and untag the requested build size.
+    if (is_small(build_size_term)) {
+	Sint signed_bits = signed_val(build_size_term);
+	if (signed_bits < 0) {
+	    goto badarg;
+	}
+	build_size_in_bits = (Uint) signed_bits;
+    } else if (term_to_Uint(build_size_term, &unsigned_bits)) {
+	build_size_in_bits = unsigned_bits;
+    } else {
+	c_p->freason = unsigned_bits;
+	return THE_NON_VALUE;
+    }
+
+    // Check the binary argument.
+    bin = reg[live];
+    if (!is_boxed(bin)) {
+    badarg:
+	c_p->freason = BADARG;
+	return THE_NON_VALUE;
+    }
+    ptr = boxed_val(bin);
+    hdr = *ptr;
+    if (!is_binary_header(hdr)) {
+	goto badarg;
+    }
+    if (hdr != HEADER_SUB_BIN) {
+	goto not_writable;
+    }
+    sb = (ErlSubBin *) ptr;
+    if (!sb->is_writable) {
+	goto not_writable;
+    }
+    pb = (ProcBin *) boxed_val(sb->orig);
+    ASSERT(pb->thing_word == HEADER_PROC_BIN);
+    if ((pb->flags & PB_IS_WRITABLE) == 0) {
+	goto not_writable;
+    }
+
+    // OK, the binary is writable.
+
+    erts_bin_offset = 8*sb->size + sb->bitsize;
+    if (unit > 1) {
+	if ((unit == 8 && (erts_bin_offset & 7) != 0) ||
+	    (erts_bin_offset % unit) != 0) {
+	    goto badarg;
+	}
+    }
+
+    if (build_size_in_bits == 0) {
+        if (c_p->stop - c_p->htop < extra_words) {
+            (void) erts_garbage_collect(c_p, extra_words, reg, live+1);
+            bin = reg[live];
+        }
+	return bin;
+    }
+
+    if((ERTS_UINT_MAX - build_size_in_bits) < erts_bin_offset) {
+        c_p->freason = SYSTEM_LIMIT;
+        return THE_NON_VALUE;
+    }
+
+    used_size_in_bits = erts_bin_offset + build_size_in_bits;
+
+    sb->is_writable = 0;	/* Make sure that no one else can write. */
+    pb->size = NBYTES(used_size_in_bits);
+    pb->flags |= PB_ACTIVE_WRITER;
+
+    // Reallocate the binary if it is too small.
+    binp = pb->val;
+    if (binp->orig_size < pb->size) {
+	Uint new_size = 2*pb->size;
+	binp = erts_bin_realloc(binp, new_size);
+	pb->val = binp;
+	pb->bytes = (byte *) binp->orig_bytes;
+    }
+    erts_current_bin = pb->bytes;
+
+    // Allocate heap space and build a new sub binary.
+    reg[live] = sb->orig;
+    heap_need = ERL_SUB_BIN_SIZE + extra_words;
+    if (c_p->stop - c_p->htop < heap_need) {
+	(void) erts_garbage_collect(c_p, heap_need, reg, live+1);
+    }
+    sb = (ErlSubBin *) c_p->htop;
+    c_p->htop += ERL_SUB_BIN_SIZE;
+    sb->thing_word = HEADER_SUB_BIN;
+    sb->size = BYTE_OFFSET(used_size_in_bits);
+    sb->bitsize = BIT_OFFSET(used_size_in_bits);
+    sb->offs = 0;
+    sb->bitoffs = 0;
+    sb->is_writable = 1;
+    sb->orig = reg[live];
+
+    return make_binary(sb);
+
+    /*
+     * The binary is not writable. We must create a new writable binary and
+     * copy the old contents of the binary.
+     */
+ not_writable:
+    {
+	Uint used_size_in_bytes; /* Size of old binary + data to be built */
+	Uint bin_size;
+	Binary* bptr;
+	byte* src_bytes;
+	Uint bitoffs;
+	Uint bitsize;
+	Eterm* hp;
+
+        /*
+	 * Allocate heap space.
+	 */
+	heap_need = PROC_BIN_SIZE + ERL_SUB_BIN_SIZE + extra_words;
+	if (c_p->stop - c_p->htop < heap_need) {
+	    (void) erts_garbage_collect(c_p, heap_need, reg, live+1);
+            bin = reg[live];
+	}
+	hp = c_p->htop;
+
+	/*
+	 * Calculate sizes. The size of the new binary, is the sum of the
+	 * build size and the size of the old binary. Allow some room
+	 * for growing.
+	 */
+	ERTS_GET_BINARY_BYTES(bin, src_bytes, bitoffs, bitsize);
+	erts_bin_offset = 8*binary_size(bin) + bitsize;
+	if (unit > 1) {
+	    if ((unit == 8 && (erts_bin_offset & 7) != 0) ||
+		(erts_bin_offset % unit) != 0) {
+		goto badarg;
+	    }
+	}
+
+	if (build_size_in_bits == 0) {
+            return bin;
+	}
+
+        if((ERTS_UINT_MAX - build_size_in_bits) < erts_bin_offset) {
+            c_p->freason = SYSTEM_LIMIT;
+            return THE_NON_VALUE;
+        }
+
+        used_size_in_bits = erts_bin_offset + build_size_in_bits;
+        used_size_in_bytes = NBYTES(used_size_in_bits);
+
+        if(used_size_in_bits < (ERTS_UINT_MAX / 2)) {
+            bin_size = 2 * used_size_in_bytes;
+        } else {
+            bin_size = NBYTES(ERTS_UINT_MAX);
+        }
+
+	bin_size = (bin_size < 256) ? 256 : bin_size;
+
+	/*
+	 * Allocate the binary data struct itself.
+	 */
+	bptr = erts_bin_nrml_alloc(bin_size);
+	erts_current_bin = (byte *) bptr->orig_bytes;
+
+	/*
+	 * Now allocate the ProcBin on the heap.
+	 */
+	pb = (ProcBin *) hp;
+	hp += PROC_BIN_SIZE;
+	pb->thing_word = HEADER_PROC_BIN;
+	pb->size = used_size_in_bytes;
+	pb->next = MSO(c_p).first;
+	MSO(c_p).first = (struct erl_off_heap_header*)pb;
+	pb->val = bptr;
+	pb->bytes = (byte*) bptr->orig_bytes;
+	pb->flags = PB_IS_WRITABLE | PB_ACTIVE_WRITER;
+	OH_OVERHEAD(&(MSO(c_p)), pb->size / sizeof(Eterm));
+
+	/*
+	 * Now allocate the sub binary and set its size to include the
+	 * data about to be built.
+	 */
+	sb = (ErlSubBin *) hp;
+	hp += ERL_SUB_BIN_SIZE;
+	sb->thing_word = HEADER_SUB_BIN;
+	sb->size = BYTE_OFFSET(used_size_in_bits);
+	sb->bitsize = BIT_OFFSET(used_size_in_bits);
+	sb->offs = 0;
+	sb->bitoffs = 0;
+	sb->is_writable = 1;
+	sb->orig = make_binary(pb);
+
+	c_p->htop = hp;
+	
+	/*
+	 * Now copy the data into the binary.
+	 */
+	copy_binary_to_buffer(erts_current_bin, 0, src_bytes, bitoffs, erts_bin_offset);
+
+	return make_binary(sb);
+    }
+    unimplemented!()
+}
 
 fn erts_bs_private_append(
     process: &RcProcess,
@@ -948,6 +1168,20 @@ fn erts_bs_private_append(
     sb.size = size_in_bits_after_build >> 3;
     sb.bitsize = size_in_bits_after_build & 7;
     return Some(binary);
+}
+
+fn erts_bs_init_writable(process: &RcProcess, size: Term) -> Term {
+    let size = match size.into_variant() {
+        value::Variant::Integer(i) if i >= 0 => i,
+        _ => 1024,
+    };
+
+    Term::subbinary(SubBinary::new(
+        Term::binary(Binary::with_capacity(size, PB_IS_ITABLE | PB_ACTIVE_WRITER)),
+        num_bits: 0,
+        offset: 0,
+        is_writable: true,
+    ))
 }
 
 #[inline(always)]
