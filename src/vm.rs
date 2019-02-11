@@ -1245,8 +1245,9 @@ impl Machine {
                         // alternatively, loop through the instrs until we hit a non bs_ instr.
                         // that way, no unsafe ptrs!
                         let size = s1.to_u32();
-                        let binary = bitstring::Binary::with_capacity(size as usize);
-                        context.bs = &binary.data as *const Vec<u8> as *mut Vec<u8>; // nasty, point to arc instead
+                        let mut binary = bitstring::Binary::with_capacity(size as usize);
+                        binary.is_writable = false;
+                        context.bs = binary.get_mut();
                                                                                      // TODO ^ ensure this pointer stays valid after heap alloc
                         set_register!(context, dest, Term::binary(&context.heap, binary));
                     } else {
@@ -1583,7 +1584,7 @@ impl Machine {
                         // place.
                         let res = Term::subbinary(
                             &context.heap,
-                            bitstring::SubBinary::new(ms.mb.original.clone(), size, offs),
+                            bitstring::SubBinary::new(ms.mb.original.clone(), size, offs, false),
                         );
                         set_register!(context, &ins.args[0], res);
                     } else {
@@ -1620,7 +1621,7 @@ impl Machine {
                 }
                 Opcode::BsInitWritable => {
                     debug_assert_eq!(ins.args.len(), 0);
-                    unimplemented!() // TODO
+                    context.x[0] = bitstring::init_writable(process, context.x[0]);
                 }
                 // BsGet and BsSkip should be implemented over an Iterator inside a match context (.skip/take)
                 // maybe we can even use nom for this
@@ -1631,39 +1632,34 @@ impl Machine {
                     // bs_append Fail Size Extra Live Unit Bin Flags Dst => \
                     //   move Bin x | i_bs_append Fail Extra Live Unit Size Dst
 
-                    if let [LValue::Label(fail), LValue::Integer(size), LValue::Literal(extra_heap), LValue::Literal(live), LValue::Literal(unit), src, _flags, dest] =
-                        &ins.args[..]
-                    {
-                        // TODO: execute fail if non zero
-                        // unit: byte alignment (8 for binary)
-                        //
-                        // size * unit = total_bytes?
+                    let size = context.expand_arg(&ins.args[1]);
+                    let extra_words = ins.args[2].to_u32() as usize;
+                    let unit = ins.args[2].to_u32() as usize;
+                    let src = context.expand_arg(&ins.args[4]);
 
-                        // make sure it's a binary otherwise badarg
-                        // make sure it's a sub binary and it's writable
-                        // if so, expand the current string and make it non-writable
-                        // else, copy it into a new string, append and return a sub-binary refering to it
+                    let res = bitstring::append(process, src, size, extra_words, unit);
 
+                    if let Some(res) = res {
+                        set_register!(context, &ins.args[5], res)
                     } else {
-                        panic!("badarg for BsAppend")
+                        // TODO: execute fail only if non zero, else raise
+                        /* TODO not yet: c_p->freason is already set (to BADARG or SYSTEM_LIMIT). */
+                        let fail = ins.args[0].to_u32();
+                        op_jump!(context, fail);
                     }
-
-                    // If the binary is a writable subbinary
-                    // referencing a ProcBin with enough empty space then a new writable subbinary
-                    // is created and the old one is made non-writable. In other cases, creates
-                    // a new shared data, a new ProcBin, and a new subbinary. For all heap
-                    // allocation, a space for more Arg1 words are requested. Arg2 is Live. Arg3 is
-                    // unit. Saves the resultant subbinary to Arg4.
-                    unimplemented!() // TODO
                 }
                 Opcode::BsPrivateAppend => {
                     debug_assert_eq!(ins.args.len(), 6);
-                    // Fail, ExtraHeap, Live, Unit, Size, Dst
+                    // bs_private_append Fail Size Unit Bin Flags Dst
 
-                    let res = bitstring::private_append(c_p, $Src, $Size, $Unit);
+                    let size = context.expand_arg(&ins.args[1]);
+                    let unit = ins.args[2].to_u32() as usize;
+                    let src = context.expand_arg(&ins.args[3]);
+
+                    let res = bitstring::private_append(process, src, size, unit);
 
                     if let Some(res) = res {
-
+                        set_register!(context, &ins.args[5], res)
                     } else {
                         /* TODO not yet: c_p->freason is already set (to BADARG or SYSTEM_LIMIT). */
                         let fail = ins.args[0].to_u32();
@@ -1673,6 +1669,7 @@ impl Machine {
                 }
                 Opcode::BsInitBits => {
                     debug_assert_eq!(ins.args.len(), 6);
+                    // TODO: RcBinary has to be set to is_writable = false
                     unimplemented!() // TODO
                 }
                 Opcode::BsGetUtf8 => {

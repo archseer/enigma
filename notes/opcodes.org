@@ -1,4 +1,4 @@
-* Opcodes [111/138]
+* Opcodes [114/138]
 - [X] Label = 1
 - [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -101,9 +101,9 @@
 - [X] BsContextToBinary = 130
 - [X] BsTestUnit = 131
 - [ ] BsMatchString = 132
-- [ ] BsInitWritable = 133
-- [ ] BsAppend = 134
-- [ ] BsPrivateAppend = 135
+- [X] BsInitWritable = 133
+- [X] BsAppend = 134
+- [X] BsPrivateAppend = 135
 - [X] Trim = 136
 - [ ] BsInitBits = 137
 - [X] BsGetUtf8 = 138
