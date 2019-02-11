@@ -1018,7 +1018,7 @@ impl Machine {
                 }
                 Opcode::Put => unimplemented!("Stray Put that wasn't rewritten by the loader!"),
                 Opcode::PutTuple2 => {
-                    debug_assert_eq!(ins.args.len(), 4);
+                    debug_assert_eq!(ins.args.len(), 2);
                     // op: PutTuple2, args: [X(0), ExtendedList([Y(1), Y(0), X(0)])] }
                     if let LValue::ExtendedList(list) = &ins.args[1] {
                         let arity = list.len();
