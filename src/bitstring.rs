@@ -4,7 +4,7 @@ use crate::servo_arc::Arc;
 use crate::value::{self, Term, TryInto};
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
-use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+// use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 // use std::cell::UnsafeCell;
 
 /// make_mask(n) constructs a mask with n bits.
@@ -216,7 +216,7 @@ impl From<SubBinary> for MatchBuffer {
         MatchBuffer {
             original: binary.original,
             //base: binary_bytes(original),
-            offset: offset,
+            offset,
             size: len * 8 + offset + binary.bitsize, // todo + offset looks like a bug
         }
     }
@@ -684,7 +684,7 @@ impl MatchBuffer {
         }
 
         let f = if num_bits == 32 {
-            fl32 as f64
+            f64::from(fl32)
         } else {
             //   #ifdef DOUBLE_MIDDLE_ENDIAN
             //   FloatDef ftmp;
@@ -783,7 +783,7 @@ impl MatchBuffer {
                 if (a & 0xC0) != 0x80 {
                     return None;
                 }
-                let result = (result << 6) + a - 0x00003080;
+                let result = (result << 6) + a - 0x0000_3080;
                 self.offset += 16;
                 result
             }
@@ -797,7 +797,7 @@ impl MatchBuffer {
                 if (a & 0xC0) != 0x80 || (b & 0xC0) != 0x80 || (result == 0xE0 && a < 0xA0) {
                     return None;
                 }
-                let result = (((result << 6) + a) << 6) + b - 0x000E2080;
+                let result = (((result << 6) + a) << 6) + b - 0x000E_2080;
                 if 0xD800 <= result && result <= 0xDFFF {
                     return None;
                 }
@@ -819,8 +819,8 @@ impl MatchBuffer {
                 {
                     return None;
                 }
-                let result = (((((result << 6) + a) << 6) + b) << 6) + c - 0x03C82080;
-                if result > 0x10FFFF {
+                let result = (((((result << 6) + a) << 6) + b) << 6) + c - 0x03C8_2080;
+                if result > 0x0010_FFFF {
                     return None;
                 }
                 self.offset += 32;
@@ -958,7 +958,7 @@ pub fn append(
     process: &RcProcess,
     binary: Term,
     build_size: Term,
-    extra_words: usize,
+    _extra_words: usize,
     unit: usize,
 ) -> Option<Term> {
     // Check and untag the requested build size.
@@ -1041,10 +1041,10 @@ pub fn append(
         //     (void) erts_garbage_collect(c_p, heap_need, reg, live+1);
         // }
 
-        return Some(Term::subbinary(
+        Some(Term::subbinary(
             heap,
             SubBinary::new(pb.clone(), used_size_in_bits, 0, true),
-        ));
+        ))
     } else {
         // The binary is not writable. We must create a new writable binary and copy the old
         // contents of the binary.
@@ -1118,10 +1118,10 @@ pub fn append(
         );
 
         // Now allocate the sub binary and set its size to include the data about to be built.
-        return Some(Term::subbinary(
+        Some(Term::subbinary(
             heap,
             SubBinary::new(new_binary, used_size_in_bits, 0, true),
-        ));
+        ))
     }
 }
 
@@ -1226,7 +1226,7 @@ pub unsafe fn cmp_bits(
         // compare as slices
         let slice_a = std::slice::from_raw_parts(a_ptr, byte_size);
         let slice_b = std::slice::from_raw_parts(b_ptr, byte_size);
-        return slice_a.cmp(&slice_b);
+        return slice_a.cmp(slice_b);
     }
 
     // Compare bit by bit until a_ptr is aligned on byte boundary
@@ -1442,7 +1442,7 @@ pub unsafe fn copy_bits(
 
         if rmask > 0 {
             bits1 = bits << lshift;
-            if (rmask << rshift) & 0xff > 0 {
+            if (rmask << rshift) > 0 { // (a << b) & 0xff but that is reduced anyway
                 bits = *src;
                 bits1 |= bits >> rshift;
             }

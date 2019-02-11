@@ -61,7 +61,7 @@ impl Ord for Tuple {
     fn cmp(&self, other: &Self) -> Ordering {
         self.len
             .cmp(&other.len) // fast path: different lengths means not equal
-            .then_with(|| self.as_slice().cmp(&other.as_slice()))
+            .then_with(|| self.as_slice().cmp(other.as_slice()))
     }
 }
 
