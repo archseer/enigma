@@ -1,7 +1,7 @@
 use crate::bif::BifResult;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, TryInto, Tuple};
+use crate::value::{self, Term, TryInto, Tuple};
 use crate::vm;
 
 pub fn bif_erlang_make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
@@ -121,12 +121,13 @@ mod tests {
     use crate::atom;
     use crate::module;
     use crate::process;
+    use crate::value::Cons;
 
     #[test]
     fn test_bif_erlang_make_tuple_2() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
 
         let number = Term::int(2);
         let default = str_to_atom!("test");
@@ -150,7 +151,7 @@ mod tests {
     fn test_bif_erlang_make_tuple_2_bad_arg_wrong_type_of_tuple() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
 
         let number = Term::from(2.1);
         let default = str_to_atom!("test");
@@ -168,7 +169,7 @@ mod tests {
     fn test_bif_erlang_make_tuple_2_bad_arg_negative_number() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
 
         let number = Term::int(-1);
         let default = str_to_atom!("test");
@@ -185,7 +186,7 @@ mod tests {
     fn test_bif_erlang_tuple_make_tuple_3() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let number = Term::int(5);
@@ -222,7 +223,7 @@ mod tests {
     fn test_bif_erlang_tuple_make_tuple_3_bad_arg_wrong_type_of_number() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let number = Term::from(2.1);
@@ -252,7 +253,7 @@ mod tests {
     fn test_bif_erlang_tuple_make_tuple_3_bad_arg_negative_number() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let number = Term::int(-1);
@@ -282,7 +283,7 @@ mod tests {
     fn test_bif_erlang_tuple_make_tuple_3_bad_arg_wrong_type_of_init_list() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
         let _heap = &process.context_mut().heap;
 
         let number = Term::int(5);
@@ -303,7 +304,7 @@ mod tests {
     fn test_bif_erlang_tuple_make_tuple_3_bad_arg_wrong_structure_init_list() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let number = Term::int(5);
@@ -333,7 +334,7 @@ mod tests {
     fn test_bif_erlang_tuple_make_tuple_3_bad_arg_init_list_out_of_range() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let number = Term::int(5);
@@ -363,7 +364,7 @@ mod tests {
     fn test_bif_erlang_append_element_2() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
 
         let heap = &process.context_mut().heap;
         let tuple = tup2!(&heap, Term::int(0), Term::int(1));
@@ -388,7 +389,7 @@ mod tests {
     fn test_bif_erlang_append_element_2_bad_arg_wrong_type_of_tuple() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
 
         let bad_tuple = Term::int(0);
         let append = Term::int(2);
@@ -406,7 +407,7 @@ mod tests {
     fn test_bif_erlang_setelement_3() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
 
         let heap = &process.context_mut().heap;
         let index = Term::int(2);
@@ -432,7 +433,7 @@ mod tests {
     fn test_bif_erlang_setelement_3_bad_arg_wrong_type_of_index() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
 
         let heap = &process.context_mut().heap;
         let index = Term::from(1.1);
@@ -452,7 +453,7 @@ mod tests {
     fn test_bif_erlang_setelement_3_bad_arg_wrong_type_of_tuple() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
 
         let _heap = &process.context_mut().heap;
         let index = Term::int(1);
@@ -472,7 +473,7 @@ mod tests {
     fn test_bif_erlang_setelement_3_bad_arg_tuple_out_of_range() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
 
         let heap = &process.context_mut().heap;
         let index = Term::int(4);
@@ -492,7 +493,7 @@ mod tests {
     fn test_bif_erlang_tuple_to_list_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
 
         let heap = &process.context_mut().heap;
         let tuple = tup2!(
@@ -523,7 +524,7 @@ mod tests {
     fn test_bif_erlang_tuple_to_list_1_bad_arg_wrong_type_of_tuple() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, module).unwrap();
+        let process = process::allocate(&vm.state, None, module).unwrap();
 
         let bad_tuple = Term::from(1);
         let args = vec![bad_tuple];

@@ -1196,7 +1196,7 @@ pub fn init_writable(process: &RcProcess, size: Term) -> Term {
 
 #[inline(always)]
 fn get_bit(b: u8, offs: usize) -> u8 {
-    return (b >> (7 - offs)) & 1;
+    (b >> (7 - offs)) & 1
 }
 
 /// Compare potentially unaligned bitstrings. Much slower than memcmp, so only use when necessary.

@@ -1,22 +1,22 @@
+pub use self::table::PID;
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
+use crate::instr_ptr::InstrPtr;
 use crate::loader::LValue;
 use crate::mailbox::Mailbox;
 use crate::module::{Module, MFA};
 use crate::pool::Job;
-pub use self::table::PID;
 use crate::value::{self, Term, TryInto};
 use crate::vm::RcState;
-use crate::instr_ptr::InstrPtr;
 use hashbrown::HashMap;
 use std::cell::UnsafeCell;
 use std::panic::RefUnwindSafe;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-pub mod tree;
-pub mod table;
 pub mod registry;
+pub mod table;
+pub mod tree;
 
 /// Heavily inspired by inko
 
@@ -31,7 +31,7 @@ pub type RcProcess = Arc<Process>;
 pub const MAX_REG: usize = 16;
 
 bitflags! {
-    pub struct Flag: u32 {
+    pub struct Flag: u8 {
         const INITIAL = 0;
         const TRAP_EXIT = (1 << 0);
     }
@@ -110,10 +110,11 @@ pub struct LocalData {
     // allocator, panic handler
     context: Box<ExecutionContext>,
 
+    parent: Option<PID>,
+
     // links (tree)
     // monitors (tree) + lt_monitors (list)
     // signals are sent on death, and the receiving side cleans up it's link/mon structures
-
     pub mailbox: Mailbox,
 
     /// The ID of the thread this process is pinned to.
@@ -143,6 +144,7 @@ impl RefUnwindSafe for Process {}
 impl Process {
     pub fn with_rc(
         pid: PID,
+        parent: Option<PID>,
         context: ExecutionContext,
         // global_allocator: RcGlobalAllocator,
         // config: &Config,
@@ -150,6 +152,7 @@ impl Process {
         let local_data = LocalData {
             // allocator: LocalAllocator::new(global_allocator.clone(), config),
             context: Box::new(context),
+            parent,
             mailbox: Mailbox::new(),
             thread_id: None,
             dictionary: HashMap::new(),
@@ -164,13 +167,14 @@ impl Process {
 
     pub fn from_block(
         pid: PID,
+        parent: Option<PID>,
         module: *const Module,
         // global_allocator: RcGlobalAllocator,
         // config: &Config,
     ) -> RcProcess {
         let context = ExecutionContext::new(module);
 
-        Process::with_rc(pid, context /*global_allocator, config*/)
+        Process::with_rc(pid, parent, context /*global_allocator, config*/)
     }
 
     #[allow(clippy::mut_from_ref)]
@@ -208,7 +212,11 @@ impl Process {
     }
 }
 
-pub fn allocate(state: &RcState, module: *const Module) -> Result<RcProcess, Exception> {
+pub fn allocate(
+    state: &RcState,
+    parent: Option<PID>,
+    module: *const Module,
+) -> Result<RcProcess, Exception> {
     let mut process_table = state.process_table.lock();
 
     let pid = process_table
@@ -216,7 +224,7 @@ pub fn allocate(state: &RcState, module: *const Module) -> Result<RcProcess, Exc
         .ok_or_else(|| Exception::new(Reason::EXC_SYSTEM_LIMIT))?;
 
     let process = Process::from_block(
-        pid, module, /*, state.global_allocator.clone(), &state.config*/
+        pid, parent, module, /*, state.global_allocator.clone(), &state.config*/
     );
 
     process_table.map(pid, process.clone());
@@ -224,14 +232,28 @@ pub fn allocate(state: &RcState, module: *const Module) -> Result<RcProcess, Exc
     Ok(process)
 }
 
+bitflags! {
+    pub struct SpawnFlag: u8 {
+        const NONE = 0;
+        const LINK = 1;
+        const MONITOR = 2;
+        // const USE_ARGS = 4;
+        // const SYSTEM_PROC = 8;
+        // const OFF_HEAP_MSGQ = 16;
+        // const ON_HEAP_MSGQ = 32;
+    }
+}
+
 pub fn spawn(
     state: &RcState,
+    parent: PID,
     module: *const Module,
     func: u32,
     args: Term,
+    flags: SpawnFlag,
 ) -> Result<Term, Exception> {
     println!("Spawning..");
-    let new_proc = allocate(state, module)?;
+    let new_proc = allocate(state, Some(parent), module)?;
     let new_pid = new_proc.pid;
 
     let pid_ptr = Term::pid(new_pid);
