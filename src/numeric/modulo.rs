@@ -2,7 +2,7 @@
 //!
 //! The Modulo trait can be used for getting the modulo (instead of remainder)
 //! of a number.
-use num_bigint::BigInt;
+use num::bigint::BigInt;
 
 pub trait Modulo<RHS = Self> {
     type Output;

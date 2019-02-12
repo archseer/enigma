@@ -6,11 +6,11 @@ use crate::module::{Lambda, Module, MFA};
 use crate::opcodes::*;
 use crate::servo_arc::Arc;
 use crate::value::Term;
-use compress::zlib;
 use hashbrown::HashMap;
+use libflate::zlib;
 use nom::*;
 use num::ToPrimitive;
-use num_bigint::{BigInt, Sign};
+use num::bigint::{BigInt, Sign};
 use std::io::{Cursor, Read};
 
 // (filename_index, loc)
@@ -71,11 +71,11 @@ impl LValue {
     }
 
     pub fn to_term(&self) -> Term {
-       match *self {
-           LValue::Atom(i) => Term::atom(i),
-           LValue::Integer(i) => Term::int(i as i32), // unsafe cast
-           _ => unimplemented!("to_term for {:?}", self),
-       }
+        match *self {
+            LValue::Atom(i) => Term::atom(i),
+            LValue::Integer(i) => Term::int(i as i32), // unsafe cast
+            _ => unimplemented!("to_term for {:?}", self),
+        }
     }
 }
 
@@ -216,7 +216,7 @@ impl<'a> Loader<'a> {
 
         // Decompress deflated literal table
         let iocursor = Cursor::new(rest);
-        zlib::Decoder::new(iocursor).read_to_end(&mut data).unwrap();
+        zlib::Decoder::new(iocursor).unwrap().read_to_end(&mut data).unwrap();
         let buf = &data[..];
 
         assert_eq!(data.len(), size as usize, "LitT inflate failed");
