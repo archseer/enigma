@@ -1,18 +1,22 @@
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
 use crate::loader::LValue;
-use crate::loader::{FuncInfo, LINE_INVALID_LOCATION};
 use crate::mailbox::Mailbox;
 use crate::module::{Module, MFA};
 use crate::pool::Job;
-pub use crate::process_table::PID;
+pub use self::table::PID;
 use crate::value::{self, Term, TryInto};
 use crate::vm::RcState;
+use crate::instr_ptr::InstrPtr;
 use hashbrown::HashMap;
 use std::cell::UnsafeCell;
 use std::panic::RefUnwindSafe;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+
+pub mod tree;
+pub mod table;
+pub mod registry;
 
 /// Heavily inspired by inko
 
@@ -25,6 +29,13 @@ pub type RcProcess = Arc<Process>;
 // also this way, regs could be a &mut [] slice with no clone?
 
 pub const MAX_REG: usize = 16;
+
+bitflags! {
+    pub struct Flag: u32 {
+        const INITIAL = 0;
+        const TRAP_EXIT = (1 << 0);
+    }
+}
 
 pub struct ExecutionContext {
     /// X registers.
@@ -50,13 +61,6 @@ pub struct ExecutionContext {
     pub flags: Flag,
 }
 
-bitflags! {
-    pub struct Flag: u32 {
-        const INITIAL = 0;
-        const TRAP_EXIT = (1 << 0);
-    }
-}
-
 impl ExecutionContext {
     #[inline]
     // TODO: expand_arg should return by value
@@ -71,120 +75,6 @@ impl ExecutionContext {
             LValue::Nil => Term::nil(),
             value => unimplemented!("expand unimplemented for {:?}", value),
         }
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Hash, Debug)]
-pub struct InstrPtr {
-    /// Module containing the instruction set.
-    pub module: *const Module,
-    /// Offset to the current instruction.
-    pub ptr: u32,
-}
-
-unsafe impl Send for InstrPtr {}
-unsafe impl Sync for InstrPtr {}
-
-impl InstrPtr {
-    pub fn new(module: *const Module, ptr: u32) -> Self {
-        InstrPtr { module, ptr }
-    }
-
-    // typedef struct {
-    //     ErtsCodeMFA* mfa;		/* Pointer to: Mod, Name, Arity */
-    //     Uint needed;		/* Heap space needed for entire tuple */
-    //     Uint32 loc;			/* Location in source code */
-    //     Eterm* fname_ptr;		/* Pointer to fname table */
-    // } FunctionInfo;
-
-    /// Find a function from the given pc and fill information in
-    /// the FunctionInfo struct. If the full_info is non-zero, fill
-    /// in all available information (including location in the
-    /// source code).
-    pub fn lookup_func_info(&self) -> Option<(MFA, Option<FuncInfo>)> {
-        let module = unsafe { &(*self.module) };
-
-        let mut vec: Vec<(&(u32, u32), &u32)> = module.funs.iter().collect();
-        vec.sort_by(|(_, v1), (_, v2)| v1.cmp(v2));
-
-        let mut low: u32 = 0;
-        let mut high = (vec.len() - 1) as u32;
-
-        while low < high {
-            let mid = low + (high - low) / 2;
-            if self.ptr < *vec[mid as usize].1 {
-                high = mid;
-            } else if self.ptr < *vec[(mid + 1) as usize].1 {
-                let ((f, a), fun_offset) = vec[mid as usize];
-                let mfa = (module.name, *f, *a);
-                let func_info = self.lookup_loc();
-                return Some((mfa, func_info));
-            } else {
-                low = mid + 1;
-            }
-        }
-        None
-    }
-
-    pub fn lookup_loc(&self) -> Option<FuncInfo> {
-        // TODO limit search scope in the future by searching between (current func, currentfunc+1);
-        let module = unsafe { &(*self.module) };
-
-        let mut low = 0;
-        let mut high = module.lines.len() - 1;
-
-        while high > low {
-            let mid = low + (high - low) / 2;
-            if self.ptr < module.lines[mid].1 {
-                high = mid;
-            } else if self.ptr < module.lines[mid + 1].1 {
-                let res = module.lines[mid];
-
-                if res == LINE_INVALID_LOCATION {
-                    return None;
-                }
-
-                return Some(res);
-            } else {
-                low = mid + 1;
-            }
-        }
-        None
-    }
-}
-
-// TODO: these are kinda messy since Opt<ptr> vs ptr deboxes differently
-
-// TODO: to be TryFrom once rust stabilizes the trait
-impl TryInto<value::Boxed<Option<InstrPtr>>> for Term {
-    type Error = value::WrongBoxError;
-
-    #[inline]
-    fn try_into(&self) -> Result<&value::Boxed<Option<InstrPtr>>, value::WrongBoxError> {
-        if let value::Variant::Pointer(ptr) = self.into_variant() {
-            unsafe {
-                if *ptr == value::BOXED_CP {
-                    return Ok(&*(ptr as *const value::Boxed<Option<InstrPtr>>));
-                }
-            }
-        }
-        Err(value::WrongBoxError)
-    }
-}
-// TODO: to be TryFrom once rust stabilizes the trait
-impl TryInto<value::Boxed<InstrPtr>> for Term {
-    type Error = value::WrongBoxError;
-
-    #[inline]
-    fn try_into(&self) -> Result<&value::Boxed<InstrPtr>, value::WrongBoxError> {
-        if let value::Variant::Pointer(ptr) = self.into_variant() {
-            unsafe {
-                if *ptr == value::BOXED_CATCH {
-                    return Ok(&*(ptr as *const value::Boxed<InstrPtr>));
-                }
-            }
-        }
-        Err(value::WrongBoxError)
     }
 }
 
@@ -219,6 +109,10 @@ impl ExecutionContext {
 pub struct LocalData {
     // allocator, panic handler
     context: Box<ExecutionContext>,
+
+    // links (tree)
+    // monitors (tree) + lt_monitors (list)
+    // signals are sent on death, and the receiving side cleans up it's link/mon structures
 
     pub mailbox: Mailbox,
 
@@ -337,10 +231,9 @@ pub fn spawn(
     args: Term,
 ) -> Result<Term, Exception> {
     println!("Spawning..");
-    // let block_obj = block_ptr.block_value()?;
     let new_proc = allocate(state, module)?;
     let new_pid = new_proc.pid;
-    // let pid_ptr = new_proc.allocate_usize(new_pid, state.integer_prototype);
+
     let pid_ptr = Term::pid(new_pid);
 
     let context = new_proc.context_mut();
@@ -367,9 +260,7 @@ pub fn spawn(
 
     context.ip.ptr = *func;
 
-    /*
-     * Check if this process should be initially linked to its parent.
-     */
+    // Check if this process should be initially linked to its parent.
 
     // if (so->flags & SPO_LINK) {
     //     ErtsLink *lnk;

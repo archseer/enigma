@@ -19,9 +19,8 @@ pub mod module_registry;
 mod numeric;
 pub mod opcodes;
 mod pool;
+mod instr_ptr;
 pub mod process;
-pub mod process_registry;
-pub mod process_table;
 mod queue;
 mod servo_arc;
 pub mod value;
@@ -35,3 +34,6 @@ extern crate bitflags;
 #[cfg(test)]
 #[macro_use]
 extern crate quickcheck;
+
+#[macro_use]
+extern crate intrusive_collections;

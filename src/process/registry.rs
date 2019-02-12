@@ -1,19 +1,19 @@
 use hashbrown::HashMap;
 
-// pub type RcProcessRegistry = Arc<Mutex<ProcessRegistry<RcProcess>>>;
+// pub type RcRegistry = Arc<Mutex<Registry<RcProcess>>>;
 
 /// A registry for handling processes with registered (atom) names.
 #[derive(Default)]
-pub struct ProcessRegistry<T: Clone> {
+pub struct Registry<T: Clone> {
     processes: HashMap<u32, T>,
 }
-impl<T: Clone> ProcessRegistry<T> {
+impl<T: Clone> Registry<T> {
     pub fn new() -> Self {
-        ProcessRegistry {
+        Registry {
             processes: HashMap::new(),
         }
     }
-    // pub fn with_rc() -> RcProcessRegistry {
+    // pub fn with_rc() -> RcRegistry {
     //     Arc::new(Mutex::new(Self::new()))
     // }
 

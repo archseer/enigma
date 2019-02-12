@@ -1,6 +1,6 @@
 use crate::bif;
 use crate::module::MFA;
-use crate::process::InstrPtr;
+use crate::instr_ptr::InstrPtr;
 use crate::servo_arc::Arc;
 use hashbrown::HashMap;
 use parking_lot::RwLock;

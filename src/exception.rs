@@ -1,8 +1,8 @@
 use crate::atom;
 use crate::immix::Heap;
+use crate::instr_ptr::InstrPtr;
 use crate::loader::FuncInfo;
 use crate::module::MFA;
-use crate::process::InstrPtr;
 use crate::process::RcProcess;
 use crate::value::{self, Term, TryInto, Variant};
 
@@ -452,7 +452,12 @@ fn expand_error_value(process: &RcProcess, reason: Reason, value: Term) -> Term 
             // Primary exceptions use fvalue as it is
             value
         }
-        atom::BADMATCH | atom::CASE_CLAUSE | atom::TRY_CLAUSE | atom::BADFUN | atom::BADARITY | atom::BADKEY => {
+        atom::BADMATCH
+        | atom::CASE_CLAUSE
+        | atom::TRY_CLAUSE
+        | atom::BADFUN
+        | atom::BADARITY
+        | atom::BADKEY => {
             let heap = &process.context_mut().heap;
             //Some common exceptions: value -> {atom, value}
             //    ASSERT(is_value(Value)); TODO: check that is not non-value

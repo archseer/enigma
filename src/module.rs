@@ -1,8 +1,8 @@
 use crate::bif;
 use crate::exports_table::ExportsTable;
 use crate::immix::Heap;
+use crate::instr_ptr::InstrPtr;
 use crate::loader::{FuncInfo, Instruction};
-use crate::process::InstrPtr;
 use crate::value::Term;
 use crate::vm::Machine;
 use hashbrown::HashMap;

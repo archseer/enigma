@@ -1,6 +1,6 @@
 //! Table for storing PIDs and mapping them to processes.
 //!
-//! A ProcessTable can be used for reserving PIDs and mapping these to processes
+//! A Table can be used for reserving PIDs and mapping these to processes
 //! (e.g. a Process/Arc<Process> structure).
 //!
 //! Basic usage is broken up in two steps:
@@ -10,7 +10,7 @@
 //!
 //! For example:
 //!
-//!     let table = ProcessTable::new();
+//!     let table = Table::new();
 //!
 //!     if let Some(pid) = table.reserve() {
 //!         table.map(pid, some_process);
@@ -27,7 +27,7 @@
 //!
 //! ## PID Availability
 //!
-//! It's possible (though very unlikely) for a ProcessTable to run out of
+//! It's possible (though very unlikely) for a Table to run out of
 //! available PIDs. This can happen when many processes are added and kept
 //! around. Callers should ensure they can handle such a scenario.
 use hashbrown::HashMap;
@@ -40,7 +40,7 @@ pub type PID = u32;
 pub const MAX_PID: PID = u32::MAX;
 
 #[derive(Debug, Default)]
-pub struct ProcessTable<T: Clone> {
+pub struct Table<T: Clone> {
     /// The PID to use for the next process.
     next_pid: PID,
 
@@ -54,9 +54,9 @@ pub struct ProcessTable<T: Clone> {
     processes: HashMap<PID, Option<T>>,
 }
 
-impl<T: Clone> ProcessTable<T> {
+impl<T: Clone> Table<T> {
     pub fn new() -> Self {
-        ProcessTable {
+        Table {
             next_pid: 0,
             recycle: false,
             processes: HashMap::new(),
@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let table = ProcessTable::<()>::new();
+        let table = Table::<()>::new();
 
         assert_eq!(table.next_pid, 0);
         assert_eq!(table.recycle, false);
@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn test_reserve() {
-        let mut table = ProcessTable::<()>::new();
+        let mut table = Table::<()>::new();
         let pid = table.reserve();
 
         assert!(pid.is_some());
@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_reserve_with_recycle() {
-        let mut table = ProcessTable::<()>::new();
+        let mut table = Table::<()>::new();
 
         table.reserve();
         table.next_pid = 0;
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn test_map() {
-        let mut table = ProcessTable::new();
+        let mut table = Table::new();
         let pid = table.reserve().unwrap();
 
         table.map(pid, 10);
@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn test_release() {
-        let mut table = ProcessTable::new();
+        let mut table = Table::new();
         let pid = table.reserve().unwrap();
 
         table.map(pid, 10);
@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_get() {
-        let mut table = ProcessTable::new();
+        let mut table = Table::new();
 
         assert!(table.get(0).is_none());
 
