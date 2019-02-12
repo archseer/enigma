@@ -254,13 +254,10 @@ pub fn spawn(
 ) -> Result<Term, Exception> {
     println!("Spawning..");
     let new_proc = allocate(state, Some(parent), module)?;
-    let new_pid = new_proc.pid;
-
-    let pid_ptr = Term::pid(new_pid);
-
     let context = new_proc.context_mut();
+    let pid = Term::pid(new_proc.pid);
 
-    // arglist to process registers,
+    // Set the arglist into process registers.
     // TODO: it also needs to deep clone all the vals (for example lists etc)
     let mut i = 0;
     let mut cons = &args;
@@ -283,26 +280,25 @@ pub fn spawn(
     context.ip.ptr = *func;
 
     // Check if this process should be initially linked to its parent.
-
-    // if (so->flags & SPO_LINK) {
-    //     ErtsLink *lnk;
-    //     ErtsLinkData *ldp = erts_link_create(ERTS_LNK_TYPE_PROC,
-    //                                          parent->common.id,
-    //                                          p->common.id);
-    //     lnk = erts_link_tree_lookup_insert(&ERTS_P_LINKS(parent), &ldp->a);
-    //     if (lnk) {
-    //         /*
-    //          * This should more or less never happen, but could
-    //          * potentially happen if pid:s wrap...
-    //          */
-    //         erts_link_release(lnk);
-    //     }
-    //     erts_link_tree_insert(&ERTS_P_LINKS(p), &ldp->b);
-    // }
+    if flags.contains(SpawnFlag::LINK) {
+        // ErtsLink *lnk;
+        // ErtsLinkData *ldp = erts_link_create(ERTS_LNK_TYPE_PROC,
+        //                                      parent->common.id,
+        //                                      p->common.id);
+        // lnk = erts_link_tree_lookup_insert(&ERTS_P_LINKS(parent), &ldp->a);
+        // if (lnk) {
+        //     /*
+        //      * This should more or less never happen, but could
+        //      * potentially happen if pid:s wrap...
+        //      */
+        //     erts_link_release(lnk);
+        // }
+        // erts_link_tree_insert(&ERTS_P_LINKS(p), &ldp->b);
+    }
 
     state.process_pool.schedule(Job::normal(new_proc));
 
-    Ok(pid_ptr)
+    Ok(pid)
 }
 
 pub fn send_message(
