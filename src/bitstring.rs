@@ -26,7 +26,7 @@ macro_rules! mask_bits {
 /// nbytes!(x) returns the number of bytes needed to store x bits.
 macro_rules! nbytes {
     ($x:expr) => {
-        ($x as usize + 7 as usize) >> 3
+        (($x as u64 + 7) >> 3) as usize
     };
 }
 
