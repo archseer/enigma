@@ -52,4 +52,6 @@ impl<'a> KeyAdapter<'a> for NodeAdapter {
     }
 }
 
+// TODO: benchmark vs a BTreeMap<PID, ()>
+// also https://github.com/orium/rpds RBTreeMap
 pub type Tree = RBTree<NodeAdapter>;

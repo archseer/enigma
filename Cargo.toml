@@ -20,9 +20,6 @@ test = false
 [dependencies]
 nom = "4.1.1"
 num = "0.2.0"
-# num-traits = "0.2.6"
-# num-integer = "0.1.39"
-# num-bigint = "0.2.1"
 libflate = "0.1"
 once_cell = "0.1.6"
 parking_lot = "0.7.0"

@@ -3,6 +3,7 @@ use hamt_rs::HamtMap;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
+// TODO: evaluate using im-rs or https://github.com/orium/rpds HashTrieMap
 pub type HAMT = HamtMap<Term, Term>;
 
 #[derive(Eq, Clone)]

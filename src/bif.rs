@@ -17,8 +17,8 @@ use statrs;
 use std::i32;
 use std::ops::{Add, Mul, Sub};
 
-mod erlang;
 mod chrono;
+mod erlang;
 mod map;
 
 // maybe use https://github.com/sfackler/rust-phf
@@ -55,6 +55,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "div", 2 => bif_erlang_intdiv_2,
             "rem", 2 => bif_erlang_mod_2,
             "spawn", 3 => bif_erlang_spawn_3,
+            "spawn_link", 3 => bif_erlang_spawn_link_3,
             "self", 0 => bif_erlang_self_0,
             "send", 2 => bif_erlang_send_2,
             "is_atom", 1 => bif_erlang_is_atom_1,
@@ -195,7 +196,45 @@ fn bif_erlang_spawn_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> B
     let registry = vm.modules.lock();
     let module = registry.lookup(module).unwrap();
     // TODO: avoid the clone here since we copy later
-    process::spawn(&vm.state, process.pid, module, func, arglist, process::SpawnFlag::NONE)
+    process::spawn(
+        &vm.state,
+        process.pid,
+        module,
+        func,
+        arglist,
+        process::SpawnFlag::NONE,
+    )
+}
+
+fn bif_erlang_spawn_link_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    // parent: TODO: track parent of process
+    // arg[0] = atom for module
+    // arg[1] = atom for function
+    // arg[2] = arguments for func (well-formed list)
+    // opts, options for spawn
+
+    let module = match args[0].into_variant() {
+        Variant::Atom(module) => module,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    let func = match args[1].into_variant() {
+        Variant::Atom(func) => func,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    let arglist = args[2];
+
+    let registry = vm.modules.lock();
+    let module = registry.lookup(module).unwrap();
+    // TODO: avoid the clone here since we copy later
+    process::spawn(
+        &vm.state,
+        process.pid,
+        module,
+        func,
+        arglist,
+        process::SpawnFlag::LINK,
+    )
 }
 
 fn bif_erlang_abs_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {

@@ -9,6 +9,10 @@ fn run() -> i32 {
 
     let vm = vm::Machine::new();
 
+    // erlexec defaults:
+    //  ["/usr/local/Cellar/erlang/21.2.4/lib/erlang/erts-10.2.3/bin/enigma.smp", "--", "-root", "/usr/local/Cellar/erlang/21.2.4/lib/erlang", "-progname", "erlcat", "--", "-home", "/Users/speed", "--", "-kernel" , "shell_history", "enabled"]
+    println!("{:?}", args);
+
     vm.preload_modules();
 
     vm.start("./examples/Elixir.Bin.beam");

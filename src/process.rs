@@ -113,6 +113,7 @@ pub struct LocalData {
     parent: Option<PID>,
 
     // links (tree)
+    links: tree::Tree,
     // monitors (tree) + lt_monitors (list)
     // signals are sent on death, and the receiving side cleans up it's link/mon structures
     pub mailbox: Mailbox,
@@ -153,6 +154,7 @@ impl Process {
             // allocator: LocalAllocator::new(global_allocator.clone(), config),
             context: Box::new(context),
             parent,
+            links: tree::Tree::new(tree::NodeAdapter::new()), // eew
             mailbox: Mailbox::new(),
             thread_id: None,
             dictionary: HashMap::new(),
@@ -281,16 +283,23 @@ pub fn spawn(
 
     // Check if this process should be initially linked to its parent.
     if flags.contains(SpawnFlag::LINK) {
+        // new_proc.local_data_mut().links.insert(tree::Node {
+        //     link: RBTreeLink::new(),
+        //     other: parent,
+        // })
+
+        // // TODO: need to insert parent
+        // new_proc.local_data_mut().links.insert(tree::Node {
+        //     link: RBTreeLink::new(),
+        //     other: parent,
+        // })
         // ErtsLink *lnk;
         // ErtsLinkData *ldp = erts_link_create(ERTS_LNK_TYPE_PROC,
         //                                      parent->common.id,
         //                                      p->common.id);
         // lnk = erts_link_tree_lookup_insert(&ERTS_P_LINKS(parent), &ldp->a);
         // if (lnk) {
-        //     /*
-        //      * This should more or less never happen, but could
-        //      * potentially happen if pid:s wrap...
-        //      */
+        //     // This should more or less never happen, but could * potentially happen if pids wrap...
         //     erts_link_release(lnk);
         // }
         // erts_link_tree_insert(&ERTS_P_LINKS(p), &ldp->b);
