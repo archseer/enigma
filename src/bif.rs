@@ -198,7 +198,7 @@ fn bif_erlang_spawn_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> B
     // TODO: avoid the clone here since we copy later
     process::spawn(
         &vm.state,
-        process.pid,
+        process,
         module,
         func,
         arglist,
@@ -229,7 +229,7 @@ fn bif_erlang_spawn_link_3(vm: &vm::Machine, process: &RcProcess, args: &[Term])
     // TODO: avoid the clone here since we copy later
     process::spawn(
         &vm.state,
-        process.pid,
+        process,
         module,
         func,
         arglist,

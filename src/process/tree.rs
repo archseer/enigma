@@ -37,8 +37,9 @@ unsafe impl<T: ?Sized> IntrusivePointer<T> for Arc<T> {
 
 #[derive(Default)]
 pub struct Node {
-    link: RBTreeLink,
-    other: PID, // maybe Term<PID>
+    pub link: RBTreeLink,
+    pub other: PID, // maybe Term<PID>
+    // TODO: other can be proc/port/dist proc
 }
 // original structure had a link a, link b, but we can't do that here
 // so we allocate two nodes, one on each collection ¯\_(ツ)_/¯
@@ -55,3 +56,5 @@ impl<'a> KeyAdapter<'a> for NodeAdapter {
 // TODO: benchmark vs a BTreeMap<PID, ()>
 // also https://github.com/orium/rpds RBTreeMap
 pub type Tree = RBTree<NodeAdapter>;
+
+pub type Link = RBTreeLink;

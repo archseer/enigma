@@ -3,15 +3,15 @@ use crate::bif;
 use crate::bitstring;
 use crate::exception::{self, Exception, Reason};
 use crate::exports_table::{Export, ExportsTable, RcExportsTable};
+use crate::instr_ptr::InstrPtr;
 use crate::loader::LValue;
 use crate::module;
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
 use crate::opcodes::Opcode;
 use crate::pool::{Job, JoinGuard as PoolJoinGuard, Pool, Worker};
+use crate::process::registry::Registry as ProcessRegistry;
+use crate::process::table::Table as ProcessTable;
 use crate::process::{self, RcProcess};
-use crate::instr_ptr::InstrPtr;
-use crate::process::registry::{Registry as ProcessRegistry};
-use crate::process::table::{Table as ProcessTable};
 use crate::servo_arc::Arc;
 use crate::value::{self, Term, TryInto, TryIntoMut, Variant};
 use log::debug;
@@ -480,12 +480,15 @@ impl Machine {
         // safe, so take care when capturing new variables.
         //let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         if let Err(message) = self.run(process) {
-            if let Some(new_pc) = exception::handle_error(process, message) {
+            // HAXX: TODO clone() for now since handle_error consumes the msg
+            if let Some(new_pc) = exception::handle_error(process, message.clone()) {
                 let context = process.context_mut();
                 context.ip = new_pc;
                 self.state
                     .process_pool
                     .schedule(Job::normal(process.clone()));
+            } else {
+                process.exit(&self.state, message);
             }
         }
         // }));
@@ -541,7 +544,7 @@ impl Machine {
                     // send x1 to x0, write result to x0
                     let pid = context.x[0];
                     let msg = context.x[1];
-                    let res = process::send_message(&self.state, process, pid, msg)?;
+                    let res = process::send_message(&self.state, process, pid.to_u32(), msg)?;
                     context.x[0] = res;
                 }
                 Opcode::RemoveMessage => {
@@ -1249,7 +1252,7 @@ impl Machine {
                         let mut binary = bitstring::Binary::with_capacity(size as usize);
                         binary.is_writable = false;
                         context.bs = binary.get_mut();
-                                                                                     // TODO ^ ensure this pointer stays valid after heap alloc
+                        // TODO ^ ensure this pointer stays valid after heap alloc
                         set_register!(context, dest, Term::binary(&context.heap, binary));
                     } else {
                         unreachable!()

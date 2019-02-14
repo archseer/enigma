@@ -1,14 +1,23 @@
-use crate::value::Term;
 use parking_lot::Mutex;
 use std::collections::VecDeque;
+
+use crate::exception::Exception;
+use crate::value::Term;
+
+pub enum Signal {
+    Exit(Exception),
+    Message(Term),
+}
 
 #[derive(Default)]
 pub struct Mailbox {
     /// Internal mailbox from which the process is safe to read.
+    /// It only holds messages, other signals are processed as we read the external queue.
     internal: VecDeque<Term>,
 
     /// External mailbox, to which other processes can write (while holding the lock)
-    external: VecDeque<Term>,
+    /// It holds a mixture of different signals and messages.
+    external: VecDeque<Signal>,
 
     /// Used for synchronizing writes to the external part.
     write_lock: Mutex<()>,
@@ -27,7 +36,7 @@ impl Mailbox {
         }
     }
 
-    pub fn send_external(&mut self, message: Term) {
+    pub fn send_external(&mut self, message: Signal) {
         let _lock = self.write_lock.lock();
 
         self.external.push_back(message);
@@ -37,7 +46,7 @@ impl Mailbox {
         self.internal.push_back(message);
     }
 
-    pub fn receive(&mut self) -> Option<&Term> {
+    pub fn receive(&mut self) -> Option<&Signal> {
         if self.internal.len() >= self.save {
             let _lock = self.write_lock.lock();
 

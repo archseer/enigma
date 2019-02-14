@@ -7,7 +7,7 @@ use crate::process::RcProcess;
 use crate::value::{self, Term, TryInto, Variant};
 
 /// http://erlang.org/doc/reference_manual/errors.html#exceptions
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Exception {
     pub reason: Reason, // bitflags
     pub value: Term,
