@@ -12,6 +12,7 @@ mod bitstring;
 mod etf;
 pub mod exports_table;
 mod immix;
+mod instr_ptr;
 pub mod loader;
 pub mod mailbox;
 pub mod module;
@@ -19,10 +20,10 @@ pub mod module_registry;
 mod numeric;
 pub mod opcodes;
 mod pool;
-mod instr_ptr;
 pub mod process;
 mod queue;
 mod servo_arc;
+mod signal_queue;
 pub mod value;
 
 #[macro_use]

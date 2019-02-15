@@ -3,8 +3,9 @@ use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
 use crate::instr_ptr::InstrPtr;
 use crate::loader::LValue;
+use crate::signal_queue::SignalQueue;
 use crate::mailbox::Mailbox;
-pub use crate::mailbox::Signal;
+pub use crate::signal_queue::Signal;
 use crate::module::{Module, MFA};
 use crate::pool::Job;
 use crate::value::{self, Term, TryInto};
@@ -118,6 +119,8 @@ pub struct LocalData {
     // monitors (tree) + lt_monitors (list)
 
     // signals are sent on death, and the receiving side cleans up it's link/mon structures
+    pub signal_queue: SignalQueue,
+
     pub mailbox: Mailbox,
 
     /// The ID of the thread this process is pinned to.
@@ -157,6 +160,7 @@ impl Process {
             context: Box::new(context),
             parent,
             links: tree::Tree::new(tree::NodeAdapter::new()), // eew
+            signal_queue: SignalQueue::new(),
             mailbox: Mailbox::new(),
             thread_id: None,
             dictionary: HashMap::new(),
@@ -201,9 +205,10 @@ impl Process {
 
     pub fn send_message(&self, sender: &RcProcess, message: Term) {
         if sender.pid == self.pid {
-            self.local_data_mut().mailbox.send_internal(message);
+            // skip the signal_queue completely
+            self.local_data_mut().mailbox.send(message);
         } else {
-            self.local_data_mut().mailbox.send_external(Signal::Message(message));
+            self.local_data_mut().signal_queue.send_external(Signal::Message(message));
         }
     }
 
@@ -215,215 +220,88 @@ impl Process {
         self.waiting_for_message.load(Ordering::Relaxed)
     }
 
-    pub fn receive(&self) -> Option<&Signal> {
-        // get internal, if we ran out, start processing external
-    }
-
     // we're in receive(), but ran out of internal messages, process external queue
-    pub fn handle_incoming_signal(&self, signal: Signal) {
-        match signal {
-            Signal::Message(message) => {
-                self.local_data_mut().mailbox.send_internal(message);
-            }
-            Signal::Exit(reason) => {
-
+    pub fn process_incoming(&self) -> Option<&Signal> {
+        // get internal, if we ran out, start processing external
+        while let Some(signal) = self.local_data_mut().signal_queue.receive() {
+            match signal {
+                Signal::Message(message) => {
+                    self.local_data_mut().mailbox.send(message);
+                }
+                Signal::Exit(_reason) => {
+                    self.handle_exit_signal(signal);
+                }
             }
         }
+        // TODO: we can probably use Result<(), Exception> to signal when process turns to exiting.
+        unimplemented!()
     }
+
+    // TODO: restore Mailbox to handle signals (internal external),
+    // rename to SignalQueue, then add a Mailbox (Vec<Term>) to process
+    // that will be internal. Keep handle inside process, but this way
+    // sig queue abstracts internal/external.
 
     // handle_exit_signal(Process *c_p, ErtsSigRecvTracing *tracing,
     //                 ErtsMessage *sig, ErtsMessage ***next_nm_sig,
     //                 int *exited)
     pub fn handle_exit_signal(&self, signal: Signal) {
-        // ErtsMessage *conv_msg = NULL;
-        // ErtsExitSignalData *xsigd = NULL;
-        // ErtsLinkData *ldp = NULL; /* Avoid erroneous warning... */
-        // ErtsLink *dlnk = NULL; /* Avoid erroneous warning... */
-        // Eterm tag = ((ErtsSignal *) sig)->common.tag;
-        // Uint16 type = ERTS_PROC_SIG_TYPE(tag);
-        // int op = ERTS_PROC_SIG_OP(tag);
-        // int destroy = 0;
-        // int ignore = 0;
-        // int save = 0;
-        // int exit = 0;
-        // int cnt = 1;
-        // Eterm reason;
-        // Eterm from;
+        let mut destroy = false;
+        let mut ignore = false;
+        let mut save = false;
+        let mut exit = false;
+        let mut cnt = 1;
 
-        // if exit 
-        // if link_exit
-
-        if (type == ERTS_SIG_Q_TYPE_GEN_EXIT) {
-            xsigd = get_exit_signal_data(sig);
-            from = xsigd->from;
-            reason = xsigd->reason;
-            if (op != ERTS_SIG_Q_OP_EXIT_LINKED)
-                ignore = 0;
-            else {
-                ErtsLink *llnk = erts_link_tree_lookup(ERTS_P_LINKS(c_p), from);
-                if (!llnk) {
-                    /* Link no longer active; ignore... */
-                    ignore = !0;
-                    destroy = !0;
-                }
-                else {
-                    ignore = 0;
-                    erts_link_tree_delete(&ERTS_P_LINKS(c_p), llnk);
-                    if (llnk->type != ERTS_LNK_TYPE_DIST_PROC)
-                        erts_link_release(llnk);
-                    else {
-                        dlnk = erts_link_to_other(llnk, &ldp);
-                        if (erts_link_dist_delete(dlnk))
-                            erts_link_release_both(ldp);
-                        else
-                            erts_link_release(llnk);
-                    }
-                }
+        if let Signal::Exit { type, from, reason } = signal {
+            if type == EXIT_LINKED {
+                // delete from link tree
+                // if it was already deleted, ignore = true, destroy = true
             }
 
-            if (!ignore) {
+            if !ignore {
+                if (op != OP_EXIT || reason != atom::KILL) && (self.flags.contains(TRAP_EXIT)) {
+                    // if reason is immed, create an EXIT message tuple instead and replace
+                    // (push to internal msg queue as message)
+                    let msg = tup3!(&self.context_mut().heap, atom!(EXIT), pid, reason);
+                    // ERL_MESSAGE_TOKEN(mp) = am_undefined;
+                    erts_proc_notify_new_message(c_p, ERTS_PROC_LOCK_MAIN);
 
-                if ((op != ERTS_SIG_Q_OP_EXIT || reason != am_kill)
-                    && (c_p->flags & F_TRAP_EXIT)) {
-                    convert_prepared_sig_to_msg(c_p, sig,
-                                                xsigd->message, next_nm_sig);
-                    conv_msg = sig;
-                }
-                else if (reason == am_normal && !xsigd->u.normal_kills) {
-                    /* Ignore it... */
-                    destroy = !0;
-                    ignore = !0;
-                }
-                else {
-                    /* Terminate... */
-                    save = !0;
-                    exit = !0;
+                } else if reason == atom::NORMAL && xsigd->u.normal_kills {
+                    ignore = true;
+                    destroy = true;
+                } else {
+                    // terminate
+                    save = true;
+                    exit = true;
                     if (op == ERTS_SIG_Q_OP_EXIT && reason == am_kill)
                         reason = am_killed;
                 }
             }
         }
-        else { /* Link exit */
-            ErtsLink *slnk = (ErtsLink *) sig;
-            ErtsLink *llnk = erts_link_to_other(slnk, &ldp);
 
-            ASSERT(type == ERTS_LNK_TYPE_PROC
-                || type == ERTS_LNK_TYPE_PORT
-                || type == ERTS_LNK_TYPE_DIST_PROC);
-
-            from = llnk->other.item;
-            reason = slnk->other.item; /* reason in other.item ... */
-            ASSERT(is_pid(from) || is_internal_port(from));
-            ASSERT(is_immed(reason));
-            ASSERT(op == ERTS_SIG_Q_OP_EXIT_LINKED);
-            dlnk = erts_link_tree_key_delete(&ERTS_P_LINKS(c_p), llnk);
-            if (!dlnk) {
-                ignore = !0; /* Link no longer active; ignore... */
-                ldp = NULL;
+        if exit {
+            if save {
+                sig->data.attached = ERTS_MSG_COMBINED_HFRAG;
+                ERL_MESSAGE_TERM(sig) = xsigd->message;
+                erts_save_message_in_proc(c_p, sig);
             }
-            else {
-                Eterm pid;
-                ErtsMessage *mp;
-                ErtsProcLocks locks;
-                Uint hsz;
-                Eterm *hp;
-                ErlOffHeap *ohp;
-                ignore = 0;
-                if (dlnk == llnk)
-                    dlnk = NULL;
-                else
-                    ldp = NULL;
+            // Exit process...
+            erts_set_self_exiting(c_p, reason);
 
-                ASSERT(is_immed(reason));
-
-                if (!(c_p->flags & F_TRAP_EXIT)) {
-                    if (reason == am_normal)
-                        ignore = !0; /* Ignore it... */
-                    else
-                        exit = !0; /* Terminate... */
-                }
-                else {
-
-                    /*
-                    * Create and EXIT message and replace
-                    * the original signal with the message...
-                    */
-
-                    locks = ERTS_PROC_LOCK_MAIN;
-
-                    hsz = 4 + NC_HEAP_SIZE(from);
-
-                    mp = erts_alloc_message_heap(c_p, &locks, hsz, &hp, &ohp);
-
-                    if (locks != ERTS_PROC_LOCK_MAIN)
-                        erts_proc_unlock(c_p, locks & ~ERTS_PROC_LOCK_MAIN);
-
-                    pid = STORE_NC(&hp, ohp, from);
-
-                    ERL_MESSAGE_TERM(mp) = TUPLE3(hp, am_EXIT, pid, reason);
-                    ERL_MESSAGE_TOKEN(mp) = am_undefined;
-                    if (is_immed(pid))
-                        ERL_MESSAGE_FROM(mp) = pid;
-                    else {
-                        DistEntry *dep;
-                        ASSERT(is_external_pid(pid));
-                        dep = external_pid_dist_entry(pid);
-                        ERL_MESSAGE_FROM(mp) = dep->sysname;
-                    }
-
-                    /* Replace original signal with the exit message... */
-                    convert_to_msg(c_p, sig, mp, next_nm_sig);
-
-                    cnt += 4;
-
-                    conv_msg = mp;
-                }
-            }
-            destroy = !0;
+            cnt += 1;
         }
 
-        if (ignore|exit) {
-            remove_nm_sig(c_p, sig, next_nm_sig);
-            if (exit) {
-                if (save) {
-                    sig->data.attached = ERTS_MSG_COMBINED_HFRAG;
-                    ERL_MESSAGE_TERM(sig) = xsigd->message;
-                    erts_save_message_in_proc(c_p, sig);
-                }
-                /* Exit process... */
-                erts_set_self_exiting(c_p, reason);
-
-                cnt++;
-            }
-        }
-
-        if (!exit) {
-            if (conv_msg)
-                erts_proc_notify_new_message(c_p, ERTS_PROC_LOCK_MAIN);
-            if (op == ERTS_SIG_Q_OP_EXIT_LINKED && tracing->procs)
-                getting_unlinked(c_p, from);
-        }
-
-        if (destroy) {
-            cnt++;
-            if (type == ERTS_SIG_Q_TYPE_GEN_EXIT) {
+        if destroy {
+            cnt += 1;
+            if type == ERTS_SIG_Q_TYPE_GEN_EXIT {
                 sig->next = NULL;
                 erts_cleanup_messages(sig);
-            }
-            else {
-                if (ldp)
-                    erts_link_release_both(ldp);
-                else {
-                    if (dlnk)
-                        erts_link_release(dlnk);
-                    erts_link_release((ErtsLink *) sig);
-                }
+            } else {
+                // release all the link things
             }
         }
 
-        *exited = exit;
-
-        return cnt;
+        (cnt, exit)
     }
 
     // equivalent of erts_continue_exit_process

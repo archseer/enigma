@@ -519,6 +519,7 @@ fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) ->
 }
 
 fn bif_erlang_exit_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+    println!("exiting a proc with {}", args[0]);
     Err(Exception::with_value(Reason::EXC_EXIT, args[0]))
 }
 
