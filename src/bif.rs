@@ -284,7 +284,7 @@ fn bif_erlang_self_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> 
 
 fn bif_erlang_send_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     // args: dest <pid>, msg <term>
-    let pid = args[0];
+    let pid = args[0].to_u32();
     let msg = args[1];
     let res = process::send_message(&vm.state, process, pid, msg).unwrap();
     Ok(res)

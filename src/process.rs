@@ -264,6 +264,7 @@ impl Process {
                     // (push to internal msg queue as message)
                     let msg = tup3!(&self.context_mut().heap, atom!(EXIT), pid, reason);
                     // ERL_MESSAGE_TOKEN(mp) = am_undefined;
+                    // TODO: process::send_message() already does notify/wakeup
                     erts_proc_notify_new_message(c_p, ERTS_PROC_LOCK_MAIN);
 
                 } else if reason == atom::NORMAL && xsigd->u.normal_kills {
@@ -280,13 +281,14 @@ impl Process {
         }
 
         if exit {
-            if save {
+            if save { // something to do with heap fragments I think mainly to remove it from proc
                 sig->data.attached = ERTS_MSG_COMBINED_HFRAG;
                 ERL_MESSAGE_TERM(sig) = xsigd->message;
                 erts_save_message_in_proc(c_p, sig);
             }
             // Exit process...
             erts_set_self_exiting(c_p, reason);
+            // freason exit, kill_catches, exit instr
 
             cnt += 1;
         }
