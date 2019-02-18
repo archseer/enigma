@@ -360,8 +360,8 @@ pub fn handle_error(
 /// TODO: return is instr pointer
 fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
     let context = process.context_mut();
-    let mut prev = 0;
     let mut ptr = context.stack.len();
+    let mut prev = ptr;
 
     debug_assert!(context.stack.last().unwrap().is_cp());
     // ASSERT(ptr <= STACK_START(c_p));
