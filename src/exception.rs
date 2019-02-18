@@ -333,12 +333,12 @@ pub fn handle_error(
 
     //  Find a handler or die
     if context.catches > 0 && !exc.reason.contains(Reason::EXF_PANIC) {
-        // /* The Beam handler code (catch_end or try_end) checks reg[0]
+        // The Beam handler code (catch_end or try_end) checks reg[0]
         // for THE_NON_VALUE to see if the previous code finished
         // abnormally. If so, reg[1], reg[2] and reg[3] should hold the
         // exception class, term and trace, respectively. (If the
         // handler is just a trap to native code, these registers will
-        // be ignored.) */
+        // be ignored.)
         context.x[0] = Term::none();
         context.x[1] = Term::atom(EXIT_TAGS[exception_class!(exc.reason).bits as usize]);
         context.x[2] = exc.value;
@@ -372,23 +372,20 @@ fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
     // TODO: tracing instr handling here
 
     while ptr > 0 {
-        match context.stack[ptr - 1].clone().try_into() {
-            Ok(value::Boxed {
-                header: value::BOXED_CATCH,
-                value: ptr,
-            }) => {
-                // ASSERT(ptr < STACK_START(c_p));
+        match context.stack[ptr - 1].clone().get_boxed_header() {
+            Ok(value::BOXED_CATCH) => {
+                let ptr = context.stack[ptr - 1]
+                    .get_boxed_value::<value::Boxed<InstrPtr>>()
+                    .unwrap()
+                    .value;
+
                 // Unwind the stack up to the current frame.
                 context.stack.truncate(prev);
                 // context.stack.shrink_to_fit();
                 // TODO: tracing handling here
-                // return catch_pc(*ptr);
-                return Some(*ptr);
+                return Some(ptr);
             }
-            Ok(value::Boxed {
-                header: value::BOXED_CP,
-                ..
-            }) => {
+            Ok(value::BOXED_CP) => {
                 prev = ptr;
                 // TODO: OTP does tracing instr handling here
             }

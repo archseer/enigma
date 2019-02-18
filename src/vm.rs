@@ -722,6 +722,7 @@ impl Machine {
                             context.stack.push(Term::nil())
                         }
                         context.stack.push(Term::cp(&context.heap, context.cp));
+                        context.cp = None;
                     } else {
                         unreachable!()
                     }
@@ -741,6 +742,7 @@ impl Machine {
                             .resize(context.stack.len() + *stackneed as usize, Term::nil());
                         // TODO: check heap for heapneed space!
                         context.stack.push(Term::cp(&context.heap, context.cp));
+                        context.cp = None;
                     } else {
                         unreachable!()
                     }
@@ -752,6 +754,7 @@ impl Machine {
                             .stack
                             .resize(context.stack.len() + *need as usize, Term::nil());
                         context.stack.push(Term::cp(&context.heap, context.cp));
+                        context.cp = None;
                     } else {
                         unreachable!()
                     }
@@ -768,6 +771,7 @@ impl Machine {
                             .resize(context.stack.len() + *stackneed as usize, Term::nil());
                         // TODO: check heap for heapneed space!
                         context.stack.push(Term::cp(&context.heap, context.cp));
+                        context.cp = None;
                     } else {
                         unreachable!()
                     }
@@ -1145,7 +1149,7 @@ impl Machine {
                                 tup2!(&context.heap, Term::atom(atom::EXIT), context.x[2]);
                         }
                     }
-                    unimplemented!();
+                    // unimplemented!();
                 }
                 Opcode::Raise => {
                     debug_assert_eq!(ins.args.len(), 2);
@@ -1355,7 +1359,7 @@ impl Machine {
                         continue;
                     }
 
-                    let header = cxt.get_boxed_header();
+                    let header = cxt.get_boxed_header().unwrap();
 
                     // Reserve a slot for the start position.
                     let slots = ins.args[3].to_u32() + 1;

@@ -317,7 +317,7 @@ pub fn start_match_2(heap: &Heap, binary: Term, max: u32) -> Option<Term> {
 
     // TODO: this is not nice
     let mb = match binary.get_boxed_header() {
-        value::BOXED_BINARY => {
+        Ok(value::BOXED_BINARY) => {
             // TODO use ok_or to cast to some, then use ?
             let value = binary
                 .get_boxed_value::<value::Boxed<RcBinary>>()
@@ -326,7 +326,7 @@ pub fn start_match_2(heap: &Heap, binary: Term, max: u32) -> Option<Term> {
                 .clone();
             MatchBuffer::from(value)
         }
-        value::BOXED_SUBBINARY => {
+        Ok(value::BOXED_SUBBINARY) => {
             // TODO use ok_or to cast to some, then use ?
             let value = binary
                 .get_boxed_value::<value::Boxed<SubBinary>>()
@@ -977,7 +977,7 @@ pub fn append(
 
     // TODO: this is not nice
     let writable = match binary.get_boxed_header() {
-        value::BOXED_SUBBINARY => {
+        Ok(value::BOXED_SUBBINARY) => {
             // TODO use ok_or to cast to some, then use ?
             let sb = &binary
                 .get_boxed_value::<value::Boxed<SubBinary>>()
@@ -986,7 +986,7 @@ pub fn append(
 
             sb.is_writable && sb.original.is_writable
         }
-        value::BOXED_BINARY => false,
+        Ok(value::BOXED_BINARY) => false,
         _ => return None, // TODO: BADARG
     };
 
@@ -1055,7 +1055,7 @@ pub fn append(
          * for growing.
          */
         let (bin, bitoffs, bitsize) = match binary.get_boxed_header() {
-            value::BOXED_BINARY => {
+            Ok(value::BOXED_BINARY) => {
                 // TODO use ok_or to cast to some, then use ?
                 let value = &binary
                     .get_boxed_value::<value::Boxed<RcBinary>>()
@@ -1063,7 +1063,7 @@ pub fn append(
                     .value;
                 (value, 0, 0)
             }
-            value::BOXED_SUBBINARY => {
+            Ok(value::BOXED_SUBBINARY) => {
                 // TODO use ok_or to cast to some, then use ?
                 let value = &binary
                     .get_boxed_value::<value::Boxed<SubBinary>>()

@@ -5,10 +5,10 @@ use crate::atom;
 use crate::bitstring;
 use crate::exception;
 use crate::immix::Heap;
+use crate::instr_ptr::InstrPtr;
 use crate::loader;
 use crate::nanbox::TypedNanBox;
 use crate::process;
-use crate::instr_ptr::InstrPtr;
 use crate::servo_arc::Arc;
 use allocator_api::Layout;
 use num::bigint::BigInt;
@@ -461,7 +461,7 @@ impl Term {
             TERM_PORT => Type::Port,
             TERM_PID => Type::Pid,
             TERM_CONS => Type::Pid,
-            TERM_POINTER => match self.get_boxed_header() {
+            TERM_POINTER => match self.get_boxed_header().unwrap() {
                 BOXED_REF => Type::Ref,
                 BOXED_TUPLE => Type::Tuple,
                 BOXED_BINARY => Type::Binary,
@@ -478,11 +478,11 @@ impl Term {
         }
     }
 
-    pub fn get_boxed_header(self) -> Header {
+    pub fn get_boxed_header(self) -> Result<Header, String> {
         if let Variant::Pointer(ptr) = self.into_variant() {
-            unsafe { return *ptr }
+            unsafe { return Ok(*ptr) }
         }
-        panic!("Not a boxed type!")
+        Err("Not a boxed type!".to_string())
     }
 
     pub fn get_boxed_value<T>(&self) -> Result<&T, &str> {
@@ -821,6 +821,12 @@ impl std::fmt::Display for Variant {
                     }
                     BOXED_BIGINT => write!(f, "#BigInt<>"),
                     BOXED_CLOSURE => write!(f, "#Fun<>"),
+                    BOXED_CP => {
+                        let ptr = &*(*ptr as *const Boxed<Option<InstrPtr>>);
+                        write!(f, "CP<{:?}>", ptr.value)
+                    }
+                    BOXED_CATCH => write!(f, "CATCH"),
+                    BOXED_STACKTRACE => write!(f, "STRACE"),
                     _ => unimplemented!(),
                 }
             },
