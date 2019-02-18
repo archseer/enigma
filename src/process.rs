@@ -1,20 +1,21 @@
 pub use self::table::PID;
+use crate::atom;
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
 use crate::instr_ptr::InstrPtr;
 use crate::loader::LValue;
-use crate::signal_queue::SignalQueue;
 use crate::mailbox::Mailbox;
-pub use crate::signal_queue::Signal;
 use crate::module::{Module, MFA};
 use crate::pool::Job;
+use crate::servo_arc::Arc;
+use crate::signal_queue::SignalQueue;
+pub use crate::signal_queue::{ExitKind, Signal};
 use crate::value::{self, Term, TryInto};
 use crate::vm::RcState;
 use hashbrown::HashMap;
 use std::cell::UnsafeCell;
 use std::panic::RefUnwindSafe;
 use std::sync::atomic::{AtomicBool, Ordering};
-use crate::servo_arc::Arc;
 
 pub mod registry;
 pub mod table;
@@ -60,7 +61,6 @@ pub struct ExecutionContext {
     pub bs: *mut Vec<u8>,
     ///
     pub exc: Option<Exception>,
-    pub flags: Flag,
 }
 
 impl ExecutionContext {
@@ -102,8 +102,6 @@ impl ExecutionContext {
 
             // TODO: not great
             bs: unsafe { std::mem::uninitialized() },
-
-            flags: Flag::INITIAL,
         }
     }
 }
@@ -122,6 +120,8 @@ pub struct LocalData {
     pub signal_queue: SignalQueue,
 
     pub mailbox: Mailbox,
+
+    pub flags: Flag,
 
     /// The ID of the thread this process is pinned to.
     pub thread_id: Option<u8>,
@@ -158,6 +158,7 @@ impl Process {
         let local_data = LocalData {
             // allocator: LocalAllocator::new(global_allocator.clone(), config),
             context: Box::new(context),
+            flags: Flag::INITIAL,
             parent,
             links: tree::Tree::new(tree::NodeAdapter::new()), // eew
             signal_queue: SignalQueue::new(),
@@ -203,13 +204,34 @@ impl Process {
         self.pid == 0
     }
 
-    pub fn send_message(&self, sender: &RcProcess, message: Term) {
-        if sender.pid == self.pid {
+    pub fn send_signal(&self, signal: Signal) {
+        self.local_data_mut().signal_queue.send_external(signal);
+    }
+
+    // TODO: remove
+    pub fn send_message(&self, from: PID, message: Term) {
+        if from == self.pid {
             // skip the signal_queue completely
             self.local_data_mut().mailbox.send(message);
         } else {
-            self.local_data_mut().signal_queue.send_external(Signal::Message(message));
+            self.local_data_mut()
+                .signal_queue
+                .send_external(Signal::Message {
+                    value: message,
+                    from,
+                });
         }
+    }
+
+    // awkward result, but it works
+    pub fn receive(&self) -> Result<Option<&Term>, Exception> {
+        let local_data = self.local_data_mut();
+
+        println!("receiving");
+        if !local_data.mailbox.has_messages() {
+            self.process_incoming()?
+        }
+        Ok(local_data.mailbox.receive())
     }
 
     pub fn set_waiting_for_message(&self, value: bool) {
@@ -221,103 +243,119 @@ impl Process {
     }
 
     // we're in receive(), but ran out of internal messages, process external queue
-    pub fn process_incoming(&self) -> Option<&Signal> {
+    /// An Err signals that we're now exiting.
+    pub fn process_incoming(&self) -> Result<(), Exception> {
         // get internal, if we ran out, start processing external
+        println!("signals");
         while let Some(signal) = self.local_data_mut().signal_queue.receive() {
             match signal {
-                Signal::Message(message) => {
-                    self.local_data_mut().mailbox.send(message);
+                Signal::Message { value, .. } => {
+                    self.local_data_mut().mailbox.send(value);
                 }
-                Signal::Exit(_reason) => {
-                    self.handle_exit_signal(signal);
+                Signal::Exit { .. } => {
+                    self.handle_exit_signal(signal)?;
                 }
             }
         }
-        // TODO: we can probably use Result<(), Exception> to signal when process turns to exiting.
-        unimplemented!()
+        return Ok(());
     }
 
-    // TODO: restore Mailbox to handle signals (internal external),
-    // rename to SignalQueue, then add a Mailbox (Vec<Term>) to process
-    // that will be internal. Keep handle inside process, but this way
-    // sig queue abstracts internal/external.
+    /// Return value is true if the process is now terminating.
+    pub fn handle_exit_signal(&self, signal: Signal) -> Result<(), Exception> {
+        // this is extremely awkward, wish we could enforce a signal variant on the function signature
+        // we're also technically matching twice since process_incoming also pattern matches.
+        // TODO: inline?
+        println!("exit signals");
+        if let Signal::Exit { kind, from, reason } = signal {
+            let mut reason = reason.value;
+            let local_data = self.local_data_mut();
 
-    // handle_exit_signal(Process *c_p, ErtsSigRecvTracing *tracing,
-    //                 ErtsMessage *sig, ErtsMessage ***next_nm_sig,
-    //                 int *exited)
-    pub fn handle_exit_signal(&self, signal: Signal) {
-        let mut destroy = false;
-        let mut ignore = false;
-        let mut save = false;
-        let mut exit = false;
-        let mut cnt = 1;
-
-        if let Signal::Exit { type, from, reason } = signal {
-            if type == EXIT_LINKED {
+            if kind == ExitKind::ExitLinked {
                 // delete from link tree
-                // if it was already deleted, ignore = true, destroy = true
-            }
-
-            if !ignore {
-                if (op != OP_EXIT || reason != atom::KILL) && (self.flags.contains(TRAP_EXIT)) {
-                    // if reason is immed, create an EXIT message tuple instead and replace
-                    // (push to internal msg queue as message)
-                    let msg = tup3!(&self.context_mut().heap, atom!(EXIT), pid, reason);
-                    // ERL_MESSAGE_TOKEN(mp) = am_undefined;
-                    // TODO: process::send_message() already does notify/wakeup
-                    erts_proc_notify_new_message(c_p, ERTS_PROC_LOCK_MAIN);
-
-                } else if reason == atom::NORMAL && xsigd->u.normal_kills {
-                    ignore = true;
-                    destroy = true;
-                } else {
-                    // terminate
-                    save = true;
-                    exit = true;
-                    if (op == ERTS_SIG_Q_OP_EXIT && reason == am_kill)
-                        reason = am_killed;
+                if local_data.links.find_mut(&from).remove().is_none() {
+                    // if it was already deleted, ignore
+                    return Ok(());
                 }
             }
-        }
 
-        if exit {
-            if save { // something to do with heap fragments I think mainly to remove it from proc
-                sig->data.attached = ERTS_MSG_COMBINED_HFRAG;
-                ERL_MESSAGE_TERM(sig) = xsigd->message;
-                erts_save_message_in_proc(c_p, sig);
-            }
-            // Exit process...
-            erts_set_self_exiting(c_p, reason);
-            // freason exit, kill_catches, exit instr
+            if reason != atom!(KILL) && local_data.flags.contains(Flag::TRAP_EXIT) {
+                // if reason is immed, create an EXIT message tuple instead and replace
+                // (push to internal msg queue as message)
+                let msg = tup3!(
+                    &self.context_mut().heap,
+                    atom!(EXIT),
+                    Term::pid(from),
+                    reason
+                );
+                // TODO: ensure we do process wakeup
+                // erts_proc_notify_new_message(c_p, ERTS_PROC_LOCK_MAIN);
+                local_data.mailbox.send(msg);
+                Ok(())
+            } else if reason == atom!(NORMAL)
+            /*&& xsigd.u.normal_kills */
+            {
+                /* TODO: for exit/2, exit_signal/2 implement normal kills
+                 * Preserve the very old and *very strange* behaviour
+                 * of erlang:exit/2...
+                 *
+                 * - terminate ourselves even though exit reason
+                 *   is normal (unless we trap exit)
+                 * - terminate ourselves before exit/2 return
+                 */
 
-            cnt += 1;
-        }
-
-        if destroy {
-            cnt += 1;
-            if type == ERTS_SIG_Q_TYPE_GEN_EXIT {
-                sig->next = NULL;
-                erts_cleanup_messages(sig);
+                // ignore
+                Ok(())
             } else {
-                // release all the link things
-            }
-        }
+                // terminate
+                // save = true;
+                if
+                /*op == ERTS_SIG_Q_OP_EXIT && */
+                reason == atom!(KILL) {
+                    reason = atom!(KILLED);
+                }
 
-        (cnt, exit)
+                // if save { // something to do with heap fragments I think mainly to remove it from proc
+                //     sig->data.attached = ERTS_MSG_COMBINED_HFRAG;
+                //     ERL_MESSAGE_TERM(sig) = xsigd->message;
+                //     erts_save_message_in_proc(c_p, sig);
+                // }
+
+                // Exit process...
+
+                // kill catches
+                self.context_mut().catches = 0;
+                println!("resetting catches");
+
+                // return an exception to trigger process exit
+                Err(Exception::with_value(Reason::EXT_EXIT, reason))
+            }
+        // if destroy { cleanup messages up to signal? }
+        } else {
+            unreachable!()
+        }
     }
 
     // equivalent of erts_continue_exit_process
     pub fn exit(&self, state: &RcState, reason: Exception) {
-        let local_data = self.local_data();
+        let local_data = self.local_data_mut();
+
+        // set state to exiting
 
         // TODO: cancel timers
 
         // TODO: unregister process name
 
-        // TODO: delete links
-        for link in local_data.links.iter() {
-            let msg = Signal::Exit(reason);
-            self::send_message(state, self, link.other, msg);
+        // delete links
+        let mut cursor = local_data.links.front_mut();
+        while let Some(link) = cursor.remove() {
+            // TODO: reason has to be deep cloned, make a constructor
+            println!("sending exit signal");
+            let msg = Signal::Exit {
+                reason: reason.clone(),
+                from: self.pid,
+                kind: ExitKind::ExitLinked,
+            };
+            self::send_signal(state, link.other, msg);
             // erts_proc_sig_send_link_exit(c_p, c_p->common.id, lnk, reason, SEQ_TRACE_TOKEN(c_p));
         }
 
@@ -418,7 +456,7 @@ pub fn send_message(
     msg: Term,
 ) -> Result<Term, Exception> {
     if let Some(receiver) = state.process_table.lock().get(pid) {
-        receiver.send_message(process, msg);
+        receiver.send_message(process.pid, msg);
 
         if receiver.is_waiting_for_message() {
             // wake up
@@ -430,4 +468,20 @@ pub fn send_message(
     // TODO: if err, we return err that's then put in x0?
 
     Ok(msg)
+}
+
+pub fn send_signal(state: &RcState, pid: PID, signal: Signal) -> Result<(), Exception> {
+    if let Some(receiver) = state.process_table.lock().get(pid) {
+        receiver.send_signal(signal);
+
+        if receiver.is_waiting_for_message() {
+            // wake up
+            receiver.set_waiting_for_message(false);
+
+            state.process_pool.schedule(Job::normal(receiver));
+        }
+    }
+    // TODO: if err, we return err ?
+
+    Ok(())
 }

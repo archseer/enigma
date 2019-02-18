@@ -157,7 +157,10 @@ macro_rules! op_call_ext {
                     Err(exc) => return Err(exc),
                 }
             }
-            None => return Err(Exception::new(Reason::EXC_UNDEF)),
+            None => {
+                println!("function not found");
+                return Err(Exception::new(Reason::EXC_UNDEF));
+            }
         }
     }};
 }
@@ -560,7 +563,7 @@ impl Machine {
                 Opcode::LoopRec => {
                     // label, source
                     // grab message from queue, put to x0, if no message, jump to fail label
-                    if let Some(msg) = process.local_data_mut().mailbox.receive() {
+                    if let Some(msg) = process.receive()? {
                         context.x[0] = *msg
                     } else {
                         let fail = ins.args[0].to_u32();

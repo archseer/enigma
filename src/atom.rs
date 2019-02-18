@@ -153,6 +153,8 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
 
     atoms.register_atom("trap_exit");
     atoms.register_atom("start");
+    atoms.register_atom("kill");
+    atoms.register_atom("killed");
     atoms
 };
 
@@ -197,6 +199,8 @@ pub const APPLY: u32 = 33;
 
 pub const TRAP_EXIT: u32 = 34;
 pub const START: u32 = 35;
+pub const KILL: u32 = 36;
+pub const KILLED: u32 = 37;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

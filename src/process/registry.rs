@@ -20,6 +20,10 @@ impl<T: Clone> Registry<T> {
     pub fn register(&mut self, atom: u32, process: T) -> &T {
         self.processes.entry(atom).or_insert(process)
     }
+
+    pub fn whereis(&self, atom: u32) -> Option<&T> {
+        self.processes.get(&atom)
+    }
 }
 
 /*

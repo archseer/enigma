@@ -3,10 +3,24 @@ use std::collections::VecDeque;
 
 use crate::exception::Exception;
 use crate::value::Term;
+use crate::process::PID;
 
+#[derive(PartialEq)]
+pub enum ExitKind {
+    ExitLinked = 0,
+}
+
+// #[derive(Copy)]
 pub enum Signal {
-    Exit(Exception),
-    Message(Term),
+    Exit {
+        from: PID,
+        reason: Exception,
+        kind: ExitKind
+    },
+    Message{
+        from: PID,
+        value: Term,
+    },
 }
 
 #[derive(Default)]

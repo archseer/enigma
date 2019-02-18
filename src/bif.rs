@@ -82,6 +82,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             //"raise", 3 => bif_erlang_raise_3,
             "throw", 1 => bif_erlang_throw_1,
             "exit", 1 => bif_erlang_exit_1,
+            "whereis", 1 => bif_erlang_whereis_1,
             "nif_error", 1 => bif_erlang_nif_error_1,
             "nif_error", 2 => bif_erlang_nif_error_2,
             "load_nif", 2 => bif_erlang_load_nif_2,
@@ -536,6 +537,17 @@ fn bif_erlang_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     ))
 }
 
+fn bif_erlang_whereis_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+    /* (Atom, Pid|Port)   */
+    if let Variant::Atom(name) = args[0].into_variant() {
+        if let Some(process) = vm.state.process_registry.lock().whereis(name) {
+            return Ok(Term::pid(process.pid));
+        }
+        return Ok(atom!(UNDEFINED));
+    }
+    Err(Exception::new(Reason::EXC_BADARG))
+}
+
 fn bif_erlang_nif_error_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     Err(Exception::with_value(Reason::EXC_ERROR, args[0]))
 }
@@ -576,12 +588,12 @@ pub fn bif_erlang_process_flag_2(
 ) -> BifResult {
     match args[0].into_variant() {
         Variant::Atom(atom::TRAP_EXIT) => {
-            let context = process.context_mut();
-            let old_value = context.flags.contains(process::Flag::TRAP_EXIT);
+            let local_data = process.local_data_mut();
+            let old_value = local_data.flags.contains(process::Flag::TRAP_EXIT);
             match args[1].into_variant() {
                 // TODO atom to_bool, then pass that in as 2 arg
-                Variant::Atom(atom::TRUE) => context.flags.set(process::Flag::TRAP_EXIT, true),
-                Variant::Atom(atom::FALSE) => context.flags.set(process::Flag::TRAP_EXIT, false),
+                Variant::Atom(atom::TRUE) => local_data.flags.set(process::Flag::TRAP_EXIT, true),
+                Variant::Atom(atom::FALSE) => local_data.flags.set(process::Flag::TRAP_EXIT, false),
                 _ => return Err(Exception::new(Reason::EXC_BADARG)),
             }
             Ok(Term::boolean(old_value))
