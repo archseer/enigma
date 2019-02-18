@@ -47,6 +47,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "date", 0 => chrono::bif_erlang_date_0,
             "localtime", 0 => chrono::bif_erlang_localtime_0,
             "monotonic_time", 0 => chrono::bif_erlang_monotonic_time_0,
+            "monotonic_time", 1 => chrono::bif_erlang_monotonic_time_1,
             "system_time", 0 => chrono::bif_erlang_system_time_0,
             "universaltime", 0 => chrono::bif_erlang_universaltime_0,
             "+", 2 => bif_erlang_add_2,

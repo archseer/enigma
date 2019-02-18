@@ -61,6 +61,20 @@ pub fn bif_erlang_monotonic_time_0(
 }
 
 // TODO monotonic_time_1
+pub fn bif_erlang_monotonic_time_1(
+    vm: &vm::Machine,
+    process: &RcProcess,
+    _args: &[Term],
+) -> BifResult {
+    // TODO: needs https://github.com/rust-lang/rust/issues/50202
+    // .as_nanos()
+    let heap = &process.context_mut().heap;
+
+    Ok(Term::bigint(
+        heap,
+        vm.elapsed_time().as_secs().to_bigint().unwrap(),
+    ))
+}
 
 pub fn bif_erlang_system_time_0(
     _vm: &vm::Machine,
