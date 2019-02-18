@@ -1937,7 +1937,7 @@ impl Machine {
                         let mut iter = list.chunks_exact(2);
                         while let Some([key, value]) = iter.next() {
                             // TODO: optimize by having the ExtendedList store Term instead of LValue
-                            map = map.plus(key.to_term(), value.to_term())
+                            map = map.plus(key.to_term(), context.expand_arg(value))
                         }
                         set_register!(context, dest, Term::map(&context.heap, map))
                     }
