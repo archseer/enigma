@@ -469,9 +469,8 @@ impl Machine {
         let arity = 2;
         context.x[0] = Term::atom(atom::from_str("init"));
         context.x[1] = value::Cons::from_iter(
-            args.into_iter().map(|arg| {
-                Term::binary(&context.heap, bitstring::Binary::from(arg.into_bytes()))
-            }),
+            args.into_iter()
+                .map(|arg| Term::binary(&context.heap, bitstring::Binary::from(arg.into_bytes()))),
             &context.heap,
         );
         op_jump!(context, module.funs[&(fun, arity)]);
@@ -1709,8 +1708,50 @@ impl Machine {
                 }
                 Opcode::BsMatchString => {
                     debug_assert_eq!(ins.args.len(), 4);
-                    // fail cxt bits ptr
-                    unimplemented!() // TODO
+                    // fail cxt bits str
+
+                    // byte* bytes = (byte *) $Ptr;
+                    // Uint bits = $Bits;
+                    // ErlBinMatchBuffer* mb;
+                    // Uint offs;
+
+                    if let Ok(value::Boxed { value: ms, .. }) =
+                        context
+                            .expand_arg(&ins.args[1])
+                            .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>()
+                    {
+                        let mb = &mut ms.mb;
+
+                        let bits = ins.args[2].to_u32() as usize;
+                        let string = match &ins.args[3] {
+                            LValue::Str(string) => string,
+                            _ => unreachable!()
+                        };
+
+                        if mb.remaining() < bits {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                            continue;
+                        }
+                        // offs = mb->offset & 7;
+                        // if (offs == 0 && (bits & 7) == 0) {
+                        //     if (sys_memcmp(bytes, mb->base+(mb->offset>>3), bits>>3)) {
+                        //         $FAIL($Fail);
+                        //     }
+
+                        // No need for memcmp fastpath, cmp_bits already does that.
+                        unsafe {
+                            if bitstring::cmp_bits(string.as_ptr(), 0, mb.original.data.as_ptr().add(mb.offset >> 3), mb.offset & 7, bits) != std::cmp::Ordering::Equal {
+                                let fail = ins.args[0].to_u32();
+                                op_jump!(context, fail);
+                                continue;
+                            }
+                        }
+                        mb.offset += bits;
+                    } else {
+                        unreachable!()
+                    }
+
                 }
                 Opcode::BsInitWritable => {
                     debug_assert_eq!(ins.args.len(), 0);

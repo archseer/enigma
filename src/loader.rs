@@ -9,8 +9,8 @@ use crate::value::Term;
 use hashbrown::HashMap;
 use libflate::zlib;
 use nom::*;
-use num::ToPrimitive;
 use num::bigint::{BigInt, Sign};
+use num::ToPrimitive;
 use std::io::{Cursor, Read};
 
 // (filename_index, loc)
@@ -47,6 +47,7 @@ pub enum LValue {
     Character(u8),
     Nil,
     Binary(Arc<bitstring::Binary>),
+    Str(Vec<u8>), // TODO this is so avoid constructing a full binary
     BigInt(BigInt),
     //
     Literal(u32),
@@ -216,7 +217,10 @@ impl<'a> Loader<'a> {
 
         // Decompress deflated literal table
         let iocursor = Cursor::new(rest);
-        zlib::Decoder::new(iocursor).unwrap().read_to_end(&mut data).unwrap();
+        zlib::Decoder::new(iocursor)
+            .unwrap()
+            .read_to_end(&mut data)
+            .unwrap();
         let buf = &data[..];
 
         assert_eq!(data.len(), size as usize, "LitT inflate failed");
@@ -345,15 +349,36 @@ impl<'a> Loader<'a> {
                         .insert(LINE_INVALID_LOCATION, self.instructions.len() as u32);
                     break;
                 }
+                Opcode::OnLoad => unimplemented!("on_load instruction"),
                 Opcode::BsPutString => {
                     if let [LValue::Literal(len), LValue::Literal(offset)] = instruction.args[..] {
                         // TODO: ideally use a single string that we slice into for these interned strings
                         // but need to tie them to the string heap lifetime
                         let offset = offset as usize;
                         let bytes = &self.strings[offset..offset + len as usize];
-                        instruction.args = vec![LValue::Binary(Arc::new(
-                            bitstring::Binary::from(bytes.as_bytes()),
-                        ))];
+                        instruction.args = vec![LValue::Binary(Arc::new(bitstring::Binary::from(
+                            bytes.as_bytes(),
+                        )))];
+                        instruction
+                    } else {
+                        unreachable!()
+                    }
+                }
+                Opcode::BsMatchString => {
+                    if let [fail, src, LValue::Literal(bits), LValue::Literal(offset)] =
+                        &instruction.args[..]
+                    {
+                        // TODO: ideally use a single string that we slice into for these interned strings
+                        // but need to tie them to the string heap lifetime
+                        let offset = *offset as usize;
+                        let len = bits >> 3;
+                        let bytes = &self.strings[offset..offset + len as usize];
+                        instruction.args = vec![
+                            fail.clone(), // not happy about the clones
+                            src.clone(),
+                            LValue::Literal(*bits),
+                            LValue::Str(bytes.as_bytes().to_vec()),
+                        ];
                         instruction
                     } else {
                         unreachable!()
