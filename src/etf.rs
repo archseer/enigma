@@ -222,10 +222,7 @@ pub fn decode_binary<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term>
     }
 
     let (rest, bytes) = take!(rest, len)?;
-    Ok((
-        rest,
-        Term::binary(heap, bitstring::Binary::from_vec(bytes.to_vec())),
-    ))
+    Ok((rest, Term::binary(heap, bitstring::Binary::from(bytes))))
 }
 
 #[cfg(target_pointer_width = "32")]

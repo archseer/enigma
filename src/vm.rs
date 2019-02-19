@@ -429,12 +429,12 @@ impl Machine {
     ///
     /// This method returns true if the VM terminated successfully, false
     /// otherwise.
-    pub fn start(&self, file: &str) {
+    pub fn start(&self, args: Vec<String>) {
         //self.configure_rayon();
 
         let primary_guard = self.start_primary_threads();
 
-        self.start_main_process(file);
+        self.start_main_process(args);
 
         // Joining the pools only fails in case of a panic. In this case we
         // don't want to re-panic as this clutters the error output.
@@ -456,7 +456,7 @@ impl Machine {
     }
 
     /// Starts the main process
-    pub fn start_main_process(&self, path: &str) {
+    pub fn start_main_process(&self, args: Vec<String>) {
         println!("Starting main process...");
         let registry = self.modules.lock();
         //let module = unsafe { &*module::load_module(self, path).unwrap() };
@@ -468,7 +468,12 @@ impl Machine {
         let fun = atom::from_str("start");
         let arity = 2;
         context.x[0] = Term::atom(atom::from_str("init"));
-        context.x[1] = bitstring!(&context.heap, "");
+        context.x[1] = value::Cons::from_iter(
+            args.into_iter().map(|arg| {
+                Term::binary(&context.heap, bitstring::Binary::from(arg.into_bytes()))
+            }),
+            &context.heap,
+        );
         op_jump!(context, module.funs[&(fun, arity)]);
         /* TEMP */
 

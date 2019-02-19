@@ -72,19 +72,32 @@ impl Binary {
         }
     }
 
-    pub fn from_vec(vec: Vec<u8>) -> Self {
-        Binary {
-            // flags: AtomicUsize::new(0),
-            // WRITABLE | ACTIVE_WRITER
-            is_writable: true,
-            data: vec,
-        }
-    }
-
     #[allow(clippy::mut_from_ref)]
     pub fn get_mut(&self) -> &mut Vec<u8> {
         // :( we want to avoid locks so this method is for specifically when we know we're the only writer.
         unsafe { &mut *(&self.data as *const Vec<u8> as *mut Vec<u8>) }
+    }
+}
+
+impl From<Vec<u8>> for Binary {
+    fn from(value: Vec<u8>) -> Self {
+        Binary {
+            // flags: AtomicUsize::new(0),
+            // WRITABLE | ACTIVE_WRITER
+            is_writable: true,
+            data: value,
+        }
+    }
+}
+
+impl From<&[u8]> for Binary {
+    fn from(value: &[u8]) -> Self {
+        Binary {
+            // flags: AtomicUsize::new(0),
+            // WRITABLE | ACTIVE_WRITER
+            is_writable: true,
+            data: value.to_vec(),
+        }
     }
 }
 

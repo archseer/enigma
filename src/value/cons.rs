@@ -1,8 +1,8 @@
 use super::{Term, TryInto, Variant, WrongBoxError};
+use crate::immix::Heap;
 use core::marker::PhantomData;
 use std::cmp::Ordering;
 use std::ptr::NonNull;
-use crate::immix::Heap;
 
 #[derive(Debug, Eq)]
 #[repr(C)]
@@ -97,12 +97,15 @@ impl Cons {
 
     // impl FromIterator<Term> for Cons { can't do this since we need heap
 
-    pub fn from_iter<'a, I: IntoIterator<Item=&'a Term> + ExactSizeIterator>(iter: I, heap: &Heap) -> Term {
+    pub fn from_iter<I: IntoIterator<Item = Term> + ExactSizeIterator>(
+        iter: I,
+        heap: &Heap,
+    ) -> Term {
         let len = iter.len();
         let mut iter = iter.into_iter();
         let val = iter.next().unwrap();
         let c = heap.alloc(Cons {
-            head: *val,
+            head: val,
             tail: Term::nil(),
         });
 
@@ -111,7 +114,7 @@ impl Cons {
                 let Cons { ref mut tail, .. } = *cons;
                 let val = iter.next().unwrap();
                 let new_cons = heap.alloc(Cons {
-                    head: *val,
+                    head: val,
                     tail: Term::nil(),
                 });
                 let ptr = new_cons as *mut Cons;
