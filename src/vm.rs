@@ -1499,7 +1499,13 @@ impl Machine {
                 Opcode::BsGetInteger2 => {
                     debug_assert_eq!(ins.args.len(), 7);
                     // bs_get_integer2 Fail=f Ms=xy Live=u Sz=sq Unit=u Flags=u Dst=d
-                    // ms == context
+
+                    let size = ins.args[3].to_u32() as usize;
+                    let unit = ins.args[4].to_u32() as usize;
+                    let flags = ins.args[5].to_u32();
+
+                    let bits = size * unit;
+
                     // match bits {
                     //     8 => unimplemented!()
                     //     16 => unimplemented!()
@@ -1507,7 +1513,26 @@ impl Machine {
                     //     _ => unimplemented!() // slow fallback
                     // }
 
-                    unimplemented!() // TODO
+                    // let size = size * (flags as usize >> 3); TODO: this was just because flags
+                    // & size were packed together on BEAM
+
+                    // TODO: this cast can fail
+                    if let Ok(value::Boxed { value: ms, .. }) = context
+                        .expand_arg(&ins.args[1])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
+                        let res = ms.mb.get_integer(
+                            &context.heap,
+                            bits,
+                            bitstring::Flag::from_bits(flags as u8).unwrap(),
+                        );
+                        if let Some(res) = res {
+                            set_register!(context, &ins.args[6], res)
+                        } else {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                        }
+                    };
                 }
                 Opcode::BsGetFloat2 => {
                     debug_assert_eq!(ins.args.len(), 7);
