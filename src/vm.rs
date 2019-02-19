@@ -1416,6 +1416,82 @@ impl Machine {
                         }
                     }
                 }
+                Opcode::BsStartMatch3 => {
+                    debug_assert_eq!(ins.args.len(), 4);
+                    // fail, src, live, dst
+
+                    let cxt = context.expand_arg(&ins.args[1]);
+
+                    if !cxt.is_pointer() {
+                        let fail = ins.args[0].to_u32();
+                        op_jump!(context, fail);
+                        continue;
+                    }
+
+                    let header = cxt.get_boxed_header().unwrap();
+
+                    // Reserve a slot for the start position.
+                    let live = ins.args[2].to_u32();
+
+                    match header {
+                        value::BOXED_MATCHSTATE => {
+                            if let Ok(value::Boxed { value: ms, .. }) =
+                                cxt.get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>()
+                            {
+                                let actual_slots = ms.saved_offsets.len();
+                                // We're not compatible with contexts created by bs_start_match2.
+                                assert!(actual_slots == 0);
+                                set_register!(context, &ins.args[3], cxt);
+                            }
+                        }
+                        value::BOXED_BINARY => {
+                            // Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
+                            // $GC_TEST_PRESERVE(wordsneeded, live, context);
+
+                            let result = bitstring::start_match_3(&context.heap, cxt);
+
+                            if let Some(res) = result {
+                                set_register!(context, &ins.args[3], res)
+                            } else {
+                                let fail = ins.args[0].to_u32();
+                                op_jump!(context, fail);
+                                continue;
+                            }
+                        }
+                        _ => {
+                            let fail = ins.args[0].to_u32();
+                            op_jump!(context, fail);
+                            continue;
+                        }
+                    }
+                }
+                Opcode::BsGetPosition => {
+                    debug_assert_eq!(ins.args.len(), 3);
+                    // cxt dst live
+                    if let Ok(value::Boxed { value: ms, .. }) = context
+                        .expand_arg(&ins.args[0])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
+                        // TODO: unsafe cast
+                        set_register!(context, &ins.args[1], Term::int(ms.mb.offset as i32));
+                    } else {
+                        unreachable!()
+                    };
+                }
+                Opcode::BsSetPosition => {
+                    debug_assert_eq!(ins.args.len(), 2);
+                    // cxt pos
+
+                    if let Ok(value::Boxed { value: ms, .. }) = context
+                        .expand_arg(&ins.args[0])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
+                        let pos = context.expand_arg(&ins.args[1]).to_u32();
+                        ms.mb.offset = pos as usize;
+                    } else {
+                        unreachable!()
+                    };
+                }
                 Opcode::BsGetInteger2 => {
                     debug_assert_eq!(ins.args.len(), 7);
                     // bs_get_integer2 Fail=f Ms=xy Live=u Sz=sq Unit=u Flags=u Dst=d
@@ -1628,6 +1704,7 @@ impl Machine {
                 }
                 Opcode::BsMatchString => {
                     debug_assert_eq!(ins.args.len(), 4);
+                    // fail cxt bits ptr
                     unimplemented!() // TODO
                 }
                 Opcode::BsInitWritable => {

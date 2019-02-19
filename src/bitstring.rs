@@ -353,6 +353,56 @@ pub fn start_match_2(heap: &Heap, binary: Term, max: u32) -> Option<Term> {
     ))
 }
 
+pub fn start_match_3(heap: &Heap, binary: Term) -> Option<Term> {
+    assert!(binary.is_binary());
+
+    // TODO: BEAM allocates size on all binary types right after the header so we can grab it
+    // without needing the binary subtype.
+    let total_bin_size = binary_size!(binary);
+
+    if (total_bin_size >> (8 * std::mem::size_of::<usize>() - 3)) != 0 {
+        // Uint => maybe u8??
+        return None;
+    }
+
+    // TODO: this is not nice
+    let mb = match binary.get_boxed_header() {
+        Ok(value::BOXED_BINARY) => {
+            // TODO use ok_or to cast to some, then use ?
+            let value = binary
+                .get_boxed_value::<value::Boxed<RcBinary>>()
+                .unwrap()
+                .value
+                .clone();
+            MatchBuffer::from(value)
+        }
+        Ok(value::BOXED_SUBBINARY) => {
+            // TODO use ok_or to cast to some, then use ?
+            let value = binary
+                .get_boxed_value::<value::Boxed<SubBinary>>()
+                .unwrap()
+                .value
+                .clone();
+            MatchBuffer::from(value)
+        }
+        _ => unreachable!(),
+    };
+
+    // TODO: toggle is_writable to false for rcbinary!
+    // pb = (ProcBin *) boxed_val(Orig);
+    // if (pb->thing_word == HEADER_PROC_BIN && pb->flags != 0) {
+    //  erts_emasculate_writable_binary(pb);
+    // }
+
+    Some(Term::matchstate(
+        heap,
+        MatchState {
+            saved_offsets: vec![],
+            mb,
+        },
+    ))
+}
+
 // #ifdef DEBUG
 // # define CHECK_MATCH_BUFFER(MB) check_match_buffer(MB)
 
