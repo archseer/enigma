@@ -192,7 +192,7 @@ impl SubBinary {
     }
 
     pub fn is_binary(&self) -> bool {
-        self.bitsize != 0
+        self.bitsize & 7 == 0
     }
 }
 
