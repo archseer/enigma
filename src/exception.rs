@@ -288,7 +288,7 @@ pub fn handle_error(
     let context = process.context_mut();
     // let exc = &mut context.exc.unwrap();
 
-    assert!(!exc.reason.contains(Reason::TRAP)); /* Should have been handled earlier. */
+    assert!(exc.reason != Reason::TRAP); /* Should have been handled earlier. */
     //     if (c_p->freason & EXF_RESTORE_NIF) {
     //      	erts_nif_export_restore_error(c_p, reg, &bif_mfa);
     //     }
