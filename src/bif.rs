@@ -762,114 +762,70 @@ fn bif_lists_member_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) ->
     Ok(atom!(FALSE)) // , reds_left - max_iter/16
 }
 
-// static BIF_RETTYPE lists_reverse_alloc(Process *c_p,
-//                                        Eterm list_in,
-//                                        Eterm tail_in)
-// {
-//     static const Uint CELLS_PER_RED = 40;
+// fn lists_reverse_alloc(process: &RcProcess, mut list: Term, mut tail: Term) -> BifResult {
+//     const CELLS_PER_RED: usize = 40;
 
-//     Eterm *alloc_top, *alloc_end;
-//     Uint cells_left, max_cells;
-//     Eterm list, tail;
-//     Eterm lookahead;
+//     let max_cells = CELLS_PER_RED * process.context().reds;
+//     let mut cells_left = max_cells;
+//     let mut lookahead = list;
 
-//     list = list_in;
-//     tail = tail_in;
-
-//     cells_left = max_cells = CELLS_PER_RED * ERTS_BIF_REDS_LEFT(c_p);
-//     lookahead = list;
-
-//     while (cells_left != 0 && is_list(lookahead)) {
+//     while cells_left != 0 && lookahead.is_list() {
 //         lookahead = CDR(list_val(lookahead));
-//         cells_left--;
+//         cells_left -= 1;
 //     }
 
 //     BUMP_REDS(c_p, (max_cells - cells_left) / CELLS_PER_RED);
 
-//     if (is_not_list(lookahead) && is_not_nil(lookahead)) {
-//         BIF_ERROR(c_p, BADARG);
+//     if !lookahead.is_list() && !lookahead.is_nil() {
+//         return Err(Exception::new(Reason::EXC_BADARG));
 //     }
 
-//     alloc_top = HAlloc(c_p, 2 * (max_cells - cells_left));
-//     alloc_end = alloc_top + 2 * (max_cells - cells_left);
+//     // alloc_top = HAlloc(c_p, 2 * (max_cells - cells_left));
+//     // alloc_end = alloc_top + 2 * (max_cells - cells_left);
 
-//     while (alloc_top < alloc_end) {
-//         Eterm *pair = list_val(list);
+//     let heap = &process.context_mut().heap;
+
+//     let list = list.iter().take(max_cells).fold(tail, |acc, val| cons!(heap, val, acc));
+
+//     while alloc_top < alloc_end {
+//         Term *pair = list_val(list);
 
 //         tail = CONS(alloc_top, CAR(pair), tail);
 //         list = CDR(pair);
 
-//         ASSERT(is_list(list) || is_nil(list));
+//         debug_assert!(list.is_list() || list.is_nil());
 
 //         alloc_top += 2;
 //     }
 
-//     if (is_nil(list)) {
-//         BIF_RET(tail);
+//     if list.is_nil() {
+//         return Ok(tail);
 //     }
 
-//     ASSERT(is_list(tail) && cells_left == 0);
-//     BIF_TRAP2(bif_export[BIF_lists_reverse_2], c_p, list, tail);
-// }
-
-// static BIF_RETTYPE lists_reverse_onheap(Process *c_p,
-//                                         Eterm list_in,
-//                                         Eterm tail_in)
-// {
-//     static const Uint CELLS_PER_RED = 60;
-
-//     Eterm *alloc_start, *alloc_top, *alloc_end;
-//     Uint cells_left, max_cells;
-//     Eterm list, tail;
-
-//     list = list_in;
-//     tail = tail_in;
-
-//     cells_left = max_cells = CELLS_PER_RED * ERTS_BIF_REDS_LEFT(c_p);
-
-//     ASSERT(HEAP_LIMIT(c_p) >= HEAP_TOP(c_p) + 2);
-//     alloc_start = HEAP_TOP(c_p);
-//     alloc_end = HEAP_LIMIT(c_p) - 2;
-//     alloc_top = alloc_start;
-
-//     /* Don't process more cells than we have reductions for. */
-//     alloc_end = MIN(alloc_top + (cells_left * 2), alloc_end);
-
-//     while (alloc_top < alloc_end && is_list(list)) {
-//         Eterm *pair = list_val(list);
-
-//         tail = CONS(alloc_top, CAR(pair), tail);
-//         list = CDR(pair);
-
-//         alloc_top += 2;
-//     }
-
-//     cells_left -= (alloc_top - alloc_start) / 2;
-//     HEAP_TOP(c_p) = alloc_top;
-
-//     ASSERT(cells_left >= 0 && cells_left <= max_cells);
-//     BUMP_REDS(c_p, (max_cells - cells_left) / CELLS_PER_RED);
-
-//     if (is_nil(list)) {
-//         BIF_RET(tail);
-//     } else if (is_list(list)) {
-//         if (cells_left > CELLS_PER_RED) {
-//             return lists_reverse_alloc(c_p, list, tail);
-//         }
-
-//         BUMP_ALL_REDS(c_p);
-//         BIF_TRAP2(bif_export[BIF_lists_reverse_2], c_p, list, tail);
-//     }
-
-//     BIF_ERROR(c_p, BADARG);
+//     debug_assert!(tail.is_list() && cells_left == 0);
+//     BIF_TRAP2(bif_export[BIF_lists_reverse_2], process, list, tail);
+//     unimplemented!()
 // }
 
 fn bif_lists_reverse_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    println!("lists reverse called");
     // Handle legal and illegal non-lists quickly.
     if args[0].is_nil() {
         return Ok(args[1]);
-    } else if !args[1].is_list() {
+    }
+
+    if !args[0].is_list() {
         return Err(Exception::new(Reason::EXC_BADARG));
+    }
+
+    if let Ok(cons) = args[0].try_into() {
+        let cons: &value::Cons = cons; // annoying, need type annotation
+
+        let heap = &process.context_mut().heap;
+        // TODO: finish up the reduction counting implementation
+        Ok(cons.iter().fold(args[1], |acc, val| cons!(heap, *val, acc)))
+    } else {
+        Err(Exception::new(Reason::EXC_BADARG))
     }
 
     /* We build the reversal on the unused part of the heap if possible to save
@@ -880,8 +836,6 @@ fn bif_lists_reverse_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     // }
 
     // return lists_reverse_alloc(BIF_P, BIF_ARG_1, BIF_ARG_2);
-
-    unimplemented!()
 }
 
 fn bif_lists_keymember_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
