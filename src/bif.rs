@@ -29,7 +29,7 @@ macro_rules! bif_map {
             let mut table: BifTable = HashMap::new();
             $(
                 let module = atom::from_str($module);
-                $(table.insert((module, atom::from_str($fun), $arity), $rust_fn);)*
+                $(table.insert(module::MFA(module, atom::from_str($fun), $arity), $rust_fn);)*
             )*
             table
         }
@@ -38,7 +38,7 @@ macro_rules! bif_map {
 
 type BifResult = Result<Term, Exception>;
 pub type BifFn = fn(&vm::Machine, &RcProcess, &[Term]) -> BifResult;
-type BifTable = HashMap<(u32, u32, u32), BifFn>;
+type BifTable = HashMap<module::MFA, BifFn>;
 
 pub static BIFS: Lazy<BifTable> = sync_lazy! {
     bif_map![
@@ -630,7 +630,7 @@ fn bif_erlang_function_exported_3(
     }
 
     let arity = args[2].to_u32();
-    let mfa = (args[0].to_u32(), args[1].to_u32(), arity);
+    let mfa = module::MFA(args[0].to_u32(), args[1].to_u32(), arity);
 
     if vm.exports.read().lookup(&mfa).is_some() || bif::is_bif(&mfa) {
         return Ok(atom!(TRUE));

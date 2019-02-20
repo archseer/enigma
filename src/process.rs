@@ -94,7 +94,7 @@ impl ExecutionContext {
 
             exc: None,
 
-            current: (0, 0, 0),
+            current: MFA(0, 0, 0),
 
             // register: Register::new(block.code.registers as usize),
             // binding: Binding::with_rc(block.locals(), block.receiver),

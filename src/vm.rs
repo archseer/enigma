@@ -126,8 +126,8 @@ macro_rules! op_call_ext {
         let mfa = unsafe { &(*$context.ip.module).imports[*$dest as usize] };
 
         println!(
-            "call_ext mfa: {:?}, pid: {:?}",
-            (atom::to_str(mfa.0), atom::to_str(mfa.1), mfa.2),
+            "call_ext mfa: {}, pid: {:?}",
+            mfa,
             $process.pid
         );
 
@@ -281,7 +281,7 @@ macro_rules! op_fixed_apply {
          * Note: All BIFs have export entries; thus, no special case is needed.
          */
 
-        let mfa = (module.to_u32(), func.to_u32(), $arity);
+        let mfa = module::MFA(module.to_u32(), func.to_u32(), $arity);
 
         match $vm.exports.read().lookup(&mfa) {
             Some(Export::Fun(ptr)) => op_jump_ptr!($context, *ptr),
@@ -1740,17 +1740,16 @@ impl Machine {
                     // ErlBinMatchBuffer* mb;
                     // Uint offs;
 
-                    if let Ok(value::Boxed { value: ms, .. }) =
-                        context
-                            .expand_arg(&ins.args[1])
-                            .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>()
-                    {
+                    if let Ok(value::Boxed { value: ms, .. }) = context
+                        .expand_arg(&ins.args[1])
+                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
+                    ) {
                         let mb = &mut ms.mb;
 
                         let bits = ins.args[2].to_u32() as usize;
                         let string = match &ins.args[3] {
                             LValue::Str(string) => string,
-                            _ => unreachable!()
+                            _ => unreachable!(),
                         };
 
                         if mb.remaining() < bits {
@@ -1776,7 +1775,6 @@ impl Machine {
                     } else {
                         unreachable!()
                     }
-
                 }
                 Opcode::BsInitWritable => {
                     debug_assert_eq!(ins.args.len(), 0);
@@ -2030,7 +2028,7 @@ impl Machine {
                     context.x[0] = Term::closure(
                         &context.heap,
                         value::Closure {
-                            mfa: (module.name, lambda.name, lambda.arity), // TODO: use module id instead later
+                            mfa: module::MFA(module.name, lambda.name, lambda.arity), // TODO: use module id instead later
                             ptr: lambda.offset,
                             binding,
                         },

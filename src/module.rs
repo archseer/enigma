@@ -4,10 +4,19 @@ use crate::immix::Heap;
 use crate::instr_ptr::InstrPtr;
 use crate::loader::{FuncInfo, Instruction};
 use crate::value::Term;
+use crate::atom;
 use crate::vm::Machine;
 use hashbrown::HashMap;
 
-pub type MFA = (u32, u32, u32); // function, arity, label
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub struct MFA(pub u32, pub u32, pub u32);
+
+impl std::fmt::Display for MFA {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}:{}/{}", atom::to_str(self.0).unwrap(), atom::to_str(self.1).unwrap(), self.2)
+    }
+}
+
 
 #[derive(Debug, PartialEq)]
 pub struct Lambda {
@@ -43,7 +52,7 @@ impl Module {
         self.exports.iter().for_each(|export| {
             // a bit awkward, export is (func, arity, label),
             // we need (module, func, arity).
-            let mfa = (self.name, export.0, export.1);
+            let mfa = MFA(self.name, export.0, export.1);
             if !bif::is_bif(&mfa) {
                 // only export if there's no bif override
                 let ptr = InstrPtr {

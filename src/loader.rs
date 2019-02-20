@@ -184,7 +184,7 @@ impl<'a> Loader<'a> {
         self.imports = data
             .into_iter()
             .map(|mfa| {
-                (
+                MFA(
                     self.atom_map[&(mfa.0 as u32 - 1)],
                     self.atom_map[&(mfa.1 as u32 - 1)],
                     mfa.2,
@@ -198,7 +198,7 @@ impl<'a> Loader<'a> {
         self.exports = data
             .into_iter()
             .map(|mfa| {
-                (
+                MFA(
                     self.atom_map[&(mfa.0 as u32 - 1)],
                     mfa.1,
                     mfa.2, // TODO: translate these offsets instead of using funs[]
@@ -608,7 +608,7 @@ named!(
         function: be_u32 >>
         arity: be_u32 >>
         label: be_u32 >>
-        (function, arity, label)
+        (MFA(function, arity, label))
     )
 );
 
