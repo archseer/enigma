@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use crate::value::Term;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Mailbox {
     queue: VecDeque<Term>,
 

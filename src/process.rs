@@ -61,6 +61,8 @@ pub struct ExecutionContext {
     pub bs: *mut Vec<u8>,
     ///
     pub exc: Option<Exception>,
+    /// Reductions left
+    pub reds: usize,
 }
 
 impl ExecutionContext {
@@ -102,6 +104,7 @@ impl ExecutionContext {
 
             // TODO: not great
             bs: unsafe { std::mem::uninitialized() },
+            reds: 0,
         }
     }
 }
@@ -189,6 +192,10 @@ impl Process {
     #[allow(clippy::mut_from_ref)]
     pub fn context_mut(&self) -> &mut ExecutionContext {
         &mut *self.local_data_mut().context
+    }
+
+    pub fn context(&self) -> &ExecutionContext {
+        &*self.local_data_mut().context
     }
 
     #[allow(clippy::mut_from_ref)]

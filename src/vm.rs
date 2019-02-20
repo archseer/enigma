@@ -519,8 +519,8 @@ impl Machine {
 
     #[allow(clippy::cyclomatic_complexity)]
     pub fn run(&self, process: &RcProcess) -> Result<(), Exception> {
-        let mut reductions = 2000; // self.state.config.reductions;
         let context = process.context_mut();
+        context.reds = 2000; // self.state.config.reductions;
 
         loop {
             let module = unsafe { &(*context.ip.module) };
@@ -528,10 +528,11 @@ impl Machine {
             context.ip.ptr += 1;
 
             println!(
-                "proc pid={:?} reds={:?} mod={:?} ins={:?} args={:?}",
+                "proc pid={:?} reds={:?} mod={:?} offs={:?} ins={:?} args={:?}",
                 process.pid,
-                reductions,
+                context.reds,
                 atom::to_str(module.name).unwrap(),
+                context.ip.ptr,
                 ins.op,
                 ins.args
             );
@@ -620,7 +621,7 @@ impl Machine {
                     } else {
                         unreachable!()
                     }
-                    safepoint_and_reduce!(self, process, reductions);
+                    safepoint_and_reduce!(self, process, context.reds);
                 }
                 Opcode::CallLast => {
                     //literal arity, label jmp, nwords
@@ -634,7 +635,7 @@ impl Machine {
                     } else {
                         unreachable!()
                     }
-                    safepoint_and_reduce!(self, process, reductions);
+                    safepoint_and_reduce!(self, process, context.reds);
                 }
                 Opcode::CallOnly => {
                     //literal arity, label jmp
@@ -644,7 +645,7 @@ impl Machine {
                     } else {
                         unreachable!()
                     }
-                    safepoint_and_reduce!(self, process, reductions);
+                    safepoint_and_reduce!(self, process, context.reds);
                 }
                 Opcode::CallExt => {
                     //literal arity, literal destination (module.imports index)
@@ -656,7 +657,7 @@ impl Machine {
                     } else {
                         unreachable!()
                     }
-                    safepoint_and_reduce!(self, process, reductions);
+                    safepoint_and_reduce!(self, process, context.reds);
                 }
                 Opcode::CallExtOnly => {
                     //literal arity, literal destination (module.imports index)
@@ -665,7 +666,7 @@ impl Machine {
                     } else {
                         unreachable!()
                     }
-                    safepoint_and_reduce!(self, process, reductions);
+                    safepoint_and_reduce!(self, process, context.reds);
                 }
                 Opcode::CallExtLast => {
                     //literal arity, literal destination (module.imports index), literal deallocate
@@ -678,7 +679,7 @@ impl Machine {
                     } else {
                         unreachable!()
                     }
-                    safepoint_and_reduce!(self, process, reductions);
+                    safepoint_and_reduce!(self, process, context.reds);
                 }
                 Opcode::Bif0 => {
                     // literal import, x reg
@@ -1186,7 +1187,7 @@ impl Machine {
                     } else {
                         unreachable!()
                     }
-                    safepoint_and_reduce!(self, process, reductions);
+                    safepoint_and_reduce!(self, process, context.reds);
                 }
                 Opcode::ApplyLast => {
                     //literal arity, nwords (dealloc)
@@ -1197,7 +1198,7 @@ impl Machine {
                     } else {
                         unreachable!()
                     }
-                    safepoint_and_reduce!(self, process, reductions);
+                    safepoint_and_reduce!(self, process, context.reds);
                 }
                 Opcode::GcBif1 => {
                     // fail label, live, bif, arg1, dest
@@ -1765,7 +1766,14 @@ impl Machine {
 
                         // No need for memcmp fastpath, cmp_bits already does that.
                         unsafe {
-                            if bitstring::cmp_bits(string.as_ptr(), 0, mb.original.data.as_ptr().add(mb.offset >> 3), mb.offset & 7, bits) != std::cmp::Ordering::Equal {
+                            if bitstring::cmp_bits(
+                                string.as_ptr(),
+                                0,
+                                mb.original.data.as_ptr().add(mb.offset >> 3),
+                                mb.offset & 7,
+                                bits,
+                            ) != std::cmp::Ordering::Equal
+                            {
                                 let fail = ins.args[0].to_u32();
                                 op_jump!(context, fail);
                                 continue;
