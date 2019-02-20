@@ -1573,15 +1573,6 @@ impl Machine {
                 Opcode::BsGetBinary2 => {
                     debug_assert_eq!(ins.args.len(), 7);
 
-                    let size = match ins.args[3] {
-                        LValue::Integer(size) => size as usize,
-                        _ => {
-                            let fail = ins.args[0].to_u32();
-                            op_jump!(context, fail);
-                            continue;
-                        }
-                    };
-
                     let flags = ins.args[5].to_u32();
                     // let size = size * (flags as usize >> 3); TODO: this was just because flags
                     // & size were packed together on BEAM
@@ -1591,11 +1582,14 @@ impl Machine {
                         .expand_arg(&ins.args[1])
                         .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
                     ) {
-                        let res = ms.mb.get_binary(
-                            &context.heap,
-                            size as usize,
-                            bitstring::Flag::from_bits(flags as u8).unwrap(),
-                        );
+                        let flags = bitstring::Flag::from_bits(flags as u8).unwrap();
+                        let heap = &context.heap;
+                        let res = match ins.args[3] {
+                            LValue::Integer(size) => ms.mb.get_binary(heap, size as usize, flags),
+                            LValue::Atom(atom::ALL) => ms.mb.get_binary_all(heap, flags),
+                            _ => unreachable!(),
+                        };
+
                         if let Some(res) = res {
                             set_register!(context, &ins.args[6], res)
                         } else {

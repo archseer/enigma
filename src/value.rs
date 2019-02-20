@@ -807,6 +807,8 @@ impl std::fmt::Display for Variant {
                     }
                     BOXED_REF => write!(f, "#Ref<>"),
                     BOXED_BINARY => write!(f, "#Binary<>"),
+                    BOXED_SUBBINARY => write!(f, "#SubBinary<>"),
+                    BOXED_MATCHSTATE => write!(f, "#MatchState<>"),
                     BOXED_MAP => {
                         let map = &*(*ptr as *const map::Map);
                         write!(f, "%{{")?;

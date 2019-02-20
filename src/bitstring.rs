@@ -786,6 +786,16 @@ impl MatchBuffer {
         Some(binary)
     }
 
+    pub fn get_binary_all(&mut self, heap: &Heap, flags: Flag) -> Option<Term> {
+        // CHECK_MATCH_BUFFER(mb);
+
+        let size = self.remaining();
+        Some(Term::subbinary(
+            heap,
+            SubBinary::new(self.original.clone(), size, self.offset, false),
+        ))
+    }
+
     /// Copy up to 4 bytes into the supplied buffer.
     #[inline]
     fn align_utf8_bytes(&self, buf: *mut u8) {
@@ -1505,7 +1515,8 @@ pub unsafe fn copy_bits(
 
         if rmask > 0 {
             bits1 = bits << lshift;
-            if (rmask << rshift) > 0 { // (a << b) & 0xff but that is reduced anyway
+            if (rmask << rshift) > 0 {
+                // (a << b) & 0xff but that is reduced anyway
                 bits = *src;
                 bits1 |= bits >> rshift;
             }
