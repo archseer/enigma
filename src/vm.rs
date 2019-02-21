@@ -549,7 +549,7 @@ impl Machine {
                     let pid = context.x[0]; // TODO can be pid or atom name
                     let msg = context.x[1];
                     println!("sending from {} to {} msg {}", process.pid, pid, msg);
-                    let res = process::send_message(&self.state, process, pid.to_u32(), msg)?;
+                    let res = process::send_message(&self.state, process, pid, msg)?;
                     context.x[0] = res;
                 }
                 Opcode::RemoveMessage => {

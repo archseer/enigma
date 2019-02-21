@@ -462,10 +462,23 @@ pub fn spawn(
 pub fn send_message(
     state: &RcState,
     process: &RcProcess,
-    pid: PID,
+    pid: Term,
     msg: Term,
 ) -> Result<Term, Exception> {
-    if let Some(receiver) = state.process_table.lock().get(pid) {
+    let receiver = match pid.into_variant() {
+        value::Variant::Atom(name) => {
+            if let Some(process) = state.process_registry.lock().whereis(name) {
+                Some(process.clone())
+            } else {
+                println!("registered name not found!");
+                return Err(Exception::new(Reason::EXC_BADARG));
+            }
+        }
+        value::Variant::Pid(pid) => state.process_table.lock().get(pid),
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    if let Some(receiver) = receiver {
         receiver.send_message(process.pid, msg);
 
         if receiver.is_waiting_for_message() {
