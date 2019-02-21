@@ -218,6 +218,61 @@ pub fn bif_erlang_list_to_existing_atom_1(
     // }
     unimplemented!()
 }
+
+/// erlang:'++'/2
+///
+/// Adds a list to another (LHS ++ RHS). For historical reasons this is implemented by copying LHS
+/// and setting its tail to RHS without checking that RHS is a proper list. [] ++ 'not_a_list' will
+/// therefore result in 'not_a_list', and [1,2] ++ 3 will result in [1,2|3], and this is a bug that
+/// we have to live with.
+pub fn bif_erlang_append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    let lhs = args[0];
+    let rhs = args[1];
+
+    let heap = &process.context_mut().heap;
+
+    // This is buggy but expected, `[] ++ 'not_a_list'` has always resulted in 'not_a_list'.
+    if lhs.is_nil() {
+        return Ok(rhs);
+    }
+    
+    // TODO: use into_variant match?
+
+    // TODO: this same type of logic appears a lot, need to abstract it out, too much unsafe use
+    if let Ok(value::Cons { head, tail }) = lhs.try_into() {
+        // keep copying lhs until we reach the tail, point it to rhs
+        let mut iter = tail;
+
+        let c = heap.alloc(value::Cons {
+            head: *head,
+            tail: Term::nil(),
+        });
+
+        let mut ptr = c as *mut value::Cons;
+
+        while let Ok(value::Cons { head, tail }) = iter.try_into() {
+            let new_cons = heap.alloc(value::Cons {
+                head: *head,
+                tail: Term::nil(),
+            });
+
+            let prev = unsafe { &mut (*ptr).tail };
+            ptr = new_cons as *mut value::Cons;
+            std::mem::replace(prev, Term::from(new_cons));
+
+            iter = tail;
+        }
+
+        // now link the copy to the rhs
+        unsafe { (*ptr).tail = rhs; }
+
+        return Ok(Term::from(c));
+    }
+
+    // assert!(!(BIF_P->flags & F_DISABLE_GC));
+    Err(Exception::new(Reason::EXC_BADARG))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
