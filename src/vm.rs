@@ -941,7 +941,7 @@ impl Machine {
                     if let [arg, LValue::Label(fail), LValue::ExtendedList(vec)] = &ins.args[..] {
                         if let Ok(tup) = context.expand_arg(arg).try_into() {
                             let tup: &value::Tuple = tup; // annoying, need type annotation
-                            let len = LValue::Integer(i64::from(tup.len));
+                            let len = LValue::Literal(u32::from(tup.len));
                             let mut i = 0;
                             loop {
                                 // if key matches, jump to the following label
