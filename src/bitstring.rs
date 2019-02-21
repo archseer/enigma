@@ -1561,7 +1561,7 @@ mod tests {
     #[test]
     fn test_get_integer() {
         // TODO start_match_2 should just be MatchBuffer::from(binary/subbinary)
-        let binary = Arc::new(Binary::from_vec(vec![0xAB, 0xCD, 0xEF]));
+        let binary = Arc::new(Binary::from(vec![0xAB, 0xCD, 0xEF]));
 
         let heap = Heap::new();
 

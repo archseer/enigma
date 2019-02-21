@@ -1203,7 +1203,7 @@ mod tests {
         let args = vec![Term::closure(
             heap,
             value::Closure {
-                mfa: (0, 0, 0),
+                mfa: module::MFA(0, 0, 0),
                 ptr: 0,
                 binding: None,
             },

@@ -355,7 +355,7 @@ mod tests {
                 tup2!(&heap, Term::int(5), str_to_atom!("zz")),
                 tup2!(&heap, Term::int(2), str_to_atom!("aa")),
             ]
-            .iter(),
+            .into_iter(),
             &heap,
         );
 
