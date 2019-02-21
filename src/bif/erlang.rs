@@ -1,4 +1,6 @@
+use crate::atom;
 use crate::bif::BifResult;
+use crate::bitstring;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
 use crate::value::{self, Term, TryInto, Tuple};
@@ -115,6 +117,107 @@ pub fn bif_erlang_tuple_to_list_1(
     Ok(list)
 }
 
+pub fn bif_erlang_binary_to_list_1(
+    _vm: &vm::Machine,
+    process: &RcProcess,
+    args: &[Term],
+) -> BifResult {
+    let binary = args[0];
+
+    // TODO: extract as macro
+    let (bytes, bitoffs, size) = match binary.get_boxed_header() {
+        Ok(value::BOXED_BINARY) => {
+            // TODO use ok_or to cast to some, then use ?
+            let value = &binary
+                .get_boxed_value::<value::Boxed<bitstring::RcBinary>>()
+                .unwrap()
+                .value;
+            (&value.data[..], 0, value.data.len())
+        }
+        Ok(value::BOXED_SUBBINARY) => {
+            // TODO use ok_or to cast to some, then use ?
+            let value = &binary
+                .get_boxed_value::<value::Boxed<bitstring::SubBinary>>()
+                .unwrap()
+                .value;
+            (
+                &value.original.data[value.offset..],
+                value.bit_offset,
+                value.size,
+            )
+        }
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    let res = bitstring::bytes_to_list(
+        &process.context_mut().heap,
+        Term::nil(),
+        bytes,
+        size,
+        bitoffs,
+    );
+    println!("{}", res);
+    Ok(res)
+}
+
+/// convert a list of ascii integers to an atom
+pub fn bif_erlang_list_to_atom_1(
+    _vm: &vm::Machine,
+    process: &RcProcess,
+    args: &[Term],
+) -> BifResult {
+    // Eterm res;
+    // byte *buf = (byte *) erts_alloc(ERTS_ALC_T_TMP, MAX_ATOM_SZ_LIMIT);
+    // Sint written;
+    // int i = erts_unicode_list_to_buf(BIF_ARG_1, buf, MAX_ATOM_CHARACTERS,
+    //                                  &written);
+    // if (i < 0) {
+    // erts_free(ERTS_ALC_T_TMP, (void *) buf);
+    // if (i == -2) {
+    // BIF_ERROR(BIF_P, SYSTEM_LIMIT);
+    // }
+    // BIF_ERROR(BIF_P, BADARG);
+    // }
+    // res = erts_atom_put(buf, written, ERTS_ATOM_ENC_UTF8, 1);
+    // ASSERT(is_atom(res));
+    // erts_free(ERTS_ALC_T_TMP, (void *) buf);
+    // BIF_RET(res);
+    match args[0].try_into() {
+        Ok(list) => {
+            let string = value::cons::unicode_list_to_buf(list, atom::MAX_ATOM_CHARS)?;
+            let atom = atom::from_str(string.as_str());
+            Ok(Term::atom(atom))
+        }
+        _ => Err(Exception::new(Reason::EXC_BADARG)),
+    }
+}
+
+/// conditionally convert a list of ascii integers to an atom
+pub fn bif_erlang_list_to_existing_atom_1(
+    _vm: &vm::Machine,
+    process: &RcProcess,
+    args: &[Term],
+) -> BifResult {
+    // byte *buf = (byte *) erts_alloc(ERTS_ALC_T_TMP, MAX_ATOM_SZ_LIMIT);
+    // Sint written;
+    // int i = erts_unicode_list_to_buf(BIF_ARG_1, buf, MAX_ATOM_CHARACTERS,
+    //                                  &written);
+    // if (i < 0) {
+    // error:
+    // erts_free(ERTS_ALC_T_TMP, (void *) buf);
+    // BIF_ERROR(BIF_P, BADARG);
+    // } else {
+    // Eterm a;
+
+    // if (erts_atom_get((char *) buf, written, &a, ERTS_ATOM_ENC_UTF8)) {
+    // erts_free(ERTS_ALC_T_TMP, (void *) buf);
+    // BIF_RET(a);
+    // } else {
+    // goto error;
+    // }
+    // }
+    unimplemented!()
+}
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -264,7 +264,7 @@ impl Process {
                 }
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     /// Return value is true if the process is now terminating.

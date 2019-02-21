@@ -1,4 +1,5 @@
 use super::{Term, TryInto, Variant, WrongBoxError};
+use crate::exception;
 use crate::immix::Heap;
 use core::marker::PhantomData;
 use std::cmp::Ordering;
@@ -127,6 +128,23 @@ impl Cons {
     }
 }
 
+/// @brief Fill buf with the UTF8 contents of the unicode list
+/// @param len Max number of characters to write.
+/// @param written NULL or bytes written.
+/// @return 0 ok,
+///        -1 type error,
+///        -2 list too long, only \c len characters written
+pub fn unicode_list_to_buf(list: &Cons, max_len: usize) -> Result<String, exception::Exception> {
+    // TODO: handle max_len
+    list.iter()
+        .map(|v| {
+            v.to_int()
+                .and_then(std::char::from_u32)
+                .ok_or_else(|| exception::Exception::new(exception::Reason::EXC_BADARG))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -147,5 +165,13 @@ mod tests {
         assert_eq!(Some(&Term::int(2)), iter.next());
         assert_eq!(Some(&Term::int(3)), iter.next());
         assert_eq!(None, iter.next());
+    }
+
+    #[test]
+    fn test_unicode_list_to_buf() {
+        let heap = Heap::new();
+
+        // '関数に渡すことで'
+        // [38306, 25968, 12395, 28193, 12377, 12371, 12392, 12391]
     }
 }

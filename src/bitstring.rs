@@ -149,18 +149,18 @@ impl TryInto<value::Boxed<RcBinary>> for Term {
 pub struct SubBinary {
     // TODO: wrap into value
     /// Binary size in bytes
-    size: usize,
+    pub size: usize,
     /// Offset into binary
-    offset: usize,
+    pub offset: usize,
     /// Bit size
-    bitsize: usize,
+    pub bitsize: usize,
     /// Bit offset
-    bit_offset: u8,
+    pub bit_offset: u8,
     /// Is the underlying binary writable?
-    is_writable: bool,
+    pub is_writable: bool,
     /// Original binary (refc or heap)
-    original: RcBinary,
-}
+    pub original: RcBinary,
+} // TODO: I don't like pub here, have a method (binary_data()) or something
 
 // TODO: to be TryFrom once rust stabilizes the trait
 impl TryInto<value::Boxed<SubBinary>> for Term {
@@ -1243,7 +1243,7 @@ pub fn private_append(
 
     sb.size = size_in_bits_after_build >> 3;
     sb.bitsize = size_in_bits_after_build & 7;
-    return Some(binary);
+    Some(binary)
 }
 
 // TODO: transform into SubBinary::new() + is_writable
@@ -1523,6 +1523,35 @@ pub unsafe fn copy_bits(
             *dst = mask_bits!(bits1, *dst, rmask);
         }
     }
+}
+
+pub fn bytes_to_list(
+    heap: &Heap,
+    mut previous: Term,
+    bytes: &[u8],
+    mut size: usize,
+    bitoffs: u8,
+) -> Term {
+    if bitoffs == 0 {
+        while size > 0 {
+            size -= 1;
+            previous = cons!(heap, Term::int(i32::from(bytes[size])), previous);
+        }
+    } else {
+        let mut present: i32;
+        let mut next: i32 = i32::from(bytes[size]);
+        while size > 0 {
+            present = next;
+            size -= 1;
+            next = i32::from(bytes[size]);
+            previous = cons!(
+                heap,
+                Term::int(((present >> (8 - bitoffs)) | (next << bitoffs)) & 255),
+                previous
+            );
+        }
+    }
+    previous
 }
 
 #[cfg(test)]

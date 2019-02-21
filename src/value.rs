@@ -16,7 +16,7 @@ use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
 mod closure;
-mod cons;
+pub mod cons;
 mod map;
 mod tuple;
 pub use self::closure::Closure;
@@ -616,6 +616,14 @@ impl Term {
             Variant::Pid(i) => i,
             Variant::Integer(i) => i as u32,
             _ => unimplemented!("to_u32 for {:?}", self),
+        }
+    }
+
+    // TODO: had to add this for the list_to_atom
+    pub fn to_int(self) -> Option<u32> {
+        match self.into_variant() {
+            Variant::Integer(i) => Some(i as u32),
+            _ => None,
         }
     }
 

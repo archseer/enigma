@@ -4,6 +4,9 @@ use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use std::u16;
 
+/// Maximum character length of an atom.
+pub const MAX_ATOM_CHARS: usize = 255;
+
 #[derive(Debug)]
 pub struct Atom {
     /// Length of utf8-encoded atom name.
