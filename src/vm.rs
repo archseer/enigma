@@ -125,11 +125,7 @@ macro_rules! op_call_ext {
     ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr) => {{
         let mfa = unsafe { &(*$context.ip.module).imports[*$dest as usize] };
 
-        println!(
-            "call_ext mfa: {}, pid: {:?}",
-            mfa,
-            $process.pid
-        );
+        println!("call_ext mfa: {}, pid: {:?}", mfa, $process.pid);
 
         match $vm.exports.read().lookup(mfa) {
             Some(Export::Fun(ptr)) => op_jump_ptr!($context, *ptr),
@@ -550,8 +546,9 @@ impl Machine {
                 }
                 Opcode::Send => {
                     // send x1 to x0, write result to x0
-                    let pid = context.x[0];
+                    let pid = context.x[0]; // TODO can be pid or atom name
                     let msg = context.x[1];
+                    println!("sending from {} to {} msg {}", process.pid, pid, msg);
                     let res = process::send_message(&self.state, process, pid.to_u32(), msg)?;
                     context.x[0] = res;
                 }
@@ -569,6 +566,7 @@ impl Machine {
                     // label, source
                     // grab message from queue, put to x0, if no message, jump to fail label
                     if let Some(msg) = process.receive()? {
+                        println!("recv proc pid={:?} msg={}", process.pid, msg);
                         context.x[0] = *msg
                     } else {
                         let fail = ins.args[0].to_u32();

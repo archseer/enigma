@@ -2,28 +2,29 @@ use parking_lot::Mutex;
 use std::collections::VecDeque;
 
 use crate::exception::Exception;
-use crate::value::Term;
 use crate::process::PID;
+use crate::value::Term;
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum ExitKind {
     ExitLinked = 0,
 }
 
 // #[derive(Copy)]
+#[derive(Debug)]
 pub enum Signal {
     Exit {
         from: PID,
         reason: Exception,
-        kind: ExitKind
+        kind: ExitKind,
     },
-    Message{
+    Message {
         from: PID,
         value: Term,
     },
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct SignalQueue {
     /// Internal mailbox from which the process is safe to read.
     /// It only holds messages, other signals are processed as we read the external queue.

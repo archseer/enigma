@@ -40,6 +40,7 @@ bitflags! {
     }
 }
 
+#[derive(Debug)]
 pub struct ExecutionContext {
     /// X registers.
     pub x: [Term; MAX_REG],
@@ -109,6 +110,7 @@ impl ExecutionContext {
     }
 }
 
+#[derive(Debug)]
 pub struct LocalData {
     // allocator, panic handler
     context: Box<ExecutionContext>,
@@ -133,6 +135,7 @@ pub struct LocalData {
     pub dictionary: HashMap<Term, Term>,
 }
 
+#[derive(Debug)]
 pub struct Process {
     /// Data stored in a process that should only be modified by a single thread
     /// at once.

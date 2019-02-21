@@ -449,6 +449,7 @@ impl Term {
     pub fn is_list(self) -> bool {
         let tag = self.value.tag() as u8;
         tag == TERM_CONS || tag == TERM_NIL
+            // TODO: is nil also ok?
     }
 
     #[inline]

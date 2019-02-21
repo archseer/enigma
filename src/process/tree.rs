@@ -35,11 +35,11 @@ unsafe impl<T: ?Sized> IntrusivePointer<T> for Arc<T> {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Node {
     pub link: RBTreeLink,
     pub other: PID, // maybe Term<PID>
-    // TODO: other can be proc/port/dist proc
+                    // TODO: other can be proc/port/dist proc
 }
 // original structure had a link a, link b, but we can't do that here
 // so we allocate two nodes, one on each collection ¯\_(ツ)_/¯
