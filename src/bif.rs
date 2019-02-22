@@ -553,7 +553,23 @@ fn bif_erlang_whereis_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
-fn bif_erlang_nif_error_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+fn bif_erlang_nif_error_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    // cheating: we don't have dynamic loading yet, so if there's a nif_error call, assume
+    // we were supposed to call an equivalent bif.
+
+    // if undefined or undef, try to lookup a bif with same name and dispatch!
+    match args[0].into_variant() {
+        Variant::Atom(atom::UNDEFINED) | Variant::Atom(atom::UNDEF) | Variant::Atom(atom::NOT_LOADED) => {
+            if let Some((mfa, _)) = process.context().ip.lookup_func_info() {
+                if let Some(bif) = BIFS.get(&mfa) {
+                    return bif(vm, process, args);
+                }
+                println!("bif as nif {}", mfa);
+            }
+        }
+        _ => ()
+    };
+
     Err(Exception::with_value(Reason::EXC_ERROR, args[0]))
 }
 

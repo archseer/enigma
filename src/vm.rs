@@ -14,7 +14,7 @@ use crate::process::table::Table as ProcessTable;
 use crate::process::{self, RcProcess};
 use crate::servo_arc::Arc;
 use crate::value::{self, Term, TryInto, TryIntoMut, Variant};
-use log::debug;
+// use log::debug;
 use parking_lot::Mutex;
 use std::mem::transmute;
 use std::panic;
