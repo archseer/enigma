@@ -250,6 +250,14 @@ macro_rules! op_jump_ptr {
     }};
 }
 
+macro_rules! fail {
+    ($context:expr, $label:expr) => {{
+        let fail = $label.to_u32();
+        op_jump!($context, fail);
+        continue;
+    }};
+}
+
 macro_rules! op_fixed_apply {
     ($vm:expr, $context:expr, $process:expr, $arity:expr) => {{
         let arity = $arity as usize;
@@ -1274,12 +1282,13 @@ impl Machine {
                     unimplemented!()
                 }
                 Opcode::BsPutBinary => {
-                    if let [LValue::Label(fail), size, LValue::Literal(unit), _flags, src] =
+                    if let [fail, size, LValue::Literal(unit), _flags, src] =
                         &ins.args[..]
                     {
                         // TODO: fail label
                         if *unit != 8 {
-                            unimplemented!()
+                            unimplemented!();
+                            fail!(context, fail);
                         }
 
                         if let Ok(value::Boxed {
@@ -1304,12 +1313,13 @@ impl Machine {
                 Opcode::BsPutFloat => {
                     // gen_put_float(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
                     // Size can be atom all
-                    if let [LValue::Label(fail), size, LValue::Literal(unit), _flags, src] =
+                    if let [fail, size, LValue::Literal(unit), _flags, src] =
                         &ins.args[..]
                     {
                         // TODO: fail label
                         if *unit != 8 {
-                            unimplemented!()
+                            unimplemented!();
+                            fail!(context, fail);
                         }
 
                         if let Variant::Float(value::Float(f)) =
@@ -1357,9 +1367,7 @@ impl Machine {
                     let cxt = context.expand_arg(&ins.args[1]);
 
                     if !cxt.is_pointer() {
-                        let fail = ins.args[0].to_u32();
-                        op_jump!(context, fail);
-                        continue;
+                        fail!(context, ins.args[0]);
                     }
 
                     let header = cxt.get_boxed_header().unwrap();
@@ -1407,15 +1415,11 @@ impl Machine {
                             if let Some(res) = result {
                                 set_register!(context, &ins.args[4], res)
                             } else {
-                                let fail = ins.args[0].to_u32();
-                                op_jump!(context, fail);
-                                continue;
+                                fail!(context, ins.args[0]);
                             }
                         }
                         _ => {
-                            let fail = ins.args[0].to_u32();
-                            op_jump!(context, fail);
-                            continue;
+                            fail!(context, ins.args[0]);
                         }
                     }
                 }
@@ -1426,9 +1430,7 @@ impl Machine {
                     let cxt = context.expand_arg(&ins.args[1]);
 
                     if !cxt.is_pointer() {
-                        let fail = ins.args[0].to_u32();
-                        op_jump!(context, fail);
-                        continue;
+                        fail!(context, ins.args[0]);
                     }
 
                     let header = cxt.get_boxed_header().unwrap();
@@ -1456,15 +1458,11 @@ impl Machine {
                             if let Some(res) = result {
                                 set_register!(context, &ins.args[3], res)
                             } else {
-                                let fail = ins.args[0].to_u32();
-                                op_jump!(context, fail);
-                                continue;
+                                fail!(context, ins.args[0]);
                             }
                         }
                         _ => {
-                            let fail = ins.args[0].to_u32();
-                            op_jump!(context, fail);
-                            continue;
+                            fail!(context, ins.args[0]);
                         }
                     }
                 }
@@ -1528,8 +1526,7 @@ impl Machine {
                         if let Some(res) = res {
                             set_register!(context, &ins.args[6], res)
                         } else {
-                            let fail = ins.args[0].to_u32();
-                            op_jump!(context, fail);
+                            fail!(context, ins.args[0]);
                         }
                     };
                 }
@@ -1540,9 +1537,7 @@ impl Machine {
                     let size = match ins.args[3] {
                         LValue::Integer(size) if size <= 64 => size as usize,
                         _ => {
-                            let fail = ins.args[0].to_u32();
-                            op_jump!(context, fail);
-                            continue;
+                            fail!(context, ins.args[0]);
                         }
                     };
 
@@ -1563,8 +1558,7 @@ impl Machine {
                         if let Some(res) = res {
                             set_register!(context, &ins.args[6], res)
                         } else {
-                            let fail = ins.args[0].to_u32();
-                            op_jump!(context, fail);
+                            fail!(context, ins.args[0]);
                         }
                     };
                 }
@@ -1591,8 +1585,7 @@ impl Machine {
                         if let Some(res) = res {
                             set_register!(context, &ins.args[6], res)
                         } else {
-                            let fail = ins.args[0].to_u32();
-                            op_jump!(context, fail);
+                            fail!(context, ins.args[0]);
                         }
                     };
                 }
@@ -1612,8 +1605,7 @@ impl Machine {
                         let new_offset = mb.offset + (size * unit) as usize;
 
                         if new_offset <= mb.size {
-                            let fail = ins.args[0].to_u32();
-                            op_jump!(context, fail);
+                            fail!(context, ins.args[0]);
                         }
                     } else {
                         unreachable!()
@@ -1636,8 +1628,7 @@ impl Machine {
                         let mb = &ms.mb;
 
                         if mb.remaining() != offset {
-                            let fail = ins.args[0].to_u32();
-                            op_jump!(context, fail);
+                            fail!(context, ins.args[0]);
                         }
                     } else {
                         unreachable!()
@@ -1716,8 +1707,7 @@ impl Machine {
                         let unit = ins.args[2].to_u32() as usize;
 
                         if mb.remaining() % unit != 0 {
-                            let fail = ins.args[0].to_u32();
-                            op_jump!(context, fail);
+                            fail!(context, ins.args[0]);
                         }
                     } else {
                         unreachable!()
@@ -1746,9 +1736,7 @@ impl Machine {
                         };
 
                         if mb.remaining() < bits {
-                            let fail = ins.args[0].to_u32();
-                            op_jump!(context, fail);
-                            continue;
+                            fail!(context, ins.args[0]);
                         }
                         // offs = mb->offset & 7;
                         // if (offs == 0 && (bits & 7) == 0) {
@@ -1766,9 +1754,7 @@ impl Machine {
                                 bits,
                             ) != std::cmp::Ordering::Equal
                             {
-                                let fail = ins.args[0].to_u32();
-                                op_jump!(context, fail);
-                                continue;
+                                fail!(context, ins.args[0]);
                             }
                         }
                         mb.offset += bits;
@@ -1801,8 +1787,7 @@ impl Machine {
                     } else {
                         // TODO: execute fail only if non zero, else raise
                         /* TODO not yet: c_p->freason is already set (to BADARG or SYSTEM_LIMIT). */
-                        let fail = ins.args[0].to_u32();
-                        op_jump!(context, fail);
+                        fail!(context, ins.args[0]);
                     }
                 }
                 Opcode::BsPrivateAppend => {
@@ -1819,8 +1804,7 @@ impl Machine {
                         set_register!(context, &ins.args[5], res)
                     } else {
                         /* TODO not yet: c_p->freason is already set (to BADARG or SYSTEM_LIMIT). */
-                        let fail = ins.args[0].to_u32();
-                        op_jump!(context, fail);
+                        fail!(context, ins.args[0]);
                     }
                     unimplemented!() // TODO
                 }
@@ -1842,8 +1826,7 @@ impl Machine {
                         if let Some(res) = res {
                             set_register!(context, &ins.args[4], res)
                         } else {
-                            let fail = ins.args[0].to_u32();
-                            op_jump!(context, fail);
+                            fail!(context, ins.args[0]);
                         }
                     };
                 }
@@ -1864,8 +1847,7 @@ impl Machine {
                         if let Some(res) = res {
                             set_register!(context, &ins.args[4], res)
                         } else {
-                            let fail = ins.args[0].to_u32();
-                            op_jump!(context, fail);
+                            fail!(context, ins.args[0]);
                         }
                     };
                 }
@@ -1880,8 +1862,7 @@ impl Machine {
                     ) {
                         let res = ms.mb.get_utf8();
                         if res.is_none() {
-                            let fail = ins.args[0].to_u32();
-                            op_jump!(context, fail);
+                            fail!(context, ins.args[0]);
                         }
                     };
                 }
@@ -1900,8 +1881,7 @@ impl Machine {
                             .mb
                             .get_utf16(bitstring::Flag::from_bits(flags as u8).unwrap());
                         if res.is_none() {
-                            let fail = ins.args[0].to_u32();
-                            op_jump!(context, fail);
+                            fail!(context, ins.args[0]);
                         }
                     };
                 }
@@ -2158,7 +2138,6 @@ impl Machine {
                 }
                 Opcode::IsTaggedTuple => {
                     debug_assert_eq!(ins.args.len(), 4);
-                    let fail = ins.args[0].to_u32();
                     let reg = context.expand_arg(&ins.args[1]);
                     let n = ins.args[2].to_u32();
                     let atom = context.expand_arg(&ins.args[3]);
@@ -2166,12 +2145,12 @@ impl Machine {
                         let tuple: &value::Tuple = t; // annoying, need type annotation
 
                         if tuple.len == 0 || tuple.len != n || !tuple[0].eq(&atom) {
-                            op_jump!(context, fail);
+                            fail!(context, ins.args[0]);
                         } else {
                             // ok
                         }
                     } else {
-                        op_jump!(context, fail);
+                        fail!(context, ins.args[0]);
                     }
                 }
                 Opcode::BuildStacktrace => {
