@@ -60,6 +60,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "spawn_link", 3 => bif_erlang_spawn_link_3,
             "self", 0 => bif_erlang_self_0,
             "send", 2 => bif_erlang_send_2,
+            "!", 2 => bif_erlang_send_2,
             "is_atom", 1 => bif_erlang_is_atom_1,
             "is_list", 1 => bif_erlang_is_list_1,
             "is_tuple", 1 => bif_erlang_is_tuple_1,
