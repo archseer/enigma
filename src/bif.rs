@@ -20,6 +20,7 @@ use std::ops::{Add, Mul, Sub};
 mod chrono;
 mod erlang;
 mod map;
+mod prim_file;
 
 // maybe use https://github.com/sfackler/rust-phf
 
@@ -154,6 +155,10 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "update", 3 => map::bif_maps_update_3,
             "values", 1 => map::bif_maps_values_1,
             "take", 2 => map::bif_maps_take_2,
+        },
+        "prim_file" => {
+            "get_cwd_nif", 0 => prim_file::get_cwd_nif_0,
+            "internal_native2name", 1 => prim_file::internal_native2name_1,
         },
     ]
 };
@@ -562,9 +567,9 @@ fn bif_erlang_nif_error_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
         Variant::Atom(atom::UNDEFINED) | Variant::Atom(atom::UNDEF) | Variant::Atom(atom::NOT_LOADED) => {
             if let Some((mfa, _)) = process.context().ip.lookup_func_info() {
                 if let Some(bif) = BIFS.get(&mfa) {
+                    println!("bif as nif {}", mfa);
                     return bif(vm, process, args);
                 }
-                println!("bif as nif {}", mfa);
             }
         }
         _ => ()
