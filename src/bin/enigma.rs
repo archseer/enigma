@@ -24,7 +24,10 @@ fn run() -> i32 {
         "-kernel",
         "shell_history",
         "enabled",
-    ].iter().map(|s| s.to_string()).collect();
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
 
     vm.preload_modules();
 

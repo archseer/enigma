@@ -526,6 +526,9 @@ impl Machine {
         let context = process.context_mut();
         context.reds = 2000; // self.state.config.reductions;
 
+        // process the incoming signal queue
+        process.process_incoming()?;
+
         loop {
             let module = unsafe { &(*context.ip.module) };
             let ins = &module.instructions[context.ip.ptr as usize];
