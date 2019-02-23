@@ -125,7 +125,7 @@ macro_rules! op_call_ext {
     ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr) => {{
         let mfa = unsafe { &(*$context.ip.module).imports[*$dest as usize] };
 
-        println!("call_ext mfa: {}, pid: {:?}", mfa, $process.pid);
+        println!("pid={} action=call_ext mfa={}", $process.pid, mfa);
 
         match $vm.exports.read().lookup(mfa) {
             Some(Export::Fun(ptr)) => op_jump_ptr!($context, *ptr),
@@ -567,6 +567,9 @@ impl Machine {
                     // Unlink the current message from the message queue. Remove any timeout.
                     process.local_data_mut().mailbox.remove();
                     // TODO: clear timeout
+                    // reset savepoint of the mailbox
+                    process.local_data_mut().mailbox.reset();
+
                 }
                 Opcode::Timeout => {
                     //  Reset the save point of the mailbox and clear the timeout flag.
@@ -618,7 +621,8 @@ impl Machine {
                     // TODO: timeout and jump to label if time expires
                     // set wait flag
                     process.set_waiting_for_message(true);
-                    // TODO: return (suspend process)
+                    // return (suspend process)
+                    return Ok(());
                 }
                 // TODO: RecvMark(label)/RecvSet(label) for ref based sends
                 Opcode::Call => {
@@ -790,7 +794,10 @@ impl Machine {
                         unreachable!()
                     }
                 }
-                Opcode::TestHeap => println!("TODO: TestHeap unimplemented!"),
+                Opcode::TestHeap => {
+                    // println!("TODO: TestHeap unimplemented!");
+                    ()
+                },
                 Opcode::Init => {
                     debug_assert_eq!(ins.args.len(), 1);
                     set_register!(context, &ins.args[0], Term::nil())
@@ -1285,9 +1292,7 @@ impl Machine {
                     unimplemented!()
                 }
                 Opcode::BsPutBinary => {
-                    if let [fail, size, LValue::Literal(unit), _flags, src] =
-                        &ins.args[..]
-                    {
+                    if let [fail, size, LValue::Literal(unit), _flags, src] = &ins.args[..] {
                         // TODO: fail label
                         if *unit != 8 {
                             unimplemented!();
@@ -1316,9 +1321,7 @@ impl Machine {
                 Opcode::BsPutFloat => {
                     // gen_put_float(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
                     // Size can be atom all
-                    if let [fail, size, LValue::Literal(unit), _flags, src] =
-                        &ins.args[..]
-                    {
+                    if let [fail, size, LValue::Literal(unit), _flags, src] = &ins.args[..] {
                         // TODO: fail label
                         if *unit != 8 {
                             unimplemented!();

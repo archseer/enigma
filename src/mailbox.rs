@@ -31,7 +31,7 @@ impl Mailbox {
     }
 
     pub fn reset(&mut self) {
-        self.save += 0;
+        self.save = 0;
     }
 
     /// We use a reference when we receive, because of pattern matching.

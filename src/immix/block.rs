@@ -145,7 +145,7 @@ impl Heap {
             let ptr = header.ptr.get().as_ptr() as usize;
             let ptr = round_up_to(ptr, layout.align());
             let end = header.data.as_ptr() as usize + header.layout.size();
-            debug_assert!(ptr <= end);
+            // debug_assert!(ptr <= end);
 
             let new_ptr = ptr + layout.size();
             if new_ptr <= end {
