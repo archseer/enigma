@@ -34,6 +34,16 @@ impl Exception {
     }
 }
 
+// impl From<std::io::Error> for Exception {
+//     fn from(error: std::io::Error) -> Self {
+//         let reason = match error {
+//
+//         }
+//
+//         Exception::new(reason)
+//     }
+// }
+
 bitflags! {
     pub struct Reason: u32 {
         /// There are three primary exception classes:
