@@ -629,6 +629,34 @@ impl Term {
         }
     }
 
+    pub fn to_bytes(&self) -> Option<&[u8]> {
+        match self.get_boxed_header() {
+            Ok(BOXED_BINARY) => {
+                // TODO use ok_or to cast to some, then use ?
+                let value = &self
+                    .get_boxed_value::<Boxed<bitstring::RcBinary>>()
+                    .unwrap()
+                    .value;
+                Some(&value.data)
+            }
+            Ok(BOXED_SUBBINARY) => {
+                // TODO use ok_or to cast to some, then use ?
+                let value = &self
+                    .get_boxed_value::<Boxed<bitstring::SubBinary>>()
+                    .unwrap()
+                    .value;
+
+                if value.bit_offset & 7 != 0 {
+                    panic!("to_str can't work with non-zero bit_offset");
+                }
+
+                let offset = value.offset >> 3; // byte_offset!
+                Some(&value.original.data[offset..offset + value.size])
+            }
+            _ => None,
+        }
+    }
+
     pub fn to_str(&self) -> Option<&str> {
         match self.get_boxed_header() {
             Ok(BOXED_BINARY) => {

@@ -104,7 +104,9 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "setelement", 3 => erlang::bif_erlang_setelement_3,
             "tuple_to_list", 1 => erlang::bif_erlang_tuple_to_list_1,
             "binary_to_list", 1 => erlang::bif_erlang_binary_to_list_1,
+            "binary_to_term", 1 => erlang::bif_erlang_binary_to_term_1,
             "list_to_atom", 1 => erlang::bif_erlang_list_to_atom_1,
+            "list_to_binary", 1 => erlang::bif_erlang_list_to_binary_1,
             "++", 2 => erlang::bif_erlang_append_2,
             "append", 2 => erlang::bif_erlang_append_2,
 
@@ -661,6 +663,7 @@ fn bif_erlang_whereis_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -
 }
 
 fn bif_erlang_nif_error_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    println!("Tried running nif might be missing!!");
     Err(Exception::with_value(Reason::EXC_ERROR, args[0]))
 }
 

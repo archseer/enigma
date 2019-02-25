@@ -3,7 +3,7 @@ use crate::bif::BifResult;
 use crate::bitstring;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Term, TryInto, Tuple};
+use crate::value::{self, Cons, Term, TryInto, Tuple, Variant};
 use crate::vm;
 
 pub fn bif_erlang_make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
@@ -219,6 +219,72 @@ pub fn bif_erlang_list_to_existing_atom_1(
     unimplemented!()
 }
 
+pub fn bif_erlang_list_to_binary_1(
+    _vm: &vm::Machine,
+    process: &RcProcess,
+    args: &[Term],
+) -> BifResult {
+    let mut bytes: Vec<u8> = Vec::new();
+    let heap = &process.context_mut().heap;
+
+    // if nil return an empty string
+    if args[0].is_nil() {
+        return Ok(Term::binary(heap, bitstring::Binary::new()));
+    }
+
+    let mut stack = Vec::new();
+    let cons: &Cons = match args[0].try_into() {
+        Ok(cons) => cons,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    stack.push(cons.iter());
+
+    // TODO fastpath for if [binary]
+    while let Some(iter) = stack.last_mut() {
+        if let Some(elem) = iter.next() {
+            match elem.into_variant() {
+                Variant::Integer(i @ 0...255) => {
+                    // append int to bytes
+                    bytes.push(i as u8);
+                }
+                Variant::Cons(ptr) => {
+                    // push cons onto stack
+                    let cons = unsafe { &*ptr };
+                    stack.push(cons.iter())
+                }
+                Variant::Pointer(..) => {
+                    match elem.to_bytes() {
+                        Some(data) => bytes.extend_from_slice(data),
+                        None => return Err(Exception::new(Reason::EXC_BADARG)),
+                    }
+                }
+                _ => return Err(Exception::new(Reason::EXC_BADARG)),
+            }
+        } else {
+            stack.pop();
+        }
+    }
+
+    Ok(Term::binary(heap, bitstring::Binary::from(bytes)))
+}
+// TODO iolist_to_binary is the same, input can be a binary (is_binary() true), and we just return
+// it (badarg on bitstring)
+
+pub fn bif_erlang_binary_to_term_1(
+    _vm: &vm::Machine,
+    process: &RcProcess,
+    args: &[Term],
+) -> BifResult {
+    // TODO: needs to yield mid parsing...
+    if let Some(string) = args[0].to_bytes() {
+        match crate::etf::decode(string, &process.context_mut().heap) {
+            Ok((_, term)) => return Ok(term),
+            Err(error) => panic!("binary_to_term error: {:?}", error),
+        };
+    }
+    Err(Exception::new(Reason::EXC_BADARG))
+}
+
 /// erlang:'++'/2
 ///
 /// Adds a list to another (LHS ++ RHS). For historical reasons this is implemented by copying LHS
@@ -267,7 +333,6 @@ pub fn bif_erlang_append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]
         unsafe {
             (*ptr).tail = rhs;
         }
-
         return Ok(Term::from(c));
     }
 
