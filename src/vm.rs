@@ -127,9 +127,7 @@ macro_rules! op_call_ext {
 
         println!("pid={} action=call_ext mfa={}", $process.pid, mfa);
 
-        let export = {
-            $vm.exports.read().lookup(mfa)
-        }; // drop the exports lock
+        let export = { $vm.exports.read().lookup(mfa) }; // drop the exports lock
 
         match export {
             Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
@@ -279,7 +277,7 @@ macro_rules! op_fixed_apply {
         // Handle apply of apply/3...
         if module.to_u32() == atom::ERLANG && func.to_u32() == atom::APPLY && $arity == 3 {
             unimplemented!()
-                // return apply(p, reg, I, stack_offset);
+            // return apply(p, reg, I, stack_offset);
         }
 
         /*
@@ -291,9 +289,7 @@ macro_rules! op_fixed_apply {
 
         let mfa = module::MFA(module.to_u32(), func.to_u32(), $arity);
 
-        let export = {
-            $vm.exports.read().lookup(&mfa)
-        }; // drop the exports lock
+        let export = { $vm.exports.read().lookup(&mfa) }; // drop the exports lock
 
         match export {
             Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
@@ -803,7 +799,7 @@ impl Machine {
                 Opcode::TestHeap => {
                     // println!("TODO: TestHeap unimplemented!");
                     ()
-                },
+                }
                 Opcode::Init => {
                     debug_assert_eq!(ins.args.len(), 1);
                     set_register!(context, &ins.args[0], Term::nil())
@@ -1015,7 +1011,7 @@ impl Machine {
                         set_register!(context, &ins.args[1], *head);
                         set_register!(context, &ins.args[2], *tail);
                     } else {
-                        panic!("badarg to GetHd")
+                        panic!("badarg to GetList")
                     }
                 }
                 Opcode::GetTupleElement => {
@@ -2081,7 +2077,7 @@ impl Machine {
                         let mut iter = list.chunks_exact(2);
                         while let Some([key, value]) = iter.next() {
                             // TODO: optimize by having the ExtendedList store Term instead of LValue
-                            map = map.plus(key.to_term(), context.expand_arg(value))
+                            map = map.plus(context.expand_arg(key), context.expand_arg(value))
                         }
                         set_register!(context, dest, Term::map(&context.heap, map))
                     }
@@ -2100,7 +2096,7 @@ impl Machine {
                         // exist, jump to fail label.
                         let mut iter = list.chunks_exact(2);
                         while let Some([key, _dest]) = iter.next() {
-                            if map.find(&key.to_term()).is_some() {
+                            if map.find(&context.expand_arg(key)).is_some() {
                                 // ok
                             } else {
                                 op_jump!(context, *fail);
@@ -2123,7 +2119,7 @@ impl Machine {
                         // exist, jump to fail label.
                         let mut iter = list.chunks_exact(2);
                         while let Some([key, dest]) = iter.next() {
-                            if let Some(&val) = map.find(&key.to_term()) {
+                            if let Some(&val) = map.find(&context.expand_arg(key)) {
                                 set_register!(context, dest, val)
                             } else {
                                 op_jump!(context, *fail);
@@ -2149,7 +2145,7 @@ impl Machine {
                         let mut iter = list.chunks_exact(2);
                         while let Some([key, value]) = iter.next() {
                             // TODO: optimize by having the ExtendedList store Term instead of LValue
-                            map = map.plus(key.to_term(), value.to_term())
+                            map = map.plus(context.expand_arg(key), context.expand_arg(value))
                         }
                         set_register!(context, dest, Term::map(&context.heap, map))
                     }
