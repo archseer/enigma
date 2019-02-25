@@ -127,8 +127,12 @@ macro_rules! op_call_ext {
 
         println!("pid={} action=call_ext mfa={}", $process.pid, mfa);
 
-        match $vm.exports.read().lookup(mfa) {
-            Some(Export::Fun(ptr)) => op_jump_ptr!($context, *ptr),
+        let export = {
+            $vm.exports.read().lookup(mfa)
+        }; // drop the exports lock
+
+        match export {
+            Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
             Some(Export::Bif(APPLY_2)) => {
                 // I'm cheating here, *shrug*
                 op_apply_fun!($vm, $context)
@@ -275,7 +279,7 @@ macro_rules! op_fixed_apply {
         // Handle apply of apply/3...
         if module.to_u32() == atom::ERLANG && func.to_u32() == atom::APPLY && $arity == 3 {
             unimplemented!()
-            // return apply(p, reg, I, stack_offset);
+                // return apply(p, reg, I, stack_offset);
         }
 
         /*
@@ -287,8 +291,12 @@ macro_rules! op_fixed_apply {
 
         let mfa = module::MFA(module.to_u32(), func.to_u32(), $arity);
 
-        match $vm.exports.read().lookup(&mfa) {
-            Some(Export::Fun(ptr)) => op_jump_ptr!($context, *ptr),
+        let export = {
+            $vm.exports.read().lookup(&mfa)
+        }; // drop the exports lock
+
+        match export {
+            Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
             Some(Export::Bif(bif)) => {
                 // TODO: apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
                 // ^ only happens in apply/fixed_apply
@@ -381,8 +389,6 @@ impl Machine {
     pub fn new() -> Machine {
         let primary_threads = 8;
         let process_pool = Pool::new(primary_threads, Some("primary".to_string()));
-
-        println!("sizeof value: {:?}", std::mem::size_of::<Term>());
 
         let state = State {
             process_table: Mutex::new(ProcessTable::new()),

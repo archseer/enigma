@@ -9,6 +9,7 @@ use std::fmt;
 /// Reference counted ExportsTable.
 pub type RcExportsTable = Arc<RwLock<ExportsTable>>; // TODO: I don't like this lock at all
 
+#[derive(Copy, Clone)]
 pub enum Export {
     Fun(InstrPtr),
     Bif(bif::BifFn),
@@ -44,8 +45,13 @@ impl ExportsTable {
         self.exports.insert(mfa, Export::Fun(ptr));
     }
 
-    pub fn lookup(&self, mfa: &MFA) -> Option<&Export> {
-        self.exports.get(mfa)
+    pub fn insert(&mut self, mfa: MFA, export: Export) {
+        self.exports.insert(mfa, export);
+    }
+
+    pub fn lookup(&self, mfa: &MFA) -> Option<Export> {
+        self.exports.get(mfa).map(|v| v.clone())
+            // need to clone to avoid keeping a ref too long and lock the table
     }
 
     // get or get stub

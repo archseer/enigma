@@ -264,7 +264,9 @@ pub fn bif_erlang_append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]
         }
 
         // now link the copy to the rhs
-        unsafe { (*ptr).tail = rhs; }
+        unsafe {
+            (*ptr).tail = rhs;
+        }
 
         return Ok(Term::from(c));
     }
