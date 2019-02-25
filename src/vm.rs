@@ -70,11 +70,11 @@ macro_rules! expand_float {
             LValue::ExtendedLiteral(i) => unsafe {
                 if let Variant::Float(value::Float(f)) =
                     (*$context.ip.module).literals[*i as usize].into_variant()
-                    {
-                        f
-                    } else {
-                        unreachable!()
-                    }
+                {
+                    f
+                } else {
+                    unreachable!()
+                }
             },
             LValue::X(reg) => {
                 if let Variant::Float(value::Float(f)) = $context.x[*reg as usize].into_variant() {
@@ -87,11 +87,11 @@ macro_rules! expand_float {
                 let len = $context.stack.len();
                 if let Variant::Float(value::Float(f)) =
                     $context.stack[len - (*reg + 2) as usize].into_variant()
-                    {
-                        f
-                    } else {
-                        unreachable!()
-                    }
+                {
+                    f
+                } else {
+                    unreachable!()
+                }
             }
             LValue::FloatReg(reg) => $context.f[*reg as usize],
             _ => unreachable!(),

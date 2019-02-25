@@ -74,8 +74,23 @@ unsafe impl Send for Term {}
 
 impl Hash for Term {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        // maybe we could hash the repr directly
-        self.into_variant().hash(state)
+        // maybe we could hash the f64 repr directly in some cases
+        match self.into_variant() {
+            Variant::Pointer(_p) => {
+                match self.get_boxed_header().unwrap() {
+                    BOXED_BINARY => {
+                        let value = &self
+                            .get_boxed_value::<Boxed<bitstring::RcBinary>>()
+                            .unwrap()
+                            .value;
+
+                        value.data.hash(state)
+                    },
+                    _ => unimplemented!(),
+                }
+            },
+            variant => variant.hash(state)
+        }
     }
 }
 
@@ -665,6 +680,7 @@ impl Term {
                     .get_boxed_value::<Boxed<bitstring::RcBinary>>()
                     .unwrap()
                     .value;
+                // TODO: handle err
                 std::str::from_utf8(&value.data).ok()
             }
             Ok(BOXED_SUBBINARY) => {
@@ -679,7 +695,7 @@ impl Term {
                 }
 
                 let offset = value.offset >> 3; // byte_offset!
-                std::str::from_utf8(&value.original.data[offset..offset+value.size]).ok()
+                std::str::from_utf8(&value.original.data[offset..offset + value.size]).ok()
             }
             _ => None,
         }
@@ -734,6 +750,11 @@ impl PartialEq for Variant {
                         // TODO: handle other boxed types
                         // ref, bigint, cp, catch, stacktrace, binary, subbinary
                         // TODO: binary and subbinary need to be compared
+                        BOXED_BINARY => {
+                            let b1 = &*(*p1 as *const Boxed<bitstring::RcBinary>);
+                            let b2 = &*(*p2 as *const Boxed<bitstring::RcBinary>);
+                            b1.value.data.eq(&b2.value.data)
+                        }
                         _ => unimplemented!(),
                     }
                 } else {
@@ -828,7 +849,7 @@ impl std::fmt::Display for Term {
 impl std::fmt::Display for Variant {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Variant::Nil(..) => write!(f, "nil"),
+            Variant::Nil(..) => write!(f, "NIL"),
             Variant::Integer(i) => write!(f, "{}", i),
             Variant::Float(self::Float(i)) => write!(f, "{}", i),
             Variant::Atom(i) => write!(f, ":{}", atom::to_str(*i).unwrap()),

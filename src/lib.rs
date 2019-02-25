@@ -8,7 +8,7 @@ pub mod vm;
 pub mod nanbox;
 mod atom;
 mod bif;
-mod bitstring;
+pub mod bitstring;
 mod etf;
 pub mod exports_table;
 mod immix;
@@ -22,7 +22,7 @@ pub mod opcodes;
 mod pool;
 pub mod process;
 mod queue;
-mod servo_arc;
+pub mod servo_arc;
 mod signal_queue;
 pub mod value;
 
