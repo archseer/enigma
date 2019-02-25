@@ -156,7 +156,7 @@ pub fn bif_erlang_binary_to_list_1(
         size,
         bitoffs,
     );
-    println!("{}", res);
+    //println!("{}", res);
     Ok(res)
 }
 
@@ -235,7 +235,7 @@ pub fn bif_erlang_append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]
     if lhs.is_nil() {
         return Ok(rhs);
     }
-    
+
     // TODO: use into_variant match?
 
     // TODO: this same type of logic appears a lot, need to abstract it out, too much unsafe use

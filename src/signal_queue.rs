@@ -22,6 +22,12 @@ pub enum Signal {
         from: PID,
         value: Term,
     },
+    Link {
+        from: PID,
+    },
+    Unlink {
+        from: PID,
+    },
 }
 
 #[derive(Default, Debug)]

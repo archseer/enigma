@@ -104,6 +104,11 @@ impl<T: Clone> Table<T> {
         }
     }
 
+    /// Returns true if the process exists.
+    pub fn contains_key(&self, pid: PID) -> bool {
+        self.processes.contains_key(&pid)
+    }
+
     fn next_pid(&mut self) -> PID {
         let pid = self.next_pid;
 

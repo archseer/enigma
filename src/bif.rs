@@ -58,6 +58,8 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "rem", 2 => bif_erlang_mod_2,
             "spawn", 3 => bif_erlang_spawn_3,
             "spawn_link", 3 => bif_erlang_spawn_link_3,
+            "link", 1 => bif_erlang_link_1,
+            "unlink", 1 => bif_erlang_unlink_1,
             "self", 0 => bif_erlang_self_0,
             "send", 2 => bif_erlang_send_2,
             "!", 2 => bif_erlang_send_2,
@@ -247,6 +249,79 @@ fn bif_erlang_spawn_link_3(vm: &vm::Machine, process: &RcProcess, args: &[Term])
         arglist,
         process::SpawnFlag::LINK,
     )
+}
+
+fn bif_erlang_link_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    // arg[0] = pid/port
+
+    match args[0].into_variant() {
+        Variant::Pid(pid) => {
+            if pid == process.pid {
+                return Ok(atom!(TRUE));
+            }
+
+            {
+                // scope the process_table lock
+                if !vm.state.process_table.lock().contains_key(pid) {
+                    // if pid doesn't exist fail with noproc
+                    if process
+                        .local_data()
+                        .flags
+                        .contains(process::Flag::TRAP_EXIT)
+                    {
+                        return Err(Exception::new(Reason::EXC_NOPROC));
+                    } else {
+                        // if trapping exits, fail with exit signal that has reason noproc instead
+                        let heap = &process.context_mut().heap;
+                        let from = Term::pid(process.pid);
+                        process::send_message(
+                            &vm.state,
+                            process,
+                            from,
+                            tup3!(heap, atom!(EXIT), from, atom!(NOPROC)),
+                        );
+                        return Ok(atom!(TRUE));
+                    }
+                }
+            }
+
+            // add the pid to our link tree
+            process
+                .local_data_mut()
+                .links
+                .insert(Arc::new(process::tree::Node {
+                    link: process::tree::Link::new(),
+                    other: pid,
+                }));
+
+            // send LINK signal to the other process return true
+            process::send_signal(&vm.state, pid, process::Signal::Link { from: process.pid })?;
+            Ok(atom!(TRUE))
+        }
+        // TODO: port
+        _ => Err(Exception::new(Reason::EXC_BADARG)),
+    }
+}
+
+fn bif_erlang_unlink_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    // arg[0] = pid/port
+
+    match args[0].into_variant() {
+        Variant::Pid(pid) => {
+            // remove the pid to our link tree
+            process.local_data_mut().links.find_mut(&pid).remove();
+
+            // send LINK signal to the other process return true
+            process::send_signal(
+                &vm.state,
+                pid,
+                process::Signal::Unlink { from: process.pid },
+            );
+            Ok(atom!(TRUE))
+        }
+        // TODO: port
+        _ => Err(Exception::new(Reason::EXC_BADARG)),
+    }
 }
 
 fn bif_erlang_abs_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {

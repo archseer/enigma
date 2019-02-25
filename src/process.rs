@@ -118,7 +118,7 @@ pub struct LocalData {
     parent: Option<PID>,
 
     // links (tree)
-    links: tree::Tree,
+    pub links: tree::Tree,
     // monitors (tree) + lt_monitors (list)
 
     // signals are sent on death, and the receiving side cleans up it's link/mon structures
@@ -265,6 +265,15 @@ impl Process {
                 Signal::Exit { .. } => {
                     self.handle_exit_signal(signal)?;
                 }
+                Signal::Link { from } => {
+                    self.local_data_mut().links.insert(Arc::new(tree::Node {
+                        link: tree::Link::new(),
+                        other: from,
+                    }));
+                }
+                Signal::Unlink { from } => {
+                    self.local_data_mut().links.find_mut(&from).remove();
+                }
             }
         }
         Ok(())
@@ -334,7 +343,6 @@ impl Process {
 
                 // kill catches
                 self.context_mut().catches = 0;
-                println!("resetting catches");
 
                 // return an exception to trigger process exit
                 Err(Exception::with_value(Reason::EXT_EXIT, reason))
