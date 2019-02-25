@@ -1,12 +1,12 @@
-* BIFs [22/117]
+* BIFs [30/117]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
 - [ ] bif erlang:adler32/2
 - [ ] bif erlang:adler32_combine/3
-- [ ] bif erlang:apply/3
+- [X] bif erlang:apply/3
 - [ ] bif erlang:atom_to_list/1
-- [ ] bif erlang:binary_to_list/1
+- [X] bif erlang:binary_to_list/1
 - [ ] bif erlang:binary_to_list/3
 - [ ] bif erlang:binary_to_term/1
 - [ ] bif erlang:crc32/1
@@ -20,7 +20,7 @@
 - [ ] ubif erlang:element/2
 - [X] bif erlang:erase/0
 - [X] bif erlang:erase/1
-- [ ] bif erlang:exit/1
+- [X] bif erlang:exit/1
 - [ ] bif erlang:exit/2
 - [ ] bif erlang:exit_signal/2
 - [ ] bif erlang:external_size/1
@@ -44,8 +44,8 @@
 - [ ] bif erlang:integer_to_list/1
 - [ ] bif erlang:is_alive/0
 - [ ] ubif erlang:length/1
-- [ ] bif erlang:link/1
-- [ ] bif erlang:list_to_atom/1
+- [X] bif erlang:link/1
+- [X] bif erlang:list_to_atom/1
 - [ ] bif erlang:list_to_binary/1
 - [ ] bif erlang:list_to_float/1
 - [ ] bif erlang:list_to_integer/1
@@ -95,7 +95,7 @@
 - [X] bif erlang:setelement/3
 - [ ] ubif erlang:size/1
 - [X] bif erlang:spawn/3
-- [ ] bif erlang:spawn_link/3
+- [X] bif erlang:spawn_link/3
 - [ ] bif erlang:split_binary/2
 - [ ] bif erlang:statistics/1
 - [ ] bif erlang:term_to_binary/1
@@ -107,9 +107,9 @@
 - [X] bif erlang:tuple_to_list/1
 - [X] bif erlang:universaltime/0
 - [ ] bif erlang:universaltime_to_localtime/1
-- [ ] bif erlang:unlink/1
+- [X] bif erlang:unlink/1
 - [ ] bif erlang:unregister/1
-- [ ] bif erlang:whereis/1
+- [X] bif erlang:whereis/1
 - [ ] bif erlang:spawn_opt/1
 - [ ] bif erlang:setnode/2
 - [ ] bif erlang:dist_get_stat/1
@@ -197,7 +197,7 @@
 ** System [0/2]
 - [ ] bif erlang:system_flag/2
 - [ ] bif erlang:system_info/1
-** New in R9C [5/44]
+** New in R9C [7/44]
 - [ ] bif erlang:system_monitor/0
 - [ ] bif erlang:system_monitor/1
 - [ ] bif erlang:system_monitor/2
@@ -214,8 +214,8 @@
 - [ ] bif erlang:is_process_alive/1
 - [ ] bif erts_internal:is_process_alive/2
 
-- [ ] bif erlang:error/1		error_1
-- [ ] bif erlang:error/2		error_2
+- [X] bif erlang:error/1		error_1
+- [X] bif erlang:error/2		error_2
 - [ ] bif erlang:raise/3		raise_3
 - [ ] bif erlang:get_stacktrace/0
 
@@ -250,12 +250,12 @@
 - [ ] ubif erlang:'+'/1			splus_1
 
 
-** New operators [12/22]
-- [ ] bif erlang:'!'/2		ebif_bang_2
+** New operators [15/22]
+- [X] bif erlang:'!'/2		ebif_bang_2
 - [X] bif erlang:send/2
 - [ ] bif erlang:send/3
-- [ ] bif erlang:'++'/2		ebif_plusplus_2
-- [ ] bif erlang:append/2
+- [X] bif erlang:'++'/2		ebif_plusplus_2
+- [X] bif erlang:append/2
 - [ ] bif erlang:'--'/2		ebif_minusminus_2
 - [ ] bif erlang:subtract/2
 
@@ -453,9 +453,9 @@ The searching/splitting/substituting thingies
 - [X] bif erlang:nif_error/1
 - [X] bif erlang:nif_error/2
 
-** Helpers for unicode filenames [0/5]
-- [ ] bif prim_file:internal_name2native/1
-- [ ] bif prim_file:internal_native2name/1
+** Helpers for unicode filenames [2/5]
+- [X] bif prim_file:internal_name2native/1
+- [X] bif prim_file:internal_native2name/1
 - [ ] bif prim_file:internal_normalize_utf8/1
 - [ ] bif prim_file:is_translatable/1
 - [ ] bif file:native_name_encoding/0
