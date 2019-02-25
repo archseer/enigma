@@ -519,13 +519,14 @@ impl Term {
     }
 
     // TODO: ExtendedList should instead become a Term vec
-    pub fn into_lvalue(self) -> loader::LValue {
+    // TODO: might be atoms only??
+    pub fn into_lvalue(self) -> Option<loader::LValue> {
         match self.into_variant() {
-            Variant::Integer(i) => loader::LValue::Integer(i64::from(i)),
-            Variant::Atom(i) => loader::LValue::Atom(i),
-            Variant::Nil(..) => loader::LValue::Nil,
-            //Variant::Float(self::Float(i)) => Num::Float(i),
-            _ => unimplemented!(),
+            Variant::Integer(i) => Some(loader::LValue::Integer(i64::from(i))),
+            Variant::Atom(i) => Some(loader::LValue::Atom(i)),
+            Variant::Nil(..) => Some(loader::LValue::Nil),
+            // TODO Variant::Float(self::Float(i)) => Num::Float(i),
+            _ => None,
         }
     }
 

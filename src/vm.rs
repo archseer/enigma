@@ -70,11 +70,11 @@ macro_rules! expand_float {
             LValue::ExtendedLiteral(i) => unsafe {
                 if let Variant::Float(value::Float(f)) =
                     (*$context.ip.module).literals[*i as usize].into_variant()
-                {
-                    f
-                } else {
-                    unreachable!()
-                }
+                    {
+                        f
+                    } else {
+                        unreachable!()
+                    }
             },
             LValue::X(reg) => {
                 if let Variant::Float(value::Float(f)) = $context.x[*reg as usize].into_variant() {
@@ -87,11 +87,11 @@ macro_rules! expand_float {
                 let len = $context.stack.len();
                 if let Variant::Float(value::Float(f)) =
                     $context.stack[len - (*reg + 2) as usize].into_variant()
-                {
-                    f
-                } else {
-                    unreachable!()
-                }
+                    {
+                        f
+                    } else {
+                        unreachable!()
+                    }
             }
             LValue::FloatReg(reg) => $context.f[*reg as usize],
             _ => unreachable!(),
@@ -940,7 +940,13 @@ impl Machine {
                     // arg, fail, dests
                     // loop over dests
                     if let [arg, LValue::Label(fail), LValue::ExtendedList(vec)] = &ins.args[..] {
-                        let arg = context.expand_arg(arg).into_lvalue();
+                        let arg = match context.expand_arg(arg).into_lvalue() {
+                            Some(val) => val,
+                            None => {
+                                op_jump!(context, *fail);
+                                continue;
+                            }
+                        };
                         let mut i = 0;
                         loop {
                             // if key matches, jump to the following label
