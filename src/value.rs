@@ -449,7 +449,7 @@ impl Term {
     pub fn is_list(self) -> bool {
         let tag = self.value.tag() as u8;
         tag == TERM_CONS || tag == TERM_NIL
-            // TODO: is nil also ok?
+        // TODO: is nil also ok?
     }
 
     #[inline]
@@ -461,7 +461,7 @@ impl Term {
             TERM_ATOM => Type::Atom,
             TERM_PORT => Type::Port,
             TERM_PID => Type::Pid,
-            TERM_CONS => Type::Pid,
+            TERM_CONS => Type::List,
             TERM_POINTER => match self.get_boxed_header().unwrap() {
                 BOXED_REF => Type::Ref,
                 BOXED_TUPLE => Type::Tuple,
@@ -579,7 +579,7 @@ impl Term {
     #[inline]
     pub fn is_non_empty_list(self) -> bool {
         match self.into_variant() {
-            Variant::Cons(ptr) => unsafe { !(*ptr).head.is_nil() },
+            Variant::Cons(_ptr) => true,
             _ => false,
         }
     }
