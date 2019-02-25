@@ -156,6 +156,7 @@ impl Heap {
             }
         }
 
+        // TODO: verify new block alloc works
         self.alloc_layout_slow(layout)
     }
 

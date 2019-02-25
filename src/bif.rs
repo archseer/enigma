@@ -2,10 +2,12 @@ use crate::atom;
 use crate::bif;
 use crate::bitstring;
 use crate::exception::{Exception, Reason};
+use crate::loader;
 use crate::module;
 use crate::numeric::division::{FlooredDiv, OverflowingFlooredDiv};
 use crate::numeric::modulo::{Modulo, OverflowingModulo};
 use crate::process::{self, RcProcess};
+use crate::servo_arc::Arc;
 use crate::value::{self, Cons, Term, TryInto, Tuple, Variant};
 use crate::vm;
 use hashbrown::HashMap;
@@ -159,9 +161,33 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "values", 1 => map::bif_maps_values_1,
             "take", 2 => map::bif_maps_take_2,
         },
+    ]
+};
+
+type NifTable = HashMap<u32, Vec<(u32, u32, BifFn)>>;
+
+macro_rules! nif_map {
+    ($($module:expr => {$($fun:expr, $arity:expr => $rust_fn:path,)*},)*) => {
+        {
+            let mut table: NifTable = HashMap::new();
+            $(
+                let module = atom::from_str($module);
+                table.insert(module, vec![
+                    $((atom::from_str($fun), $arity, $rust_fn),)*
+                ]);
+            )*
+            table
+        }
+    };
+}
+
+pub static NIFS: Lazy<NifTable> = sync_lazy! {
+    nif_map![
         "prim_file" => {
             "get_cwd_nif", 0 => prim_file::get_cwd_nif_0,
+            "read_file_nif", 1 => prim_file::read_file_nif_1,
             "internal_native2name", 1 => prim_file::internal_native2name_1,
+            "internal_name2native", 1 => prim_file::internal_name2native_1,
         },
     ]
 };
@@ -635,22 +661,6 @@ fn bif_erlang_whereis_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -
 }
 
 fn bif_erlang_nif_error_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
-    // cheating: we don't have dynamic loading yet, so if there's a nif_error call, assume
-    // we were supposed to call an equivalent bif.
-
-    // if undefined or undef, try to lookup a bif with same name and dispatch!
-    match args[0].into_variant() {
-        Variant::Atom(atom::UNDEFINED) | Variant::Atom(atom::UNDEF) | Variant::Atom(atom::NOT_LOADED) => {
-            if let Some((mfa, _)) = process.context().ip.lookup_func_info() {
-                if let Some(bif) = BIFS.get(&mfa) {
-                    println!("bif as nif {}", mfa);
-                    return bif(vm, process, args);
-                }
-            }
-        }
-        _ => ()
-    };
-
     Err(Exception::with_value(Reason::EXC_ERROR, args[0]))
 }
 
@@ -663,10 +673,55 @@ fn bif_erlang_nif_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
     ))
 }
 
-fn bif_erlang_load_nif_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+fn bif_erlang_load_nif_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     println!("Tried loading nif: {} with args {}", args[0], args[1]);
 
-    Ok(Term::atom(atom::OK))
+    use loader::LValue;
+
+    if let Ok(cons) = args[0].try_into() {
+        let name = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
+        let atom = atom::from_str(&name);
+        let nifs = match NIFS.get(&atom) {
+            Some(nifs) => nifs,
+            None => {
+                println!("NIFS name: {}, atom {} not found", name, atom);
+                return Ok(Term::atom(atom::OK));
+            }
+        };
+
+        // TODO: this needs to be ensured to not eval after the module is loaded!
+        let module = unsafe { &mut *(process.context_mut().ip.module as *mut module::Module) };
+
+        let mut exports = vm.exports.write();
+
+        for (name, arity, fun) in nifs {
+            // find func_info
+            if let Some(i) = module.instructions.iter().position(|ins| {
+                let lname = LValue::Atom(*name);
+                let larity = LValue::Literal(*arity);
+                ins.op == crate::opcodes::Opcode::FuncInfo
+                    && ins.args[1] == lname
+                    && ins.args[2] == larity
+            }) {
+                let mfa = module::MFA(atom, *name, *arity);
+                exports.insert(mfa, crate::exports_table::Export::Bif(*fun));
+
+                let pos = module.imports.len();
+                module.imports.push(mfa);
+                // replace instruction immediately after with call_nif
+                module.instructions[i + 1] = loader::Instruction {
+                    op: crate::opcodes::Opcode::CallExtOnly,
+                    args: vec![LValue::Literal(*arity), LValue::Literal(pos as u32)],
+                };
+                println!("NIF replaced {}", mfa);
+            } else {
+                panic!("NIF stub not found")
+            }
+        }
+
+        return Ok(Term::atom(atom::OK));
+    }
+    Err(Exception::new(Reason::EXC_BADARG))
 }
 
 pub fn bif_erlang_apply_2(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> BifResult {
