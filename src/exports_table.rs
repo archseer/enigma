@@ -1,6 +1,6 @@
 use crate::bif;
-use crate::module::MFA;
 use crate::instr_ptr::InstrPtr;
+use crate::module::MFA;
 use crate::servo_arc::Arc;
 use hashbrown::HashMap;
 use parking_lot::RwLock;
@@ -51,7 +51,7 @@ impl ExportsTable {
 
     pub fn lookup(&self, mfa: &MFA) -> Option<Export> {
         self.exports.get(mfa).map(|v| v.clone())
-            // need to clone to avoid keeping a ref too long and lock the table
+        // need to clone to avoid keeping a ref too long and lock the table
     }
 
     // get or get stub

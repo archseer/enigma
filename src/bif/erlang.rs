@@ -252,12 +252,10 @@ pub fn bif_erlang_list_to_binary_1(
                     let cons = unsafe { &*ptr };
                     stack.push(cons.iter())
                 }
-                Variant::Pointer(..) => {
-                    match elem.to_bytes() {
-                        Some(data) => bytes.extend_from_slice(data),
-                        None => return Err(Exception::new(Reason::EXC_BADARG)),
-                    }
-                }
+                Variant::Pointer(..) => match elem.to_bytes() {
+                    Some(data) => bytes.extend_from_slice(data),
+                    None => return Err(Exception::new(Reason::EXC_BADARG)),
+                },
                 _ => return Err(Exception::new(Reason::EXC_BADARG)),
             }
         } else {

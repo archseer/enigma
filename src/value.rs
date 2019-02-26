@@ -76,23 +76,23 @@ impl Hash for Term {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // maybe we could hash the f64 repr directly in some cases
         match self.into_variant() {
-            Variant::Pointer(_p) => {
-                match self.get_boxed_header().unwrap() {
-                    BOXED_BINARY => {
-                        let value = &self
-                            .get_boxed_value::<Boxed<bitstring::RcBinary>>()
-                            .unwrap()
-                            .value;
+            Variant::Pointer(_p) => match self.get_boxed_header().unwrap() {
+                BOXED_BINARY => {
+                    let value = &self
+                        .get_boxed_value::<Boxed<bitstring::RcBinary>>()
+                        .unwrap()
+                        .value;
 
-                        value.data.hash(state)
-                    },
-                    _ => unimplemented!(),
+                    value.data.hash(state)
                 }
+                _ => unimplemented!(),
             },
-            variant => variant.hash(state)
+            variant => variant.hash(state),
         }
     }
 }
+
+// NEED hash for boxed types
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Special {

@@ -1,10 +1,10 @@
+use crate::atom;
 use crate::bif;
 use crate::exports_table::ExportsTable;
 use crate::immix::Heap;
 use crate::instr_ptr::InstrPtr;
 use crate::loader::{FuncInfo, Instruction};
 use crate::value::Term;
-use crate::atom;
 use crate::vm::Machine;
 use hashbrown::HashMap;
 
@@ -13,10 +13,15 @@ pub struct MFA(pub u32, pub u32, pub u32);
 
 impl std::fmt::Display for MFA {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}:{}/{}", atom::to_str(self.0).unwrap(), atom::to_str(self.1).unwrap(), self.2)
+        write!(
+            f,
+            "{}:{}/{}",
+            atom::to_str(self.0).unwrap(),
+            atom::to_str(self.1).unwrap(),
+            self.2
+        )
     }
 }
-
 
 #[derive(Debug, PartialEq)]
 pub struct Lambda {
