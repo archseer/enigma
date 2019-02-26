@@ -444,7 +444,7 @@ impl MatchBuffer {
         self.size - self.offset
     }
 
-    pub fn get_integer(&mut self, _heap: &Heap, num_bits: usize, mut flags: Flag) -> Option<Term> {
+    pub fn get_integer(&mut self, heap: &Heap, num_bits: usize, mut flags: Flag) -> Option<Term> {
         //    Uint bytes;
         //    Uint bits;
         //    Uint offs;
@@ -488,7 +488,7 @@ impl MatchBuffer {
             // if ((flags & BSF_SIGNED) && b >> (num_bits-1)) {
             //     b |= ~mask;
             // }
-            return Some(Term::int(b as i32));
+            return Some(Term::int(i32::from(b)));
         } else if num_bits <= 8 {
             /*
              * The bits are in two different bytes. It is easiest to
@@ -505,7 +505,7 @@ impl MatchBuffer {
             // if ((flags & BSF_SIGNED) && w >> (num_bits-1)) {
             //     w |= ~mask;
             // }
-            return Some(Term::int(w as i32));
+            return Some(Term::int(i32::from(w)));
         } else if num_bits < SMALL_BITS && !flags.contains(Flag::BSF_LITTLE) {
             /*
              * Handle field sizes from 9 up to SMALL_BITS-1 bits, big-endian,
@@ -556,7 +556,7 @@ impl MatchBuffer {
             //   if ((flags & BSF_SIGNED) != 0 && (w >> (num_bits-1) != 0)) {
             //       w |= ~MAKE_MASK(num_bits);
             //   }
-            return Some(Term::int(w as i32));
+            return Some(Term::uint(heap, w));
         }
         // TODO: this is not nice
 

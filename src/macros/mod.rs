@@ -1,6 +1,39 @@
 pub mod arith;
 
 #[macro_export]
+macro_rules! tup {
+    (@single $($x:tt)*) => (());
+    (@count $($rest:expr),*) => (<[()]>::len(&[$(tup!(@single $rest)),*]));
+
+    ($heap:expr, $($value:expr,)+) => { tup!($heap, $($value),+) };
+    ($heap:expr, $($value:expr),*) => {
+        {
+            let _cap = tup!(@count $($value),*);
+            let _tuple = value::tuple($heap, _cap as u32);
+            let mut _i = 0;
+            unsafe {
+                $(
+                    std::ptr::write(&mut _tuple[_i], $value);
+                    _i += 1;
+                )*
+            }
+            Term::from(_tuple)
+        }
+
+    };
+    ($heap:expr, $element1:expr, $element2:expr, $element3:expr, $element4:expr) => {{
+        let tuple = value::tuple($heap, 4);
+        unsafe {
+            std::ptr::write(&mut tuple[0], $element1);
+            std::ptr::write(&mut tuple[1], $element2);
+            std::ptr::write(&mut tuple[2], $element3);
+            std::ptr::write(&mut tuple[3], $element4);
+        }
+        Term::from(tuple)
+    }};
+}
+
+#[macro_export]
 macro_rules! tup2 {
     ($heap:expr, $element1:expr, $element2:expr) => {{
         let tuple = value::tuple($heap, 2);

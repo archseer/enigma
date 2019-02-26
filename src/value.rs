@@ -332,6 +332,45 @@ impl Term {
         }
     }
 
+    #[inline]
+    pub fn int64(heap: &Heap, value: i64) -> Self {
+        if value > (i32::max_value() as i64) {
+            Term::bigint(heap, BigInt::from(value))
+        } else {
+            unsafe {
+                Term {
+                    value: TypedNanBox::new(TERM_INTEGER, value as i32),
+                }
+            }
+        }
+    }
+
+    #[inline]
+    pub fn uint(heap: &Heap, value: u32) -> Self {
+        if value > (i32::max_value() as u32) {
+            Term::bigint(heap, BigInt::from(value))
+        } else {
+            unsafe {
+                Term {
+                    value: TypedNanBox::new(TERM_INTEGER, value as i32),
+                }
+            }
+        }
+    }
+
+    #[inline]
+    pub fn uint64(heap: &Heap, value: u64) -> Self {
+        if value > (i32::max_value() as u64) {
+            Term::bigint(heap, BigInt::from(value))
+        } else {
+            unsafe {
+                Term {
+                    value: TypedNanBox::new(TERM_INTEGER, value as i32),
+                }
+            }
+        }
+    }
+
     pub fn pid(value: process::PID) -> Self {
         unsafe {
             Term {
@@ -640,6 +679,13 @@ impl Term {
     pub fn to_int(self) -> Option<u32> {
         match self.into_variant() {
             Variant::Integer(i) => Some(i as u32),
+            _ => None,
+        }
+    }
+
+    pub fn to_i32(self) -> Option<i32> {
+        match self.into_variant() {
+            Variant::Integer(i) => Some(i),
             _ => None,
         }
     }

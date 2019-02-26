@@ -161,6 +161,18 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
 
     atoms.register_atom("not_loaded");
     atoms.register_atom("noproc");
+    atoms.register_atom("file_info");
+
+    atoms.register_atom("device");
+    atoms.register_atom("directory");
+    atoms.register_atom("regular");
+    atoms.register_atom("symlink");
+    atoms.register_atom("other");
+
+    atoms.register_atom("read");
+    atoms.register_atom("write");
+    atoms.register_atom("read_write");
+    atoms.register_atom("none");
     atoms
 };
 
@@ -210,6 +222,18 @@ pub const KILLED: u32 = 37;
 
 pub const NOT_LOADED: u32 = 38;
 pub const NOPROC: u32 = 39;
+pub const FILE_INFO: u32 = 40;
+
+pub const DEVICE: u32 = 41;
+pub const DIRECTORY: u32 = 42;
+pub const REGULAR: u32 = 43;
+pub const SYMLINK: u32 = 44;
+pub const OTHER: u32 = 45;
+
+pub const READ: u32 = 46;
+pub const WRITE: u32 = 47;
+pub const READ_WRITE: u32 = 48;
+pub const NONE: u32 = 49;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)
