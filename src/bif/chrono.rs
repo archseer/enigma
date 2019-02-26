@@ -1,15 +1,16 @@
 use crate::bif::BifResult;
+use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Term};
+use crate::value::{self, Term, TryInto, Tuple};
 use crate::vm;
-use chrono::{Datelike, Local, Timelike, Utc};
+use chrono::prelude::*;
 use num::bigint::ToBigInt;
+use num::traits::ToPrimitive;
 use std::time::SystemTime;
 
 /// http://erlang.org/doc/apps/erts/time_correction.html
 /// http://erlang.org/doc/apps/erts/time_correction.html#Erlang_System_Time
 
-#[inline]
 pub fn bif_erlang_date_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResult {
     let heap = &process.context_mut().heap;
     let date = Local::today();
@@ -22,7 +23,6 @@ pub fn bif_erlang_date_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term])
     ))
 }
 
-#[inline]
 pub fn bif_erlang_localtime_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResult {
     let heap = &process.context_mut().heap;
     let datetime = Local::now();
@@ -106,7 +106,6 @@ pub fn bif_erlang_system_time_0(
 // MicroSecs = ErlangSystemTime rem 1000000,
 // {MegaSecs, Secs, MicroSecs}.
 
-#[inline]
 pub fn bif_erlang_universaltime_0(
     _vm: &vm::Machine,
     process: &RcProcess,
@@ -126,6 +125,113 @@ pub fn bif_erlang_universaltime_0(
         Term::int(datetime.hour() as i32),
         Term::int(datetime.minute() as i32),
         Term::int(datetime.second() as i32)
+    );
+    Ok(tup2!(heap, date, time))
+}
+
+pub fn posixtime_to_universaltime_1(
+    _vm: &vm::Machine,
+    process: &RcProcess,
+    args: &[Term],
+) -> BifResult {
+    let heap = &process.context_mut().heap;
+
+    let timestamp: i64 = match args[0].into_number() {
+        Ok(value::Num::Integer(i)) => i64::from(i),
+        Ok(value::Num::Bignum(value)) => value
+            .to_i64()
+            .ok_or_else(|| Exception::new(Reason::EXC_BADARG))?,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    let dt = NaiveDateTime::from_timestamp_opt(timestamp, 0)
+        .ok_or_else(|| Exception::new(Reason::EXC_BADARG))?;
+
+    // hp = HAlloc(BIF_P, 4+4+3);
+    let date = tup3!(
+        heap,
+        Term::int(dt.year() as i32),
+        Term::int(dt.month() as i32),
+        Term::int(dt.day() as i32)
+    );
+    let time = tup3!(
+        heap,
+        Term::int(dt.hour() as i32),
+        Term::int(dt.minute() as i32),
+        Term::int(dt.second() as i32)
+    );
+    Ok(tup2!(heap, date, time))
+}
+
+/// Check and extract components from a tuple on form: {{Y,M,D},{H,M,S}}
+fn time_to_parts(term: Term) -> Option<((i32, i32, i32), (i32, i32, i32))> {
+    // term to tuple
+    if let Ok(wrapper) = term.try_into() {
+        let wrapper: &Tuple = wrapper;
+
+        if wrapper.len() != 2 {
+            return None;
+        }
+
+        let date: &Tuple = match wrapper[0].try_into() {
+            Ok(date) => {
+                let date: &Tuple = date;
+                if date.len() != 3 {
+                    return None;
+                }
+                date
+            }
+            _ => return None,
+        };
+        let year = date[0].to_i32()?;
+        let month = date[1].to_i32()?;
+        let day = date[2].to_i32()?;
+
+        let time: &Tuple = match wrapper[1].try_into() {
+            Ok(time) => {
+                let time: &Tuple = time;
+                if time.len() != 3 {
+                    return None;
+                }
+                time
+            }
+            _ => return None,
+        };
+        let hour = time[0].to_i32()?;
+        let minute = time[1].to_i32()?;
+        let second = time[2].to_i32()?;
+        return Some(((year, month, day), (hour, minute, second)));
+    }
+    None
+}
+
+pub fn universaltime_to_localtime_1(
+    _vm: &vm::Machine,
+    process: &RcProcess,
+    args: &[Term],
+) -> BifResult {
+    let heap = &process.context_mut().heap;
+
+    let ((year, month, day), (hour, minute, second)) =
+        time_to_parts(args[0]).ok_or_else(|| Exception::new(Reason::EXC_BADARG))?;
+
+    let dt = Utc
+        .ymd(year, month as u32, day as u32)
+        .and_hms(hour as u32, minute as u32, second as u32)
+        .with_timezone(&Local);
+
+    // hp = HAlloc(BIF_P, 4+4+3);
+    let date = tup3!(
+        heap,
+        Term::int(dt.year() as i32),
+        Term::int(dt.month() as i32),
+        Term::int(dt.day() as i32)
+    );
+    let time = tup3!(
+        heap,
+        Term::int(dt.hour() as i32),
+        Term::int(dt.minute() as i32),
+        Term::int(dt.second() as i32)
     );
     Ok(tup2!(heap, date, time))
 }
