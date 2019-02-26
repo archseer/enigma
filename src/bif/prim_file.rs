@@ -35,32 +35,17 @@ pub fn read_file_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     // arg[0] = filename
     let heap = &process.context_mut().heap;
 
-    // read into buffer, alloc into RcBinary
-    println!("before cast {}", args[0]);
-
     // TODO bitstrings or non zero offsets can fail ...
     let path = match args[0].try_into() {
        Ok(cons) => value::cons::unicode_list_to_buf(cons, 2048).unwrap(),
        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
 
-    println!("Reading {}", path);
-
-    // TODO: need feature(try_blocks) for try { }
-    let mut file = match File::open(path) {
-        Ok(file) => file,
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
         Err(err) => return Ok(error_to_tuple(heap, err))
     };
 
-    println!("file");
-
-    // TODO: maybe read file metadata and preallocate with_capacity
-    let mut bytes = Vec::new();
-
-    if let Err(err) = file.read_to_end(&mut bytes) {
-        return Ok(error_to_tuple(heap, err))
-    };
-    println!("{:?} bytes", bytes);
     Ok(tup2!(heap, atom!(OK), Term::binary(heap, Binary::from(bytes))))
 }
 

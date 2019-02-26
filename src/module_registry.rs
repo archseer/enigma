@@ -3,8 +3,6 @@ use crate::module::Module;
 use crate::servo_arc::Arc;
 use hashbrown::HashMap;
 use parking_lot::Mutex;
-use std::fs::File;
-use std::io::Read;
 
 pub type RcModuleRegistry = Arc<Mutex<ModuleRegistry>>;
 
@@ -21,9 +19,7 @@ impl ModuleRegistry {
 
     /// Parses a full file path pointing to a module.
     pub fn parse_module(&mut self, path: &str) -> Result<&Module, std::io::Error> {
-        let mut file = File::open(path)?;
-        let mut bytes = Vec::new();
-        file.read_to_end(&mut bytes)?;
+        let bytes = std::fs::read(path)?;
 
         let loader = Loader::new();
         let module = loader.load_file(&bytes[..]).unwrap();
