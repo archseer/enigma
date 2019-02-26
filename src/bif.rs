@@ -99,6 +99,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "apply", 3 => bif_erlang_apply_3,
             "register", 2 => bif_erlang_register_2,
             "function_exported", 3 => bif_erlang_function_exported_3,
+            "module_loaded", 1 => bif_erlang_module_loaded_1,
             "process_flag", 2 => bif_erlang_process_flag_2,
             "make_tuple", 2 => erlang::bif_erlang_make_tuple_2,
             "make_tuple", 3 => erlang::bif_erlang_make_tuple_3,
@@ -795,6 +796,19 @@ fn bif_erlang_function_exported_3(
     let mfa = module::MFA(args[0].to_u32(), args[1].to_u32(), arity);
 
     if vm.exports.read().lookup(&mfa).is_some() || bif::is_bif(&mfa) {
+        return Ok(atom!(TRUE));
+    }
+    Ok(atom!(FALSE))
+}
+
+fn bif_erlang_module_loaded_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+    if !args[0].is_atom() {
+        return Err(Exception::new(Reason::EXC_BADARG));
+    }
+
+    let module = args[0].to_u32();
+
+    if vm.modules.lock().lookup(module).is_some() {
         return Ok(atom!(TRUE));
     }
     Ok(atom!(FALSE))
