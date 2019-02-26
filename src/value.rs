@@ -387,7 +387,7 @@ impl Term {
         }
     }
 
-    pub fn reference(heap: &Heap, value: u32) -> Self {
+    pub fn reference(heap: &Heap, value: usize) -> Self {
         Term::from(heap.alloc(Boxed {
             header: BOXED_REF,
             value,

@@ -112,6 +112,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "list_to_binary", 1 => erlang::bif_erlang_list_to_binary_1,
             "++", 2 => erlang::bif_erlang_append_2,
             "append", 2 => erlang::bif_erlang_append_2,
+            "make_ref", 0 => erlang::bif_make_ref_0,
 
             // pdict
             "get", 0 => bif_erlang_get_0,

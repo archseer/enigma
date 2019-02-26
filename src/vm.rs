@@ -18,6 +18,7 @@ use crate::value::{self, Term, TryInto, TryIntoMut, Variant};
 use parking_lot::Mutex;
 use std::mem::transmute;
 use std::panic;
+use std::sync::atomic::AtomicUsize;
 use std::time;
 
 /// A reference counted State.
@@ -32,6 +33,8 @@ pub struct State {
 
     /// The start time of the VM (more or less).
     pub start_time: time::Instant,
+
+    pub next_ref: AtomicUsize,
 }
 
 #[derive(Clone)]
@@ -391,6 +394,7 @@ impl Machine {
             process_registry: Mutex::new(ProcessRegistry::new()),
             process_pool,
             start_time: time::Instant::now(),
+            next_ref: AtomicUsize::new(1),
         };
 
         Machine {

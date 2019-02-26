@@ -340,6 +340,17 @@ pub fn bif_erlang_append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
+pub fn bif_make_ref_0(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    let heap = &process.context_mut().heap;
+    let reference = vm
+        .state
+        .next_ref
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+    // TODO: heap allocating these is not ideal
+    Ok(Term::reference(heap, reference))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
