@@ -112,6 +112,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "binary_to_term", 1 => erlang::bif_erlang_binary_to_term_1,
             "list_to_atom", 1 => erlang::bif_erlang_list_to_atom_1,
             "list_to_binary", 1 => erlang::bif_erlang_list_to_binary_1,
+            "atom_to_list", 1 => erlang::bif_erlang_atom_to_list_1,
             "++", 2 => erlang::bif_erlang_append_2,
             "append", 2 => erlang::bif_erlang_append_2,
             "make_ref", 0 => erlang::bif_make_ref_0,
@@ -316,33 +317,25 @@ fn bif_erlang_spawn_opt_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
         Ok(cons) => {
             let cons: &value::Cons = cons; // annoying, need type annotation
             cons
-        },
+        }
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
 
     let flag = opts.iter().fold(SpawnFlag::NONE, |acc, val| {
         match val.into_variant() {
-            Variant::Atom(atom::LINK) => { acc | SpawnFlag::LINK }
-            Variant::Atom(atom::MONITOR) => { acc | SpawnFlag::MONITOR }
+            Variant::Atom(atom::LINK) => acc | SpawnFlag::LINK,
+            Variant::Atom(atom::MONITOR) => acc | SpawnFlag::MONITOR,
             opt => {
                 unimplemented!("Unimplemented spawn_opt for {}", opt);
                 // return Err(Exception::new(Reason::EXC_BADARG));
             }
         }
-
     });
 
     let registry = vm.modules.lock();
     let module = registry.lookup(module).unwrap();
     // TODO: avoid the clone here since we copy later
-    process::spawn(
-        &vm.state,
-        process,
-        module,
-        func,
-        arglist,
-        flag,
-    )
+    process::spawn(&vm.state, process, module, func, arglist, flag)
 }
 
 fn bif_erlang_link_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {

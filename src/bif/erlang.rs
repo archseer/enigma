@@ -283,6 +283,22 @@ pub fn bif_erlang_binary_to_term_1(
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
+pub fn bif_erlang_atom_to_list_1(
+    _vm: &vm::Machine,
+    process: &RcProcess,
+    args: &[Term],
+) -> BifResult {
+    match args[0].into_variant() {
+        Variant::Atom(i) => {
+            let string = atom::to_str(i).unwrap();
+            let heap = &process.context_mut().heap;
+
+            Ok(bitstring!(heap, string))
+        }
+        _ => Err(Exception::new(Reason::EXC_BADARG)),
+    }
+}
+
 /// erlang:'++'/2
 ///
 /// Adds a list to another (LHS ++ RHS). For historical reasons this is implemented by copying LHS
