@@ -471,7 +471,7 @@ pub fn spawn(
     println!("Spawning..");
     let new_proc = allocate(state, Some(parent.pid), module)?;
     let context = new_proc.context_mut();
-    let pid = Term::pid(new_proc.pid);
+    let mut ret = Term::pid(new_proc.pid);
 
     // Set the arglist into process registers.
     // TODO: it also needs to deep clone all the vals (for example lists etc)
@@ -516,11 +516,14 @@ pub fn spawn(
             .local_data_mut()
             .lt_monitors
             .push((parent.pid, reference));
+
+        let heap = &parent.context_mut().heap;
+        ret = tup2!(heap, ret, Term::reference(heap, reference))
     }
 
     state.process_pool.schedule(Job::normal(new_proc));
 
-    Ok(pid)
+    Ok(ret)
 }
 
 pub fn send_message(

@@ -575,7 +575,6 @@ impl Machine {
                     // TODO: clear timeout
                     // reset savepoint of the mailbox
                     process.local_data_mut().mailbox.reset();
-
                 }
                 Opcode::Timeout => {
                     //  Reset the save point of the mailbox and clear the timeout flag.

@@ -62,6 +62,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "rem", 2 => bif_erlang_mod_2,
             "spawn", 3 => bif_erlang_spawn_3,
             "spawn_link", 3 => bif_erlang_spawn_link_3,
+            "spawn_opt", 1 => bif_erlang_spawn_opt_1,
             "link", 1 => bif_erlang_link_1,
             "unlink", 1 => bif_erlang_unlink_1,
             "self", 0 => bif_erlang_self_0,
@@ -282,6 +283,65 @@ fn bif_erlang_spawn_link_3(vm: &vm::Machine, process: &RcProcess, args: &[Term])
         func,
         arglist,
         process::SpawnFlag::LINK,
+    )
+}
+
+fn bif_erlang_spawn_opt_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    use process::SpawnFlag;
+
+    // arg 0 is a 4 value tuple
+    let tup: &Tuple = match args[0].try_into() {
+        Ok(tup) => {
+            let tup: &Tuple = tup;
+            if tup.len() != 4 {
+                return Err(Exception::new(Reason::EXC_BADARG));
+            }
+            tup
+        }
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    let module = match tup[0].into_variant() {
+        Variant::Atom(module) => module,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    let func = match tup[1].into_variant() {
+        Variant::Atom(func) => func,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    let arglist = tup[2];
+
+    let opts = match tup[3].try_into() {
+        Ok(cons) => {
+            let cons: &value::Cons = cons; // annoying, need type annotation
+            cons
+        },
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    let flag = opts.iter().fold(SpawnFlag::NONE, |acc, val| {
+        match val.into_variant() {
+            Variant::Atom(atom::LINK) => { acc | SpawnFlag::LINK }
+            Variant::Atom(atom::MONITOR) => { acc | SpawnFlag::MONITOR }
+            opt => {
+                unimplemented!("Unimplemented spawn_opt for {}", opt);
+                // return Err(Exception::new(Reason::EXC_BADARG));
+            }
+        }
+
+    });
+
+    let registry = vm.modules.lock();
+    let module = registry.lookup(module).unwrap();
+    // TODO: avoid the clone here since we copy later
+    process::spawn(
+        &vm.state,
+        process,
+        module,
+        func,
+        arglist,
+        flag,
     )
 }
 
