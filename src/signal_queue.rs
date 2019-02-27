@@ -2,7 +2,7 @@ use parking_lot::Mutex;
 use std::collections::VecDeque;
 
 use crate::exception::Exception;
-use crate::process::PID;
+use crate::process::{PID,Ref};
 use crate::value::Term;
 
 #[derive(Debug, PartialEq)]
@@ -26,6 +26,18 @@ pub enum Signal {
         from: PID,
     },
     Unlink {
+        from: PID,
+    },
+    MonitorDown {
+        from: PID,
+        reason: Exception,
+        reference: Ref,
+    },
+    Monitor {
+        from: PID,
+        reference: Ref,
+    },
+    Demonitor {
         from: PID,
     },
 }

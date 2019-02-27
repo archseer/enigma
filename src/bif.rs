@@ -319,13 +319,7 @@ fn bif_erlang_link_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Bi
             }
 
             // add the pid to our link tree
-            process
-                .local_data_mut()
-                .links
-                .insert(Arc::new(process::tree::Node {
-                    link: process::tree::Link::new(),
-                    other: pid,
-                }));
+            process.local_data_mut().links.insert(pid);
 
             // send LINK signal to the other process return true
             process::send_signal(&vm.state, pid, process::Signal::Link { from: process.pid })?;
@@ -342,7 +336,7 @@ fn bif_erlang_unlink_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     match args[0].into_variant() {
         Variant::Pid(pid) => {
             // remove the pid to our link tree
-            process.local_data_mut().links.find_mut(&pid).remove();
+            process.local_data_mut().links.remove(&pid);
 
             // send LINK signal to the other process return true
             process::send_signal(

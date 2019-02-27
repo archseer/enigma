@@ -173,6 +173,9 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("write");
     atoms.register_atom("read_write");
     atoms.register_atom("none");
+
+    atoms.register_atom("down");
+    atoms.register_atom("process");
     atoms
 };
 
@@ -234,6 +237,9 @@ pub const READ: u32 = 46;
 pub const WRITE: u32 = 47;
 pub const READ_WRITE: u32 = 48;
 pub const NONE: u32 = 49;
+
+pub const DOWN: u32 = 50;
+pub const PROCESS: u32 = 51;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

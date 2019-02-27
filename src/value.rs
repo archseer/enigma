@@ -263,7 +263,7 @@ pub struct Binary {
 #[repr(C)]
 pub struct Ref {
     pub header: Header,
-    pub value: u32,
+    pub value: process::Ref,
 }
 
 // term order:
@@ -387,7 +387,7 @@ impl Term {
         }
     }
 
-    pub fn reference(heap: &Heap, value: usize) -> Self {
+    pub fn reference(heap: &Heap, value: process::Ref) -> Self {
         Term::from(heap.alloc(Boxed {
             header: BOXED_REF,
             value,

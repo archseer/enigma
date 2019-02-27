@@ -12,18 +12,19 @@ use crate::signal_queue::SignalQueue;
 pub use crate::signal_queue::{ExitKind, Signal};
 use crate::value::{self, Term, TryInto};
 use crate::vm::RcState;
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use std::cell::UnsafeCell;
 use std::panic::RefUnwindSafe;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 pub mod registry;
 pub mod table;
-pub mod tree;
 
 /// Heavily inspired by inko
 
 pub type RcProcess = Arc<Process>;
+
+pub type Ref = usize;
 
 // TODO: max registers should be a MAX_REG constant for (x and freg), OTP uses 1024
 // regs should be growable and shrink on live
@@ -118,8 +119,11 @@ pub struct LocalData {
     parent: Option<PID>,
 
     // links (tree)
-    pub links: tree::Tree,
-    // monitors (tree) + lt_monitors (list)
+    pub links: HashSet<PID>,
+    // monitors (tree)
+    pub monitors: HashSet<PID>,
+    // lt_monitors (list)
+    pub lt_monitors: Vec<(PID, Ref)>,
 
     // signals are sent on death, and the receiving side cleans up it's link/mon structures
     pub signal_queue: SignalQueue,
@@ -166,7 +170,9 @@ impl Process {
             context: Box::new(context),
             flags: Flag::INITIAL,
             parent,
-            links: tree::Tree::new(tree::NodeAdapter::new()), // eew
+            links: HashSet::new(),
+            monitors: HashSet::new(),
+            lt_monitors: Vec::new(),
             signal_queue: SignalQueue::new(),
             mailbox: Mailbox::new(),
             thread_id: None,
@@ -237,7 +243,6 @@ impl Process {
     pub fn receive(&self) -> Result<Option<&Term>, Exception> {
         let local_data = self.local_data_mut();
 
-        println!("receiving");
         if !local_data.mailbox.has_messages() {
             self.process_incoming()?
         }
@@ -256,7 +261,6 @@ impl Process {
     /// An Err signals that we're now exiting.
     pub fn process_incoming(&self) -> Result<(), Exception> {
         // get internal, if we ran out, start processing external
-        println!("signals");
         while let Some(signal) = self.local_data_mut().signal_queue.receive() {
             match signal {
                 Signal::Message { value, .. } => {
@@ -266,17 +270,43 @@ impl Process {
                     self.handle_exit_signal(signal)?;
                 }
                 Signal::Link { from } => {
-                    self.local_data_mut().links.insert(Arc::new(tree::Node {
-                        link: tree::Link::new(),
-                        other: from,
-                    }));
+                    self.local_data_mut().links.insert(from);
                 }
                 Signal::Unlink { from } => {
-                    self.local_data_mut().links.find_mut(&from).remove();
+                    self.local_data_mut().links.remove(&from);
+                }
+                Signal::MonitorDown { .. } => {
+                    // monitor down: delete from monitors tree, deliver :down message
+                    self.handle_monitor_down_signal(signal);
+                }
+                Signal::Monitor { from, reference } => {
+                    self.local_data_mut().lt_monitors.push((from, reference));
+                }
+                Signal::Demonitor { from } => {
+                    if let Some(pos) = self.local_data_mut().lt_monitors.iter().position(|(x, _)| *x == from) {
+                        self.local_data_mut().lt_monitors.remove(pos);
+                    }
                 }
             }
         }
         Ok(())
+    }
+
+    fn handle_monitor_down_signal(&self, signal: Signal) {
+        // Create a 'DOWN' message and replace the signal with it...
+        if let Signal::MonitorDown { from, reason, reference } = signal {
+            // assert!(is_immed(reason));
+            let heap = &self.context_mut().heap;
+            let from = Term::pid(from);
+            let reference = Term::reference(heap, reference as usize);
+            let reason = reason.value;
+
+            let msg = tup!(heap, atom!(DOWN), reference, atom!(PROCESS), from, reason);
+            self.local_data_mut().mailbox.send(msg);
+            // bump reds by 8?
+        } else {
+            unreachable!();
+        }
     }
 
     /// Return value is true if the process is now terminating.
@@ -284,14 +314,13 @@ impl Process {
         // this is extremely awkward, wish we could enforce a signal variant on the function signature
         // we're also technically matching twice since process_incoming also pattern matches.
         // TODO: inline?
-        println!("exit signals");
         if let Signal::Exit { kind, from, reason } = signal {
             let mut reason = reason.value;
             let local_data = self.local_data_mut();
 
             if kind == ExitKind::ExitLinked {
                 // delete from link tree
-                if local_data.links.find_mut(&from).remove().is_none() {
+                if local_data.links.take(&from).is_none() {
                     // if it was already deleted, ignore
                     return Ok(());
                 }
@@ -364,8 +393,7 @@ impl Process {
         // TODO: unregister process name
 
         // delete links
-        let mut cursor = local_data.links.front_mut();
-        while let Some(link) = cursor.remove() {
+        for pid in local_data.links.drain() {
             // TODO: reason has to be deep cloned, make a constructor
             println!("sending exit signal");
             let msg = Signal::Exit {
@@ -373,11 +401,30 @@ impl Process {
                 from: self.pid,
                 kind: ExitKind::ExitLinked,
             };
-            self::send_signal(state, link.other, msg);
+            self::send_signal(state, pid, msg);
             // erts_proc_sig_send_link_exit(c_p, c_p->common.id, lnk, reason, SEQ_TRACE_TOKEN(c_p));
         }
 
         // TODO: delete monitors
+        for pid in local_data.monitors.drain() {
+            // we're watching someone else
+            // send_demonitor(mon)
+            let msg = Signal::Demonitor {
+                from: self.pid,
+            };
+            self::send_signal(state, pid, msg);
+        }
+
+        for (pid, reference) in local_data.lt_monitors.drain(..) {
+            // we're being watched
+            // send_monitor_down(mon, reason)
+            let msg = Signal::MonitorDown {
+                reason: reason.clone(),
+                from: self.pid,
+                reference
+            };
+            self::send_signal(state, pid, msg);
+        }
     }
 }
 
@@ -450,16 +497,25 @@ pub fn spawn(
 
     // Check if this process should be initially linked to its parent.
     if flags.contains(SpawnFlag::LINK) {
-        new_proc.local_data_mut().links.insert(Arc::new(tree::Node {
-            link: tree::Link::new(),
-            other: parent.pid,
-        }));
+        new_proc.local_data_mut().links.insert(parent.pid);
 
-        // TODO: add constructor for Node
-        parent.local_data_mut().links.insert(Arc::new(tree::Node {
-            link: tree::Link::new(),
-            other: new_proc.pid,
-        }));
+        parent.local_data_mut().links.insert(new_proc.pid);
+    }
+
+    if flags.contains(SpawnFlag::MONITOR) {
+        let reference = state
+            .next_ref
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+        parent
+            .local_data_mut()
+            .monitors
+            .insert(new_proc.pid);
+
+        new_proc
+            .local_data_mut()
+            .lt_monitors
+            .push((parent.pid, reference));
     }
 
     state.process_pool.schedule(Job::normal(new_proc));

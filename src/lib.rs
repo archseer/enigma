@@ -35,6 +35,3 @@ extern crate bitflags;
 #[cfg(test)]
 #[macro_use]
 extern crate quickcheck;
-
-#[macro_use]
-extern crate intrusive_collections;
