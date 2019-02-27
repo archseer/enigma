@@ -86,6 +86,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "tuple_size", 1 => bif_erlang_tuple_size_1,
             "byte_size", 1 => bif_erlang_byte_size_1,
             "map_size", 1 => bif_erlang_map_size_1,
+            "length", 1 => bif_erlang_length_1,
             "error", 1 => bif_erlang_error_1,
             "error", 2 => bif_erlang_error_2,
             //"raise", 3 => bif_erlang_raise_3,
@@ -621,11 +622,22 @@ fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]
     Ok(Term::int(res as i32)) // TODO: cast potentially unsafe
 }
 
-fn bif_erlang_map_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+fn bif_erlang_map_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     if let Ok(value::Map { map, .. }) = &args[0].try_into() {
-        return Ok(Term::int(map.len() as i32));
+        let heap = &process.context_mut().heap;
+        return Ok(Term::uint(heap, map.len() as u32));
     }
-    Err(Exception::with_value(Reason::EXC_BADARG, args[0]))
+    Err(Exception::new(Reason::EXC_BADARG))
+}
+
+fn bif_erlang_length_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    if let Ok(cons) = &args[0].try_into() {
+        let cons: &value::Cons = cons; // annoying, need type annotation
+        let heap = &process.context_mut().heap;
+
+        return Ok(Term::uint(heap, cons.iter().count() as u32));
+    }
+    Err(Exception::new(Reason::EXC_BADARG))
 }
 
 fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
