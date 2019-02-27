@@ -13,7 +13,7 @@ fn error_to_tuple(heap: &Heap, error: std::io::Error) -> Term {
     tup2!(heap, atom!(ERROR), atom!(VALUE))
 }
 
-pub fn get_cwd_nif_0(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn get_cwd_nif_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResult {
     let heap = &process.context_mut().heap;
 
     match std::env::current_dir() {
@@ -23,7 +23,7 @@ pub fn get_cwd_nif_0(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> B
 
             Ok(tup2!(heap, atom!(OK), Term::binary(heap, bin)))
         }
-        _ => return Err(Exception::new(Reason::EXC_INTERNAL_ERROR)),
+        _ => Err(Exception::new(Reason::EXC_INTERNAL_ERROR)),
     }
     // TODO: make a function that converts io::Error to a tuple
 }
@@ -53,14 +53,14 @@ pub fn read_file_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
 }
 
 // TODO: maybe we should pass around as OsString which is null terminated dunno
-pub fn internal_native2name_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn internal_native2name_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     // we already validated the name into unicode in the previous command
-    return Ok(args[0]);
+    Ok(args[0])
 }
 
-pub fn internal_name2native_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn internal_name2native_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     // we already validated the name into unicode in the previous command
-    return Ok(args[0]);
+    Ok(args[0])
 }
 
 #[cfg(unix)]
@@ -127,7 +127,7 @@ fn access_to_atom(mode: u32) -> Term {
 
 /// The smallest value that can be converted freely between universal, local, and POSIX time, as
 /// required by read_file_info/2. Corresponds to {{1902,1,1},{0,0,0}}
-const FILE_MIN_FILETIME: i64 = -2145916800;
+const FILE_MIN_FILETIME: i64 = -2_145_916_800;
 
 #[cfg(unix)]
 fn meta_to_tuple(heap: &Heap, meta: std::fs::Metadata) -> Term {

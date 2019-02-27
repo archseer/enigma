@@ -6,7 +6,7 @@ use crate::process::RcProcess;
 use crate::value::{self, Cons, Term, TryInto, Tuple, Variant};
 use crate::vm;
 
-pub fn bif_erlang_make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let num = match args[0].into_number() {
         Ok(value::Num::Integer(i)) if !i < 0 => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -21,7 +21,7 @@ pub fn bif_erlang_make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[T
     Ok(Term::from(tuple))
 }
 
-pub fn bif_erlang_make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let num = match args[0].into_number() {
         Ok(value::Num::Integer(i)) if !i < 0 => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -56,7 +56,7 @@ pub fn bif_erlang_make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[T
     Ok(Term::from(tuple))
 }
 
-pub fn bif_erlang_append_element_2(
+pub fn append_element_2(
     _vm: &vm::Machine,
     process: &RcProcess,
     args: &[Term],
@@ -77,7 +77,7 @@ pub fn bif_erlang_append_element_2(
     Ok(Term::from(new_tuple))
 }
 
-pub fn bif_erlang_setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let number = match args[0].into_number() {
         Ok(value::Num::Integer(i)) if !i < 1 => i - 1,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -98,7 +98,7 @@ pub fn bif_erlang_setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[T
     Ok(Term::from(new_tuple))
 }
 
-pub fn bif_erlang_tuple_to_list_1(
+pub fn tuple_to_list_1(
     _vm: &vm::Machine,
     process: &RcProcess,
     args: &[Term],
@@ -117,7 +117,7 @@ pub fn bif_erlang_tuple_to_list_1(
     Ok(list)
 }
 
-pub fn bif_erlang_binary_to_list_1(
+pub fn binary_to_list_1(
     _vm: &vm::Machine,
     process: &RcProcess,
     args: &[Term],
@@ -161,7 +161,7 @@ pub fn bif_erlang_binary_to_list_1(
 }
 
 /// convert a list of ascii integers to an atom
-pub fn bif_erlang_list_to_atom_1(
+pub fn list_to_atom_1(
     _vm: &vm::Machine,
     process: &RcProcess,
     args: &[Term],
@@ -193,7 +193,7 @@ pub fn bif_erlang_list_to_atom_1(
 }
 
 /// conditionally convert a list of ascii integers to an atom
-pub fn bif_erlang_list_to_existing_atom_1(
+pub fn list_to_existing_atom_1(
     _vm: &vm::Machine,
     process: &RcProcess,
     args: &[Term],
@@ -219,7 +219,7 @@ pub fn bif_erlang_list_to_existing_atom_1(
     unimplemented!()
 }
 
-pub fn bif_erlang_list_to_binary_1(
+pub fn list_to_binary_1(
     _vm: &vm::Machine,
     process: &RcProcess,
     args: &[Term],
@@ -268,7 +268,7 @@ pub fn bif_erlang_list_to_binary_1(
 // TODO iolist_to_binary is the same, input can be a binary (is_binary() true), and we just return
 // it (badarg on bitstring)
 
-pub fn bif_erlang_binary_to_term_1(
+pub fn binary_to_term_1(
     _vm: &vm::Machine,
     process: &RcProcess,
     args: &[Term],
@@ -283,7 +283,7 @@ pub fn bif_erlang_binary_to_term_1(
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
-pub fn bif_erlang_atom_to_list_1(
+pub fn atom_to_list_1(
     _vm: &vm::Machine,
     process: &RcProcess,
     args: &[Term],
@@ -305,7 +305,7 @@ pub fn bif_erlang_atom_to_list_1(
 /// and setting its tail to RHS without checking that RHS is a proper list. [] ++ 'not_a_list' will
 /// therefore result in 'not_a_list', and [1,2] ++ 3 will result in [1,2|3], and this is a bug that
 /// we have to live with.
-pub fn bif_erlang_append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let lhs = args[0];
     let rhs = args[1];
 
@@ -374,7 +374,7 @@ mod tests {
     use crate::value::Cons;
 
     #[test]
-    fn test_bif_erlang_make_tuple_2() {
+    fn test_make_tuple_2() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -383,7 +383,7 @@ mod tests {
         let default = str_to_atom!("test");
         let args = vec![number, default];
 
-        let res = bif_erlang_make_tuple_2(&vm, &process, &args);
+        let res = make_tuple_2(&vm, &process, &args);
         let x = res.unwrap();
         assert!(x.is_tuple());
         if let Ok(tuple) = x.try_into() {
@@ -398,7 +398,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_make_tuple_2_bad_arg_wrong_type_of_tuple() {
+    fn test_make_tuple_2_bad_arg_wrong_type_of_tuple() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -407,7 +407,7 @@ mod tests {
         let default = str_to_atom!("test");
         let args = vec![number, default];
 
-        let res = bif_erlang_make_tuple_2(&vm, &process, &args);
+        let res = make_tuple_2(&vm, &process, &args);
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
         } else {
@@ -416,7 +416,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_make_tuple_2_bad_arg_negative_number() {
+    fn test_make_tuple_2_bad_arg_negative_number() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -425,7 +425,7 @@ mod tests {
         let default = str_to_atom!("test");
         let args = vec![number, default];
 
-        let res = bif_erlang_make_tuple_2(&vm, &process, &args);
+        let res = make_tuple_2(&vm, &process, &args);
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
         } else {
@@ -433,7 +433,7 @@ mod tests {
         }
     }
     #[test]
-    fn test_bif_erlang_tuple_make_tuple_3() {
+    fn test_tuple_make_tuple_3() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -453,7 +453,7 @@ mod tests {
 
         let args = vec![number, default, init_list];
 
-        let res = bif_erlang_make_tuple_3(&vm, &process, &args);
+        let res = make_tuple_3(&vm, &process, &args);
         let x = res.unwrap();
         assert!(x.is_tuple());
         if let Ok(tuple) = x.try_into() {
@@ -470,7 +470,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_tuple_make_tuple_3_bad_arg_wrong_type_of_number() {
+    fn test_tuple_make_tuple_3_bad_arg_wrong_type_of_number() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -491,7 +491,7 @@ mod tests {
 
         let args = vec![number, default, init_list];
 
-        let res = bif_erlang_make_tuple_3(&vm, &process, &args);
+        let res = make_tuple_3(&vm, &process, &args);
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
         } else {
@@ -500,7 +500,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_tuple_make_tuple_3_bad_arg_negative_number() {
+    fn test_tuple_make_tuple_3_bad_arg_negative_number() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -521,7 +521,7 @@ mod tests {
 
         let args = vec![number, default, init_list];
 
-        let res = bif_erlang_make_tuple_3(&vm, &process, &args);
+        let res = make_tuple_3(&vm, &process, &args);
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
         } else {
@@ -530,7 +530,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_tuple_make_tuple_3_bad_arg_wrong_type_of_init_list() {
+    fn test_tuple_make_tuple_3_bad_arg_wrong_type_of_init_list() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -542,7 +542,7 @@ mod tests {
 
         let args = vec![number, default, init_list];
 
-        let res = bif_erlang_make_tuple_3(&vm, &process, &args);
+        let res = make_tuple_3(&vm, &process, &args);
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
         } else {
@@ -551,7 +551,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_tuple_make_tuple_3_bad_arg_wrong_structure_init_list() {
+    fn test_tuple_make_tuple_3_bad_arg_wrong_structure_init_list() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -572,7 +572,7 @@ mod tests {
 
         let args = vec![number, default, init_list];
 
-        let res = bif_erlang_make_tuple_3(&vm, &process, &args);
+        let res = make_tuple_3(&vm, &process, &args);
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
         } else {
@@ -581,7 +581,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_tuple_make_tuple_3_bad_arg_init_list_out_of_range() {
+    fn test_tuple_make_tuple_3_bad_arg_init_list_out_of_range() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -602,7 +602,7 @@ mod tests {
 
         let args = vec![number, default, init_list];
 
-        let res = bif_erlang_make_tuple_3(&vm, &process, &args);
+        let res = make_tuple_3(&vm, &process, &args);
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
         } else {
@@ -611,7 +611,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_append_element_2() {
+    fn test_append_element_2() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -621,7 +621,7 @@ mod tests {
         let append = Term::int(2);
         let args = vec![tuple, append];
 
-        let res = bif_erlang_append_element_2(&vm, &process, &args);
+        let res = append_element_2(&vm, &process, &args);
         let x = res.unwrap();
         assert!(x.is_tuple());
         if let Ok(tuple) = x.try_into() {
@@ -636,7 +636,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_append_element_2_bad_arg_wrong_type_of_tuple() {
+    fn test_append_element_2_bad_arg_wrong_type_of_tuple() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -645,7 +645,7 @@ mod tests {
         let append = Term::int(2);
         let args = vec![bad_tuple, append];
 
-        let res = bif_erlang_append_element_2(&vm, &process, &args);
+        let res = append_element_2(&vm, &process, &args);
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
         } else {
@@ -654,7 +654,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_setelement_3() {
+    fn test_setelement_3() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -665,7 +665,7 @@ mod tests {
         let value = Term::from(99);
         let args = vec![index, tuple, value];
 
-        let res = bif_erlang_setelement_3(&vm, &process, &args);
+        let res = setelement_3(&vm, &process, &args);
         let x = res.unwrap();
         assert!(x.is_tuple());
         if let Ok(tuple) = x.try_into() {
@@ -680,7 +680,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_setelement_3_bad_arg_wrong_type_of_index() {
+    fn test_setelement_3_bad_arg_wrong_type_of_index() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -691,7 +691,7 @@ mod tests {
         let value = Term::from(99);
         let args = vec![index, tuple, value];
 
-        let res = bif_erlang_setelement_3(&vm, &process, &args);
+        let res = setelement_3(&vm, &process, &args);
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
         } else {
@@ -700,7 +700,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_setelement_3_bad_arg_wrong_type_of_tuple() {
+    fn test_setelement_3_bad_arg_wrong_type_of_tuple() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -711,7 +711,7 @@ mod tests {
         let value = Term::from(99);
         let args = vec![index, tuple, value];
 
-        let res = bif_erlang_setelement_3(&vm, &process, &args);
+        let res = setelement_3(&vm, &process, &args);
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
         } else {
@@ -720,7 +720,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_setelement_3_bad_arg_tuple_out_of_range() {
+    fn test_setelement_3_bad_arg_tuple_out_of_range() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -731,7 +731,7 @@ mod tests {
         let value = Term::from(99);
         let args = vec![index, tuple, value];
 
-        let res = bif_erlang_setelement_3(&vm, &process, &args);
+        let res = setelement_3(&vm, &process, &args);
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
         } else {
@@ -740,7 +740,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_tuple_to_list_1() {
+    fn test_tuple_to_list_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -753,7 +753,7 @@ mod tests {
         );
         let args = vec![tuple];
 
-        let res = bif_erlang_tuple_to_list_1(&vm, &process, &args);
+        let res = tuple_to_list_1(&vm, &process, &args);
         let x = res.unwrap();
         assert!(x.is_list());
         if let Ok(cons) = x.try_into() {
@@ -771,7 +771,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bif_erlang_tuple_to_list_1_bad_arg_wrong_type_of_tuple() {
+    fn test_tuple_to_list_1_bad_arg_wrong_type_of_tuple() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
@@ -779,7 +779,7 @@ mod tests {
         let bad_tuple = Term::from(1);
         let args = vec![bad_tuple];
 
-        let res = bif_erlang_tuple_to_list_1(&vm, &process, &args);
+        let res = tuple_to_list_1(&vm, &process, &args);
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
         } else {

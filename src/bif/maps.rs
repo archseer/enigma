@@ -6,7 +6,7 @@ use crate::value::{self, Term, TryInto};
 use crate::vm;
 use hamt_rs::HamtMap;
 
-pub fn bif_maps_find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let key = &args[0];
     let map = &args[1];
     if let Ok(value::Map { map, .. }) = map.try_into() {
@@ -23,7 +23,7 @@ pub fn bif_maps_find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
-pub fn bif_maps_get_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn get_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     let map = &args[0];
     if let Ok(value::Map { map, .. }) = map.try_into() {
         let target = &args[1];
@@ -39,7 +39,7 @@ pub fn bif_maps_get_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) ->
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
-pub fn bif_maps_from_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn from_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let mut list = &args[0];
     if !list.is_list() {
         return Err(Exception::new(Reason::EXC_BADARG));
@@ -61,7 +61,7 @@ pub fn bif_maps_from_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term
     Ok(Term::map(heap, map))
 }
 
-pub fn bif_maps_is_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn is_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     let map = &args[0];
     if let Ok(value::Map { map, .. }) = map.try_into() {
         let target = &args[1];
@@ -71,7 +71,7 @@ pub fn bif_maps_is_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term])
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
-pub fn bif_maps_keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let map = &args[0];
     if let Ok(value::Map { map, .. }) = map.try_into() {
         let heap = &process.context_mut().heap;
@@ -81,7 +81,7 @@ pub fn bif_maps_keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
-pub fn bif_maps_merge_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn merge_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let map1 = match args[0].try_into() {
         Ok(value::Map { map, .. }) => map,
         _ => return Err(Exception::with_value(Reason::EXC_BADMAP, args[0])),
@@ -98,7 +98,7 @@ pub fn bif_maps_merge_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
     Ok(Term::map(heap, new_map))
 }
 
-pub fn bif_maps_put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let heap = &process.context_mut().heap;
     let map = args[0];
     let key = args[1];
@@ -110,7 +110,7 @@ pub fn bif_maps_put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     Err(Exception::with_value(Reason::EXC_BADMAP, map))
 }
 
-pub fn bif_maps_remove_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn remove_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let heap = &process.context_mut().heap;
     let map = args[0];
     let key = args[1];
@@ -121,7 +121,7 @@ pub fn bif_maps_remove_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     Err(Exception::with_value(Reason::EXC_BADMAP, map))
 }
 
-pub fn bif_maps_update_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn update_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let map = args[0];
     let key = args[1];
     let value = args[2];
@@ -140,7 +140,7 @@ pub fn bif_maps_update_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     Err(Exception::with_value(Reason::EXC_BADMAP, map))
 }
 
-pub fn bif_maps_values_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn values_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let map = args[0];
     if let Ok(value::Map { map, .. }) = map.try_into() {
         let heap = &process.context_mut().heap;
@@ -150,7 +150,7 @@ pub fn bif_maps_values_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     Err(Exception::with_value(Reason::EXC_BADMAP, map))
 }
 
-pub fn bif_maps_take_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn take_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let key = args[0];
     let map = args[1];
     if let Ok(value::Map { map, .. }) = map.try_into() {
@@ -184,7 +184,7 @@ mod tests {
         let map = map!(heap, key => Term::int(3));
         let args = vec![key, map];
 
-        let res = bif_maps_find_2(&vm, &process, &args);
+        let res = find_2(&vm, &process, &args);
 
         if let Ok(tuple) = res.unwrap().try_into() {
             let tuple: &value::Tuple = tuple; // annoying, need type annotation
@@ -208,7 +208,7 @@ mod tests {
         let map = map!(heap, key => Term::int(3));
         let args = vec![str_to_atom!("fail"), map];
 
-        let res = bif_maps_find_2(&vm, &process, &args);
+        let res = find_2(&vm, &process, &args);
 
         assert_eq!(res, Ok(atom!(ERROR)));
     }
@@ -221,7 +221,7 @@ mod tests {
 
         let args = vec![str_to_atom!("fail"), str_to_atom!("test")];
 
-        if let Err(exception) = bif_maps_find_2(&vm, &process, &args) {
+        if let Err(exception) = find_2(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
             assert_eq!(exception.value, str_to_atom!("test"));
         } else {
@@ -239,7 +239,7 @@ mod tests {
         let map = map!(heap, str_to_atom!("test") => Term::int(3));
         let args = vec![map, str_to_atom!("test")];
 
-        let res = bif_maps_get_2(&vm, &process, &args);
+        let res = get_2(&vm, &process, &args);
 
         assert_eq!(res, Ok(Term::int(3)));
     }
@@ -253,7 +253,7 @@ mod tests {
         let bad_map = Term::int(3);
         let args = vec![bad_map, Term::atom(atom::from_str("test"))];
 
-        if let Err(exception) = bif_maps_get_2(&vm, &process, &args) {
+        if let Err(exception) = get_2(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
             assert_eq!(exception.value, bad_map);
         } else {
@@ -271,7 +271,7 @@ mod tests {
         let map = map!(heap, str_to_atom!("test") => Term::int(3));
         let args = vec![map, str_to_atom!("fail")];
 
-        if let Err(exception) = bif_maps_get_2(&vm, &process, &args) {
+        if let Err(exception) = get_2(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADKEY);
             assert_eq!(exception.value, str_to_atom!("fail"));
         } else {
@@ -296,7 +296,7 @@ mod tests {
             )
         );
         let args = vec![list];
-        let res = bif_maps_from_list_1(&vm, &process, &args);
+        let res = from_list_1(&vm, &process, &args);
     }
 
     #[test]
@@ -308,7 +308,7 @@ mod tests {
 
         let bad_list = Term::int(1);
         let args = vec![bad_list];
-        let res = bif_maps_from_list_1(&vm, &process, &args);
+        let res = from_list_1(&vm, &process, &args);
 
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
@@ -335,7 +335,7 @@ mod tests {
             )
         );
         let args = vec![list];
-        let res = bif_maps_from_list_1(&vm, &process, &args);
+        let res = from_list_1(&vm, &process, &args);
 
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADARG);
@@ -354,7 +354,7 @@ mod tests {
         let map = map!(heap, str_to_atom!("test") => Term::int(1));
         let args = vec![map, str_to_atom!("test")];
 
-        let res = bif_maps_is_key_2(&vm, &process, &args);
+        let res = is_key_2(&vm, &process, &args);
 
         assert_eq!(res, Ok(Term::boolean(true)));
     }
@@ -369,7 +369,7 @@ mod tests {
         let map = map!(heap, str_to_atom!("test") => Term::int(3));
         let args = vec![map, str_to_atom!("false")];
 
-        let res = bif_maps_is_key_2(&vm, &process, &args);
+        let res = is_key_2(&vm, &process, &args);
 
         assert_eq!(res, Ok(Term::boolean(false)));
     }
@@ -383,7 +383,7 @@ mod tests {
         let bad_map = Term::int(3);
         let args = vec![bad_map, str_to_atom!("test")];
 
-        if let Err(exception) = bif_maps_is_key_2(&vm, &process, &args) {
+        if let Err(exception) = is_key_2(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
             assert_eq!(exception.value, bad_map);
         } else {
@@ -402,7 +402,7 @@ mod tests {
             map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let args = vec![map];
 
-        if let Ok(cons) = bif_maps_keys_1(&vm, &process, &args).unwrap().try_into() {
+        if let Ok(cons) = keys_1(&vm, &process, &args).unwrap().try_into() {
             let cons: &value::Cons = cons;
             assert!(cons.iter().any(|&v| v == str_to_atom!("test")));
             assert!(cons.iter().any(|&v| v == str_to_atom!("test2")));
@@ -421,7 +421,7 @@ mod tests {
         let bad_map = Term::int(3);
         let args = vec![bad_map, str_to_atom!("test")];
 
-        if let Err(exception) = bif_maps_keys_1(&vm, &process, &args) {
+        if let Err(exception) = keys_1(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
             assert_eq!(exception.value, bad_map);
         } else {
@@ -442,7 +442,7 @@ mod tests {
             map!(heap, str_to_atom!("test") => Term::int(3), str_to_atom!("test3") => Term::int(4));
         let args = vec![map1, map2];
 
-        let res = bif_maps_merge_2(&vm, &process, &args);
+        let res = merge_2(&vm, &process, &args);
         if let Ok(value::Map { map, .. }) = res.unwrap().try_into() {
             assert_eq!(map.len(), 3);
             assert_eq!(map.find(&str_to_atom!("test")), Some(&Term::int(1)));
@@ -465,7 +465,7 @@ mod tests {
         let bad_map = Term::int(2);
 
         let args = vec![map, bad_map];
-        let res = bif_maps_merge_2(&vm, &process, &args);
+        let res = merge_2(&vm, &process, &args);
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
             assert_eq!(exception.value, bad_map);
@@ -474,7 +474,7 @@ mod tests {
         }
 
         let args = vec![bad_map, map];
-        let res = bif_maps_merge_2(&vm, &process, &args);
+        let res = merge_2(&vm, &process, &args);
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
             assert_eq!(exception.value, bad_map);
@@ -485,7 +485,7 @@ mod tests {
         // Will return the first bad map
         let bad_map2 = Term::int(3);
         let args = vec![bad_map, bad_map2];
-        let res = bif_maps_merge_2(&vm, &process, &args);
+        let res = merge_2(&vm, &process, &args);
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
             assert_eq!(exception.value, bad_map);
@@ -507,7 +507,7 @@ mod tests {
         let map: value::HAMT = HamtMap::new();
         let args = vec![Term::map(heap, map), key, value];
 
-        let res = bif_maps_put_3(&vm, &process, &args);
+        let res = put_3(&vm, &process, &args);
 
         if let Ok(value::Map { map, .. }) = res.unwrap().try_into() {
             assert_eq!(map.find(&key), Some(&value));
@@ -527,7 +527,7 @@ mod tests {
         let bad_map = Term::int(3);
         let args = vec![bad_map, key, value];
 
-        let res = bif_maps_put_3(&vm, &process, &args);
+        let res = put_3(&vm, &process, &args);
 
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
@@ -548,7 +548,7 @@ mod tests {
         let map = map!(heap, key => Term::int(1));
         let args = vec![map, key];
 
-        let res = bif_maps_remove_2(&vm, &process, &args);
+        let res = remove_2(&vm, &process, &args);
 
         if let Ok(value::Map { map, .. }) = res.unwrap().try_into() {
             assert_eq!(map.find(&key).is_none(), true);
@@ -565,7 +565,7 @@ mod tests {
 
         let args = vec![Term::int(1), Term::int(2)];
 
-        let res = bif_maps_remove_2(&vm, &process, &args);
+        let res = remove_2(&vm, &process, &args);
 
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
@@ -588,7 +588,7 @@ mod tests {
         let map = map!(heap, key => value);
         let args = vec![map, key, update_value];
 
-        let res = bif_maps_update_3(&vm, &process, &args);
+        let res = update_3(&vm, &process, &args);
 
         if let Ok(value::Map { map, .. }) = res.unwrap().try_into() {
             assert_eq!(map.find(&key), Some(&update_value));
@@ -609,7 +609,7 @@ mod tests {
         let map: value::HAMT = HamtMap::new();
         let args = vec![Term::map(heap, map), key, value];
 
-        let res = bif_maps_update_3(&vm, &process, &args);
+        let res = update_3(&vm, &process, &args);
 
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADKEY);
@@ -630,7 +630,7 @@ mod tests {
         let bad_map = Term::int(3);
         let args = vec![bad_map, key, value];
 
-        let res = bif_maps_update_3(&vm, &process, &args);
+        let res = update_3(&vm, &process, &args);
 
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
@@ -651,7 +651,7 @@ mod tests {
             map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(2));
         let args = vec![map];
 
-        if let Ok(cons) = bif_maps_values_1(&vm, &process, &args).unwrap().try_into() {
+        if let Ok(cons) = values_1(&vm, &process, &args).unwrap().try_into() {
             let cons: &value::Cons = cons; // type annotation
             assert!(cons.iter().any(|&val| val == Term::int(1)));
             assert!(cons.iter().any(|&val| val == Term::int(2)));
@@ -670,7 +670,7 @@ mod tests {
         let bad_map = Term::int(3);
         let args = vec![bad_map, str_to_atom!("test")];
 
-        if let Err(exception) = bif_maps_values_1(&vm, &process, &args) {
+        if let Err(exception) = values_1(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
             assert_eq!(exception.value, bad_map);
         } else {
@@ -690,7 +690,7 @@ mod tests {
         let key = str_to_atom!("test2");
         let args = vec![key, map];
 
-        let res = bif_maps_take_2(&vm, &process, &args);
+        let res = take_2(&vm, &process, &args);
         if let Ok(tuple) = res.unwrap().try_into() {
             let tuple: &value::Tuple = tuple; // annoying, need type annotation
             let mut iter = tuple.iter();
@@ -716,7 +716,7 @@ mod tests {
         let key = str_to_atom!("test2");
         let args = vec![key, bad_map];
 
-        let res = bif_maps_take_2(&vm, &process, &args);
+        let res = take_2(&vm, &process, &args);
         if let Err(exception) = res {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
             assert_eq!(exception.value, bad_map);
@@ -737,7 +737,7 @@ mod tests {
         let key = str_to_atom!("test3");
         let args = vec![key, map];
 
-        let res = bif_maps_take_2(&vm, &process, &args);
+        let res = take_2(&vm, &process, &args);
         if let Ok(value) = res {
             assert_eq!(value, str_to_atom!("error"));
         } else {
