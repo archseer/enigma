@@ -910,15 +910,15 @@ impl Machine {
                 Opcode::IsMap => op_is_type!(context, ins.args, is_map),
                 Opcode::IsFunction2 => {
                     if let Ok(value::Boxed { value, .. }) =
-                        context.expand_arg(&ins.args[0]).try_into()
+                        context.expand_arg(&ins.args[1]).try_into()
                     {
                         let closure: &value::Closure = value; // ughh type annotation
-                        let arity = ins.args[1].to_u32();
+                        let arity = ins.args[2].to_u32();
                         if closure.mfa.2 == arity {
                             continue;
                         }
                     }
-                    let fail = ins.args[2].to_u32();
+                    let fail = ins.args[0].to_u32();
                     op_jump!(context, fail);
                 }
                 Opcode::TestArity => {
