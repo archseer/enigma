@@ -1,11 +1,11 @@
-* BIFs [31/117]
+* BIFs [37/117]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
 - [ ] bif erlang:adler32/2
 - [ ] bif erlang:adler32_combine/3
 - [X] bif erlang:apply/3
-- [ ] bif erlang:atom_to_list/1
+- [X] bif erlang:atom_to_list/1
 - [X] bif erlang:binary_to_list/1
 - [ ] bif erlang:binary_to_list/3
 - [X] bif erlang:binary_to_term/1
@@ -43,10 +43,10 @@
 - [X] ubif erlang:hd/1
 - [ ] bif erlang:integer_to_list/1
 - [ ] bif erlang:is_alive/0
-- [ ] ubif erlang:length/1
+- [X] ubif erlang:length/1
 - [X] bif erlang:link/1
 - [X] bif erlang:list_to_atom/1
-- [ ] bif erlang:list_to_binary/1
+- [X] bif erlang:list_to_binary/1
 - [ ] bif erlang:list_to_float/1
 - [ ] bif erlang:list_to_integer/1
 - [ ] bif erlang:list_to_pid/1
@@ -56,14 +56,14 @@
 - [ ] bif erlang:loaded/0
 - [X] bif erlang:localtime/0
 - [ ] bif erlang:localtime_to_universaltime/2
-- [ ] bif erlang:make_ref/0
+- [X] bif erlang:make_ref/0
 - [ ] bif erlang:unique_integer/0
 - [ ] bif erlang:unique_integer/1
 - [ ] bif erlang:md5/1
 - [ ] bif erlang:md5_init/0
 - [ ] bif erlang:md5_update/2
 - [ ] bif erlang:md5_final/1
-- [ ] bif erlang:module_loaded/1
+- [X] bif erlang:module_loaded/1
 - [X] bif erlang:function_exported/3
 - [ ] bif erlang:monitor_node/2
 - [ ] bif erlang:monitor_node/3
@@ -110,7 +110,7 @@
 - [X] bif erlang:unlink/1
 - [ ] bif erlang:unregister/1
 - [X] bif erlang:whereis/1
-- [ ] bif erlang:spawn_opt/1
+- [X] bif erlang:spawn_opt/1
 - [ ] bif erlang:setnode/2
 - [ ] bif erlang:dist_get_stat/1
 - [ ] bif erlang:dist_ctrl_input_handler/2
@@ -342,9 +342,9 @@
 - [ ] bif re:run/2
 - [ ] bif re:run/3
 
-** Bifs in lists module. [4/5]
+** Bifs in lists module. [5/5]
 - [X] bif lists:member/2
-- [ ] bif lists:reverse/2
+- [X] bif lists:reverse/2
 - [X] bif lists:keymember/3
 - [X] bif lists:keysearch/3
 - [X] bif lists:keyfind/3
@@ -463,9 +463,9 @@ The searching/splitting/substituting thingies
 ** New in R14B04. [0/1]
 - [ ] bif erlang:check_old_code/1
 
-** New in R15B [0/2]
-- [ ] bif erlang:universaltime_to_posixtime/1
-- [ ] bif erlang:posixtime_to_universaltime/1
+** New in R15B [2/2]
+- [X] bif erlang:universaltime_to_posixtime/1
+- [X] bif erlang:posixtime_to_universaltime/1
 
 ** New in R15B01 [0/7]
 The dtrace BIF's are always present, but give dummy results if dynamic trace is not enabled in the build
