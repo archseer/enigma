@@ -2026,7 +2026,9 @@ impl Machine {
                     context.x[0] = Term::closure(
                         &context.heap,
                         value::Closure {
-                            mfa: module::MFA(module.name, lambda.name, lambda.arity), // TODO: use module id instead later
+                            // arity is arity minus nfree (beam_emu.c)
+                            mfa: module::MFA(module.name, lambda.name, lambda.arity - lambda.nfree),
+                            // TODO: use module id instead later
                             ptr: lambda.offset,
                             binding,
                         },
