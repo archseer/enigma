@@ -243,6 +243,8 @@ pub const BOXED_STACKTRACE: u8 = 8;
 pub const BOXED_MATCHSTATE: u8 = 9;
 pub const BOXED_SUBBINARY: u8 = 10;
 
+pub const BOXED_MODULE: u8 = 20;
+
 #[derive(Debug)]
 #[repr(C)]
 pub struct Boxed<T> {
@@ -437,6 +439,13 @@ impl Term {
     pub fn stacktrace(heap: &Heap, value: exception::StackTrace) -> Self {
         Term::from(heap.alloc(Boxed {
             header: BOXED_STACKTRACE,
+            value,
+        }))
+    }
+
+    pub fn boxed<T>(heap: &Heap, header: u8, value: T) -> Self {
+        Term::from(heap.alloc(Boxed {
+            header,
             value,
         }))
     }
@@ -674,6 +683,7 @@ impl Term {
         }
     }
 
+    // TODO: use std::borrow::Cow<[u8]> to return a copy_bits in the case of unalignment
     pub fn to_bytes(&self) -> Option<&[u8]> {
         match self.get_boxed_header() {
             Ok(BOXED_BINARY) => {

@@ -16,6 +16,7 @@ mod erlang;
 mod info;
 mod lists;
 mod maps;
+mod load;
 mod pdict;
 mod prim_file;
 
@@ -113,6 +114,9 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "append", 2 => erlang::append_2,
             "make_ref", 0 => erlang::bif_make_ref_0,
             "process_info", 2 => info::process_info_2,
+
+            // loader
+            "prepare_loading", 2 => load::prepare_loading_2,
 
             // pdict
             "get", 0 => pdict::get_0,

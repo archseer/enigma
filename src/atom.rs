@@ -216,6 +216,8 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("registered_name");
 
     atoms.register_atom("enoent");
+
+    atoms.register_atom("badfile");
     atoms
 };
 
@@ -320,6 +322,7 @@ pub const FULLSWEEP_AFTER: u32 = 86;
 pub const REGISTERED_NAME: u32 = 87;
 
 pub const ENOENT: u32 = 88;
+pub const BADFILE: u32 = 89;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

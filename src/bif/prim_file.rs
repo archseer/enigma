@@ -8,8 +8,6 @@ use crate::value::{self, Term, TryInto};
 use crate::vm;
 use std::fs;
 
-// erlang:prepare_loading/2
-
 fn error_to_tuple(heap: &Heap, error: std::io::Error) -> Term {
     use std::io::ErrorKind;
     let kind = match error.kind() {
