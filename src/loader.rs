@@ -24,7 +24,7 @@ pub struct Loader<'a> {
     imports: Vec<MFA>,
     exports: Vec<MFA>,
     literals: Vec<Term>,
-    strings: String,
+    strings: Vec<u8>,
     lambdas: Vec<Lambda>,
     atom_map: HashMap<u32, u32>, // TODO: remove this; local id -> global id
     funs: HashMap<(u32, u32), u32>, // (fun name as atom, arity) -> offset
@@ -80,7 +80,7 @@ impl<'a> Loader<'a> {
             exports: Vec::new(),
             literals: Vec::new(),
             literal_heap: Heap::new(),
-            strings: String::new(),
+            strings: Vec::new(),
             lambdas: Vec::new(),
             atom_map: HashMap::new(),
             labels: HashMap::new(),
@@ -200,7 +200,7 @@ impl<'a> Loader<'a> {
     }
 
     fn load_strings_table(&mut self, chunk: Chunk) {
-        self.strings = unsafe { std::str::from_utf8_unchecked(chunk).to_string() };
+        self.strings = chunk.to_vec();
     }
 
     fn load_literals_table(&mut self, chunk: Chunk) {
