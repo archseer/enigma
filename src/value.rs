@@ -7,9 +7,9 @@ use crate::exception;
 use crate::immix::Heap;
 use crate::instr_ptr::InstrPtr;
 use crate::loader;
+use crate::module;
 use crate::nanbox::TypedNanBox;
 use crate::process;
-use crate::module;
 use crate::servo_arc::Arc;
 use allocator_api::Layout;
 use num::bigint::BigInt;
@@ -970,6 +970,8 @@ impl std::fmt::Display for Variant {
                     }
                     BOXED_CATCH => write!(f, "CATCH"),
                     BOXED_STACKTRACE => write!(f, "STRACE"),
+                    BOXED_MODULE => write!(f, "MODULE<>"),
+                    BOXED_EXPORT => write!(f, "EXPORT<>"),
                     _ => unimplemented!(),
                 }
             },

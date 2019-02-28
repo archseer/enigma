@@ -34,6 +34,7 @@ pub struct Loader<'a> {
     code: &'a [u8],
     literal_heap: Heap,
     instructions: Vec<Instruction>,
+    on_load: Option<u32>,
 }
 
 /// Compact term encoding values. BEAM does some tricks to be able to share the memory layout with
@@ -89,6 +90,7 @@ impl<'a> Loader<'a> {
             file_names: Vec::new(),
             code: &[],
             instructions: Vec::new(),
+            on_load: None,
         }
     }
 
@@ -138,6 +140,7 @@ impl<'a> Loader<'a> {
             instructions: self.instructions,
             lines: self.lines,
             name: self.atom_map[&0], // atom 0 is module name
+            on_load: self.on_load,
         })
     }
 

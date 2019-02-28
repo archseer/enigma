@@ -25,12 +25,12 @@ impl ModuleRegistry {
         let module = loader.load_file(&bytes[..]).unwrap();
 
         let name = module.name;
-        self.add_module(name, module);
-        Ok(&self.modules[&name])
+        Ok(self.add_module(name, Box::new(module)))
     }
 
-    pub fn add_module(&mut self, atom: u32, module: Module) {
-        self.modules.insert(atom, Box::new(module));
+    pub fn add_module(&mut self, atom: u32, module: Box<Module>) -> &Module {
+        self.modules.insert(atom, module);
+        &*self.modules[&atom]
     }
 
     pub fn lookup(&self, atom: u32) -> Option<&Module> {

@@ -117,6 +117,8 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
 
             // loader
             "prepare_loading", 2 => load::prepare_loading_2,
+            "has_prepared_code_on_load", 1 => load::has_prepared_code_on_load_1,
+            "finish_loading", 1 => load::finish_loading_1,
 
             // pdict
             "get", 0 => pdict::get_0,
