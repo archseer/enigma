@@ -250,22 +250,6 @@ pub struct Boxed<T> {
     pub value: T,
 }
 
-/// Strings use an Arc so they can be sent to other processes without
-/// requiring a full copy of the data.
-#[derive(Debug)]
-#[repr(C)]
-pub struct Binary {
-    pub header: Header,
-    pub value: bitstring::Binary,
-}
-
-#[derive(Debug)]
-#[repr(C)]
-pub struct Ref {
-    pub header: Header,
-    pub value: process::Ref,
-}
-
 // term order:
 // number < atom < reference < fun < port < pid < tuple < map < nil < list < bit string
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
@@ -801,7 +785,12 @@ impl PartialEq for Variant {
                             let b2 = &*(*p2 as *const Boxed<bitstring::RcBinary>);
                             b1.value.data.eq(&b2.value.data)
                         }
-                        _ => unimplemented!(),
+                        BOXED_REF => {
+                            let r1 = &*(*p1 as *const Boxed<process::Ref>);
+                            let r2 = &*(*p2 as *const Boxed<process::Ref>);
+                            r1.value.eq(&r2.value)
+                        }
+                        i => unimplemented!("boxed_value eq for {}", i),
                     }
                 } else {
                     false
