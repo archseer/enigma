@@ -85,24 +85,26 @@ impl Block {
             }
         });
 
-        // let size = layout.size();
+        let size = layout.size();
 
         unsafe {
             let data = Global.alloc(layout).unwrap();
 
             let next = Cell::new(None);
-            let ptr = data.as_ptr() as usize + mem::size_of::<Block>();
-            let ptr = ptr as *mut u8;
+            let ptr = Cell::new(data);
+            let footer_ptr = data.as_ptr() as usize + size - mem::size_of::<Block>();
+            let footer_ptr = footer_ptr as *mut Block;
+
             ptr::write(
-                data.as_ptr() as *mut Block,
+                footer_ptr,
                 Block {
                     data,
                     layout,
                     next,
-                    ptr: Cell::new(NonNull::new_unchecked(ptr)),
+                    ptr,
                 },
             );
-            data.cast()
+            NonNull::new_unchecked(footer_ptr)
         }
     }
 }
@@ -140,18 +142,22 @@ impl Heap {
     #[inline(always)]
     pub fn alloc_layout(&self, layout: Layout) -> NonNull<u8> {
         unsafe {
-            let header = self.current_block.get();
-            let header = header.as_ref();
-            let ptr = header.ptr.get().as_ptr() as usize;
+            let footer = self.current_block.get();
+            let footer = footer.as_ref();
+            let ptr = footer.ptr.get().as_ptr() as usize;
             let ptr = round_up_to(ptr, layout.align());
-            let end = header.data.as_ptr() as usize + header.layout.size();
-            // debug_assert!(ptr <= end);
+            let end = footer as *const _ as usize;
+            debug_assert!(ptr <= end);
 
-            let new_ptr = ptr + layout.size();
+            let new_ptr = match ptr.checked_add(layout.size()) {
+                Some(p) => p,
+                None => self.overflow(),
+            };
+
             if new_ptr <= end {
                 let p = ptr as *mut u8;
-                debug_assert!(new_ptr > header as *const _ as usize);
-                header.ptr.set(NonNull::new_unchecked(new_ptr as *mut u8));
+                debug_assert!(new_ptr <= footer as *const _ as usize);
+                footer.ptr.set(NonNull::new_unchecked(new_ptr as *mut u8));
                 return NonNull::new_unchecked(p);
             }
         }
@@ -160,34 +166,40 @@ impl Heap {
         self.alloc_layout_slow(layout)
     }
 
-    // Slow path allocation for when we need to allocate a new chunk from the
-    // parent bump set because there isn't enough room in our current chunk.
+    #[inline(never)]
+    #[cold]
+    fn overflow(&self) -> ! {
+        panic!("allocation too large, caused overflow")
+    }
+
+    // Slow path allocation for when we need to allocate a new block from the
+    // parent bump set because there isn't enough room in our current block.
     #[inline(never)]
     fn alloc_layout_slow(&self, layout: Layout) -> NonNull<u8> {
         unsafe {
-            // Get a new chunk from the global allocator.
+            // Get a new block from the global allocator.
             let size = layout.size();
-            let header = Block::new(Some(layout));
+            let footer = Block::new(Some(layout));
 
-            // Set our current chunk's next link to this new chunk.
-            self.current_block.get().as_ref().next.set(Some(header));
+            // Set our current block's next link to this new block.
+            self.current_block.get().as_ref().next.set(Some(footer));
 
-            // Set the new chunk as our new current chunk.
-            self.current_block.set(header);
+            // Set the new block as our new current block.
+            self.current_block.set(footer);
 
             // Move the bump ptr finger ahead to allocate room for `val`.
-            let header = header.as_ref();
-            let ptr = header.ptr.as_ptr() as usize + size;
+            let footer = footer.as_ref();
+            let ptr = footer.ptr.get().as_ptr() as usize + size;
             debug_assert!(
-                ptr > header as *const _ as usize,
+                ptr <= footer as *const _ as usize,
                 "{} <= {}",
                 ptr,
-                header as *const _ as usize
+                footer as *const _ as usize
             );
-            header.ptr.set(NonNull::new_unchecked(ptr as *mut u8));
+            footer.ptr.set(NonNull::new_unchecked(ptr as *mut u8));
 
-            // Return a pointer to the start of this chunk.
-            header.data.cast::<u8>()
+            // Return a pointer to the start of this block.
+            footer.data.cast::<u8>()
         }
     }
 
