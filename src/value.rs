@@ -453,10 +453,7 @@ impl Term {
     }
 
     pub fn boxed<T>(heap: &Heap, header: u8, value: T) -> Self {
-        Term::from(heap.alloc(Boxed {
-            header,
-            value,
-        }))
+        Term::from(heap.alloc(Boxed { header, value }))
     }
 
     // immediates

@@ -716,6 +716,7 @@ fn bif_erlang_trunc_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
 mod tests {
     use super::*;
     use crate::immix::Heap;
+    use num::bigint::ToBigInt;
 
     /// Converts an erlang list to a value vector.
     fn to_vec(value: Term) -> Vec<Term> {

@@ -3,7 +3,7 @@ use crate::exception::{Exception, Reason};
 use crate::numeric::division::{FlooredDiv, OverflowingFlooredDiv};
 use crate::numeric::modulo::{Modulo, OverflowingModulo};
 use crate::process::RcProcess;
-use crate::value::{self, Term};
+use crate::value::{self, Term, TryInto};
 use crate::vm;
 use num::bigint::BigInt;
 // use num::bigint::ToBigInt;
@@ -198,12 +198,14 @@ pub fn math_pow_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Bif
 mod tests {
     use super::*;
     use crate::immix::Heap;
+    use crate::module;
+    use crate::process;
 
     /// Converts an erlang list to a value vector.
     fn to_vec(value: Term) -> Vec<Term> {
         let mut vec = Vec::new();
         let mut cons = &value;
-        while let Ok(Cons { head, tail }) = cons.try_into() {
+        while let Ok(value::Cons { head, tail }) = cons.try_into() {
             vec.push(*head);
             cons = &tail;
         }

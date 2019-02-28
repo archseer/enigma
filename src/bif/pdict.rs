@@ -91,6 +91,8 @@ pub fn erase_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResu
 mod tests {
     use super::*;
     use crate::immix::Heap;
+    use crate::module;
+    use crate::process;
 
     #[test]
     fn test_bif_pdict() {

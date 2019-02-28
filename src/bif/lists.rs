@@ -1,8 +1,8 @@
 use crate::atom;
+use crate::bif::{BifFn, BifResult};
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, Tuple, TryInto};
-use crate::bif::{BifResult, BifFn};
+use crate::value::{self, Cons, Term, TryInto, Tuple};
 use crate::vm;
 
 pub fn member_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
@@ -182,11 +182,12 @@ fn keyfind(_func: BifFn, _process: &RcProcess, args: &[Term]) -> BifResult {
     Ok(atom!(FALSE))
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::immix::Heap;
+    use crate::module;
+    use crate::process;
 
     /// Converts an erlang list to a value vector.
     fn to_vec(value: Term) -> Vec<Term> {

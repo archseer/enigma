@@ -1588,15 +1588,17 @@ mod tests {
         let subbinary =
             SubBinary::new(Arc::new(Binary::from(vec![0xAB, 0xCD, 0xEF])), 20, 4, false);
 
-        assert!(
-            cmp_bits(
-                binary.data.as_ptr(),
-                4,
-                subbinary.original.data.as_ptr(),
-                subbinary.bit_offset as usize,
-                subbinary.bitsize + subbinary.size
-            ) == std::cmp::Ordering::Equal
-        )
+        unsafe {
+            assert!(
+                cmp_bits(
+                    binary.data.as_ptr(),
+                    4,
+                    subbinary.original.data.as_ptr(),
+                    subbinary.bit_offset as usize,
+                    subbinary.bitsize + subbinary.size
+                ) == std::cmp::Ordering::Equal
+            )
+        }
     }
 
     #[test]
@@ -1604,14 +1606,16 @@ mod tests {
         let binary = Arc::new(Binary::from(vec![0xB, 0xCD, 0xE]));
         let subbinary = SubBinary::new(Arc::new(Binary::from(vec![0xB, 0xCD, 0xE])), 20, 0, false);
 
-        assert!(
-            cmp_bits(
-                binary.data.as_ptr(),
-                0,
-                subbinary.original.data.as_ptr(),
-                subbinary.bit_offset as usize,
-                subbinary.bitsize + subbinary.size
-            ) == std::cmp::Ordering::Equal
-        )
+        unsafe {
+            assert!(
+                cmp_bits(
+                    binary.data.as_ptr(),
+                    0,
+                    subbinary.original.data.as_ptr(),
+                    subbinary.bit_offset as usize,
+                    subbinary.bitsize + subbinary.size
+                ) == std::cmp::Ordering::Equal
+            )
+        }
     }
 }
