@@ -1,4 +1,5 @@
 use crate::atom;
+use crate::module;
 use crate::bitstring;
 use crate::immix::Heap;
 use crate::value::{self, Term, HAMT};
@@ -75,7 +76,7 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> 
         Tag::String => decode_string(rest, heap),
         Tag::Binary => decode_binary(rest, heap),
         // NewFun
-        // Export
+        Tag::Export => decode_export(rest, heap),
         // NewReference
         // SmallAtom (deprecated?)
         Tag::Map => decode_map(rest, heap),
@@ -223,6 +224,14 @@ pub fn decode_binary<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term>
 
     let (rest, bytes) = take!(rest, len)?;
     Ok((rest, Term::binary(heap, bitstring::Binary::from(bytes))))
+}
+
+pub fn decode_export<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
+    let (rest, m) = decode_value(rest, heap)?;
+    let (rest, f) = decode_value(rest, heap)?;
+    let (rest, a) = decode_value(rest, heap)?;
+
+    Ok((rest, Term::export(heap, module::MFA(m.to_u32(), f.to_u32(), a.to_u32()))))
 }
 
 #[cfg(target_pointer_width = "32")]

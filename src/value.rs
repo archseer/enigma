@@ -9,6 +9,7 @@ use crate::instr_ptr::InstrPtr;
 use crate::loader;
 use crate::nanbox::TypedNanBox;
 use crate::process;
+use crate::module;
 use crate::servo_arc::Arc;
 use allocator_api::Layout;
 use num::bigint::BigInt;
@@ -244,6 +245,7 @@ pub const BOXED_MATCHSTATE: u8 = 9;
 pub const BOXED_SUBBINARY: u8 = 10;
 
 pub const BOXED_MODULE: u8 = 20;
+pub const BOXED_EXPORT: u8 = 21;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -439,6 +441,13 @@ impl Term {
     pub fn stacktrace(heap: &Heap, value: exception::StackTrace) -> Self {
         Term::from(heap.alloc(Boxed {
             header: BOXED_STACKTRACE,
+            value,
+        }))
+    }
+
+    pub fn export(heap: &Heap, value: module::MFA) -> Self {
+        Term::from(heap.alloc(Boxed {
+            header: BOXED_EXPORT,
             value,
         }))
     }
