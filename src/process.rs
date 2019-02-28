@@ -287,7 +287,12 @@ impl Process {
                     self.local_data_mut().lt_monitors.push((from, reference));
                 }
                 Signal::Demonitor { from } => {
-                    if let Some(pos) = self.local_data_mut().lt_monitors.iter().position(|(x, _)| *x == from) {
+                    if let Some(pos) = self
+                        .local_data_mut()
+                        .lt_monitors
+                        .iter()
+                        .position(|(x, _)| *x == from)
+                    {
                         self.local_data_mut().lt_monitors.remove(pos);
                     }
                 }
@@ -298,7 +303,12 @@ impl Process {
 
     fn handle_monitor_down_signal(&self, signal: Signal) {
         // Create a 'DOWN' message and replace the signal with it...
-        if let Signal::MonitorDown { from, reason, reference } = signal {
+        if let Signal::MonitorDown {
+            from,
+            reason,
+            reference,
+        } = signal
+        {
             // assert!(is_immed(reason));
             let heap = &self.context_mut().heap;
             let from = Term::pid(from);
@@ -307,7 +317,7 @@ impl Process {
 
             let msg = tup!(heap, atom!(DOWN), reference, atom!(PROCESS), from, reason);
             self.local_data_mut().mailbox.send(msg);
-            // bump reds by 8?
+        // bump reds by 8?
         } else {
             unreachable!();
         }
@@ -413,9 +423,7 @@ impl Process {
         for pid in local_data.monitors.drain() {
             // we're watching someone else
             // send_demonitor(mon)
-            let msg = Signal::Demonitor {
-                from: self.pid,
-            };
+            let msg = Signal::Demonitor { from: self.pid };
             self::send_signal(state, pid, msg);
         }
 
@@ -425,7 +433,7 @@ impl Process {
             let msg = Signal::MonitorDown {
                 reason: reason.clone(),
                 from: self.pid,
-                reference
+                reference,
             };
             self::send_signal(state, pid, msg);
         }
@@ -511,10 +519,7 @@ pub fn spawn(
             .next_ref
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-        parent
-            .local_data_mut()
-            .monitors
-            .insert(new_proc.pid);
+        parent.local_data_mut().monitors.insert(new_proc.pid);
 
         new_proc
             .local_data_mut()
