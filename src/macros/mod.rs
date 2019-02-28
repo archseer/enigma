@@ -128,7 +128,6 @@ macro_rules! map {
 #[macro_export]
 macro_rules! iter_to_list {
     ($heap: expr, $iter:expr) => {
-        // FIXME The list required to rev for HamtMap and Cons
-        $iter.fold(Term::nil(), |res, val| value::cons($heap, val, res))
+        $iter.fold(Term::nil(), |acc, val| cons!($heap, val, acc))
     };
 }

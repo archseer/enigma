@@ -118,6 +118,9 @@ pub struct LocalData {
 
     parent: Option<PID>,
 
+    // name (atom)
+    pub name: Option<u32>,
+
     // links (tree)
     pub links: HashSet<PID>,
     // monitors (tree)
@@ -170,6 +173,7 @@ impl Process {
             context: Box::new(context),
             flags: Flag::INITIAL,
             parent,
+            name: None,
             links: HashSet::new(),
             monitors: HashSet::new(),
             lt_monitors: Vec::new(),

@@ -35,3 +35,23 @@ extern crate bitflags;
 #[cfg(test)]
 #[macro_use]
 extern crate quickcheck;
+
+// extracted from itertools
+trait Itertools: Iterator {
+    #[inline]
+    fn fold_results<A, E, B, F>(&mut self, mut start: B, mut f: F) -> Result<B, E>
+    where
+        Self: Iterator<Item = Result<A, E>>,
+        F: FnMut(B, A) -> B,
+    {
+        for elt in self {
+            match elt {
+                Ok(v) => start = f(start, v),
+                Err(u) => return Err(u),
+            }
+        }
+        Ok(start)
+    }
+}
+
+impl<T: ?Sized> Itertools for T where T: Iterator {}

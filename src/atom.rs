@@ -179,6 +179,43 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
 
     atoms.register_atom("link");
     atoms.register_atom("monitor");
+
+    atoms.register_atom("current_function");
+    atoms.register_atom("current_location");
+    atoms.register_atom("current_stacktrace");
+    atoms.register_atom("initial_call");
+    atoms.register_atom("status");
+    atoms.register_atom("messages");
+    atoms.register_atom("message_queue_len");
+    atoms.register_atom("message_queue_data");
+    atoms.register_atom("links");
+    atoms.register_atom("monitored_by");
+    atoms.register_atom("dictionary");
+    atoms.register_atom("error_handler");
+    atoms.register_atom("heap_size");
+    atoms.register_atom("stack_size");
+    atoms.register_atom("memory");
+    atoms.register_atom("garbage_collection");
+    atoms.register_atom("garbage_collection_info");
+    atoms.register_atom("group_leader");
+    atoms.register_atom("reductions");
+    atoms.register_atom("priority");
+    atoms.register_atom("trace");
+    atoms.register_atom("binary");
+    atoms.register_atom("sequential_trace_token");
+    atoms.register_atom("catch_level");
+    atoms.register_atom("backtrace");
+    atoms.register_atom("last_calls");
+    atoms.register_atom("total_heap_size");
+    atoms.register_atom("suspending");
+    atoms.register_atom("min_heap_size");
+    atoms.register_atom("min_bin_vheap_size");
+    atoms.register_atom("max_heap_size");
+    atoms.register_atom("magic_ref");
+    atoms.register_atom("fullsweep_after");
+    atoms.register_atom("registered_name");
+
+    atoms.register_atom("enoent");
     atoms
 };
 
@@ -246,6 +283,43 @@ pub const PROCESS: u32 = 51;
 
 pub const LINK: u32 = 52;
 pub const MONITOR: u32 = 53;
+
+pub const CURRENT_FUNCTION: u32 = 54;
+pub const CURRENT_LOCATION: u32 = 55;
+pub const CURRENT_STACKTRACE: u32 = 56;
+pub const INITIAL_CALL: u32 = 57;
+pub const STATUS: u32 = 58;
+pub const MESSAGES: u32 = 59;
+pub const MESSAGE_QUEUE_LEN: u32 = 60;
+pub const MESSAGE_QUEUE_DATA: u32 = 61;
+pub const LINKS: u32 = 62;
+pub const MONITORED_BY: u32 = 63;
+pub const DICTIONARY: u32 = 64;
+pub const ERROR_HANDLER: u32 = 65;
+pub const HEAP_SIZE: u32 = 66;
+pub const STACK_SIZE: u32 = 67;
+pub const MEMORY: u32 = 68;
+pub const GARBAGE_COLLECTION: u32 = 69;
+pub const GARBAGE_COLLECTION_INFO: u32 = 70;
+pub const GROUP_LEADER: u32 = 71;
+pub const REDUCTIONS: u32 = 72;
+pub const PRIORITY: u32 = 73;
+pub const TRACE: u32 = 74;
+pub const BINARY: u32 = 75;
+pub const SEQUENTIAL_TRACE_TOKEN: u32 = 76;
+pub const CATCH_LEVEL: u32 = 77;
+pub const BACKTRACE: u32 = 78;
+pub const LAST_CALLS: u32 = 79;
+pub const TOTAL_HEAP_SIZE: u32 = 80;
+pub const SUSPENDING: u32 = 81;
+pub const MIN_HEAP_SIZE: u32 = 82;
+pub const MIN_BIN_VHEAP_SIZE: u32 = 83;
+pub const MAX_HEAP_SIZE: u32 = 84;
+pub const MAGIC_REF: u32 = 85;
+pub const FULLSWEEP_AFTER: u32 = 86;
+pub const REGISTERED_NAME: u32 = 87;
+
+pub const ENOENT: u32 = 88;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

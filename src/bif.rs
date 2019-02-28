@@ -112,6 +112,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "++", 2 => erlang::append_2,
             "append", 2 => erlang::append_2,
             "make_ref", 0 => erlang::bif_make_ref_0,
+            "process_info", 2 => info::process_info_2,
 
             // pdict
             "get", 0 => pdict::get_0,
@@ -639,6 +640,8 @@ fn bif_erlang_register_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
             .process_registry
             .lock()
             .register(name, process.clone());
+
+        process.local_data_mut().name = Some(name);
         return Ok(atom!(TRUE));
     }
     Err(Exception::new(Reason::EXC_BADARG))

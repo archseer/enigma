@@ -8,9 +8,15 @@ use crate::value::{self, Term, TryInto};
 use crate::vm;
 use std::fs;
 
+// erlang:prepare_loading/2
+
 fn error_to_tuple(heap: &Heap, error: std::io::Error) -> Term {
-    // TODO:
-    tup2!(heap, atom!(ERROR), atom!(VALUE))
+    use std::io::ErrorKind;
+    let kind = match error.kind() {
+        ErrorKind::NotFound => atom!(ENOENT),
+        _ => unimplemented!("error_to_tuple for {:?}", error)
+    };
+    tup2!(heap, atom!(ERROR), kind)
 }
 
 pub fn get_cwd_nif_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResult {
