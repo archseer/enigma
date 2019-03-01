@@ -15,8 +15,8 @@ mod chrono;
 mod erlang;
 mod info;
 mod lists;
-mod maps;
 mod load;
+mod maps;
 mod pdict;
 mod prim_file;
 
@@ -629,6 +629,25 @@ pub fn bif_erlang_process_flag_2(
                 _ => return Err(Exception::new(Reason::EXC_BADARG)),
             }
             Ok(Term::boolean(old_value))
+        }
+        Variant::Atom(atom::PRIORITY) => {
+            use process::StateFlag;
+            let flag = match args[1].into_variant() {
+                // TODO atom to_bool, then pass that in as 2 arg
+                Variant::Atom(atom::MAX) => StateFlag::PRQ_MAX,
+                Variant::Atom(atom::HIGH) => StateFlag::PRQ_HIGH,
+                Variant::Atom(atom::MEDIUM) => StateFlag::PRQ_MEDIUM,
+                Variant::Atom(atom::LOW) => StateFlag::PRQ_LOW,
+                _ => return Err(Exception::new(Reason::EXC_BADARG)),
+            };
+            let local_data = process.local_data_mut();
+
+            let old_value = match local_data.state & StateFlag::PRQ_MASK {
+                StateFlag::PRQ_MAX => atom!(MAX),
+                _ => atom!(UNDEFINED),
+            };
+            local_data.state = flag;
+            Ok(old_value)
         }
         Variant::Atom(i) => unimplemented!(
             "erlang:process_flag/2 not implemented for {:?}",

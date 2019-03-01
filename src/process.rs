@@ -111,10 +111,28 @@ impl ExecutionContext {
     }
 }
 
+bitflags! {
+    pub struct StateFlag: u8 {
+        const INITIAL = 0;
+
+        const PRQ_OFFSET = 0;
+        const PRQ_BITS = 3;
+
+        const PRQ_MAX = 0b100;
+        const PRQ_HIGH = 0b11;
+        const PRQ_MEDIUM = 0b10;
+        const PRQ_LOW = 0b01;
+
+        const PRQ_MASK = (1 << Self::PRQ_BITS.bits) - 1;
+    }
+}
+
 #[derive(Debug)]
 pub struct LocalData {
     // allocator, panic handler
     context: Box<ExecutionContext>,
+
+    pub state: StateFlag,
 
     parent: Option<PID>,
 
@@ -172,6 +190,7 @@ impl Process {
             // allocator: LocalAllocator::new(global_allocator.clone(), config),
             context: Box::new(context),
             flags: Flag::INITIAL,
+            state: StateFlag::INITIAL,
             parent,
             name: None,
             links: HashSet::new(),
