@@ -351,6 +351,18 @@ macro_rules! fail {
     }};
 }
 
+macro_rules! cond_fail {
+    ($context:expr, $label:expr, $exc: expr) => {{
+        let fail = $label.to_u32();
+        if fail != 0 {
+            op_jump!($context, fail);
+            continue;
+        } else {
+            return Err($exc)
+        }
+    }};
+}
+
 macro_rules! op_fixed_apply {
     ($vm:expr, $context:expr, $process:expr, $arity:expr) => {{
         let arity = $arity as usize;
@@ -800,28 +812,28 @@ impl Machine {
                 }
                 Opcode::Bif1 => {
                     // literal import, arg, x reg
-                    if let [LValue::Literal(dest), arg1, reg] = &ins.args[..] {
+                    if let [fail, LValue::Literal(dest), arg1, reg] = &ins.args[..] {
                         let args = &[context.expand_arg(arg1)];
                         // TODO: precompute these lookups
                         let mfa = &module.imports[*dest as usize];
-                        let val = bif::apply(self, process, mfa, args).unwrap(); // TODO handle fail
-                        set_register!(context, reg, val);
-
-                    // TODO: consume fail label if not 0, else return error
+                        match bif::apply(self, process, mfa, args) {
+                            Ok(val) => set_register!(context, reg, val),
+                            Err(exc) => cond_fail!(context, fail, exc),
+                        }
                     } else {
                         unreachable!()
                     }
                 }
                 Opcode::Bif2 => {
                     // literal import, arg, arg, x reg
-                    if let [LValue::Literal(dest), arg1, arg2, reg] = &ins.args[..] {
+                    if let [fail, LValue::Literal(dest), arg1, arg2, reg] = &ins.args[..] {
                         let args = &[context.expand_arg(arg1), context.expand_arg(arg2)];
                         // TODO: precompute these lookups
                         let mfa = &module.imports[*dest as usize];
-                        let val = bif::apply(self, process, mfa, args).unwrap(); // TODO handle fail
-                        set_register!(context, reg, val);
-
-                    // TODO: consume fail label if not 0, else return error
+                        match bif::apply(self, process, mfa, args) {
+                            Ok(val) => set_register!(context, reg, val),
+                            Err(exc) => cond_fail!(context, fail, exc),
+                        }
                     } else {
                         unreachable!()
                     }
@@ -1097,7 +1109,6 @@ impl Machine {
                     // source, head, tail
                     if let Ok(value::Cons { head, tail }) =
                         context.expand_arg(&ins.args[0]).try_into()
-                    // TODO: this clone is bad but the borrow checker complains (but doesn't on GetTl/GetHd)
                     {
                         set_register!(context, &ins.args[1], *head);
                         set_register!(context, &ins.args[2], *tail);
@@ -1321,11 +1332,10 @@ impl Machine {
                         // TODO: GcBif needs to handle GC as necessary
                         let args = &[context.expand_arg(&ins.args[3])];
                         let mfa = &module.imports[*i as usize];
-                        let val = bif::apply(self, process, mfa, &args[..]).unwrap(); // TODO: handle fail
-
-                        // TODO: consume fail label if not 0
-
-                        set_register!(context, &ins.args[4], val)
+                        match bif::apply(self, process, mfa, args) {
+                            Ok(val) => set_register!(context, &ins.args[4], val),
+                            Err(exc) => cond_fail!(context, ins.args[0], exc),
+                        }
                     } else {
                         unreachable!()
                     }
