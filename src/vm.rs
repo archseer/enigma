@@ -140,7 +140,7 @@ macro_rules! op_call_ext {
             }
             Some(Export::Bif(APPLY_3)) => {
                 // I'm cheating here, *shrug*
-                unreachable!()
+                op_apply!($vm, $context, $process);
             }
             Some(Export::Bif(bif)) => {
                 // TODO: precompute which exports are bifs
@@ -193,6 +193,94 @@ macro_rules! op_call_fun {
         };
 
         op_jump_ptr!($context, ptr);
+    }};
+}
+
+//TODO: need op_apply_fun, but it should use x0 as mod, x1 as fun, etc
+macro_rules! op_apply {
+    ($vm:expr, $context:expr, $process:expr) => {{
+        // Walk down the 3rd parameter of apply (the argument list) and copy
+        // the parameters to the x registers (reg[]).
+        let module = $context.x[0];
+        let func = $context.x[1];
+        let mut tmp = $context.x[2];
+
+        if !func.is_atom() || !module.is_atom() {
+            $context.x[0] = module;
+            $context.x[1] = func;
+            $context.x[2] = Term::nil();
+
+            return Err(Exception::new(Reason::EXC_BADARG));
+        }
+
+        // Handle apply of apply/3...
+        if module.to_u32() == atom::ERLANG && func.to_u32() == atom::APPLY {
+            unimplemented!()
+            // continually loop over args to resolve
+        }
+
+        let mut arity = 0;
+
+        while let Ok(value::Cons { head, tail }) = tmp.try_into() {
+            if arity < process::MAX_REG - 1 {
+                $context.x[arity] = *head;
+                arity += 1;
+                tmp = *tail
+            } else {
+                return Err(Exception::new(Reason::EXC_SYSTEM_LIMIT));
+            }
+        }
+
+        if !tmp.is_nil() {
+            /* Must be well-formed list */
+            return Err(Exception::new(Reason::EXC_BADARG));
+        }
+
+        /*
+         * Get the index into the export table, or failing that the export
+         * entry for the error handler module.
+         *
+         * Note: All BIFs have export entries; thus, no special case is needed.
+         */
+
+        let mfa = module::MFA(module.to_u32(), func.to_u32(), arity as u32);
+
+        let export = { $vm.exports.read().lookup(&mfa) }; // drop the exports lock
+
+        match export {
+            Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
+            Some(Export::Bif(bif)) => {
+                // TODO: apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
+                // ^ only happens in apply/fixed_apply
+
+                // precompute export lookup. once Pin<> is a thing we can be sure that
+                // a ptr into the hashmap will always point to a module.
+                // call_ext_only Ar=u Bif=u$is_bif => \
+                // allocate u Ar | call_bif Bif | deallocate_return u
+
+                // make a slice out of arity x registers
+                let args = &$context.x[0..arity];
+                match bif($vm, $process, args) {
+                    Ok(val) => {
+                        set_register!($context, &LValue::X(0), val); // HAXX
+                        op_return!($context);
+                    }
+                    Err(exc) => return Err(exc),
+                }
+            }
+            None => {
+                unimplemented!()
+                // apply_setup_error_handler
+            }
+        }
+        //    if ((ep = erts_active_export_entry(module, function, arity)) == NULL) {
+        //      if ((ep = apply_setup_error_handler(p, module, function, arity, reg)) == NULL)
+        //        goto error;
+        //    }
+        //    TODO: runs on apply and fixed apply
+        //    apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
+
+        // op_jump_ptr!($context, ptr)
     }};
 }
 
