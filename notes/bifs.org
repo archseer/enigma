@@ -1,4 +1,4 @@
-* BIFs [40/117]
+* BIFs [43/117]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
@@ -14,7 +14,7 @@
 - [ ] bif erlang:crc32_combine/3
 - [X] bif erlang:date/0
 - [ ] bif erlang:delete_module/1
-- [ ] bif erlang:display/1
+- [X] bif erlang:display/1
 - [ ] bif erlang:display_string/1
 - [ ] bif erlang:display_nl/0
 - [ ] ubif erlang:element/2
@@ -41,7 +41,7 @@
 - [ ] bif erlang:phash2/1
 - [ ] bif erlang:phash2/2
 - [X] ubif erlang:hd/1
-- [ ] bif erlang:integer_to_list/1
+- [X] bif erlang:integer_to_list/1
 - [ ] bif erlang:is_alive/0
 - [X] ubif erlang:length/1
 - [X] bif erlang:link/1
@@ -108,7 +108,7 @@
 - [X] bif erlang:universaltime/0
 - [ ] bif erlang:universaltime_to_localtime/1
 - [X] bif erlang:unlink/1
-- [ ] bif erlang:unregister/1
+- [X] bif erlang:unregister/1
 - [X] bif erlang:whereis/1
 - [X] bif erlang:spawn_opt/1
 - [ ] bif erlang:setnode/2

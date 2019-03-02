@@ -5,6 +5,7 @@ use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
 use crate::value::{self, Cons, Term, TryInto, Tuple, Variant};
 use crate::vm;
+use lexical;
 
 pub fn make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     let num = match args[0].into_number() {
@@ -265,6 +266,23 @@ pub fn atom_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
         }
         _ => Err(Exception::new(Reason::EXC_BADARG)),
     }
+}
+
+pub fn integer_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    match args[0].into_variant() {
+        Variant::Integer(i) => {
+            let string = lexical::to_string(i);
+            let heap = &process.context_mut().heap;
+
+            Ok(bitstring!(heap, string))
+        }
+        _ => Err(Exception::new(Reason::EXC_BADARG)),
+    }
+}
+
+pub fn display_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    println!("{}", args[0]);
+    Ok(atom!(OK))
 }
 
 /// erlang:'++'/2
