@@ -223,6 +223,8 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("high");
     atoms.register_atom("medium");
     atoms.register_atom("low");
+
+    atoms.register_atom("nonode@nohost");
     atoms
 };
 
@@ -333,6 +335,8 @@ pub const MAX: u32 = 90;
 pub const HIGH: u32 = 91;
 pub const MEDIUM: u32 = 92;
 pub const LOW: u32 = 93;
+
+pub const NO_NODE_NO_HOST: u32 = 94;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

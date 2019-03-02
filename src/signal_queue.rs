@@ -2,12 +2,13 @@ use parking_lot::Mutex;
 use std::collections::VecDeque;
 
 use crate::exception::Exception;
-use crate::process::{PID,Ref};
+use crate::process::{Ref, PID};
 use crate::value::Term;
 
 #[derive(Debug, PartialEq)]
 pub enum ExitKind {
-    ExitLinked = 0,
+    Exit = 0,
+    ExitLinked = 1,
 }
 
 // #[derive(Copy)]

@@ -86,9 +86,10 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "length", 1 => bif_erlang_length_1,
             "error", 1 => bif_erlang_error_1,
             "error", 2 => bif_erlang_error_2,
-            //"raise", 3 => bif_erlang_raise_3,
+            "raise", 3 => bif_erlang_raise_3,
             "throw", 1 => bif_erlang_throw_1,
             "exit", 1 => bif_erlang_exit_1,
+            "exit", 2 => bif_erlang_exit_2,
             "whereis", 1 => bif_erlang_whereis_1,
             "nif_error", 1 => bif_erlang_nif_error_1,
             "nif_error", 2 => bif_erlang_nif_error_2,
@@ -96,6 +97,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "apply", 2 => bif_erlang_apply_2,
             "apply", 3 => bif_erlang_apply_3,
             "register", 2 => bif_erlang_register_2,
+            "unregister", 1 => bif_erlang_unregister_1,
             "function_exported", 3 => bif_erlang_function_exported_3,
             "module_loaded", 1 => bif_erlang_module_loaded_1,
             "process_flag", 2 => bif_erlang_process_flag_2,
@@ -110,10 +112,13 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "list_to_atom", 1 => erlang::list_to_atom_1,
             "list_to_binary", 1 => erlang::list_to_binary_1,
             "atom_to_list", 1 => erlang::atom_to_list_1,
+            // "integer_to_list", 1 => erlang::integer_to_list_1,
             "++", 2 => erlang::append_2,
             "append", 2 => erlang::append_2,
-            "make_ref", 0 => erlang::bif_make_ref_0,
+            "make_ref", 0 => erlang::make_ref_0,
             "process_info", 2 => info::process_info_2,
+            "node", 0 => erlang::node_0,
+            "node", 1 => erlang::node_1,
 
             // loader
             "prepare_loading", 2 => load::prepare_loading_2,
@@ -212,7 +217,10 @@ pub fn is_bif(mfa: &module::MFA) -> bool {
 
 #[inline]
 pub fn apply(vm: &vm::Machine, process: &RcProcess, mfa: &module::MFA, args: &[Term]) -> BifResult {
-    (BIFS.get(mfa).unwrap())(vm, process, args)
+    match BIFS.get(mfa) {
+        Some(fun) => fun(vm, process, args),
+        None => unimplemented!("BIF {} not implemented", mfa),
+    }
 }
 
 /// Bif implementations
@@ -510,6 +518,29 @@ fn bif_erlang_exit_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> 
     Err(Exception::with_value(Reason::EXC_EXIT, args[0]))
 }
 
+fn bif_erlang_exit_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    // arg[0] pid/port
+    // arg[1] reason
+
+    match args[0].into_variant() {
+        Variant::Pid(pid) => {
+            process::send_signal(
+                &vm.state,
+                pid,
+                // TODO: deep copy reason
+                process::Signal::Exit {
+                    from: process.pid,
+                    reason: Exception::with_value(Reason::EXC_EXIT, args[1]),
+                    kind: process::ExitKind::Exit,
+                },
+            );
+            Ok(atom!(TRUE))
+        }
+        // TODO: port
+        _ => Err(Exception::new(Reason::EXC_BADARG)),
+    }
+}
+
 fn bif_erlang_error_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
     Err(Exception::with_value(Reason::EXC_ERROR, args[0]))
 }
@@ -521,6 +552,23 @@ fn bif_erlang_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
         Reason::EXC_ERROR_2,
         tup2!(heap, args[0], args[1]),
     ))
+}
+
+fn bif_erlang_raise_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    let heap = &process.context_mut().heap;
+    // class, reason, stacktrace
+    let class = match args[0].into_variant() {
+        Variant::Atom(atom::ERROR) => Reason::EXC_ERROR,
+        Variant::Atom(atom::EXIT) => Reason::EXC_EXIT,
+        Variant::Atom(atom::THROW) => Reason::EXC_THROWN,
+        _ => return Err(Exception::new(Reason::EXC_BADARG))
+    };
+
+    Err(Exception {
+        reason: class,
+        value: args[1],
+        trace: args[2],
+    })
 }
 
 fn bif_erlang_whereis_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
@@ -668,6 +716,17 @@ fn bif_erlang_register_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
 
         process.local_data_mut().name = Some(name);
         return Ok(atom!(TRUE));
+    }
+    Err(Exception::new(Reason::EXC_BADARG))
+}
+
+/// unregister(atom) unregisters a global process or port (for this node)
+fn bif_erlang_unregister_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    /* (Atom, Pid|Port)   */
+    if let Variant::Atom(name) = args[0].into_variant() {
+        let res = vm.state.process_registry.lock().unregister(name);
+
+        return Ok(Term::boolean(res.is_some()));
     }
     Err(Exception::new(Reason::EXC_BADARG))
 }

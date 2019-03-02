@@ -1,12 +1,17 @@
 use crate::atom;
 use crate::bif::BifResult;
 use crate::exception::{Exception, Reason};
-use crate::process::{self, RcProcess};
-use crate::value::{self, Cons, Term, TryInto, Tuple, Variant};
+use crate::process::RcProcess;
+use crate::value::{self, Cons, Term, TryInto, Variant};
 use crate::vm;
 use crate::Itertools;
 
-pub fn process_info_aux(_vm: &vm::Machine, process: &RcProcess, item: Term, always_wrap: bool) -> BifResult {
+pub fn process_info_aux(
+    _vm: &vm::Machine,
+    process: &RcProcess,
+    item: Term,
+    always_wrap: bool,
+) -> BifResult {
     let heap = &process.context_mut().heap;
 
     // TODO: bump process regs
@@ -91,15 +96,30 @@ pub fn process_info_aux(_vm: &vm::Machine, process: &RcProcess, item: Term, alwa
 pub fn process_info_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
     // args are pid, `[item, .. ]` or just `item`.
     // response is `[tup,..]` or just `tup`
+    if !args[0].is_pid() {
+        return Err(Exception::new(Reason::EXC_BADARG));
+    }
 
-    match args[0].try_into() {
-        Ok(cons) => {
-            let cons: &Cons = cons; // type annotation
-            let heap = &process.context_mut().heap;
-            cons.iter()
-                .map(|val| process_info_aux(vm, process, *val, true))
-                .fold_results(Term::nil(), |acc, val| cons!(heap, val, acc))
+    let pid = args[0].to_u32();
+
+    // TODO optimize for if process.pid == pid
+    let proc = {
+        let table = vm.state.process_table.lock();
+        table.get(pid)
+    };
+
+    if let Some(proc) = proc {
+        match args[1].try_into() {
+            Ok(cons) => {
+                let cons: &Cons = cons; // type annotation
+                let heap = &process.context_mut().heap;
+                cons.iter()
+                    .map(|val| process_info_aux(vm, &proc, *val, true))
+                    .fold_results(Term::nil(), |acc, val| cons!(heap, val, acc))
+            }
+            _ => process_info_aux(vm, &proc, args[1], false),
         }
-        _ => process_info_aux(vm, process, args[0], false),
+    } else {
+        return Ok(atom!(UNDEFINED));
     }
 }

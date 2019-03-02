@@ -358,7 +358,7 @@ macro_rules! cond_fail {
             op_jump!($context, fail);
             continue;
         } else {
-            return Err($exc)
+            return Err($exc);
         }
     }};
 }
@@ -1405,7 +1405,7 @@ impl Machine {
                         // TODO: fail label
                         if *unit != 8 {
                             unimplemented!();
-                            fail!(context, fail);
+                            //fail!(context, fail);
                         }
 
                         if let Ok(value::Boxed {
@@ -1434,7 +1434,7 @@ impl Machine {
                         // TODO: fail label
                         if *unit != 8 {
                             unimplemented!();
-                            fail!(context, fail);
+                            //fail!(context, fail);
                         }
 
                         if let Variant::Float(value::Float(f)) =

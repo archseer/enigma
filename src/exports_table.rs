@@ -50,7 +50,7 @@ impl ExportsTable {
     }
 
     pub fn lookup(&self, mfa: &MFA) -> Option<Export> {
-        self.exports.get(mfa).map(|v| v.clone())
+        self.exports.get(mfa).cloned()
         // need to clone to avoid keeping a ref too long and lock the table
     }
 

@@ -1,4 +1,4 @@
-* BIFs [37/117]
+* BIFs [40/117]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
@@ -21,7 +21,7 @@
 - [X] bif erlang:erase/0
 - [X] bif erlang:erase/1
 - [X] bif erlang:exit/1
-- [ ] bif erlang:exit/2
+- [X] bif erlang:exit/2
 - [ ] bif erlang:exit_signal/2
 - [ ] bif erlang:external_size/1
 - [ ] bif erlang:external_size/2
@@ -67,8 +67,8 @@
 - [X] bif erlang:function_exported/3
 - [ ] bif erlang:monitor_node/2
 - [ ] bif erlang:monitor_node/3
-- [ ] ubif erlang:node/1
-- [ ] ubif erlang:node/0
+- [X] ubif erlang:node/1
+- [X] ubif erlang:node/0
 - [ ] bif erlang:nodes/1
 - [ ] bif erlang:now/0
 - [X] bif erlang:monotonic_time/0
@@ -197,7 +197,7 @@
 ** System [0/2]
 - [ ] bif erlang:system_flag/2
 - [ ] bif erlang:system_info/1
-** New in R9C [7/44]
+** New in R9C [8/44]
 - [ ] bif erlang:system_monitor/0
 - [ ] bif erlang:system_monitor/1
 - [ ] bif erlang:system_monitor/2
@@ -216,7 +216,7 @@
 
 - [X] bif erlang:error/1		error_1
 - [X] bif erlang:error/2		error_2
-- [ ] bif erlang:raise/3		raise_3
+- [X] bif erlang:raise/3		raise_3
 - [ ] bif erlang:get_stacktrace/0
 
 - [ ] bif erlang:is_builtin/3
@@ -479,9 +479,9 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 - [ ] bif erlang:dt_prepend_vm_tag_data/1
 - [ ] bif erlang:dt_append_vm_tag_data/1
 
-** New in R16B. [0/12]
-- [ ] bif erlang:prepare_loading/2
-- [ ] bif erlang:finish_loading/1
+** New in R16B. [2/12]
+- [X] bif erlang:prepare_loading/2
+- [X] bif erlang:finish_loading/1
 - [ ] bif erlang:insert_element/3
 - [ ] bif erlang:delete_element/2
 - [ ] bif erlang:binary_to_integer/1
@@ -518,7 +518,7 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 - [ ] bif ets:update_counter/4
 - [ ] bif erts_debug:map_info/1
 
-** New in 19.0 [1/9]
+** New in 19.0 [2/9]
 - [ ] bif erts_internal:is_process_executing_dirty/1
 - [ ] bif erts_internal:check_dirty_process_code/2
 - [ ] bif erts_internal:purge_module/2
@@ -526,7 +526,7 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 - [ ] bif binary:split/3
 - [ ] bif erts_debug:size_shared/1
 - [ ] bif erts_debug:copy_shared/1
-- [ ] bif erlang:has_prepared_code_on_load/1
+- [X] bif erlang:has_prepared_code_on_load/1
 - [X] bif maps:take/2
 
 ** New in 20.0 [0/6]
