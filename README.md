@@ -73,7 +73,7 @@ Features:
 - [x] Exceptions
 - [x] Process Dictionary
 - [x] Links
-- [ ] Monitors
+- [x] Monitors
 - [x] Signal queue
 - [ ] error_handler system hooks (export stubs)
 - [ ] Deep term comparison (lists, tuples, maps)

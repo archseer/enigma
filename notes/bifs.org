@@ -197,7 +197,7 @@
 ** System [0/2]
 - [ ] bif erlang:system_flag/2
 - [ ] bif erlang:system_info/1
-** New in R9C [8/44]
+** New in R9C [10/44]
 - [ ] bif erlang:system_monitor/0
 - [ ] bif erlang:system_monitor/1
 - [ ] bif erlang:system_monitor/2
@@ -207,8 +207,8 @@
 - [ ] bif erlang:port_to_list/1
 - [ ] bif erlang:fun_to_list/1
 
-- [ ] bif erlang:monitor/2
-- [ ] bif erlang:demonitor/1
+- [X] bif erlang:monitor/2
+- [X] bif erlang:demonitor/1
 - [ ] bif erlang:demonitor/2
 
 - [ ] bif erlang:is_process_alive/1

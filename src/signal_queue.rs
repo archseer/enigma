@@ -40,6 +40,7 @@ pub enum Signal {
     },
     Demonitor {
         from: PID,
+        reference: Ref,
     },
 }
 

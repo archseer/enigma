@@ -142,7 +142,7 @@ pub struct LocalData {
     // links (tree)
     pub links: HashSet<PID>,
     // monitors (tree)
-    pub monitors: HashSet<PID>,
+    pub monitors: HashMap<Ref, PID>,
     // lt_monitors (list)
     pub lt_monitors: Vec<(PID, Ref)>,
 
@@ -194,7 +194,7 @@ impl Process {
             parent,
             name: None,
             links: HashSet::new(),
-            monitors: HashSet::new(),
+            monitors: HashMap::new(),
             lt_monitors: Vec::new(),
             signal_queue: SignalQueue::new(),
             mailbox: Mailbox::new(),
@@ -305,12 +305,12 @@ impl Process {
                 Signal::Monitor { from, reference } => {
                     self.local_data_mut().lt_monitors.push((from, reference));
                 }
-                Signal::Demonitor { from } => {
+                Signal::Demonitor { from, reference } => {
                     if let Some(pos) = self
                         .local_data_mut()
                         .lt_monitors
                         .iter()
-                        .position(|(x, _)| *x == from)
+                        .position(|(x, r)| *x == from && *r == reference)
                     {
                         self.local_data_mut().lt_monitors.remove(pos);
                     }
@@ -438,11 +438,14 @@ impl Process {
             // erts_proc_sig_send_link_exit(c_p, c_p->common.id, lnk, reason, SEQ_TRACE_TOKEN(c_p));
         }
 
-        // TODO: delete monitors
-        for pid in local_data.monitors.drain() {
+        // delete monitors
+        for (reference, pid) in local_data.monitors.drain() {
             // we're watching someone else
             // send_demonitor(mon)
-            let msg = Signal::Demonitor { from: self.pid };
+            let msg = Signal::Demonitor {
+                from: self.pid,
+                reference,
+            };
             self::send_signal(state, pid, msg);
         }
 
@@ -538,7 +541,10 @@ pub fn spawn(
             .next_ref
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-        parent.local_data_mut().monitors.insert(new_proc.pid);
+        parent
+            .local_data_mut()
+            .monitors
+            .insert(reference, new_proc.pid);
 
         new_proc
             .local_data_mut()
@@ -582,13 +588,15 @@ pub fn send_message(
 
             state.process_pool.schedule(Job::normal(receiver));
         }
+    } else {
+        println!("NOTFOUND");
     }
     // TODO: if err, we return err that's then put in x0?
 
     Ok(msg)
 }
 
-pub fn send_signal(state: &RcState, pid: PID, signal: Signal) -> Result<(), Exception> {
+pub fn send_signal(state: &RcState, pid: PID, signal: Signal) -> bool {
     if let Some(receiver) = state.process_table.lock().get(pid) {
         receiver.send_signal(signal);
 
@@ -598,8 +606,8 @@ pub fn send_signal(state: &RcState, pid: PID, signal: Signal) -> Result<(), Exce
 
             state.process_pool.schedule(Job::normal(receiver));
         }
+        return true;
     }
     // TODO: if err, we return err ?
-
-    Ok(())
+    false
 }

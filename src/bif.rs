@@ -61,6 +61,8 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "spawn_opt", 1 => bif_erlang_spawn_opt_1,
             "link", 1 => bif_erlang_link_1,
             "unlink", 1 => bif_erlang_unlink_1,
+            "monitor", 2 => bif_erlang_monitor_2,
+            "demonitor", 1 => bif_erlang_demonitor_1,
             "self", 0 => bif_erlang_self_0,
             "send", 2 => bif_erlang_send_2,
             "!", 2 => bif_erlang_send_2,
@@ -376,10 +378,11 @@ fn bif_erlang_link_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Bi
             process.local_data_mut().links.insert(pid);
 
             // send LINK signal to the other process return true
-            process::send_signal(&vm.state, pid, process::Signal::Link { from: process.pid })?;
+            process::send_signal(&vm.state, pid, process::Signal::Link { from: process.pid });
+            // TODO do we need to check the return value here? ^^
             Ok(atom!(TRUE))
         }
-        // TODO: port
+        Variant::Port(_) => unimplemented!(),
         _ => Err(Exception::new(Reason::EXC_BADARG)),
     }
 }
@@ -403,6 +406,88 @@ fn bif_erlang_unlink_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
         // TODO: port
         _ => Err(Exception::new(Reason::EXC_BADARG)),
     }
+}
+
+fn bif_erlang_monitor_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    // arg[0] = pid/port
+    match args[0].into_variant() {
+        Variant::Atom(atom::PROCESS) => {
+            match args[1].into_variant() {
+                Variant::Pid(pid) => {
+                    let heap = &process.context_mut().heap;
+                    let reference = vm
+                        .state
+                        .next_ref
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let ref_term = Term::reference(heap, reference);
+
+                    if pid == process.pid {
+                        return Ok(ref_term);
+                    }
+
+                    // add the pid to our monitor tree
+                    process.local_data_mut().monitors.insert(reference, pid);
+
+                    // send MONITOR signal to the other process return true
+                    let sent = process::send_signal(
+                        &vm.state,
+                        pid,
+                        process::Signal::Monitor {
+                            from: process.pid,
+                            reference,
+                        },
+                    );
+
+                    if !sent {
+                        let from = Term::pid(process.pid);
+                        process::send_signal(
+                            &vm.state,
+                            process.pid,
+                            process::Signal::MonitorDown {
+                                from: process.pid,
+                                // TODO: could be just reason: term
+                                reason: Exception::with_value(Reason::EXC_ERROR, atom!(NOPROC)),
+                                reference,
+                            },
+                        );
+                    }
+
+                    Ok(ref_term)
+                }
+                Variant::Atom(_) => unimplemented!(),
+                // TODO: {atom name, node}
+                Variant::Pointer(_) => unimplemented!(),
+                Variant::Port(_) => unimplemented!(),
+                _ => Err(Exception::new(Reason::EXC_BADARG)),
+            }
+        }
+        Variant::Atom(atom::PORT) => unimplemented!(),
+        Variant::Atom(atom::TIME_OFFSET) => unimplemented!(),
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    }
+}
+
+fn bif_erlang_demonitor_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+    // arg[0] = ref
+
+    // TODO: inefficient, we do get_boxed_ twice
+    if args[0].get_boxed_header() == Ok(value::BOXED_REF) {
+        let reference = args[0].get_boxed_value().unwrap();
+        // remove the pid from our monitor tree
+        if let Some(pid) = process.local_data_mut().monitors.remove(&reference) {
+            // send DEMONITOR signal to the other process return true
+            process::send_signal(
+                &vm.state,
+                pid,
+                process::Signal::Demonitor {
+                    from: process.pid,
+                    reference: *reference,
+                },
+            );
+        }
+        return Ok(atom!(TRUE));
+    }
+    Err(Exception::new(Reason::EXC_BADARG))
 }
 
 fn bif_erlang_self_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResult {
@@ -562,7 +647,7 @@ fn bif_erlang_raise_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
         Variant::Atom(atom::ERROR) => Reason::EXC_ERROR,
         Variant::Atom(atom::EXIT) => Reason::EXC_EXIT,
         Variant::Atom(atom::THROW) => Reason::EXC_THROWN,
-        _ => return Err(Exception::new(Reason::EXC_BADARG))
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
 
     Err(Exception {
