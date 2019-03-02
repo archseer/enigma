@@ -168,8 +168,6 @@ macro_rules! op_call_ext {
 
 macro_rules! op_call_fun {
     ($vm:expr, $context:expr, $closure:expr, $arity:expr) => {{
-        // store ip in cp
-        $context.cp = Some($context.ip);
         // keep X regs set based on arity
         // set additional X regs based on lambda.binding
         // set x from 1 + arity (x0 is func, followed by call params) onwards to binding
@@ -2139,6 +2137,7 @@ impl Machine {
                         context.x[arity as usize].clone().try_into()
                     {
                         let closure: &value::Closure = value; // ughh type annotation
+                        context.cp = Some(context.ip);
                         op_call_fun!(self, context, closure, arity)
                     } else {
                         unreachable!()
