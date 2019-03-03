@@ -1,5 +1,5 @@
 use crate::atom;
-use crate::bif::BifResult;
+use crate::bif;
 use crate::bitstring::Binary;
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
@@ -12,12 +12,12 @@ fn error_to_tuple(heap: &Heap, error: std::io::Error) -> Term {
     use std::io::ErrorKind;
     let kind = match error.kind() {
         ErrorKind::NotFound => atom!(ENOENT),
-        _ => unimplemented!("error_to_tuple for {:?}", error)
+        _ => unimplemented!("error_to_tuple for {:?}", error),
     };
     tup2!(heap, atom!(ERROR), kind)
 }
 
-pub fn get_cwd_nif_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResult {
+pub fn get_cwd_nif_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
 
     match std::env::current_dir() {
@@ -34,7 +34,7 @@ pub fn get_cwd_nif_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> 
 
 /// Reads an entire file into \c result, stopping after \c size bytes or EOF. It will read until
 /// EOF if size is 0.
-pub fn read_file_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn read_file_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // arg[0] = filename
     let heap = &process.context_mut().heap;
 
@@ -44,6 +44,7 @@ pub fn read_file_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
 
+    println!("Trying to read file {:?}", path);
     let bytes = match std::fs::read(path) {
         Ok(bytes) => bytes,
         Err(err) => return Ok(error_to_tuple(heap, err)),
@@ -57,12 +58,20 @@ pub fn read_file_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
 }
 
 // TODO: maybe we should pass around as OsString which is null terminated dunno
-pub fn internal_native2name_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn internal_native2name_1(
+    _vm: &vm::Machine,
+    _process: &RcProcess,
+    args: &[Term],
+) -> bif::Result {
     // we already validated the name into unicode in the previous command
     Ok(args[0])
 }
 
-pub fn internal_name2native_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn internal_name2native_1(
+    _vm: &vm::Machine,
+    _process: &RcProcess,
+    args: &[Term],
+) -> bif::Result {
     // we already validated the name into unicode in the previous command
     Ok(args[0])
 }
@@ -210,7 +219,7 @@ fn meta_to_tuple(heap: &Heap, meta: std::fs::Metadata) -> Term {
     )
 }
 
-pub fn read_info_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn read_info_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
 
     assert!(args.len() == 2);

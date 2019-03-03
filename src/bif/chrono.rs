@@ -1,4 +1,4 @@
-use crate::bif::BifResult;
+use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
 use crate::value::{self, Term, TryInto, Tuple};
@@ -11,7 +11,7 @@ use std::time::SystemTime;
 /// http://erlang.org/doc/apps/erts/time_correction.html
 /// http://erlang.org/doc/apps/erts/time_correction.html#Erlang_System_Time
 
-pub fn date_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResult {
+pub fn date_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
     let date = Local::today();
 
@@ -23,7 +23,7 @@ pub fn date_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResu
     ))
 }
 
-pub fn localtime_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResult {
+pub fn localtime_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
     let datetime = Local::now();
 
@@ -44,7 +44,7 @@ pub fn localtime_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> Bi
 
 // now_0 is deprecated
 
-pub fn monotonic_time_0(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResult {
+pub fn monotonic_time_0(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     // TODO: needs https://github.com/rust-lang/rust/issues/50202
     // .as_nanos()
 
@@ -57,7 +57,7 @@ pub fn monotonic_time_0(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -
 }
 
 // TODO monotonic_time_1
-pub fn monotonic_time_1(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResult {
+pub fn monotonic_time_1(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     // TODO: needs https://github.com/rust-lang/rust/issues/50202
     // .as_nanos()
     let heap = &process.context_mut().heap;
@@ -68,7 +68,7 @@ pub fn monotonic_time_1(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -
     ))
 }
 
-pub fn system_time_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResult {
+pub fn system_time_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
 
     Ok(Term::bigint(
@@ -94,7 +94,7 @@ pub fn system_time_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> 
 // MicroSecs = ErlangSystemTime rem 1000000,
 // {MegaSecs, Secs, MicroSecs}.
 
-pub fn universaltime_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResult {
+pub fn universaltime_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
     let datetime = Utc::now();
 
@@ -117,7 +117,7 @@ pub fn posixtime_to_universaltime_1(
     _vm: &vm::Machine,
     process: &RcProcess,
     args: &[Term],
-) -> BifResult {
+) -> bif::Result {
     let heap = &process.context_mut().heap;
 
     let timestamp: i64 = match args[0].into_number() {
@@ -195,7 +195,7 @@ pub fn universaltime_to_localtime_1(
     _vm: &vm::Machine,
     process: &RcProcess,
     args: &[Term],
-) -> BifResult {
+) -> bif::Result {
     let heap = &process.context_mut().heap;
 
     let ((year, month, day), (hour, minute, second)) =

@@ -1,5 +1,5 @@
 use crate::atom;
-use crate::bif::BifResult;
+use crate::bif;
 use crate::bitstring;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
@@ -7,7 +7,7 @@ use crate::value::{self, Cons, Term, TryInto, Tuple, Variant};
 use crate::vm;
 use lexical;
 
-pub fn make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let num = match args[0].into_number() {
         Ok(value::Num::Integer(i)) if !i < 0 => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -22,7 +22,7 @@ pub fn make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Bi
     Ok(Term::from(tuple))
 }
 
-pub fn make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let num = match args[0].into_number() {
         Ok(value::Num::Integer(i)) if !i < 0 => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -57,7 +57,7 @@ pub fn make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Bi
     Ok(Term::from(tuple))
 }
 
-pub fn append_element_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn append_element_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     if !args[0].is_tuple() {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
@@ -74,7 +74,7 @@ pub fn append_element_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
     Ok(Term::from(new_tuple))
 }
 
-pub fn setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let number = match args[0].into_number() {
         Ok(value::Num::Integer(i)) if !i < 1 => i - 1,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -95,7 +95,7 @@ pub fn setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Bi
     Ok(Term::from(new_tuple))
 }
 
-pub fn tuple_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn tuple_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let t: &Tuple = match args[0].try_into() {
         Ok(tuple) => tuple,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -110,7 +110,7 @@ pub fn tuple_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     Ok(list)
 }
 
-pub fn binary_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn binary_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let binary = args[0];
 
     // TODO: extract as macro
@@ -150,7 +150,7 @@ pub fn binary_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
 }
 
 /// convert a list of ascii integers to an atom
-pub fn list_to_atom_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn list_to_atom_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // Eterm res;
     // byte *buf = (byte *) erts_alloc(ERTS_ALC_T_TMP, MAX_ATOM_SZ_LIMIT);
     // Sint written;
@@ -178,7 +178,11 @@ pub fn list_to_atom_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
 }
 
 /// conditionally convert a list of ascii integers to an atom
-pub fn list_to_existing_atom_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn list_to_existing_atom_1(
+    _vm: &vm::Machine,
+    process: &RcProcess,
+    args: &[Term],
+) -> bif::Result {
     // byte *buf = (byte *) erts_alloc(ERTS_ALC_T_TMP, MAX_ATOM_SZ_LIMIT);
     // Sint written;
     // int i = erts_unicode_list_to_buf(BIF_ARG_1, buf, MAX_ATOM_CHARACTERS,
@@ -200,7 +204,7 @@ pub fn list_to_existing_atom_1(_vm: &vm::Machine, process: &RcProcess, args: &[T
     unimplemented!()
 }
 
-pub fn list_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn list_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let mut bytes: Vec<u8> = Vec::new();
     let heap = &process.context_mut().heap;
 
@@ -245,7 +249,7 @@ pub fn list_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
 // TODO iolist_to_binary is the same, input can be a binary (is_binary() true), and we just return
 // it (badarg on bitstring)
 
-pub fn binary_to_term_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn binary_to_term_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // TODO: needs to yield mid parsing...
     if let Some(string) = args[0].to_bytes() {
         match crate::etf::decode(string, &process.context_mut().heap) {
@@ -256,7 +260,7 @@ pub fn binary_to_term_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
-pub fn atom_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn atom_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     match args[0].into_variant() {
         Variant::Atom(i) => {
             let string = atom::to_str(i).unwrap();
@@ -268,7 +272,7 @@ pub fn atom_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     }
 }
 
-pub fn integer_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn integer_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     match args[0].into_variant() {
         Variant::Integer(i) => {
             let string = lexical::to_string(i);
@@ -280,7 +284,7 @@ pub fn integer_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     }
 }
 
-pub fn display_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn display_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     println!("{}", args[0]);
     Ok(atom!(OK))
 }
@@ -291,7 +295,7 @@ pub fn display_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifRe
 /// and setting its tail to RHS without checking that RHS is a proper list. [] ++ 'not_a_list' will
 /// therefore result in 'not_a_list', and [1,2] ++ 3 will result in [1,2|3], and this is a bug that
 /// we have to live with.
-pub fn append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let lhs = args[0];
     let rhs = args[1];
 
@@ -340,7 +344,7 @@ pub fn append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifRes
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
-pub fn make_ref_0(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifResult {
+pub fn make_ref_0(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
     let reference = vm
         .state
@@ -352,10 +356,10 @@ pub fn make_ref_0(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> BifR
 }
 
 // for the time being, these two functions are constant since we don't do distributed
-pub fn node_0(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> BifResult {
+pub fn node_0(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> bif::Result {
     Ok(atom!(NO_NODE_NO_HOST))
 }
-pub fn node_1(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> BifResult {
+pub fn node_1(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> bif::Result {
     Ok(atom!(NO_NODE_NO_HOST))
 }
 

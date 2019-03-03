@@ -1,11 +1,11 @@
 use crate::atom;
-use crate::bif::{BifFn, BifResult};
+use crate::bif::{self, BifFn};
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
 use crate::value::{self, Cons, Term, TryInto, Tuple};
 use crate::vm;
 
-pub fn member_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn member_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     // need to bump reductions as we go
     let reds_left = 1; // read from process
     let mut max_iter = 16 * reds_left;
@@ -45,7 +45,7 @@ pub fn member_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifRe
     Ok(atom!(FALSE)) // , reds_left - max_iter/16
 }
 
-// fn lists_reverse_alloc(process: &RcProcess, mut list: Term, mut tail: Term) -> BifResult {
+// fn lists_reverse_alloc(process: &RcProcess, mut list: Term, mut tail: Term) -> bif::Result {
 //     const CELLS_PER_RED: usize = 40;
 
 //     let max_cells = CELLS_PER_RED * process.context().reds;
@@ -90,7 +90,7 @@ pub fn member_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> BifRe
 //     unimplemented!()
 // }
 
-pub fn reverse_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn reverse_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     println!("lists reverse called");
     // Handle legal and illegal non-lists quickly.
     if args[0].is_nil() {
@@ -121,7 +121,7 @@ pub fn reverse_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifRe
     // return lists_reverse_alloc(BIF_P, BIF_ARG_1, BIF_ARG_2);
 }
 
-pub fn keymember_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn keymember_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     keyfind(keyfind_3, process, args).map(|res| {
         if res.is_tuple() {
             return atom!(TRUE);
@@ -130,7 +130,7 @@ pub fn keymember_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Bif
     })
 }
 
-pub fn keysearch_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn keysearch_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     keyfind(keyfind_3, process, args).map(|res| {
         if res.is_tuple() {
             let heap = &process.context_mut().heap;
@@ -140,14 +140,14 @@ pub fn keysearch_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Bif
     })
 }
 
-pub fn keyfind_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn keyfind_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     keyfind(keyfind_3, process, args)
 }
 
 /// Swap process out after this number
 const CONTEXT_REDS: usize = 4000;
 
-fn keyfind(_func: BifFn, _process: &RcProcess, args: &[Term]) -> BifResult {
+fn keyfind(_func: BifFn, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let mut max_iter: isize = 10 * CONTEXT_REDS as isize;
 
     let key = args[0];

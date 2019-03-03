@@ -1,5 +1,5 @@
 use crate::atom;
-use crate::bif::BifResult;
+use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
 use crate::value::{self, Cons, Term, TryInto, Variant};
@@ -11,7 +11,7 @@ pub fn process_info_aux(
     process: &RcProcess,
     item: Term,
     always_wrap: bool,
-) -> BifResult {
+) -> bif::Result {
     let heap = &process.context_mut().heap;
 
     // TODO: bump process regs
@@ -93,7 +93,7 @@ pub fn process_info_aux(
     Ok(tup2!(heap, Term::atom(item), res))
 }
 
-pub fn process_info_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> BifResult {
+pub fn process_info_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // args are pid, `[item, .. ]` or just `item`.
     // response is `[tup,..]` or just `tup`
     if !args[0].is_pid() {
