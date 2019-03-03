@@ -1,6 +1,7 @@
 use crate::atom;
 use crate::bif;
 use crate::bitstring;
+use crate::ets::{TableRegistry, RcTableRegistry};
 use crate::exception::{self, Exception, Reason};
 use crate::exports_table::{Export, ExportsTable, RcExportsTable};
 use crate::instr_ptr::InstrPtr;
@@ -50,6 +51,8 @@ pub struct Machine {
 
     /// Module registry
     pub modules: RcModuleRegistry,
+
+    pub ets_tables: RcTableRegistry,
 }
 
 macro_rules! set_register {
@@ -499,6 +502,7 @@ impl Machine {
             state: Arc::new(state),
             exports: ExportsTable::with_rc(),
             modules: ModuleRegistry::with_rc(),
+            ets_tables: TableRegistry::with_rc(),
         }
     }
 
