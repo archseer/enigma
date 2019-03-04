@@ -664,6 +664,12 @@ impl Machine {
                     // coming out of nowhere, probably, needed for NIFs.
 
                     // happens if no other clause matches
+                    eprintln!(
+                        "function clause! {} {} {:?}",
+                        context.expand_arg(&ins.args[0]),
+                        context.expand_arg(&ins.args[1]),
+                        ins.args[2]
+                    );
                     return Err(Exception::new(Reason::EXC_FUNCTION_CLAUSE));
                 }
                 Opcode::Return => {
