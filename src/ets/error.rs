@@ -31,6 +31,7 @@ impl Error {
 /// The specific type of an error.
 #[derive(Debug)]
 pub enum ErrorKind {
+    SystemLimit,
     /// Hints that destructuring should not be exhaustive.
     ///
     /// This enum may grow additional variants, so this makes sure clients

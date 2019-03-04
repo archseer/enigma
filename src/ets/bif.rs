@@ -2,222 +2,318 @@ use crate::atom;
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, TryInto, Tuple};
+use crate::value::{Cons, Term, TryFrom, TryInto, Tuple, Variant};
 use crate::vm;
+use crate::Itertools;
 
+use super::hash_table::HashTable;
+use super::Status;
 use super::*;
 
-pub fn new_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
-    // DbTable* tb = NULL;
-    // Eterm list;
-    // Eterm val;
-    // Eterm ret;
-    // Eterm heir;
-    // UWord heir_data;
-    // Uint32 status;
-    // Sint keypos;
-    // int is_named, is_compressed;
-    // int is_fine_locked, frequent_read;
-    // int cret;
-    // DbTableMethod* meth;
-
+pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     if !args[0].is_atom() {
-        return Err(Exception::new(Reason::EXC_BADARG))
+        return Err(Exception::new(Reason::EXC_BADARG));
     }
     // TODO: is_list already checks for nil? needs impl change maybe
     if !(args[1].is_nil() || args[1].is_list()) {
-        return Err(Exception::new(Reason::EXC_BADARG))
+        return Err(Exception::new(Reason::EXC_BADARG));
     }
 
-    let status = DB_SET | DB_PROTECTED;
-    keypos = 1;
-    is_named = 0;
-    is_fine_locked = 0;
-    frequent_read = 0;
-    heir = am_none;
-    heir_data = (UWord) am_undefined;
-    is_compressed = erts_ets_always_compress;
+    let heap = &process.context_mut().heap;
 
-    list = BIF_ARG_2;
+    let mut status = Status::DB_SET | Status::DB_PROTECTED;
+    let mut keypos = 1;
+    let mut is_named = false;
+    let mut is_fine_locked = false;
+    let mut frequent_read = false;
+    let mut heir = atom!(NONE);
+    let mut heir_data = atom!(UNDEFINED);
+    // is_compressed = erts_ets_always_compress;
+    let mut is_compressed = false;
 
     match args[1].try_into() {
         Ok(cons) => {
+            // [:set, :protected, :named_table, {:read_concurrency, :true}, {:write_concurrency, :true}]
             let cons: &Cons = cons; // type annotation
-            let heap = &process.context_mut().heap;
             for val in cons.iter() {
                 match val.into_variant() {
                     Variant::Atom(atom::BAG) => {
                         status.insert(Status::DB_BAG);
-                        status.remove(Status::DB_SET | Status::DB_DUPLICATE_BAG | Status::DB_ORDERED_SET | Status::DB_CA_ORDERED_SET);
+                        status.remove(
+                            Status::DB_SET
+                                | Status::DB_DUPLICATE_BAG
+                                | Status::DB_ORDERED_SET
+                                | Status::DB_CA_ORDERED_SET,
+                        );
                     }
                     Variant::Atom(atom::DUPLICATE_BAG) => {
                         status.insert(Status::DB_DUPLICATE_BAG);
-                        status.remove(Status::DB_SET | Status::DB_BAG | Status::DB_ORDERED_SET | Status::DB_CA_ORDERED_SET);
+                        status.remove(
+                            Status::DB_SET
+                                | Status::DB_BAG
+                                | Status::DB_ORDERED_SET
+                                | Status::DB_CA_ORDERED_SET,
+                        );
                     }
                     Variant::Atom(atom::ORDERED_SET) => {
                         status.insert(Status::DB_ORDERED_SET);
-                        status.remove(Status::DB_SET | Status::DB_DUPLICATE_BAG | Status::DB_SET | Status::DB_CA_ORDERED_SET);
+                        status.remove(
+                            Status::DB_SET
+                                | Status::DB_DUPLICATE_BAG
+                                | Status::DB_SET
+                                | Status::DB_CA_ORDERED_SET,
+                        );
                     }
                     Variant::Pointer(_ptr) => {
                         // tuple
-                        match args[1].try_into() {
+                        match val.try_into() {
                             Ok(tup) => {
                                 let tup: &Tuple = tup; // type annotation
-                                if t.len() == 2 {
+                                if tup.len() == 2 {
+                                    match tup[0].into_variant() {
+                                        Variant::Atom(atom::KEYPOS) => {
+                                            match tup[1].to_int() {
+                                                Some(i) if i > 0 => keypos = i as usize,
+                                                _ => {
+                                                    return Err(Exception::new(Reason::EXC_BADARG))
+                                                }
+                                            };
+                                        }
+                                        Variant::Atom(atom::WRITE_CONCURRENCY) => {
+                                            match tup[1].to_bool() {
+                                                Some(val) => is_fine_locked = val,
+                                                None => {
+                                                    return Err(Exception::new(Reason::EXC_BADARG))
+                                                }
+                                            };
+                                        }
+                                        Variant::Atom(atom::READ_CONCURRENCY) => {
+                                            match tup[1].to_bool() {
+                                                Some(val) => frequent_read = val,
+                                                None => {
+                                                    return Err(Exception::new(Reason::EXC_BADARG))
+                                                }
+                                            };
+                                        }
+                                        Variant::Atom(atom::HEIR) => {
+                                            if tup[1] == atom!(NONE) {
+                                                heir = atom!(NONE);
+                                                heir_data = atom!(UNDEFINED);
+                                            } else {
+                                                return Err(Exception::new(Reason::EXC_BADARG));
+                                            }
+                                        }
+                                        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                                    }
+                                } else if tup.len() == 3 {
+                                    //&& tup[0] == am_heir && is_internal_pid(tp[2]) {
+                                    unimplemented!()
+                                //     heir = tp[2];
+                                //     heir_data = tp[3];
+                                } else {
                                     return Err(Exception::new(Reason::EXC_BADARG));
                                 }
-
                             }
                             _ => return Err(Exception::new(Reason::EXC_BADARG)),
                         }
-                        if (arityval(tp[0]) == 2) {
-                            if (tp[1] == am_keypos
-                                && is_small(tp[2]) && (signed_val(tp[2]) > 0)) {
-                                keypos = signed_val(tp[2]);
-                            }		
-                            else if (tp[1] == am_write_concurrency) {
-                                if (tp[2] == am_true) {
-                                    is_fine_locked = 1;
-                                } else if (tp[2] == am_false) {
-                                    is_fine_locked = 0;
-                                } else break;
-                            }
-                            else if (tp[1] == am_read_concurrency) {
-                                if (tp[2] == am_true) {
-                                    frequent_read = 1;
-                                } else if (tp[2] == am_false) {
-                                    frequent_read = 0;
-                                } else break;
-                                
-                            }
-                            else if (tp[1] == am_heir && tp[2] == am_none) {
-                                heir = am_none;
-                                heir_data = am_undefined;
-                            }
-                            else break;
-                        }
-                        else if (arityval(tp[0]) == 3 && tp[1] == am_heir
-                                && is_internal_pid(tp[2])) {
-                            heir = tp[2];
-                            heir_data = tp[3];
-                        }
-                        else break;
                     }
-                    else if (val == am_public) {
-                        status |= DB_PUBLIC;
-                        status &= ~(DB_PROTECTED|DB_PRIVATE);
+                    Variant::Atom(atom::PUBLIC) => {
+                        status.insert(Status::DB_PUBLIC);
+                        status.remove(Status::DB_PROTECTED | Status::DB_PRIVATE);
                     }
-                    else if (val == am_private) {
-                        status |= DB_PRIVATE;
-                        status &= ~(DB_PROTECTED|DB_PUBLIC);
+                    Variant::Atom(atom::PRIVATE) => {
+                        status.insert(Status::DB_PRIVATE);
+                        status.remove(Status::DB_PROTECTED | Status::DB_PUBLIC);
                     }
-                    else if (val == am_named_table) {
-                        is_named = 1;
-                        status |= DB_NAMED_TABLE;
+                    Variant::Atom(atom::NAMED_TABLE) => {
+                        is_named = true;
+                        status |= Status::DB_NAMED_TABLE;
                     }
-                    else if (val == am_compressed) {
-                        is_compressed = 1;
+                    Variant::Atom(atom::COMPRESSED) => {
+                        is_compressed = true;
                     }
-                    else if (val == am_set || val == am_protected)
-                        ;
+                    Variant::Atom(atom::SET) | Variant::Atom(atom::PROTECTED) => {}
+                    _ => return Err(Exception::new(Reason::EXC_BADARG)),
                 }
             }
         }
         // TODO skip if args is nil
-        _ => return Err(Exception::new(Reason::EXC_BADARG)) 
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     }
 
-    if !list.is_nil() { /* bad opt or not a well formed list */
-        return Err(Exception::new(Reason::EXC_BADARG));
+    // if !list.is_nil() { // bad opt or not a well formed list
+    //     return Err(Exception::new(Reason::EXC_BADARG));
+    // }
+
+    /*if IS_TREE_TABLE(status) && is_fine_locked && !status.contains(Status::DB_PRIVATE) {
+        status.insert(Status::DB_CA_ORDERED_SET);
+        status.remove(Status::DB_SET | Status::DB_BAG | Status::DB_DUPLICATE_BAG | Status::DB_ORDERED_SET);
+        status.insert(Status::DB_FINE_LOCKED);
+    } */
+
+    // if is_hash_table
+    if let Status::DB_SET | Status::DB_BAG | Status::DB_DUPLICATE_BAG = table_kind!(status) {
+        if is_fine_locked && !status.contains(Status::DB_PRIVATE) {
+            status.insert(Status::DB_FINE_LOCKED);
+        }
     }
 
-    if (IS_TREE_TABLE(status) && is_fine_locked && !(status & DB_PRIVATE)) {
-        meth = &db_catree;
-        status |= DB_CA_ORDERED_SET;
-        status &= ~(DB_SET | DB_BAG | DB_DUPLICATE_BAG | DB_ORDERED_SET);
-        status |= DB_FINE_LOCKED;
-    } else if (IS_HASH_TABLE(status)) {
-	meth = &db_hash;
-	if (is_fine_locked && !(status & DB_PRIVATE)) {
-	    status |= DB_FINE_LOCKED;
-	}
-    } else if (IS_TREE_TABLE(status)) {
-	meth = &db_tree;
-    } else {
-	BIF_ERROR(BIF_P, BADARG);
+    if frequent_read && !status.contains(Status::DB_PRIVATE) {
+        status |= Status::DB_FREQ_READ;
     }
 
-    if frequent_read && !(status & DB_PRIVATE) {
-	status |= DB_FREQ_READ;
-    }
+    // make_btid(tb);
+    let tid = vm.state.next_ref();
 
-    // we create table outside any table lock and take the unusal cost of destroy table if it fails
-    // to find a slot 
-    {
-        DbTable init_tb;
+    // meth: methods
+    let meta = Metadata {
+        tid,
+        name: Some(args[0].to_u32() as usize), // unsound conversion
+        status,
+        kind: status, // Note, 'kind' is *read only* from now on...
+        keypos,
+        owner: process.pid,
+        compress: is_compressed,
+        // init fixing to count 0 and procs NULL
+    };
+    // erts_refc_init(&tb->common.fix_count, 0);
+    // db_init_lock(tb, status & (DB_FINE_LOCKED|DB_FREQ_READ));
+    // set_heir(BIF_P, tb, heir, heir_data);
+    // erts_atomic_init_nob(&tb->common.nitems, 0);
 
-	erts_atomic_init_nob(&init_tb.common.memory_size, 0);
-	tb = (DbTable*) erts_db_alloc(ERTS_ALC_T_DB_TABLE,
-				      &init_tb, sizeof(DbTable));
-	erts_atomic_init_nob(&tb->common.memory_size,
-				 erts_atomic_read_nob(&init_tb.common.memory_size));
-    }
-
-    tb->common.meth = meth;
-    tb->common.the_name = BIF_ARG_1;
-    tb->common.status = status;    
-    tb->common.type = status;
-    /* Note, 'type' is *read only* from now on... */
-    erts_refc_init(&tb->common.fix_count, 0);
-    db_init_lock(tb, status & (DB_FINE_LOCKED|DB_FREQ_READ));
-    tb->common.keypos = keypos;
-    tb->common.owner = BIF_P->common.id;
-    set_heir(BIF_P, tb, heir, heir_data);
-
-    erts_atomic_init_nob(&tb->common.nitems, 0);
-
-    tb->common.fixing_procs = NULL;
-    tb->common.compress = is_compressed;
-// #ifdef ETS_DBG_FORCE_TRAP
-//     erts_atomic_init_nob(&tb->common.dbg_force_trap, erts_ets_dbg_force_trap);
-// #endif
+    // #ifdef ETS_DBG_FORCE_TRAP
+    //     erts_atomic_init_nob(&tb->common.dbg_force_trap, erts_ets_dbg_force_trap);
+    // #endif
 
     // had an assert here before, hence unwrap
-    cret = meth->db_create(BIF_P, tb).unwrap();
-
-    make_btid(tb);
-
-    let ret = if is_named {
-        args[0]
-    } else {
-        make_tid(BIF_P, tb)
+    let table = match table_kind!(status) {
+        Status::DB_SET | Status::DB_BAG | Status::DB_DUPLICATE_BAG => {
+            Arc::new(HashTable::new(meta, process))
+        }
+        Status::DB_ORDERED_SET => unimplemented!(), // SetTable::new
+        Status::DB_CA_ORDERED_SET => unimplemented!(),
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
 
-    save_sched_table(BIF_P, tb);
-    save_owned_table(BIF_P, tb);
-
-    if is_named && !insert_named_tab(BIF_ARG_1, tb, 0) {
-        tid_clear(BIF_P, tb);
-        delete_owned_table(BIF_P, tb);
-
-	db_lock(tb,LCK_WRITE);
-	free_heir_data(tb);
-	tb->common.meth->db_free_empty_table(tb);
-	db_unlock(tb,LCK_WRITE);
-        table_dec_refc(tb, 0);
-	BIF_ERROR(BIF_P, BADARG);
+    {
+        // TODO: need clone since insert_named might run, not ideal
+        vm.ets_tables.lock().insert(tid, table.clone());
     }
-    
-    BIF_P->flags |= F_USING_DB; /* So we can remove tb if p dies */
+    // process.save_sched_table(tabletb);
+    // process.save_owned_table(table);
 
-// #ifdef HARDDEBUG
-//     erts_fprintf(stderr,
-// 		"ets:new(%T,%T)=%T; Process: %T, initial: %T:%T/%bpu\n",
-// 		 BIF_ARG_1, BIF_ARG_2, ret, BIF_P->common.id,
-// 		 BIF_P->u.initial[0], BIF_P->u.initial[1], BIF_P->u.initial[2]);
-// #endif
+    if is_named {
+        if vm
+            .ets_tables
+            .lock()
+            .insert_named(args[0].to_u32() as usize, table)
+        {
+            return Ok(args[0]);
+        }
+        // table drops
 
-    ret
+        // tid_clear(BIF_P, tb);
+        // delete_owned_table(BIF_P, tb);
+
+        // db_lock(tb,LCK_WRITE);
+        // free_heir_data(tb);
+        // tb->common.meth->db_free_empty_table(tb);
+        // db_unlock(tb,LCK_WRITE);
+        // table_dec_refc(tb, 0);
+        // BIF_ERROR(BIF_P, BADARG);
+
+        Err(Exception::new(Reason::EXC_BADARG))
+    } else {
+        let reference = vm.state.next_ref();
+        Ok(Term::reference(heap, reference))
+    }
+
+    // BIF_P->flags |= F_USING_DB; /* So we can remove tb if p dies */
+    // #ifdef HARDDEBUG
+    //     erts_fprintf(stderr,
+    // 		"ets:new(%T,%T)=%T; Process: %T, initial: %T:%T/%bpu\n",
+    // 		 BIF_ARG_1, BIF_ARG_2, ret, BIF_P->common.id,
+    // 		 BIF_P->u.initial[0], BIF_P->u.initial[1], BIF_P->u.initial[2]);
+    // #endif
+}
+pub fn whereis_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    // atom
+    let name = match args[0].into_variant() {
+        Variant::Atom(name) => name,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    let tid = vm
+        .ets_tables
+        .lock()
+        .whereis(name as usize)
+        .map(|tid| Term::reference(&process.context_mut().heap, tid));
+
+    match tid {
+        Some(tid) => Ok(tid),
+        None => Ok(atom!(UNDEFINED)),
+    }
+}
+
+pub fn insert_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    /* Write lock table if more than one object to keep atomicity */
+    // let lock_kind = if (is_list(BIF_ARG_2) && CDR(list_val(BIF_ARG_2)) != NIL { LCK_WRITE } else { LCK_WRITE_REC };
+
+    // find table
+    /*let key = match args[0].into_variant() {
+        Variant::Atom(name) => name as usize,
+        _ => unimplemented!()
+    };*/
+    let key = args[0].to_ref().unwrap(); // TODO: HANDLE Atom
+
+    eprintln!("going in {}", args[0]);
+    let table = {
+        // get DB_WRITE, lock kind, ets_insert_2
+        let lock = vm.ets_tables.lock();
+        lock.get(key)
+            .ok_or_else(|| Exception::new(Reason::EXC_BADARG))?
+        // TODO: get_named for atom
+    }; // lock is dropped
+
+    if args[1].is_nil() {
+        return Ok(atom!(TRUE));
+    }
+
+    let keypos = table.meta().keypos;
+
+    let validate = |val: &Term| val.is_tuple() && Tuple::try_from(val).unwrap().len() > keypos;
+
+    let res: Result<()> = if let Ok(cons) = args[1].try_into() {
+        let cons: &Cons = cons;
+        let valid = cons.iter().all(validate);
+        // TODO if bad list
+        // if (lst != NIL) { goto badarg; }
+        if !valid {
+            return Err(Exception::new(Reason::EXC_BADARG));
+        }
+
+        cons.iter()
+            .map(|val| table.insert(process, *val, false))
+            .collect::<Result<Vec<()>>>() // this is not efficient at all
+            .map(|_| ())
+    } else {
+        // single param
+        if !validate(&args[1]) {
+            return Err(Exception::new(Reason::EXC_BADARG));
+        }
+        table.insert(process, args[1], false)
+    };
+
+    match res {
+        Ok(_) => Ok(atom!(TRUE)),
+        // TODO use From ets::Error
+        // TODO ERROR_SYSRES on SYSTEM_LIMIT
+        Err(_) => Err(Exception::new(Reason::EXC_BADARG)),
+    }
+}
+
+pub fn lookup_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    unimplemented!()
 }
 
 // safe_fixtable_2
@@ -229,10 +325,8 @@ pub fn new_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Res
 // update_element_3
 // update_counter_3
 // update_counter_4
-// insert_2
 // insert_new_2
 // rename_2
-// whereis_1
 // lookup_2
 // member_2
 // lookup_element_3

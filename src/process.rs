@@ -537,9 +537,7 @@ pub fn spawn(
     }
 
     if flags.contains(SpawnFlag::MONITOR) {
-        let reference = state
-            .next_ref
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let reference = state.next_ref();
 
         parent
             .local_data_mut()

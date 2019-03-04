@@ -715,6 +715,28 @@ impl Term {
         }
     }
 
+    pub fn to_bool(self) -> Option<bool> {
+        match self.into_variant() {
+            Variant::Atom(atom::TRUE) => Some(true),
+            Variant::Atom(atom::FALSE) => Some(false),
+            _ => None,
+        }
+    }
+
+    pub fn to_ref(&self) -> Option<process::Ref> {
+        match self.get_boxed_header() {
+            Ok(BOXED_REF) => {
+                // TODO use ok_or to cast to some, then use ?
+                let value = &self
+                    .get_boxed_value::<Boxed<process::Ref>>()
+                    .unwrap()
+                    .value;
+                Some(*value)
+            }
+            _ => None
+        }
+    }
+
     // TODO: use std::borrow::Cow<[u8]> to return a copy_bits in the case of unalignment
     pub fn to_bytes(&self) -> Option<&[u8]> {
         match self.get_boxed_header() {

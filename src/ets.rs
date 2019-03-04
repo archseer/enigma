@@ -1,14 +1,28 @@
 use crate::value::Term;
-use crate::servo_arc::Arc;
-use crate::process::RcProcess;
+//use crate::servo_arc::Arc;
+use std::sync::Arc; // servo_arc doesn't work with trait objects
+use crate::process::{RcProcess, self};
+use hashbrown::HashMap;
+use parking_lot::Mutex;
+
+#[macro_export]
+macro_rules! table_kind {
+    ($x:expr) => {
+        Status::from_bits_truncate($x.bits & Status::KIND_MASK.bits)
+    };
+}
 
 pub mod bif;
+pub mod hash_table;
+
 pub mod error;
 // use std::error::Error;
 pub use error::Result;
 
 /// Represents an interface to a single table.
-pub trait Table {
+pub trait Table: Send + Sync {
+    fn meta(&self) -> &Metadata;
+
     // first, next, last, prev could be iter? --> iter can't go backwards so we'll add a Cursor API
     // almost no code uses prev() outside of a few OTP tests so we could just start with Iter.
     // also, the db impl seems to equate the two
@@ -21,7 +35,7 @@ pub trait Table {
     fn prev(&self, process: &RcProcess, key: Term) -> Result<Term>;
 
     // put
-    fn insert(&mut self, /* [in out] */ value: Term, key_clash_fail: bool); /* DB_ERROR_BADKEY if key exists */ 
+    fn insert(&self, process: &RcProcess, value: Term, key_clash_fail: bool) -> Result<()>; /* DB_ERROR_BADKEY if key exists */ 
 
     fn get(&self, process: &RcProcess,  key: Term) -> Result<Term>;
 
@@ -90,23 +104,88 @@ pub trait Table {
     // fn finalize_dbterm(&self, cret: usize, handle: DbUpdateHandle);
 }
 
+bitflags! {
+    pub struct Status: u32 {
+        const INITIAL = 0;
+
+        const DB_PRIVATE = (1 << 0);
+        const DB_PROTECTED = (1 << 1);
+        const DB_PUBLIC = (1 << 2);
+        /// table is being deleted
+        const DB_DELETE = (1 << 3);
+
+        const KIND_OFFSET = 4;
+        const KIND_BITS = 5;
+        const KIND_MASK  = (((1<<(Self::KIND_BITS.bits + Self::KIND_OFFSET.bits))-1) & !((1<<(Self::KIND_OFFSET.bits))-1));
+
+        const DB_SET = (1 << 4);
+        const DB_BAG = (1 << 5);
+        const DB_DUPLICATE_BAG = (1 << 6);
+        const DB_ORDERED_SET = (1 << 7);
+        const DB_CA_ORDERED_SET = (1 << 8);
+
+        /// write_concurrency
+        const DB_FINE_LOCKED = (1 << 9);
+        /// read_concurrency
+        const DB_FREQ_READ = (1 << 10);
+        const DB_NAMED_TABLE = (1 << 11);
+        const DB_BUSY = (1 << 12);
+    }
+}
+
+// Shared metadata for all table types.
+pub struct Metadata {
+    ///
+    tid: process::Ref,
+    /// atom
+    name: Option<usize>,
+    status: Status,
+    kind: Status,
+    keypos: usize,
+    owner: process::PID,
+    compress: bool,
+}
+
 // TODO: we want to avoid mutex for concurrent writes tho, maybe dyn Table + Sync
-pub type RcTableRegistry = Arc<TableRegistry>;
+pub type RcTableRegistry = Arc<Mutex<TableRegistry>>;
+
+pub type RcTable = Arc<dyn Table>;
 
 pub struct TableRegistry {
-    tables: Vec<Arc<dyn Table + Sync + Send>>
+    tables: HashMap<process::Ref, RcTable>,
+    named_tables: HashMap<usize, RcTable>,
 }
 
 impl TableRegistry {
     pub fn with_rc() -> RcTableRegistry {
-        Arc::new(Self {
-            tables: Vec::new()
-        })
+        Arc::new(Mutex::new(Self {
+            tables: HashMap::new(),
+            named_tables: HashMap::new()
+        }))
     }
 
-    pub fn new_table(process: &RcProcess) -> Result<Box<dyn Table>> {
-        unimplemented!()
+    pub fn get(&self, reference: process::Ref) -> Option<RcTable> {
+        self.tables.get(&reference).cloned()
+    }
+
+    pub fn get_named(&self, name: usize) -> Option<RcTable> {
+        self.named_tables.get(&name).cloned()
+    }
+
+    pub fn insert(&mut self, reference: process::Ref, table: RcTable) {
+       self.tables.insert(reference, table);
+    }
+
+    pub fn insert_named(&mut self, name: usize, table: RcTable) -> bool {
+        if !self.named_tables.contains_key(&name) {
+            self.named_tables.insert(name, table);
+            return true
+        }
+        false
+    }
+
+    pub fn whereis(&self, name: usize) -> Option<process::Ref> {
+        self.named_tables.get(&name).map(|table| table.meta().tid)
     }
 }
-
 

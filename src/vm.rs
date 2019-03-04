@@ -38,6 +38,12 @@ pub struct State {
     pub next_ref: AtomicUsize,
 }
 
+impl State {
+    pub fn next_ref(&self) -> process::Ref {
+        self.next_ref.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
 #[derive(Clone)]
 pub struct Machine {
     /// VM internal state

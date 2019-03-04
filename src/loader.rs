@@ -363,6 +363,8 @@ impl<'a> Loader<'a> {
                     if let [fail, src, LValue::Literal(bits), LValue::Literal(offset)] =
                         &instruction.args[..]
                     {
+                        // TODO: needs to work with byte unaligned stuff
+
                         // TODO: ideally use a single string that we slice into for these interned strings
                         // but need to tie them to the string heap lifetime
                         let offset = *offset as usize;

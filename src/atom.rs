@@ -228,6 +228,20 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
 
     atoms.register_atom("port");
     atoms.register_atom("time_offset");
+
+    atoms.register_atom("bag");
+    atoms.register_atom("duplicate_bag");
+    atoms.register_atom("set");
+    atoms.register_atom("ordered_set");
+    atoms.register_atom("keypos");
+    atoms.register_atom("write_concurrency");
+    atoms.register_atom("read_concurrency");
+    atoms.register_atom("heir");
+    atoms.register_atom("public");
+    atoms.register_atom("private");
+    atoms.register_atom("protected");
+    atoms.register_atom("named_table");
+    atoms.register_atom("compressed");
     atoms
 };
 
@@ -342,6 +356,20 @@ pub const LOW: u32 = 93;
 pub const NO_NODE_NO_HOST: u32 = 94;
 pub const PORT: u32 = 95;
 pub const TIME_OFFSET: u32 = 96;
+
+pub const BAG: u32 = 97;
+pub const DUPLICATE_BAG: u32 = 98;
+pub const SET: u32 = 99;
+pub const ORDERED_SET: u32 = 100;
+pub const KEYPOS: u32 = 101;
+pub const WRITE_CONCURRENCY: u32 = 102;
+pub const READ_CONCURRENCY: u32 = 103;
+pub const HEIR: u32 = 104;
+pub const PUBLIC: u32 = 105;
+pub const PRIVATE: u32 = 106;
+pub const PROTECTED: u32 = 107;
+pub const NAMED_TABLE: u32 = 108;
+pub const COMPRESSED: u32 = 109;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

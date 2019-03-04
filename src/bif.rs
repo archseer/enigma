@@ -1,6 +1,7 @@
 use crate::atom;
 use crate::bif;
 use crate::bitstring;
+use crate::ets;
 use crate::exception::{Exception, Reason};
 use crate::loader;
 use crate::module;
@@ -180,6 +181,12 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "update", 3 => maps::update_3,
             "values", 1 => maps::values_1,
             "take", 2 => maps::take_2,
+        },
+        "ets" => {
+            "new", 2 => ets::bif::new_2,
+            "whereis", 1 => ets::bif::whereis_1,
+            "insert", 2 => ets::bif::insert_2,
+            "lookup", 2 => ets::bif::lookup_2,
         },
     ]
 };
@@ -415,10 +422,7 @@ fn bif_erlang_monitor_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
             match args[1].into_variant() {
                 Variant::Pid(pid) => {
                     let heap = &process.context_mut().heap;
-                    let reference = vm
-                        .state
-                        .next_ref
-                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let reference = vm.state.next_ref();
                     let ref_term = Term::reference(heap, reference);
 
                     if pid == process.pid {
@@ -747,11 +751,7 @@ pub fn bif_erlang_apply_3(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term
 }
 
 /// this sets some process info- trapping exits or the error handler
-pub fn bif_erlang_process_flag_2(
-    _vm: &vm::Machine,
-    process: &RcProcess,
-    args: &[Term],
-) -> Result {
+pub fn bif_erlang_process_flag_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
     match args[0].into_variant() {
         Variant::Atom(atom::TRAP_EXIT) => {
             let local_data = process.local_data_mut();
@@ -817,11 +817,7 @@ fn bif_erlang_unregister_1(vm: &vm::Machine, process: &RcProcess, args: &[Term])
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
-fn bif_erlang_function_exported_3(
-    vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> Result {
+fn bif_erlang_function_exported_3(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     if !args[0].is_atom() || !args[1].is_atom() || !args[2].is_smallint() {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
