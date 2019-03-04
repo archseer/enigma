@@ -585,7 +585,7 @@ fn bif_erlang_map_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     let val = value::Map::try_from(&args[0])?;
     let heap = &process.context_mut().heap;
 
-    Ok(Term::uint(heap, val.map.len() as u32))
+    Ok(Term::uint(heap, val.0.len() as u32))
 }
 
 fn bif_erlang_length_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {

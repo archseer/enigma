@@ -1,4 +1,4 @@
-use super::{Header, Term, TryFrom, Variant, WrongBoxError, BOXED_MAP};
+use super::{Term, TryFrom, Variant, WrongBoxError, BOXED_MAP, Boxed};
 use hamt_rs::HamtMap;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
@@ -7,11 +7,7 @@ use std::hash::{Hash, Hasher};
 pub type HAMT = HamtMap<Term, Term>;
 
 #[derive(Eq, Clone)]
-#[repr(C)]
-pub struct Map {
-    pub header: Header,
-    pub map: HAMT,
-}
+pub struct Map(pub HAMT);
 
 // TODO: to be TryFrom once rust stabilizes the trait
 impl TryFrom<Term> for Map {
@@ -22,7 +18,7 @@ impl TryFrom<Term> for Map {
         if let Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == BOXED_MAP {
-                    return Ok(&*(ptr as *const Map));
+                    return Ok(&(*(ptr as *const Boxed<Self>)).value);
                 }
             }
         }

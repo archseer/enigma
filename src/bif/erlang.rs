@@ -127,7 +127,7 @@ pub fn binary_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
 }
 
 /// convert a list of ascii integers to an atom
-pub fn list_to_atom_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn list_to_atom_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     // Eterm res;
     // byte *buf = (byte *) erts_alloc(ERTS_ALC_T_TMP, MAX_ATOM_SZ_LIMIT);
     // Sint written;
@@ -316,10 +316,7 @@ pub fn append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
 
 pub fn make_ref_0(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
-    let reference = vm
-        .state
-        .next_ref
-        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let reference = vm.state.next_ref();
 
     // TODO: heap allocating these is not ideal
     Ok(Term::reference(heap, reference))

@@ -174,12 +174,6 @@ impl From<&mut Tuple> for Term {
     }
 }
 
-impl From<&mut Map> for Term {
-    fn from(value: &mut Map) -> Term {
-        Term::from(Variant::Pointer(value as *const Map as *const Header))
-    }
-}
-
 impl<T> From<&mut Boxed<T>> for Term {
     fn from(value: &mut Boxed<T>) -> Term {
         Term::from(Variant::Pointer(value as *const Boxed<T> as *const Header))
@@ -411,10 +405,10 @@ impl Term {
         }))
     }
 
-    pub fn map(heap: &Heap, map: HAMT) -> Self {
-        Term::from(heap.alloc(self::Map {
+    pub fn map(heap: &Heap, value: HAMT) -> Self {
+        Term::from(heap.alloc(Boxed {
             header: BOXED_MAP,
-            map,
+            value: Map(value),
         }))
     }
 
@@ -986,7 +980,7 @@ impl std::fmt::Display for Variant {
                     BOXED_MAP => {
                         let map = &*(*ptr as *const map::Map);
                         write!(f, "%{{")?;
-                        let mut iter = map.map.iter().peekable();
+                        let mut iter = map.0.iter().peekable();
                         while let Some((key, val)) = iter.next() {
                             write!(f, "{} => {}", key, val)?;
                             if iter.peek().is_some() {

@@ -9,7 +9,7 @@ use hamt_rs::HamtMap;
 pub fn find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let key = &args[0];
     let map = &args[1];
-    if let Ok(value::Map { map, .. }) = map.try_into() {
+    if let Ok(value::Map(map)) = map.try_into() {
         match map.find(key) {
             Some(value) => {
                 let heap = &process.context_mut().heap;
@@ -25,7 +25,7 @@ pub fn find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Res
 
 pub fn get_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let map = &args[1];
-    if let Ok(value::Map { map, .. }) = map.try_into() {
+    if let Ok(value::Map(map)) = map.try_into() {
         let target = &args[0];
         match map.find(target) {
             Some(value) => {
@@ -62,7 +62,7 @@ pub fn from_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif
 
 pub fn is_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let map = &args[1];
-    if let Ok(value::Map { map, .. }) = map.try_into() {
+    if let Ok(value::Map(map)) = map.try_into() {
         let target = &args[0];
         let exist = map.find(target).is_some();
         return Ok(Term::boolean(exist));
@@ -72,7 +72,7 @@ pub fn is_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::
 
 pub fn keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let map = &args[0];
-    if let Ok(value::Map { map, .. }) = map.try_into() {
+    if let Ok(value::Map(map)) = map.try_into() {
         let heap = &process.context_mut().heap;
         let list = iter_to_list!(heap, map.iter().map(|(k, _)| k).cloned());
         return Ok(list);
@@ -82,11 +82,11 @@ pub fn keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Res
 
 pub fn merge_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let map1 = match args[0].try_into() {
-        Ok(value::Map { map, .. }) => map,
+        Ok(value::Map(map)) => map,
         _ => return Err(Exception::with_value(Reason::EXC_BADMAP, args[0])),
     };
     let map2 = match args[1].try_into() {
-        Ok(value::Map { map, .. }) => map,
+        Ok(value::Map(map)) => map,
         _ => return Err(Exception::with_value(Reason::EXC_BADMAP, args[1])),
     };
     let mut new_map = map2.clone();
@@ -102,7 +102,7 @@ pub fn put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resu
     let key = args[0];
     let value = args[1];
     let map = args[2];
-    if let Ok(value::Map { map, .. }) = map.try_into() {
+    if let Ok(value::Map(map)) = map.try_into() {
         let new_map = map.clone().plus(key, value);
         return Ok(Term::map(heap, new_map));
     }
@@ -113,7 +113,7 @@ pub fn remove_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
     let heap = &process.context_mut().heap;
     let key = args[0];
     let map = args[1];
-    if let Ok(value::Map { map, .. }) = map.try_into() {
+    if let Ok(value::Map(map)) = map.try_into() {
         let new_map = map.clone().minus(&key);
         return Ok(Term::map(heap, new_map));
     }
@@ -124,7 +124,7 @@ pub fn update_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
     let key = args[0];
     let value = args[1];
     let map = args[2];
-    if let Ok(value::Map { map, .. }) = map.try_into() {
+    if let Ok(value::Map(map)) = map.try_into() {
         match map.find(&key) {
             Some(_v) => {
                 let new_map = map.clone().plus(key, value);
@@ -141,7 +141,7 @@ pub fn update_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
 
 pub fn values_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let map = args[0];
-    if let Ok(value::Map { map, .. }) = map.try_into() {
+    if let Ok(value::Map(map)) = map.try_into() {
         let heap = &process.context_mut().heap;
         let list = iter_to_list!(heap, map.iter().map(|(_, v)| v).cloned());
         return Ok(list);
@@ -152,7 +152,7 @@ pub fn values_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
 pub fn take_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let key = args[0];
     let map = args[1];
-    if let Ok(value::Map { map, .. }) = map.try_into() {
+    if let Ok(value::Map(map)) = map.try_into() {
         let result = if let Some(value) = map.find(&key) {
             let new_map = map.clone().minus(&key);
             let heap = &process.context_mut().heap;

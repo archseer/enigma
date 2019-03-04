@@ -2170,7 +2170,7 @@ impl Machine {
                         &ins.args[..]
                     {
                         let mut map = match context.expand_arg(map).try_into() {
-                            Ok(value::Map { map, .. }) => map.clone(),
+                            Ok(value::Map(map)) => map.clone(),
                             _ => unreachable!(),
                         };
 
@@ -2188,7 +2188,7 @@ impl Machine {
                     // TODO: make a macro or make the try_into() return an Exception so we can use ?
                     if let [LValue::Label(fail), map, LValue::ExtendedList(list)] = &ins.args[..] {
                         let map = match context.expand_arg(map).try_into() {
-                            Ok(value::Map { map, .. }) => map.clone(),
+                            Ok(value::Map(map)) => map.clone(),
                             _ => unreachable!(),
                         };
 
@@ -2211,7 +2211,7 @@ impl Machine {
                     // TODO: make a macro or make the try_into() return an Exception so we can use ?
                     if let [LValue::Label(fail), map, LValue::ExtendedList(list)] = &ins.args[..] {
                         let map = match context.expand_arg(map).try_into() {
-                            Ok(value::Map { map, .. }) => map.clone(),
+                            Ok(value::Map(map)) => map.clone(),
                             _ => unreachable!(),
                         };
 
@@ -2238,7 +2238,7 @@ impl Machine {
                         &ins.args[..]
                     {
                         let mut map = match context.expand_arg(map).try_into() {
-                            Ok(value::Map { map, .. }) => map.clone(),
+                            Ok(value::Map(map)) => map.clone(),
                             _ => unreachable!(),
                         };
 
