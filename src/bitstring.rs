@@ -1,7 +1,7 @@
 use crate::immix::Heap;
 use crate::process::RcProcess;
 use crate::servo_arc::Arc;
-use crate::value::{self, Term, TryInto};
+use crate::value::{self, Term, TryFrom};
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 // use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
@@ -128,12 +128,12 @@ impl Hash for Binary {
 }
 
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryInto<value::Boxed<RcBinary>> for Term {
+impl TryFrom<Term> for value::Boxed<RcBinary> {
     type Error = value::WrongBoxError;
 
     #[inline]
-    fn try_into(&self) -> Result<&value::Boxed<RcBinary>, value::WrongBoxError> {
-        if let value::Variant::Pointer(ptr) = self.into_variant() {
+    fn try_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
+        if let value::Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_BINARY {
                     return Ok(&*(ptr as *const value::Boxed<RcBinary>));
@@ -163,12 +163,12 @@ pub struct SubBinary {
 } // TODO: I don't like pub here, have a method (binary_data()) or something
 
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryInto<value::Boxed<SubBinary>> for Term {
+impl TryFrom<Term> for value::Boxed<SubBinary> {
     type Error = value::WrongBoxError;
 
     #[inline]
-    fn try_into(&self) -> Result<&value::Boxed<SubBinary>, value::WrongBoxError> {
-        if let value::Variant::Pointer(ptr) = self.into_variant() {
+    fn try_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
+        if let value::Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_SUBBINARY {
                     return Ok(&*(ptr as *const value::Boxed<SubBinary>));
@@ -243,12 +243,12 @@ pub struct MatchState {
 } // TODO: Dump start_match_2 support. use MatchBuffer directly
 
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryInto<value::Boxed<MatchState>> for Term {
+impl TryFrom<Term> for value::Boxed<MatchState> {
     type Error = value::WrongBoxError;
 
     #[inline]
-    fn try_into(&self) -> Result<&value::Boxed<MatchState>, value::WrongBoxError> {
-        if let value::Variant::Pointer(ptr) = self.into_variant() {
+    fn try_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
+        if let value::Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_MATCHSTATE {
                     return Ok(&*(ptr as *const value::Boxed<MatchState>));

@@ -5,7 +5,7 @@ use crate::exception::{Exception, Reason};
 use crate::loader;
 use crate::module;
 use crate::process::{self, RcProcess};
-use crate::value::{self, Cons, Term, TryInto, Tuple, Variant};
+use crate::value::{self, Cons, Term, TryFrom, TryInto, Tuple, Variant};
 use crate::vm;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;

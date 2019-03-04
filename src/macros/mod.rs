@@ -10,11 +10,11 @@ macro_rules! tup {
         {
             let _cap = tup!(@count $($value),*);
             let _tuple = value::tuple($heap, _cap as u32);
-            let mut _i = 0;
+            let mut _i = 0usize;
             unsafe {
                 $(
                     std::ptr::write(&mut _tuple[_i], $value);
-                    _i += 1;
+                    _i += 1usize;
                 )*
             }
             Term::from(_tuple)

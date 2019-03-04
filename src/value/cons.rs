@@ -1,4 +1,4 @@
-use super::{Term, TryInto, Variant, WrongBoxError};
+use super::{Term, TryFrom, TryInto, Variant, WrongBoxError};
 use crate::exception;
 use crate::immix::Heap;
 use core::marker::PhantomData;
@@ -34,12 +34,12 @@ impl Ord for Cons {
 }
 
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryInto<Cons> for Term {
+impl TryFrom<Term> for Cons {
     type Error = WrongBoxError;
 
     #[inline]
-    fn try_into(&self) -> Result<&Cons, WrongBoxError> {
-        if let Variant::Cons(ptr) = self.into_variant() {
+    fn try_from(value: &Term) -> Result<&Self, WrongBoxError> {
+        if let Variant::Cons(ptr) = value.into_variant() {
             unsafe { return Ok(&*(ptr as *const Cons)) }
         }
         Err(WrongBoxError)

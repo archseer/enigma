@@ -1,5 +1,5 @@
 use crate::module;
-use crate::value::{Boxed, Term, TryInto, Variant, WrongBoxError, BOXED_CLOSURE};
+use crate::value::{Boxed, Term, TryFrom, Variant, WrongBoxError, BOXED_CLOSURE};
 
 #[derive(Debug)]
 #[repr(C)]
@@ -10,12 +10,12 @@ pub struct Closure {
 }
 
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryInto<Boxed<Closure>> for Term {
+impl TryFrom<Term> for Boxed<Closure> {
     type Error = WrongBoxError;
 
     #[inline]
-    fn try_into(&self) -> Result<&Boxed<Closure>, WrongBoxError> {
-        if let Variant::Pointer(ptr) = self.into_variant() {
+    fn try_from(value: &Term) -> Result<&Self, WrongBoxError> {
+        if let Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == BOXED_CLOSURE {
                     return Ok(&*(ptr as *const Boxed<Closure>));

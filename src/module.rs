@@ -4,9 +4,9 @@ use crate::exports_table::ExportsTable;
 use crate::immix::Heap;
 use crate::instr_ptr::InstrPtr;
 use crate::loader::{FuncInfo, Instruction};
+use crate::value::{self, Term, TryFrom, Variant};
 use crate::vm::Machine;
 use hashbrown::HashMap;
-use crate::value::{self, Term, TryInto, Variant};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct MFA(pub u32, pub u32, pub u32);
@@ -94,12 +94,12 @@ pub fn finish_loading_modules(vm: &Machine, modules: Vec<Box<Module>>) {
 
 // Ugh
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryInto<value::Boxed<*mut Module>> for Term {
+impl TryFrom<Term> for value::Boxed<*mut Module> {
     type Error = value::WrongBoxError;
 
     #[inline]
-    fn try_into(&self) -> Result<&value::Boxed<*mut Module>, value::WrongBoxError> {
-        if let Variant::Pointer(ptr) = self.into_variant() {
+    fn try_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
+        if let Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_MODULE {
                     return Ok(&*(ptr as *const value::Boxed<*mut Module>));
@@ -109,4 +109,3 @@ impl TryInto<value::Boxed<*mut Module>> for Term {
         Err(value::WrongBoxError)
     }
 }
-

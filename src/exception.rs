@@ -4,7 +4,7 @@ use crate::instr_ptr::InstrPtr;
 use crate::loader::FuncInfo;
 use crate::module::MFA;
 use crate::process::RcProcess;
-use crate::value::{self, Term, TryInto, Variant};
+use crate::value::{self, Term, TryFrom, TryInto, Variant};
 
 /// http://erlang.org/doc/reference_manual/errors.html#exceptions
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -249,12 +249,12 @@ pub struct StackTrace {
 }
 
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryInto<value::Boxed<StackTrace>> for Term {
+impl TryFrom<Term> for value::Boxed<StackTrace> {
     type Error = value::WrongBoxError;
 
     #[inline]
-    fn try_into(&self) -> Result<&value::Boxed<StackTrace>, value::WrongBoxError> {
-        if let Variant::Pointer(ptr) = self.into_variant() {
+    fn try_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
+        if let Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_STACKTRACE {
                     return Ok(&*(ptr as *const value::Boxed<StackTrace>));

@@ -1,6 +1,6 @@
 use crate::loader::{FuncInfo, LINE_INVALID_LOCATION};
 use crate::module::{Module, MFA};
-use crate::value::{self, Term, TryInto};
+use crate::value::{self, Term, TryFrom};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Hash, Debug)]
 pub struct InstrPtr {
@@ -84,12 +84,12 @@ impl InstrPtr {
 // TODO: these are kinda messy since Opt<ptr> vs ptr deboxes differently
 
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryInto<value::Boxed<Option<InstrPtr>>> for Term {
+impl TryFrom<Term> for value::Boxed<Option<InstrPtr>> {
     type Error = value::WrongBoxError;
 
     #[inline]
-    fn try_into(&self) -> Result<&value::Boxed<Option<InstrPtr>>, value::WrongBoxError> {
-        if let value::Variant::Pointer(ptr) = self.into_variant() {
+    fn try_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
+        if let value::Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_CP {
                     return Ok(&*(ptr as *const value::Boxed<Option<InstrPtr>>));
@@ -100,12 +100,12 @@ impl TryInto<value::Boxed<Option<InstrPtr>>> for Term {
     }
 }
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryInto<value::Boxed<InstrPtr>> for Term {
+impl TryFrom<Term> for value::Boxed<InstrPtr> {
     type Error = value::WrongBoxError;
 
     #[inline]
-    fn try_into(&self) -> Result<&value::Boxed<InstrPtr>, value::WrongBoxError> {
-        if let value::Variant::Pointer(ptr) = self.into_variant() {
+    fn try_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
+        if let value::Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_CATCH {
                     return Ok(&*(ptr as *const value::Boxed<InstrPtr>));
