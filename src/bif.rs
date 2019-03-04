@@ -334,9 +334,20 @@ fn bif_erlang_spawn_opt_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
         match val.into_variant() {
             Variant::Atom(atom::LINK) => acc | SpawnFlag::LINK,
             Variant::Atom(atom::MONITOR) => acc | SpawnFlag::MONITOR,
-            opt => {
-                unimplemented!("Unimplemented spawn_opt for {}", opt);
-                // return Err(Exception::new(Reason::EXC_BADARG));
+            _ => {
+                if let Ok(tup) = Tuple::try_from(&val) {
+                    if tup.len() != 2 {
+                        unimplemented!("error!");
+                        // return Err(Exception::new(Reason::EXC_BADARG));
+                    }
+                    match tup[0].into_variant() {
+                        Variant::Atom(atom::MESSAGE_QUEUE_DATA) => acc, // TODO: implement
+                        opt => unimplemented!("Unimplemented spawn_opt for {}", opt),
+                    }
+                } else {
+                    unimplemented!("Unimplemented spawn_opt for badarg");
+                    // return Err(Exception::new(Reason::EXC_BADARG));
+                }
             }
         }
     });
