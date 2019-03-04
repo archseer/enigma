@@ -2,7 +2,7 @@ use crate::atom;
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Term, TryInto};
+use crate::value::{self, Term, TryFrom, TryInto};
 use crate::vm;
 use hamt_rs::HamtMap;
 
@@ -46,8 +46,7 @@ pub fn from_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif
     }
     let mut map = HamtMap::new();
     while let Ok(value::Cons { head, tail }) = list.try_into() {
-        if let Ok(tuple) = head.try_into() {
-            let tuple: &value::Tuple = tuple; // annoying, need type annotation
+        if let Ok(tuple) = value::Tuple::try_from(head) {
             if tuple.len != 2 {
                 return Err(Exception::new(Reason::EXC_BADARG));
             }
@@ -186,8 +185,7 @@ mod tests {
 
         let res = find_2(&vm, &process, &args);
 
-        if let Ok(tuple) = res.unwrap().try_into() {
-            let tuple: &value::Tuple = tuple; // annoying, need type annotation
+        if let Ok(tuple) = value::Tuple::try_from(&res.unwrap()) {
             assert_eq!(tuple.len, 2);
             let mut iter = tuple.iter();
             assert_eq!(iter.next(), Some(&atom!(OK)));
@@ -691,8 +689,7 @@ mod tests {
         let args = vec![key, map];
 
         let res = take_2(&vm, &process, &args);
-        if let Ok(tuple) = res.unwrap().try_into() {
-            let tuple: &value::Tuple = tuple; // annoying, need type annotation
+        if let Ok(tuple) = value::Tuple::try_from(&res.unwrap()) {
             let mut iter = tuple.iter();
             assert_eq!(&Term::int(2), iter.next().unwrap());
             if let Ok(value::Map { map, .. }) = iter.next().unwrap().try_into() {

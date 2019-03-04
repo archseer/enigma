@@ -34,6 +34,12 @@ impl Exception {
     }
 }
 
+impl From<value::WrongBoxError> for Exception {
+    fn from(_value: value::WrongBoxError) -> Self {
+        Exception::new(Reason::EXC_BADARG)
+    }
+}
+
 // impl From<std::io::Error> for Exception {
 //     fn from(error: std::io::Error) -> Self {
 //         let reason = match error {

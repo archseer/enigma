@@ -4,7 +4,7 @@ use crate::bitstring::Binary;
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
 use crate::process::RcProcess;
-use crate::value::{self, Term, TryInto};
+use crate::value::{self, Cons, Term, TryFrom};
 use crate::vm;
 use std::fs;
 
@@ -39,10 +39,8 @@ pub fn read_file_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     let heap = &process.context_mut().heap;
 
     // TODO bitstrings or non zero offsets can fail ...
-    let path = match args[0].try_into() {
-        Ok(cons) => value::cons::unicode_list_to_buf(cons, 2048).unwrap(),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
-    };
+    let cons = Cons::try_from(&args[0])?;
+    let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
 
     println!("Trying to read file {:?}", path);
     let bytes = match std::fs::read(path) {
@@ -231,11 +229,9 @@ pub fn read_info_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
         None => return Err(Exception::new(Reason::EXC_BADARG)),
     };
 
-    let path = match args[0].try_into() {
-        // TODO: maybe do these casts in the native2name/name2native
-        Ok(cons) => value::cons::unicode_list_to_buf(cons, 2048).unwrap(),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
-    };
+    let cons = Cons::try_from(&args[0])?;
+    // TODO: maybe do these casts in the native2name/name2native
+    let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
 
     println!("path stuff");
 

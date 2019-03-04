@@ -2,7 +2,7 @@ use crate::atom;
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, TryInto, Variant};
+use crate::value::{self, Cons, Term, TryFrom, Variant};
 use crate::vm;
 use crate::Itertools;
 
@@ -109,9 +109,8 @@ pub fn process_info_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
     };
 
     if let Some(proc) = proc {
-        match args[1].try_into() {
+        match Cons::try_from(&args[1]) {
             Ok(cons) => {
-                let cons: &Cons = cons; // type annotation
                 let heap = &process.context_mut().heap;
                 cons.iter()
                     .map(|val| process_info_aux(vm, &proc, *val, true))

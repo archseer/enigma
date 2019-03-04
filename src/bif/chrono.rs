@@ -1,7 +1,7 @@
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Term, TryInto, Tuple};
+use crate::value::{self, Term, TryFrom, Tuple};
 use crate::vm;
 use chrono::prelude::*;
 use num::bigint::ToBigInt;
@@ -152,16 +152,13 @@ type ErlDateTime = ((i32, i32, i32), (i32, i32, i32));
 /// Check and extract components from a tuple on form: {{Y,M,D},{H,M,S}}
 fn time_to_parts(term: Term) -> Option<ErlDateTime> {
     // term to tuple
-    if let Ok(wrapper) = term.try_into() {
-        let wrapper: &Tuple = wrapper;
-
+    if let Ok(wrapper) = Tuple::try_from(&term) {
         if wrapper.len() != 2 {
             return None;
         }
 
-        let date: &Tuple = match wrapper[0].try_into() {
+        let date = match Tuple::try_from(&wrapper[0]) {
             Ok(date) => {
-                let date: &Tuple = date;
                 if date.len() != 3 {
                     return None;
                 }
@@ -173,9 +170,8 @@ fn time_to_parts(term: Term) -> Option<ErlDateTime> {
         let month = date[1].to_i32()?;
         let day = date[2].to_i32()?;
 
-        let time: &Tuple = match wrapper[1].try_into() {
+        let time = match Tuple::try_from(&wrapper[1]) {
             Ok(time) => {
-                let time: &Tuple = time;
                 if time.len() != 3 {
                     return None;
                 }

@@ -300,9 +300,8 @@ fn bif_erlang_spawn_opt_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     use process::SpawnFlag;
 
     // arg 0 is a 4 value tuple
-    let tup: &Tuple = match args[0].try_into() {
+    let tup: &Tuple = match Tuple::try_from(&args[0]) {
         Ok(tup) => {
-            let tup: &Tuple = tup;
             if tup.len() != 4 {
                 return Err(Exception::new(Reason::EXC_BADARG));
             }
@@ -322,13 +321,7 @@ fn bif_erlang_spawn_opt_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     };
     let arglist = tup[2];
 
-    let opts = match tup[3].try_into() {
-        Ok(cons) => {
-            let cons: &value::Cons = cons; // annoying, need type annotation
-            cons
-        }
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
-    };
+    let opts = Cons::try_from(&tup[3])?;
 
     let flag = opts.iter().fold(SpawnFlag::NONE, |acc, val| {
         match val.into_variant() {
@@ -601,13 +594,10 @@ fn bif_erlang_map_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
 }
 
 fn bif_erlang_length_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-    if let Ok(cons) = &args[0].try_into() {
-        let cons: &value::Cons = cons; // annoying, need type annotation
-        let heap = &process.context_mut().heap;
+    let cons = Cons::try_from(&args[0])?;
+    let heap = &process.context_mut().heap;
 
-        return Ok(Term::uint(heap, cons.iter().count() as u32));
-    }
-    Err(Exception::new(Reason::EXC_BADARG))
+    Ok(Term::uint(heap, cons.iter().count() as u32))
 }
 
 fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {

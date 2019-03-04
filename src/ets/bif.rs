@@ -2,7 +2,7 @@ use crate::atom;
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{Cons, Term, TryFrom, TryInto, Tuple, Variant};
+use crate::value::{Cons, Term, TryFrom, Tuple, Variant};
 use crate::vm;
 use crate::Itertools;
 
@@ -31,114 +31,97 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
     // is_compressed = erts_ets_always_compress;
     let mut is_compressed = false;
 
-    match args[1].try_into() {
-        Ok(cons) => {
-            // [:set, :protected, :named_table, {:read_concurrency, :true}, {:write_concurrency, :true}]
-            let cons: &Cons = cons; // type annotation
-            for val in cons.iter() {
-                match val.into_variant() {
-                    Variant::Atom(atom::BAG) => {
-                        status.insert(Status::DB_BAG);
-                        status.remove(
-                            Status::DB_SET
-                                | Status::DB_DUPLICATE_BAG
-                                | Status::DB_ORDERED_SET
-                                | Status::DB_CA_ORDERED_SET,
-                        );
-                    }
-                    Variant::Atom(atom::DUPLICATE_BAG) => {
-                        status.insert(Status::DB_DUPLICATE_BAG);
-                        status.remove(
-                            Status::DB_SET
-                                | Status::DB_BAG
-                                | Status::DB_ORDERED_SET
-                                | Status::DB_CA_ORDERED_SET,
-                        );
-                    }
-                    Variant::Atom(atom::ORDERED_SET) => {
-                        status.insert(Status::DB_ORDERED_SET);
-                        status.remove(
-                            Status::DB_SET
-                                | Status::DB_DUPLICATE_BAG
-                                | Status::DB_SET
-                                | Status::DB_CA_ORDERED_SET,
-                        );
-                    }
-                    Variant::Pointer(_ptr) => {
-                        // tuple
-                        match val.try_into() {
-                            Ok(tup) => {
-                                let tup: &Tuple = tup; // type annotation
-                                if tup.len() == 2 {
-                                    match tup[0].into_variant() {
-                                        Variant::Atom(atom::KEYPOS) => {
-                                            match tup[1].to_int() {
-                                                Some(i) if i > 0 => keypos = i as usize,
-                                                _ => {
-                                                    return Err(Exception::new(Reason::EXC_BADARG))
-                                                }
-                                            };
-                                        }
-                                        Variant::Atom(atom::WRITE_CONCURRENCY) => {
-                                            match tup[1].to_bool() {
-                                                Some(val) => is_fine_locked = val,
-                                                None => {
-                                                    return Err(Exception::new(Reason::EXC_BADARG))
-                                                }
-                                            };
-                                        }
-                                        Variant::Atom(atom::READ_CONCURRENCY) => {
-                                            match tup[1].to_bool() {
-                                                Some(val) => frequent_read = val,
-                                                None => {
-                                                    return Err(Exception::new(Reason::EXC_BADARG))
-                                                }
-                                            };
-                                        }
-                                        Variant::Atom(atom::HEIR) => {
-                                            if tup[1] == atom!(NONE) {
-                                                heir = atom!(NONE);
-                                                heir_data = atom!(UNDEFINED);
-                                            } else {
-                                                return Err(Exception::new(Reason::EXC_BADARG));
-                                            }
-                                        }
-                                        _ => return Err(Exception::new(Reason::EXC_BADARG)),
-                                    }
-                                } else if tup.len() == 3 {
-                                    //&& tup[0] == am_heir && is_internal_pid(tp[2]) {
-                                    unimplemented!()
-                                //     heir = tp[2];
-                                //     heir_data = tp[3];
-                                } else {
-                                    return Err(Exception::new(Reason::EXC_BADARG));
-                                }
-                            }
-                            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    // TODO skip if args is nil
+    let cons = Cons::try_from(&args[1])?;
+
+    for val in cons.iter() {
+        match val.into_variant() {
+            Variant::Atom(atom::BAG) => {
+                status.insert(Status::DB_BAG);
+                status.remove(
+                    Status::DB_SET
+                        | Status::DB_DUPLICATE_BAG
+                        | Status::DB_ORDERED_SET
+                        | Status::DB_CA_ORDERED_SET,
+                );
+            }
+            Variant::Atom(atom::DUPLICATE_BAG) => {
+                status.insert(Status::DB_DUPLICATE_BAG);
+                status.remove(
+                    Status::DB_SET
+                        | Status::DB_BAG
+                        | Status::DB_ORDERED_SET
+                        | Status::DB_CA_ORDERED_SET,
+                );
+            }
+            Variant::Atom(atom::ORDERED_SET) => {
+                status.insert(Status::DB_ORDERED_SET);
+                status.remove(
+                    Status::DB_SET
+                        | Status::DB_DUPLICATE_BAG
+                        | Status::DB_SET
+                        | Status::DB_CA_ORDERED_SET,
+                );
+            }
+            Variant::Pointer(_ptr) => {
+                let tup = Tuple::try_from(val)?;
+                if tup.len() == 2 {
+                    match tup[0].into_variant() {
+                        Variant::Atom(atom::KEYPOS) => {
+                            match tup[1].to_int() {
+                                Some(i) if i > 0 => keypos = i as usize,
+                                _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                            };
                         }
+                        Variant::Atom(atom::WRITE_CONCURRENCY) => {
+                            match tup[1].to_bool() {
+                                Some(val) => is_fine_locked = val,
+                                None => return Err(Exception::new(Reason::EXC_BADARG)),
+                            };
+                        }
+                        Variant::Atom(atom::READ_CONCURRENCY) => {
+                            match tup[1].to_bool() {
+                                Some(val) => frequent_read = val,
+                                None => return Err(Exception::new(Reason::EXC_BADARG)),
+                            };
+                        }
+                        Variant::Atom(atom::HEIR) => {
+                            if tup[1] == atom!(NONE) {
+                                heir = atom!(NONE);
+                                heir_data = atom!(UNDEFINED);
+                            } else {
+                                return Err(Exception::new(Reason::EXC_BADARG));
+                            }
+                        }
+                        _ => return Err(Exception::new(Reason::EXC_BADARG)),
                     }
-                    Variant::Atom(atom::PUBLIC) => {
-                        status.insert(Status::DB_PUBLIC);
-                        status.remove(Status::DB_PROTECTED | Status::DB_PRIVATE);
-                    }
-                    Variant::Atom(atom::PRIVATE) => {
-                        status.insert(Status::DB_PRIVATE);
-                        status.remove(Status::DB_PROTECTED | Status::DB_PUBLIC);
-                    }
-                    Variant::Atom(atom::NAMED_TABLE) => {
-                        is_named = true;
-                        status |= Status::DB_NAMED_TABLE;
-                    }
-                    Variant::Atom(atom::COMPRESSED) => {
-                        is_compressed = true;
-                    }
-                    Variant::Atom(atom::SET) | Variant::Atom(atom::PROTECTED) => {}
-                    _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                } else if tup.len() == 3 {
+                    //&& tup[0] == am_heir && is_internal_pid(tp[2]) {
+                    unimplemented!()
+                //     heir = tp[2];
+                //     heir_data = tp[3];
+                } else {
+                    return Err(Exception::new(Reason::EXC_BADARG));
                 }
             }
+            Variant::Atom(atom::PUBLIC) => {
+                status.insert(Status::DB_PUBLIC);
+                status.remove(Status::DB_PROTECTED | Status::DB_PRIVATE);
+            }
+            Variant::Atom(atom::PRIVATE) => {
+                status.insert(Status::DB_PRIVATE);
+                status.remove(Status::DB_PROTECTED | Status::DB_PUBLIC);
+            }
+            Variant::Atom(atom::NAMED_TABLE) => {
+                is_named = true;
+                status |= Status::DB_NAMED_TABLE;
+            }
+            Variant::Atom(atom::COMPRESSED) => {
+                is_compressed = true;
+            }
+            Variant::Atom(atom::SET) | Variant::Atom(atom::PROTECTED) => {}
+            _ => return Err(Exception::new(Reason::EXC_BADARG)),
         }
-        // TODO skip if args is nil
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     }
 
     // if !list.is_nil() { // bad opt or not a well formed list
@@ -283,8 +266,7 @@ pub fn insert_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
 
     let validate = |val: &Term| val.is_tuple() && Tuple::try_from(val).unwrap().len() > keypos;
 
-    let res: Result<()> = if let Ok(cons) = args[1].try_into() {
-        let cons: &Cons = cons;
+    let res: Result<()> = if let Ok(cons) = Cons::try_from(&args[1]) {
         let valid = cons.iter().all(validate);
         // TODO if bad list
         // if (lst != NIL) { goto badarg; }

@@ -2,7 +2,7 @@ use crate::atom;
 use crate::bif::{self, BifFn};
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, TryInto, Tuple};
+use crate::value::{self, Cons, Term, TryFrom, TryInto, Tuple};
 use crate::vm;
 
 pub fn member_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
@@ -97,19 +97,11 @@ pub fn reverse_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::
         return Ok(args[1]);
     }
 
-    if !args[0].is_list() {
-        return Err(Exception::new(Reason::EXC_BADARG));
-    }
+    let cons = Cons::try_from(&args[0])?;
 
-    if let Ok(cons) = args[0].try_into() {
-        let cons: &value::Cons = cons; // annoying, need type annotation
-
-        let heap = &process.context_mut().heap;
-        // TODO: finish up the reduction counting implementation
-        Ok(cons.iter().fold(args[1], |acc, val| cons!(heap, *val, acc)))
-    } else {
-        Err(Exception::new(Reason::EXC_BADARG))
-    }
+    let heap = &process.context_mut().heap;
+    // TODO: finish up the reduction counting implementation
+    Ok(cons.iter().fold(args[1], |acc, val| cons!(heap, *val, acc)))
 
     /* We build the reversal on the unused part of the heap if possible to save
      * us the trouble of having to figure out the list size. We fall back to
@@ -168,8 +160,7 @@ fn keyfind(_func: BifFn, _process: &RcProcess, args: &[Term]) -> bif::Result {
 
         let term = head;
         list = tail;
-        if let Ok(tuple) = term.try_into() {
-            let tuple: &Tuple = tuple; // annoying, need type annotation
+        if let Ok(tuple) = Tuple::try_from(&term) {
             if pos <= (tuple.len as usize) && key == tuple[pos] {
                 return Ok(*term);
             }

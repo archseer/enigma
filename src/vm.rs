@@ -1,7 +1,7 @@
 use crate::atom;
 use crate::bif;
 use crate::bitstring;
-use crate::ets::{TableRegistry, RcTableRegistry};
+use crate::ets::{RcTableRegistry, TableRegistry};
 use crate::exception::{self, Exception, Reason};
 use crate::exports_table::{Export, ExportsTable, RcExportsTable};
 use crate::instr_ptr::InstrPtr;
@@ -14,7 +14,7 @@ use crate::process::registry::Registry as ProcessRegistry;
 use crate::process::table::Table as ProcessTable;
 use crate::process::{self, RcProcess};
 use crate::servo_arc::Arc;
-use crate::value::{self, Term, TryInto, TryIntoMut, Variant};
+use crate::value::{self, Cons, Term, TryFrom, TryInto, TryIntoMut, Tuple, Variant};
 // use log::debug;
 use parking_lot::Mutex;
 use std::mem::transmute;
@@ -40,7 +40,8 @@ pub struct State {
 
 impl State {
     pub fn next_ref(&self) -> process::Ref {
-        self.next_ref.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        self.next_ref
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     }
 }
 
@@ -1037,8 +1038,7 @@ impl Machine {
                 Opcode::TestArity => {
                     // check tuple arity
                     if let [LValue::Label(fail), arg, LValue::Literal(arity)] = &ins.args[..] {
-                        if let Ok(t) = context.expand_arg(arg).try_into() {
-                            let t: &value::Tuple = t; // annoying, need type annotation
+                        if let Ok(t) = Tuple::try_from(&context.expand_arg(arg)) {
                             if t.len != *arity {
                                 op_jump!(context, *fail);
                             }
@@ -2163,7 +2163,7 @@ impl Machine {
                     debug_assert_eq!(ins.args.len(), 2);
                     // source head
                     if let Ok(value::Cons { head, .. }) =
-                        context.expand_arg(&ins.args[0]).try_into()
+                        Cons::try_from(&context.expand_arg(&ins.args[0]))
                     {
                         set_register!(context, &ins.args[1], *head);
                     } else {

@@ -3,7 +3,7 @@ use crate::bif;
 use crate::bitstring;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, TryInto, Tuple, Variant};
+use crate::value::{self, Cons, Term, TryInto, TryFrom, Tuple, Variant};
 use crate::vm;
 use lexical;
 
@@ -39,7 +39,7 @@ pub fn make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     for item in init.iter() {
-        let t: &Tuple = match item.try_into() {
+        let t = match Tuple::try_from(&item) {
             Ok(tuple) => tuple, // FIXME do the len checking here
             _ => return Err(Exception::new(Reason::EXC_BADARG)),
         };
@@ -58,13 +58,7 @@ pub fn make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
 }
 
 pub fn append_element_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    if !args[0].is_tuple() {
-        return Err(Exception::new(Reason::EXC_BADARG));
-    }
-    let t: &Tuple = match args[0].try_into() {
-        Ok(tuple) => tuple,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
-    };
+    let t = Tuple::try_from(&args[0])?;
     let heap = &process.context_mut().heap;
     let new_tuple = value::tuple(heap, (t.len() + 1) as u32);
     new_tuple[..t.len()].copy_from_slice(&t[..]);
@@ -79,10 +73,7 @@ pub fn setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
         Ok(value::Num::Integer(i)) if !i < 1 => i - 1,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
-    let t: &Tuple = match args[1].try_into() {
-        Ok(tuple) => tuple,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
-    };
+    let t = Tuple::try_from(&args[1])?;
     if number >= t.len() as i32 {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
@@ -96,10 +87,7 @@ pub fn setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
 }
 
 pub fn tuple_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    let t: &Tuple = match args[0].try_into() {
-        Ok(tuple) => tuple,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
-    };
+    let t = Tuple::try_from(&args[0])?;
     let mut n = (t.len() - 1) as i32;
     let mut list = Term::nil();
     let heap = &process.context_mut().heap;
@@ -167,14 +155,10 @@ pub fn list_to_atom_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     // ASSERT(is_atom(res));
     // erts_free(ERTS_ALC_T_TMP, (void *) buf);
     // BIF_RET(res);
-    match args[0].try_into() {
-        Ok(list) => {
-            let string = value::cons::unicode_list_to_buf(list, atom::MAX_ATOM_CHARS)?;
-            let atom = atom::from_str(string.as_str());
-            Ok(Term::atom(atom))
-        }
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
-    }
+    let list = Cons::try_from(&args[0])?;
+    let string = value::cons::unicode_list_to_buf(list, atom::MAX_ATOM_CHARS)?;
+    let atom = atom::from_str(string.as_str());
+    Ok(Term::atom(atom))
 }
 
 /// conditionally convert a list of ascii integers to an atom
@@ -214,10 +198,7 @@ pub fn list_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
     }
 
     let mut stack = Vec::new();
-    let cons: &Cons = match args[0].try_into() {
-        Ok(cons) => cons,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
-    };
+    let cons = Cons::try_from(&args[0])?;
     stack.push(cons.iter());
 
     // TODO fastpath for if [binary]
