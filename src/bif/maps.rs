@@ -24,9 +24,9 @@ pub fn find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Res
 }
 
 pub fn get_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
-    let map = &args[0];
+    let map = &args[1];
     if let Ok(value::Map { map, .. }) = map.try_into() {
-        let target = &args[1];
+        let target = &args[0];
         match map.find(target) {
             Some(value) => {
                 return Ok(*value);
@@ -62,9 +62,9 @@ pub fn from_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif
 }
 
 pub fn is_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
-    let map = &args[0];
+    let map = &args[1];
     if let Ok(value::Map { map, .. }) = map.try_into() {
-        let target = &args[1];
+        let target = &args[0];
         let exist = map.find(target).is_some();
         return Ok(Term::boolean(exist));
     }
@@ -100,9 +100,9 @@ pub fn merge_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
 
 pub fn put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
-    let map = args[0];
-    let key = args[1];
-    let value = args[2];
+    let key = args[0];
+    let value = args[1];
+    let map = args[2];
     if let Ok(value::Map { map, .. }) = map.try_into() {
         let new_map = map.clone().plus(key, value);
         return Ok(Term::map(heap, new_map));
@@ -112,8 +112,8 @@ pub fn put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resu
 
 pub fn remove_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
-    let map = args[0];
-    let key = args[1];
+    let key = args[0];
+    let map = args[1];
     if let Ok(value::Map { map, .. }) = map.try_into() {
         let new_map = map.clone().minus(&key);
         return Ok(Term::map(heap, new_map));
@@ -122,9 +122,9 @@ pub fn remove_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
 }
 
 pub fn update_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    let map = args[0];
-    let key = args[1];
-    let value = args[2];
+    let key = args[0];
+    let value = args[1];
+    let map = args[2];
     if let Ok(value::Map { map, .. }) = map.try_into() {
         match map.find(&key) {
             Some(_v) => {
@@ -237,7 +237,7 @@ mod tests {
         let heap = &process.context_mut().heap;
 
         let map = map!(heap, str_to_atom!("test") => Term::int(3));
-        let args = vec![map, str_to_atom!("test")];
+        let args = vec![str_to_atom!("test"), map];
 
         let res = get_2(&vm, &process, &args);
 
@@ -251,7 +251,7 @@ mod tests {
         let process = process::allocate(&vm.state, None, module).unwrap();
 
         let bad_map = Term::int(3);
-        let args = vec![bad_map, Term::atom(atom::from_str("test"))];
+        let args = vec![Term::atom(atom::from_str("test")), bad_map];
 
         if let Err(exception) = get_2(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
@@ -269,7 +269,7 @@ mod tests {
         let heap = &process.context_mut().heap;
 
         let map = map!(heap, str_to_atom!("test") => Term::int(3));
-        let args = vec![map, str_to_atom!("fail")];
+        let args = vec![str_to_atom!("fail"), map];
 
         if let Err(exception) = get_2(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADKEY);
@@ -352,7 +352,7 @@ mod tests {
         let heap = &process.context_mut().heap;
 
         let map = map!(heap, str_to_atom!("test") => Term::int(1));
-        let args = vec![map, str_to_atom!("test")];
+        let args = vec![str_to_atom!("test"), map];
 
         let res = is_key_2(&vm, &process, &args);
 
@@ -367,7 +367,7 @@ mod tests {
         let heap = &process.context_mut().heap;
 
         let map = map!(heap, str_to_atom!("test") => Term::int(3));
-        let args = vec![map, str_to_atom!("false")];
+        let args = vec![str_to_atom!("false"), map];
 
         let res = is_key_2(&vm, &process, &args);
 
@@ -381,7 +381,7 @@ mod tests {
         let process = process::allocate(&vm.state, None, module).unwrap();
 
         let bad_map = Term::int(3);
-        let args = vec![bad_map, str_to_atom!("test")];
+        let args = vec![str_to_atom!("test"), bad_map];
 
         if let Err(exception) = is_key_2(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
@@ -505,7 +505,7 @@ mod tests {
 
         let value = Term::int(2);
         let map: value::HAMT = HamtMap::new();
-        let args = vec![Term::map(heap, map), key, value];
+        let args = vec![key, value, Term::map(heap, map)];
 
         let res = put_3(&vm, &process, &args);
 
@@ -525,7 +525,7 @@ mod tests {
         let key = str_to_atom!("test");
         let value = Term::int(2);
         let bad_map = Term::int(3);
-        let args = vec![bad_map, key, value];
+        let args = vec![key, value, bad_map];
 
         let res = put_3(&vm, &process, &args);
 
@@ -546,7 +546,7 @@ mod tests {
 
         let key = str_to_atom!("test");
         let map = map!(heap, key => Term::int(1));
-        let args = vec![map, key];
+        let args = vec![key, map];
 
         let res = remove_2(&vm, &process, &args);
 
@@ -563,7 +563,7 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, None, module).unwrap();
 
-        let args = vec![Term::int(1), Term::int(2)];
+        let args = vec![Term::int(2), Term::int(1)];
 
         let res = remove_2(&vm, &process, &args);
 
@@ -586,7 +586,7 @@ mod tests {
         let value = Term::int(1);
         let update_value = Term::int(2);
         let map = map!(heap, key => value);
-        let args = vec![map, key, update_value];
+        let args = vec![key, update_value, map];
 
         let res = update_3(&vm, &process, &args);
 
@@ -607,7 +607,7 @@ mod tests {
         let key = str_to_atom!("test");
         let value = Term::int(2);
         let map: value::HAMT = HamtMap::new();
-        let args = vec![Term::map(heap, map), key, value];
+        let args = vec![key, value, Term::map(heap, map)];
 
         let res = update_3(&vm, &process, &args);
 
@@ -628,7 +628,7 @@ mod tests {
         let key = str_to_atom!("test");
         let value = Term::int(2);
         let bad_map = Term::int(3);
-        let args = vec![bad_map, key, value];
+        let args = vec![key, value, bad_map];
 
         let res = update_3(&vm, &process, &args);
 
@@ -668,7 +668,7 @@ mod tests {
         let process = process::allocate(&vm.state, None, module).unwrap();
 
         let bad_map = Term::int(3);
-        let args = vec![bad_map, str_to_atom!("test")];
+        let args = vec![bad_map];
 
         if let Err(exception) = values_1(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);
