@@ -1,9 +1,9 @@
 use crate::value::Term;
 //use crate::servo_arc::Arc;
-use std::sync::Arc; // servo_arc doesn't work with trait objects
-use crate::process::{RcProcess, self};
+use crate::process::{self, RcProcess};
 use hashbrown::HashMap;
 use parking_lot::Mutex;
+use std::sync::Arc; // servo_arc doesn't work with trait objects
 
 #[macro_export]
 macro_rules! table_kind {
@@ -35,9 +35,9 @@ pub trait Table: Send + Sync {
     fn prev(&self, process: &RcProcess, key: Term) -> Result<Term>;
 
     // put
-    fn insert(&self, process: &RcProcess, value: Term, key_clash_fail: bool) -> Result<()>; /* DB_ERROR_BADKEY if key exists */ 
+    fn insert(&self, process: &RcProcess, value: Term, key_clash_fail: bool) -> Result<()>; /* DB_ERROR_BADKEY if key exists */
 
-    fn get(&self, process: &RcProcess,  key: Term) -> Result<Term>;
+    fn get(&self, process: &RcProcess, key: Term) -> Result<Term>;
 
     fn get_element(&self, process: &RcProcess, key: Term, index: usize) -> Result<Term>;
 
@@ -160,7 +160,7 @@ impl TableRegistry {
     pub fn with_rc() -> RcTableRegistry {
         Arc::new(Mutex::new(Self {
             tables: HashMap::new(),
-            named_tables: HashMap::new()
+            named_tables: HashMap::new(),
         }))
     }
 
@@ -173,13 +173,13 @@ impl TableRegistry {
     }
 
     pub fn insert(&mut self, reference: process::Ref, table: RcTable) {
-       self.tables.insert(reference, table);
+        self.tables.insert(reference, table);
     }
 
     pub fn insert_named(&mut self, name: usize, table: RcTable) -> bool {
         if !self.named_tables.contains_key(&name) {
             self.named_tables.insert(name, table);
-            return true
+            return true;
         }
         false
     }
@@ -188,4 +188,3 @@ impl TableRegistry {
         self.named_tables.get(&name).map(|table| table.meta().tid)
     }
 }
-

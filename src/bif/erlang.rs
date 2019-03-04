@@ -3,7 +3,7 @@ use crate::bif;
 use crate::bitstring;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, TryInto, TryFrom, Tuple, Variant};
+use crate::value::{self, Cons, Term, TryFrom, TryInto, Tuple, Variant};
 use crate::vm;
 use lexical;
 
@@ -34,15 +34,10 @@ pub fn make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
             std::ptr::write(&mut tuple[i as usize], args[1]);
         }
     }
-    let init: &value::Cons = match args[2].try_into() {
-        Ok(cons) => cons,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
-    };
+    let init = Cons::try_from(&args[2])?;
+
     for item in init.iter() {
-        let t = match Tuple::try_from(&item) {
-            Ok(tuple) => tuple, // FIXME do the len checking here
-            _ => return Err(Exception::new(Reason::EXC_BADARG)),
-        };
+        let t = Tuple::try_from(&item)?;
         if t.len != 2 {
             return Err(Exception::new(Reason::EXC_BADARG));
         }
@@ -105,18 +100,12 @@ pub fn binary_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
     let (bytes, bitoffs, size) = match binary.get_boxed_header() {
         Ok(value::BOXED_BINARY) => {
             // TODO use ok_or to cast to some, then use ?
-            let value = &binary
-                .get_boxed_value::<value::Boxed<bitstring::RcBinary>>()
-                .unwrap()
-                .value;
+            let value = &binary.get_boxed_value::<bitstring::RcBinary>().unwrap();
             (&value.data[..], 0, value.data.len())
         }
         Ok(value::BOXED_SUBBINARY) => {
             // TODO use ok_or to cast to some, then use ?
-            let value = &binary
-                .get_boxed_value::<value::Boxed<bitstring::SubBinary>>()
-                .unwrap()
-                .value;
+            let value = &binary.get_boxed_value::<bitstring::SubBinary>().unwrap();
             (
                 &value.original.data[value.offset..],
                 value.bit_offset,

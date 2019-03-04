@@ -255,7 +255,7 @@ pub struct StackTrace {
 }
 
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryFrom<Term> for value::Boxed<StackTrace> {
+impl TryFrom<Term> for StackTrace {
     type Error = value::WrongBoxError;
 
     #[inline]
@@ -263,7 +263,7 @@ impl TryFrom<Term> for value::Boxed<StackTrace> {
         if let Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_STACKTRACE {
-                    return Ok(&*(ptr as *const value::Boxed<StackTrace>));
+                    return Ok(&(*(ptr as *const value::Boxed<Self>)).value);
                 }
             }
         }
@@ -391,9 +391,9 @@ fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
         match context.stack[ptr - 1].clone().get_boxed_header() {
             Ok(value::BOXED_CATCH) => {
                 let ptr = context.stack[ptr - 1]
-                    .get_boxed_value::<value::Boxed<InstrPtr>>()
+                    .get_boxed_value::<InstrPtr>()
                     .unwrap()
-                    .value;
+                    .clone();
 
                 // Unwind the stack up to the current frame.
                 context.stack.truncate(prev);
@@ -663,7 +663,7 @@ pub fn get_trace_from_exc(trace: &Term) -> Option<&StackTrace> {
     match trace.into_variant() {
         Variant::Nil(..) => None,
         Variant::Cons(cons) => unsafe {
-            if let Ok(value::Boxed { value, .. }) = (*cons).tail.try_into() {
+            if let Ok(value) = (*cons).tail.try_into() {
                 Some(value)
             } else {
                 unreachable!()
@@ -686,11 +686,7 @@ fn is_raised_exc(exc: Term) -> bool {
         Variant::Nil(value::Special::Nil) => false,
         Variant::Cons(cons) => unsafe {
             //return bignum_header_is_neg(*big_val(CDR(list_val(exc))));
-            if let Ok(value::Boxed {
-                value: StackTrace { complete: true, .. },
-                ..
-            }) = (*cons).tail.try_into()
-            {
+            if let Ok(StackTrace { complete: true, .. }) = (*cons).tail.try_into() {
                 return true;
             }
             false

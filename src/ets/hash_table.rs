@@ -1,6 +1,6 @@
 use super::*;
+use crate::value::{Cons, Term, TryFrom, TryInto, Tuple, Variant};
 use chashmap::CHashMap;
-use crate::value::{Cons, Term, TryInto, TryFrom, Tuple, Variant};
 
 pub(crate) struct HashTable {
     meta: Metadata,
@@ -12,7 +12,10 @@ unsafe impl Send for HashTable {}
 
 impl HashTable {
     pub fn new(meta: Metadata, process: &RcProcess) -> Self {
-        Self { meta, hashmap: CHashMap::new() }
+        Self {
+            meta,
+            hashmap: CHashMap::new(),
+        }
     }
 }
 

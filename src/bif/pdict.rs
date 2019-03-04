@@ -15,7 +15,7 @@ pub fn get_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Res
         let tuple = tup2!(heap, *key, *val);
 
         // make cons
-        value::cons(heap, tuple, res)
+        cons!(heap, tuple, res)
     });
     Ok(result)
 }
@@ -36,7 +36,7 @@ pub fn get_keys_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif
 
     let result: Term = pdict
         .keys()
-        .fold(Term::nil(), |res, key| value::cons(heap, *key, res));
+        .fold(Term::nil(), |res, key| cons!(heap, *key, res));
     Ok(result)
 }
 
@@ -75,7 +75,7 @@ pub fn erase_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::R
         let tuple = tup2!(heap, key, val);
 
         // make cons
-        value::cons(heap, tuple, res)
+        cons!(heap, tuple, res)
     });
     Ok(result)
 }

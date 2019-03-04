@@ -10,7 +10,7 @@ pub struct Closure {
 }
 
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryFrom<Term> for Boxed<Closure> {
+impl TryFrom<Term> for Closure {
     type Error = WrongBoxError;
 
     #[inline]
@@ -18,7 +18,7 @@ impl TryFrom<Term> for Boxed<Closure> {
         if let Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == BOXED_CLOSURE {
-                    return Ok(&*(ptr as *const Boxed<Closure>));
+                    return Ok(&(*(ptr as *const Boxed<Closure>)).value);
                 }
             }
         }

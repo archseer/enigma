@@ -94,7 +94,7 @@ pub fn finish_loading_modules(vm: &Machine, modules: Vec<Box<Module>>) {
 
 // Ugh
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryFrom<Term> for value::Boxed<*mut Module> {
+impl TryFrom<Term> for *mut Module {
     type Error = value::WrongBoxError;
 
     #[inline]
@@ -102,7 +102,7 @@ impl TryFrom<Term> for value::Boxed<*mut Module> {
         if let Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_MODULE {
-                    return Ok(&*(ptr as *const value::Boxed<*mut Module>));
+                    return Ok(&(*(ptr as *const value::Boxed<*mut Module>)).value);
                 }
             }
         }

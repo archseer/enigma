@@ -447,7 +447,6 @@ fn bif_erlang_monitor_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
                     );
 
                     if !sent {
-                        let from = Term::pid(process.pid);
                         process::send_signal(
                             &vm.state,
                             process.pid,
@@ -564,33 +563,29 @@ fn bif_erlang_is_map_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -
     Ok(Term::boolean(args[0].is_map()))
 }
 
-fn bif_erlang_tuple_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
-    if let Ok(Tuple { len, .. }) = args[0].try_into() {
-        return Ok(Term::int(*len as i32));
-    }
-    Err(Exception::new(Reason::EXC_BADARG))
+fn bif_erlang_tuple_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+    let tuple = Tuple::try_from(&args[0])?;
+    Ok(Term::uint(&process.context_mut().heap, tuple.len))
 }
 
 fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+    // TODO: implement for SubBinary
     let res = match &args[0].try_into() {
-        Ok(value::Boxed {
-            header: value::BOXED_BINARY,
-            value: str,
-        }) => {
+        Ok(str) => {
             let str: &bitstring::RcBinary = str; // type annotation
             str.data.len()
         }
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => unimplemented!(),
+        //_ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     Ok(Term::int(res as i32)) // TODO: cast potentially unsafe
 }
 
 fn bif_erlang_map_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-    if let Ok(value::Map { map, .. }) = &args[0].try_into() {
-        let heap = &process.context_mut().heap;
-        return Ok(Term::uint(heap, map.len() as u32));
-    }
-    Err(Exception::new(Reason::EXC_BADARG))
+    let val = value::Map::try_from(&args[0])?;
+    let heap = &process.context_mut().heap;
+
+    Ok(Term::uint(heap, val.map.len() as u32))
 }
 
 fn bif_erlang_length_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
@@ -645,8 +640,7 @@ fn bif_erlang_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     ))
 }
 
-fn bif_erlang_raise_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-    let heap = &process.context_mut().heap;
+fn bif_erlang_raise_3(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     // class, reason, stacktrace
     let class = match args[0].into_variant() {
         Variant::Atom(atom::ERROR) => Reason::EXC_ERROR,
@@ -808,7 +802,7 @@ fn bif_erlang_register_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
 }
 
 /// unregister(atom) unregisters a global process or port (for this node)
-fn bif_erlang_unregister_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_unregister_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     /* (Atom, Pid|Port)   */
     if let Variant::Atom(name) = args[0].into_variant() {
         let res = vm.state.process_registry.lock().unregister(name);
@@ -849,18 +843,14 @@ fn bif_erlang_module_loaded_1(vm: &vm::Machine, _process: &RcProcess, args: &[Te
 /* returns the head of a list - this function is unecessary
 and is only here to keep Robert happy (Even more, since it's OP as well) */
 fn bif_erlang_hd_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
-    if let Ok(Cons { head, .. }) = args[0].try_into() {
-        return Ok(*head);
-    }
-    Err(Exception::new(Reason::EXC_BADARG))
+    let cons = Cons::try_from(&args[0])?;
+    Ok(cons.head)
 }
 
 /* returns the tails of a list - same comment as above */
 fn bif_erlang_tl_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
-    if let Ok(Cons { tail, .. }) = args[0].try_into() {
-        return Ok(*tail);
-    }
-    Err(Exception::new(Reason::EXC_BADARG))
+    let cons = Cons::try_from(&args[0])?;
+    Ok(cons.tail)
 }
 
 fn bif_erlang_trunc_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {

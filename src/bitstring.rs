@@ -128,7 +128,7 @@ impl Hash for Binary {
 }
 
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryFrom<Term> for value::Boxed<RcBinary> {
+impl TryFrom<Term> for RcBinary {
     type Error = value::WrongBoxError;
 
     #[inline]
@@ -136,7 +136,7 @@ impl TryFrom<Term> for value::Boxed<RcBinary> {
         if let value::Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_BINARY {
-                    return Ok(&*(ptr as *const value::Boxed<RcBinary>));
+                    return Ok(&(*(ptr as *const value::Boxed<Self>)).value);
                 }
             }
         }
@@ -163,7 +163,7 @@ pub struct SubBinary {
 } // TODO: I don't like pub here, have a method (binary_data()) or something
 
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryFrom<Term> for value::Boxed<SubBinary> {
+impl TryFrom<Term> for SubBinary {
     type Error = value::WrongBoxError;
 
     #[inline]
@@ -171,7 +171,7 @@ impl TryFrom<Term> for value::Boxed<SubBinary> {
         if let value::Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_SUBBINARY {
-                    return Ok(&*(ptr as *const value::Boxed<SubBinary>));
+                    return Ok(&(*(ptr as *const value::Boxed<Self>)).value);
                 }
             }
         }
@@ -243,7 +243,7 @@ pub struct MatchState {
 } // TODO: Dump start_match_2 support. use MatchBuffer directly
 
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryFrom<Term> for value::Boxed<MatchState> {
+impl TryFrom<Term> for MatchState {
     type Error = value::WrongBoxError;
 
     #[inline]
@@ -251,7 +251,7 @@ impl TryFrom<Term> for value::Boxed<MatchState> {
         if let value::Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_MATCHSTATE {
-                    return Ok(&*(ptr as *const value::Boxed<MatchState>));
+                    return Ok(&(*(ptr as *const value::Boxed<Self>)).value);
                 }
             }
         }
@@ -308,11 +308,7 @@ macro_rules! native_endian {
 
 macro_rules! binary_size {
     ($str:expr) => {
-        $str.get_boxed_value::<value::Boxed<RcBinary>>()
-            .unwrap()
-            .value
-            .data
-            .len()
+        $str.get_boxed_value::<RcBinary>().unwrap().data.len()
     };
 }
 
@@ -332,20 +328,12 @@ pub fn start_match_2(heap: &Heap, binary: Term, max: u32) -> Option<Term> {
     let mb = match binary.get_boxed_header() {
         Ok(value::BOXED_BINARY) => {
             // TODO use ok_or to cast to some, then use ?
-            let value = binary
-                .get_boxed_value::<value::Boxed<RcBinary>>()
-                .unwrap()
-                .value
-                .clone();
+            let value = binary.get_boxed_value::<RcBinary>().unwrap().clone();
             MatchBuffer::from(value)
         }
         Ok(value::BOXED_SUBBINARY) => {
             // TODO use ok_or to cast to some, then use ?
-            let value = binary
-                .get_boxed_value::<value::Boxed<SubBinary>>()
-                .unwrap()
-                .value
-                .clone();
+            let value = binary.get_boxed_value::<SubBinary>().unwrap().clone();
             MatchBuffer::from(value)
         }
         _ => unreachable!(),
@@ -382,20 +370,12 @@ pub fn start_match_3(heap: &Heap, binary: Term) -> Option<Term> {
     let mb = match binary.get_boxed_header() {
         Ok(value::BOXED_BINARY) => {
             // TODO use ok_or to cast to some, then use ?
-            let value = binary
-                .get_boxed_value::<value::Boxed<RcBinary>>()
-                .unwrap()
-                .value
-                .clone();
+            let value = binary.get_boxed_value::<RcBinary>().unwrap().clone();
             MatchBuffer::from(value)
         }
         Ok(value::BOXED_SUBBINARY) => {
             // TODO use ok_or to cast to some, then use ?
-            let value = binary
-                .get_boxed_value::<value::Boxed<SubBinary>>()
-                .unwrap()
-                .value
-                .clone();
+            let value = binary.get_boxed_value::<SubBinary>().unwrap().clone();
             MatchBuffer::from(value)
         }
         _ => unreachable!(),
@@ -1052,10 +1032,7 @@ pub fn append(
     let writable = match binary.get_boxed_header() {
         Ok(value::BOXED_SUBBINARY) => {
             // TODO use ok_or to cast to some, then use ?
-            let sb = &binary
-                .get_boxed_value::<value::Boxed<SubBinary>>()
-                .unwrap()
-                .value;
+            let sb = &binary.get_boxed_value::<SubBinary>().unwrap();
 
             sb.is_writable && sb.original.is_writable
         }
@@ -1065,10 +1042,7 @@ pub fn append(
 
     if writable {
         // TODO: we lookup twice, not good
-        let sb = &mut binary
-            .get_boxed_value_mut::<value::Boxed<SubBinary>>()
-            .unwrap()
-            .value;
+        let sb = &mut binary.get_boxed_value_mut::<SubBinary>().unwrap();
 
         let pb = &mut sb.original;
 
@@ -1130,18 +1104,12 @@ pub fn append(
         let (bin, bitoffs, bitsize) = match binary.get_boxed_header() {
             Ok(value::BOXED_BINARY) => {
                 // TODO use ok_or to cast to some, then use ?
-                let value = &binary
-                    .get_boxed_value::<value::Boxed<RcBinary>>()
-                    .unwrap()
-                    .value;
-                (value, 0, 0)
+                let value = &binary.get_boxed_value::<RcBinary>().unwrap();
+                (*value, 0, 0)
             }
             Ok(value::BOXED_SUBBINARY) => {
                 // TODO use ok_or to cast to some, then use ?
-                let value = &binary
-                    .get_boxed_value::<value::Boxed<SubBinary>>()
-                    .unwrap()
-                    .value;
+                let value = &binary.get_boxed_value::<SubBinary>().unwrap();
                 (&value.original, value.bit_offset, value.bitsize)
             }
             _ => unreachable!(),
@@ -1214,10 +1182,7 @@ pub fn private_append(
         // p->freason = BADARG;
     };
 
-    let sb = &mut binary
-        .get_boxed_value_mut::<value::Boxed<SubBinary>>()
-        .unwrap()
-        .value;
+    let sb = &mut binary.get_boxed_value_mut::<SubBinary>().unwrap();
     assert!(sb.is_writable);
 
     let pb = &mut sb.original;

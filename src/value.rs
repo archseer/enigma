@@ -50,12 +50,14 @@ pub trait TryIntoMut<T>: Sized {
 }
 
 // TryFrom implies TryInto
-impl<T, U> TryInto<U> for T where U: TryFrom<T>
+impl<T, U> TryInto<U> for T
+where
+    U: TryFrom<T>,
 {
     type Error = U::Error;
 
     fn try_into(&self) -> Result<&U, U::Error> {
-	U::try_from(self)
+        U::try_from(self)
     }
 }
 
@@ -104,18 +106,12 @@ impl Hash for Term {
         match self.into_variant() {
             Variant::Pointer(_p) => match self.get_boxed_header().unwrap() {
                 BOXED_BINARY => {
-                    let value = &self
-                        .get_boxed_value::<Boxed<bitstring::RcBinary>>()
-                        .unwrap()
-                        .value;
+                    let value = &self.get_boxed_value::<bitstring::RcBinary>().unwrap();
 
                     value.data.hash(state)
                 }
                 BOXED_TUPLE => {
-                    let value = &self
-                        .get_boxed_value::<Boxed<Tuple>>()
-                        .unwrap()
-                        .value;
+                    let value = &self.get_boxed_value::<Tuple>().unwrap();
 
                     value.as_slice().hash(state)
                 }
@@ -574,14 +570,14 @@ impl Term {
 
     pub fn get_boxed_value<T>(&self) -> Result<&T, &str> {
         if let Variant::Pointer(ptr) = self.into_variant() {
-            unsafe { return Ok(&*(ptr as *const T)) }
+            unsafe { return Ok(&(*(ptr as *const Boxed<T>)).value) }
         }
         Err("Not a boxed type!")
     }
 
     pub fn get_boxed_value_mut<T>(&self) -> Result<&mut T, &str> {
         if let Variant::Pointer(ptr) = self.into_variant() {
-            unsafe { return Ok(&mut *(ptr as *mut T)) }
+            unsafe { return Ok(&mut (*(ptr as *mut Boxed<T>)).value) }
         }
         Err("Not a boxed type!")
     }
@@ -734,13 +730,10 @@ impl Term {
         match self.get_boxed_header() {
             Ok(BOXED_REF) => {
                 // TODO use ok_or to cast to some, then use ?
-                let value = &self
-                    .get_boxed_value::<Boxed<process::Ref>>()
-                    .unwrap()
-                    .value;
-                Some(*value)
+                let value = &self.get_boxed_value::<process::Ref>().unwrap();
+                Some(**value)
             }
-            _ => None
+            _ => None,
         }
     }
 
@@ -749,18 +742,12 @@ impl Term {
         match self.get_boxed_header() {
             Ok(BOXED_BINARY) => {
                 // TODO use ok_or to cast to some, then use ?
-                let value = &self
-                    .get_boxed_value::<Boxed<bitstring::RcBinary>>()
-                    .unwrap()
-                    .value;
+                let value = &self.get_boxed_value::<bitstring::RcBinary>().unwrap();
                 Some(&value.data)
             }
             Ok(BOXED_SUBBINARY) => {
                 // TODO use ok_or to cast to some, then use ?
-                let value = &self
-                    .get_boxed_value::<Boxed<bitstring::SubBinary>>()
-                    .unwrap()
-                    .value;
+                let value = &self.get_boxed_value::<bitstring::SubBinary>().unwrap();
 
                 if value.bit_offset & 7 != 0 {
                     panic!("to_str can't work with non-zero bit_offset");
@@ -777,19 +764,13 @@ impl Term {
         match self.get_boxed_header() {
             Ok(BOXED_BINARY) => {
                 // TODO use ok_or to cast to some, then use ?
-                let value = &self
-                    .get_boxed_value::<Boxed<bitstring::RcBinary>>()
-                    .unwrap()
-                    .value;
+                let value = &self.get_boxed_value::<bitstring::RcBinary>().unwrap();
                 // TODO: handle err
                 std::str::from_utf8(&value.data).ok()
             }
             Ok(BOXED_SUBBINARY) => {
                 // TODO use ok_or to cast to some, then use ?
-                let value = &self
-                    .get_boxed_value::<Boxed<bitstring::SubBinary>>()
-                    .unwrap()
-                    .value;
+                let value = &self.get_boxed_value::<bitstring::SubBinary>().unwrap();
 
                 if value.bit_offset & 7 != 0 {
                     panic!("to_str can't work with non-zero bit_offset");

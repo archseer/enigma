@@ -317,8 +317,7 @@ macro_rules! op_apply_fun {
         }
         //context.x[arity] = fun;
 
-        if let Ok(value::Boxed { value, .. }) = fun.try_into() {
-            let closure: &value::Closure = value; // ughh type annotation
+        if let Ok(closure) = value::Closure::try_from(&fun) {
             op_call_fun!($vm, $context, closure, arity);
         } else {
             // TODO raise error
@@ -1023,10 +1022,8 @@ impl Machine {
                 Opcode::IsBoolean => op_is_type!(context, ins.args, is_boolean),
                 Opcode::IsMap => op_is_type!(context, ins.args, is_map),
                 Opcode::IsFunction2 => {
-                    if let Ok(value::Boxed { value, .. }) =
-                        context.expand_arg(&ins.args[1]).try_into()
+                    if let Ok(closure) = value::Closure::try_from(&context.expand_arg(&ins.args[1]))
                     {
-                        let closure: &value::Closure = value; // ughh type annotation
                         let arity = ins.args[2].to_u32();
                         if closure.mfa.2 == arity {
                             continue;
@@ -1082,8 +1079,7 @@ impl Machine {
                 Opcode::SelectTupleArity => {
                     // tuple fail dests
                     if let [arg, LValue::Label(fail), LValue::ExtendedList(vec)] = &ins.args[..] {
-                        if let Ok(tup) = context.expand_arg(arg).try_into() {
-                            let tup: &value::Tuple = tup; // annoying, need type annotation
+                        if let Ok(tup) = Tuple::try_from(&context.expand_arg(arg)) {
                             let len = LValue::Literal(tup.len);
                             let mut i = 0;
                             loop {
@@ -1135,8 +1131,7 @@ impl Machine {
                     // source, element, dest
                     let source = context.expand_arg(&ins.args[0]);
                     let n = ins.args[1].to_u32();
-                    if let Ok(t) = source.try_into() {
-                        let t: &value::Tuple = t; // annoying, need type annotation
+                    if let Ok(t) = Tuple::try_from(&source) {
                         set_register!(context, &ins.args[2], t[n as usize])
                     } else {
                         panic!("GetTupleElement: source is of wrong type")
@@ -1422,12 +1417,7 @@ impl Machine {
                             //fail!(context, fail);
                         }
 
-                        if let Ok(value::Boxed {
-                            value,
-                            header: value::BOXED_BINARY,
-                        }) = context.expand_arg(src).try_into()
-                        {
-                            let value: &bitstring::RcBinary = value;
+                        if let Ok(value) = bitstring::RcBinary::try_from(&context.expand_arg(src)) {
                             match size {
                                 LValue::Atom(atom::ALL) => unsafe {
                                     (*context.bs).extend_from_slice(&value.data);
@@ -1507,9 +1497,7 @@ impl Machine {
 
                     match header {
                         value::BOXED_MATCHSTATE => {
-                            if let Ok(value::Boxed { value: ms, .. }) =
-                                cxt.get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>()
-                            {
+                            if let Ok(ms) = cxt.get_boxed_value_mut::<bitstring::MatchState>() {
                                 // Uint actual_slots = HEADER_NUM_SLOTS(header);
                                 let actual_slots = ms.saved_offsets.len();
 
@@ -1569,9 +1557,7 @@ impl Machine {
 
                     match header {
                         value::BOXED_MATCHSTATE => {
-                            if let Ok(value::Boxed { value: ms, .. }) =
-                                cxt.get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>()
-                            {
+                            if let Ok(ms) = cxt.get_boxed_value_mut::<bitstring::MatchState>() {
                                 let actual_slots = ms.saved_offsets.len();
                                 // We're not compatible with contexts created by bs_start_match2.
                                 assert!(actual_slots == 0);
@@ -1598,10 +1584,10 @@ impl Machine {
                 Opcode::BsGetPosition => {
                     debug_assert_eq!(ins.args.len(), 3);
                     // cxt dst live
-                    if let Ok(value::Boxed { value: ms, .. }) = context
+                    if let Ok(ms) = context
                         .expand_arg(&ins.args[0])
-                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
-                    ) {
+                        .get_boxed_value_mut::<bitstring::MatchState>()
+                    {
                         // TODO: unsafe cast
                         set_register!(context, &ins.args[1], Term::int(ms.mb.offset as i32));
                     } else {
@@ -1612,10 +1598,10 @@ impl Machine {
                     debug_assert_eq!(ins.args.len(), 2);
                     // cxt pos
 
-                    if let Ok(value::Boxed { value: ms, .. }) = context
+                    if let Ok(ms) = context
                         .expand_arg(&ins.args[0])
-                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
-                    ) {
+                        .get_boxed_value_mut::<bitstring::MatchState>()
+                    {
                         let pos = context.expand_arg(&ins.args[1]).to_u32();
                         ms.mb.offset = pos as usize;
                     } else {
@@ -1643,10 +1629,10 @@ impl Machine {
                     // & size were packed together on BEAM
 
                     // TODO: this cast can fail
-                    if let Ok(value::Boxed { value: ms, .. }) = context
+                    if let Ok(ms) = context
                         .expand_arg(&ins.args[1])
-                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
-                    ) {
+                        .get_boxed_value_mut::<bitstring::MatchState>()
+                    {
                         let res = ms.mb.get_integer(
                             &context.heap,
                             bits,
@@ -1675,10 +1661,10 @@ impl Machine {
                     // & size were packed together on BEAM
 
                     // TODO: this cast can fail
-                    if let Ok(value::Boxed { value: ms, .. }) = context
+                    if let Ok(ms) = context
                         .expand_arg(&ins.args[1])
-                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
-                    ) {
+                        .get_boxed_value_mut::<bitstring::MatchState>()
+                    {
                         let res = ms.mb.get_float(
                             &context.heap,
                             size as usize,
@@ -1699,10 +1685,10 @@ impl Machine {
                     // & size were packed together on BEAM
 
                     // TODO: this cast can fail
-                    if let Ok(value::Boxed { value: ms, .. }) = context
+                    if let Ok(ms) = context
                         .expand_arg(&ins.args[1])
-                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
-                    ) {
+                        .get_boxed_value_mut::<bitstring::MatchState>()
+                    {
                         let flags = bitstring::Flag::from_bits(flags as u8).unwrap();
                         let heap = &context.heap;
                         let res = match ins.args[3] {
@@ -1722,10 +1708,9 @@ impl Machine {
                     debug_assert_eq!(ins.args.len(), 5);
                     // fail, ms, size, unit, flags
 
-                    if let Ok(value::Boxed { value, .. }) =
-                        context.expand_arg(&ins.args[1]).try_into()
+                    if let Ok(ms) =
+                        bitstring::MatchState::try_from(&context.expand_arg(&ins.args[1]))
                     {
-                        let ms: &bitstring::MatchState = value; // ughh type annotation
                         let mb = &ms.mb;
 
                         let size = ins.args[2].to_u32();
@@ -1750,10 +1735,9 @@ impl Machine {
 
                     let offset = ins.args[2].to_u32() as usize;
 
-                    if let Ok(value::Boxed { value, .. }) =
-                        context.expand_arg(&ins.args[1]).try_into()
+                    if let Ok(ms) =
+                        bitstring::MatchState::try_from(&context.expand_arg(&ins.args[1]))
                     {
-                        let ms: &bitstring::MatchState = value; // ughh type annotation
                         let mb = &ms.mb;
 
                         if mb.remaining() != offset {
@@ -1766,10 +1750,10 @@ impl Machine {
                 Opcode::BsSave2 => {
                     debug_assert_eq!(ins.args.len(), 2);
                     // cxt slot
-                    if let Ok(value::Boxed { value: ms, .. }) = context
+                    if let Ok(ms) = context
                         .expand_arg(&ins.args[0])
-                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
-                    ) {
+                        .get_boxed_value_mut::<bitstring::MatchState>()
+                    {
                         let slot = match ins.args[1] {
                             LValue::Integer(i) => i as usize,
                             LValue::Atom(atom::START) => 0,
@@ -1783,10 +1767,10 @@ impl Machine {
                 Opcode::BsRestore2 => {
                     debug_assert_eq!(ins.args.len(), 2);
                     // cxt slot
-                    if let Ok(value::Boxed { value: ms, .. }) = context
+                    if let Ok(ms) = context
                         .expand_arg(&ins.args[0])
-                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
-                    ) {
+                        .get_boxed_value_mut::<bitstring::MatchState>()
+                    {
                         let slot = match ins.args[1] {
                             LValue::Integer(i) => i as usize,
                             LValue::Atom(atom::START) => 0,
@@ -1803,10 +1787,10 @@ impl Machine {
                     // i bs get binary all reuse rx f I.
 
                     // cxt slot
-                    if let Ok(value::Boxed { value: ms, .. }) = context
+                    if let Ok(ms) = context
                         .expand_arg(&ins.args[0])
-                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
-                    ) {
+                        .get_boxed_value_mut::<bitstring::MatchState>()
+                    {
                         let offs = ms.saved_offsets[0];
                         let size = ms.mb.size - offs;
                         // TODO; original calculated the hole size and overwrote MatchState mem in
@@ -1827,10 +1811,9 @@ impl Machine {
                     // Checks that the size of the remainder of the matching context is divisible
                     // by unit, else jump to fail
 
-                    if let Ok(value::Boxed { value, .. }) =
-                        context.expand_arg(&ins.args[1]).try_into()
+                    if let Ok(ms) =
+                        bitstring::MatchState::try_from(&context.expand_arg(&ins.args[1]))
                     {
-                        let ms: &bitstring::MatchState = value; // ughh type annotation
                         let mb = &ms.mb;
 
                         let unit = ins.args[2].to_u32() as usize;
@@ -1852,10 +1835,10 @@ impl Machine {
                     // ErlBinMatchBuffer* mb;
                     // Uint offs;
 
-                    if let Ok(value::Boxed { value: ms, .. }) = context
+                    if let Ok(ms) = context
                         .expand_arg(&ins.args[1])
-                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
-                    ) {
+                        .get_boxed_value_mut::<bitstring::MatchState>()
+                    {
                         let mb = &mut ms.mb;
 
                         let bits = ins.args[2].to_u32() as usize;
@@ -1947,10 +1930,10 @@ impl Machine {
                     // fail ms u u dest
 
                     // TODO: this cast can fail
-                    if let Ok(value::Boxed { value: ms, .. }) = context
+                    if let Ok(ms) = context
                         .expand_arg(&ins.args[1])
-                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
-                    ) {
+                        .get_boxed_value_mut::<bitstring::MatchState>()
+                    {
                         let res = ms.mb.get_utf8();
                         if let Some(res) = res {
                             set_register!(context, &ins.args[4], res)
@@ -1966,10 +1949,10 @@ impl Machine {
                     let flags = ins.args[5].to_u32();
 
                     // TODO: this cast can fail
-                    if let Ok(value::Boxed { value: ms, .. }) = context
+                    if let Ok(ms) = context
                         .expand_arg(&ins.args[1])
-                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
-                    ) {
+                        .get_boxed_value_mut::<bitstring::MatchState>()
+                    {
                         let res = ms
                             .mb
                             .get_utf16(bitstring::Flag::from_bits(flags as u8).unwrap());
@@ -1985,10 +1968,10 @@ impl Machine {
                     // fail ms u u
 
                     // TODO: this cast can fail
-                    if let Ok(value::Boxed { value: ms, .. }) = context
+                    if let Ok(ms) = context
                         .expand_arg(&ins.args[1])
-                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
-                    ) {
+                        .get_boxed_value_mut::<bitstring::MatchState>()
+                    {
                         let res = ms.mb.get_utf8();
                         if res.is_none() {
                             fail!(context, ins.args[0]);
@@ -2002,10 +1985,10 @@ impl Machine {
                     let flags = ins.args[5].to_u32();
 
                     // TODO: this cast can fail
-                    if let Ok(value::Boxed { value: ms, .. }) = context
+                    if let Ok(ms) = context
                         .expand_arg(&ins.args[1])
-                        .get_boxed_value_mut::<value::Boxed<bitstring::MatchState>>(
-                    ) {
+                        .get_boxed_value_mut::<bitstring::MatchState>()
+                    {
                         let res = ms
                             .mb
                             .get_utf16(bitstring::Flag::from_bits(flags as u8).unwrap());
@@ -2149,10 +2132,9 @@ impl Machine {
                     // literal arity
                     let arity = ins.args[0].to_u32();
                     // TODO: this clone is bad but the borrow checker complains (but doesn't on GetTl/GetHd)
-                    if let Ok(value::Boxed { value, .. }) =
-                        context.x[arity as usize].clone().try_into()
+                    if let Ok(closure) =
+                        value::Closure::try_from(&context.x[arity as usize].clone())
                     {
-                        let closure: &value::Closure = value; // ughh type annotation
                         context.cp = Some(context.ip);
                         op_call_fun!(self, context, closure, arity)
                     } else {
@@ -2273,9 +2255,7 @@ impl Machine {
                     let reg = context.expand_arg(&ins.args[1]);
                     let n = ins.args[2].to_u32();
                     let atom = context.expand_arg(&ins.args[3]);
-                    if let Ok(t) = reg.try_into() {
-                        let tuple: &value::Tuple = t; // annoying, need type annotation
-
+                    if let Ok(tuple) = Tuple::try_from(&reg) {
                         if tuple.len == 0 || tuple.len != n || !tuple[0].eq(&atom) {
                             fail!(context, ins.args[0]);
                         } else {

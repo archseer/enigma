@@ -4,7 +4,7 @@ use crate::exception::{Exception, Reason};
 use crate::loader::Loader;
 use crate::module::{self, Module};
 use crate::process::RcProcess;
-use crate::value::{self, Term, TryInto};
+use crate::value::{self, Term, TryFrom, TryInto};
 use crate::vm;
 
 pub fn prepare_loading_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
@@ -35,7 +35,7 @@ pub fn has_prepared_code_on_load_1(
     args: &[Term],
 ) -> bif::Result {
     match args[0].try_into() {
-        Ok(value::Boxed { value, .. }) => {
+        Ok(value) => {
             let value: &*mut Module = value;
             unsafe { Ok(Term::boolean((**value).on_load.is_some())) }
         }
@@ -44,21 +44,11 @@ pub fn has_prepared_code_on_load_1(
 }
 
 pub fn finish_loading_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
-    let cons = match args[0].try_into() {
-        Ok(cons) => {
-            let cons: &value::Cons = cons;
-            cons
-        }
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
-    };
-
-    cons.iter()
-        .map(|v| match v.try_into() {
-            Ok(value::Boxed { value, .. }) => {
-                let value: &*mut Module = value;
-                Ok(unsafe { Box::from_raw(*value) })
-            }
-            Err(x) => Err(x),
+    value::Cons::try_from(&args[0])?
+        .iter()
+        .map(|v| {
+            v.try_into()
+                .map(|value: &*mut Module| unsafe { Box::from_raw(*value) })
         })
         .collect::<Result<Vec<Box<Module>>, _>>()
         .map_err(|_| Exception::new(Reason::EXC_BADARG))
