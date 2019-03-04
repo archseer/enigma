@@ -86,7 +86,15 @@ impl Hash for Term {
 
                     value.data.hash(state)
                 }
-                _ => unimplemented!(),
+                BOXED_TUPLE => {
+                    let value = &self
+                        .get_boxed_value::<Boxed<Tuple>>()
+                        .unwrap()
+                        .value;
+
+                    value.as_slice().hash(state)
+                }
+                _ => unimplemented!("unimplemented Hash for {}", self),
             },
             variant => variant.hash(state),
         }
