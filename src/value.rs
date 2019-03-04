@@ -64,8 +64,15 @@ impl<T, U> TryInto<U> for T where U: TryFrom<T>
 pub struct Float(pub f64);
 impl Eq for Float {}
 impl Hash for Float {
-    fn hash<H: Hasher>(&self, _state: &mut H) {
-        unimplemented!()
+    // hash raw float
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let bits = if self.0 == 0.0 {
+            0 // this accounts for +0.0 and -0.0
+        } else {
+            unsafe { std::mem::transmute::<f64, u64>(self.0) }
+        };
+        bits.hash(state);
     }
 }
 
