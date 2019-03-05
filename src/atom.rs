@@ -242,6 +242,8 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("protected");
     atoms.register_atom("named_table");
     atoms.register_atom("compressed");
+
+    atoms.register_atom("undefined_function");
     atoms
 };
 
@@ -370,6 +372,8 @@ pub const PRIVATE: u32 = 106;
 pub const PROTECTED: u32 = 107;
 pub const NAMED_TABLE: u32 = 108;
 pub const COMPRESSED: u32 = 109;
+
+pub const UNDEFINED_FUNCTION: u32 = 110;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

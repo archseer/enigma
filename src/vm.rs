@@ -112,6 +112,18 @@ macro_rules! expand_float {
     }};
 }
 
+macro_rules! op_jump {
+    ($context:expr, $label:expr) => {{
+        $context.ip.ptr = $label;
+    }};
+}
+
+macro_rules! op_jump_ptr {
+    ($context:expr, $ptr:expr) => {{
+        $context.ip = $ptr;
+    }};
+}
+
 macro_rules! op_deallocate {
     ($context:expr, $nwords:expr) => {{
         let cp = $context.stack.pop().unwrap();
@@ -129,6 +141,41 @@ macro_rules! op_deallocate {
             panic!("Bad CP value! {:?}", cp)
         }
     }};
+}
+
+macro_rules! call_error_handler {
+    ($vm:expr, $process:expr, $mfa:expr) => {{
+        call_error_handler($vm, $process, $mfa, atom::UNDEFINED_FUNCTION)?;
+    }}
+}
+
+// func is atom
+#[inline]
+fn call_error_handler(vm: &Machine, process: &RcProcess, mfa: &module::MFA, func: u32) -> Result<(), Exception> {
+    // debug!("call_error_handler mfa={}, mfa)
+    println!("function not found {}", mfa);
+    let context = process.context_mut();
+
+    // Search for the error_handler module.
+    let ptr = match vm.exports.read().lookup(&module::MFA(process.local_data().error_handler, func, 3)) {
+        Some(Export::Fun(ptr)) => ptr,
+        Some(_) => unimplemented!(),
+        None => { // no error handler
+            // TODO: set current to mfa
+            return Err(Exception::new(Reason::EXC_UNDEF));
+        }
+    };
+
+    // Create a list with all arguments in the x registers.
+    // TODO: I don't like from_iter requiring cloned
+    let args = Cons::from_iter(context.x[0..mfa.2 as usize].iter().cloned(), &context.heap);
+
+    // Set up registers for call to error_handler:<func>/3.
+    context.x[0] = Term::atom(mfa.0); // module
+    context.x[1] = Term::atom(mfa.1); // func
+    context.x[2] = Term::from(args);
+    op_jump_ptr!(context, ptr);
+    Ok(())
 }
 
 const APPLY_2: bif::BifFn = bif::bif_erlang_apply_2;
@@ -169,8 +216,8 @@ macro_rules! op_call_ext {
                 }
             }
             None => {
-                println!("function not found");
-                return Err(Exception::new(Reason::EXC_UNDEF));
+                // call error_handler here
+                call_error_handler!($vm, $process, mfa);
             }
         }
     }};
@@ -335,18 +382,6 @@ macro_rules! op_return {
             println!("Process exited with normal, x0: {}", $context.x[0]);
             break;
         }
-    }};
-}
-
-macro_rules! op_jump {
-    ($context:expr, $label:expr) => {{
-        $context.ip.ptr = $label;
-    }};
-}
-
-macro_rules! op_jump_ptr {
-    ($context:expr, $ptr:expr) => {{
-        $context.ip = $ptr;
     }};
 }
 

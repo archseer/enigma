@@ -139,6 +139,9 @@ pub struct LocalData {
     // name (atom)
     pub name: Option<u32>,
 
+    /// error handler, defaults to error_handler
+    pub error_handler: u32,
+
     // links (tree)
     pub links: HashSet<PID>,
     // monitors (tree)
@@ -193,6 +196,7 @@ impl Process {
             state: StateFlag::INITIAL,
             parent,
             name: None,
+            error_handler: atom::ERROR_HANDLER,
             links: HashSet::new(),
             monitors: HashMap::new(),
             lt_monitors: Vec::new(),

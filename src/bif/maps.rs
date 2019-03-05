@@ -441,7 +441,7 @@ mod tests {
         let args = vec![map1, map2];
 
         let res = merge_2(&vm, &process, &args);
-        if let Ok(Map(map)) = res.unwrap().try_into() {
+        if let Ok(value::Map(map)) = res.unwrap().try_into() {
             assert_eq!(map.len(), 3);
             assert_eq!(map.find(&str_to_atom!("test")), Some(&Term::int(1)));
             assert_eq!(map.find(&str_to_atom!("test2")), Some(&Term::int(2)));

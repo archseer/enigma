@@ -97,8 +97,6 @@ fn filetype_to_atom(file_type: fs::FileType) -> Term {
 
 #[cfg(not(unix))]
 fn filetype_to_atom(file_type: fs::FileType) -> Term {
-    use std::os::unix::fs::FileTypeExt;
-
     // TODO: does FIFO count as a device?
     if file_type.is_block_device() || file_type.is_char_device() {
         return atom!(DEVICE);
