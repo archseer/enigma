@@ -146,25 +146,36 @@ macro_rules! op_deallocate {
 macro_rules! call_error_handler {
     ($vm:expr, $process:expr, $mfa:expr) => {{
         call_error_handler($vm, $process, $mfa, atom::UNDEFINED_FUNCTION)?;
-    }}
+    }};
 }
 
 // func is atom
 #[inline]
-fn call_error_handler(vm: &Machine, process: &RcProcess, mfa: &module::MFA, func: u32) -> Result<(), Exception> {
+fn call_error_handler(
+    vm: &Machine,
+    process: &RcProcess,
+    mfa: &module::MFA,
+    func: u32,
+) -> Result<(), Exception> {
     // debug!("call_error_handler mfa={}, mfa)
     println!("function not found {}", mfa);
     let context = process.context_mut();
 
     // Search for the error_handler module.
-    let ptr = match vm.exports.read().lookup(&module::MFA(process.local_data().error_handler, func, 3)) {
-        Some(Export::Fun(ptr)) => ptr,
-        Some(_) => unimplemented!(),
-        None => { // no error handler
-            // TODO: set current to mfa
-            return Err(Exception::new(Reason::EXC_UNDEF));
-        }
-    };
+    let ptr =
+        match vm
+            .exports
+            .read()
+            .lookup(&module::MFA(process.local_data().error_handler, func, 3))
+        {
+            Some(Export::Fun(ptr)) => ptr,
+            Some(_) => unimplemented!(),
+            None => {
+                // no error handler
+                // TODO: set current to mfa
+                return Err(Exception::new(Reason::EXC_UNDEF));
+            }
+        };
 
     // Create a list with all arguments in the x registers.
     // TODO: I don't like from_iter requiring cloned
@@ -264,6 +275,10 @@ macro_rules! op_apply {
             $context.x[0] = module;
             $context.x[1] = func;
             $context.x[2] = Term::nil();
+            println!(
+                "pid={} tried to apply not a func {}:{}",
+                $process.pid, module, func
+            );
 
             return Err(Exception::new(Reason::EXC_BADARG));
         }
@@ -299,6 +314,8 @@ macro_rules! op_apply {
          */
 
         let mfa = module::MFA(module.to_u32(), func.to_u32(), arity as u32);
+
+        println!("pid={} applying/3... {}", $process.pid, mfa);
 
         let export = { $vm.exports.read().lookup(&mfa) }; // drop the exports lock
 
@@ -626,6 +643,7 @@ impl Machine {
                 .map(|arg| Term::binary(&context.heap, bitstring::Binary::from(arg.into_bytes()))),
             &context.heap,
         );
+        println!("argv {}", context.x[1]);
         op_jump!(context, module.funs[&(fun, arity)]);
         /* TEMP */
 
@@ -1231,6 +1249,7 @@ impl Machine {
                 }
                 Opcode::Badmatch => {
                     let value = context.expand_arg(&ins.args[0]);
+                    println!("Badmatch: {}", value);
                     return Err(Exception::with_value(Reason::EXC_BADMATCH, value));
                 }
                 Opcode::IfEnd => {

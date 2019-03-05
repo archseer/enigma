@@ -506,7 +506,6 @@ pub fn spawn(
     args: Term,
     flags: SpawnFlag,
 ) -> Result<Term, Exception> {
-    println!("Spawning..");
     let new_proc = allocate(state, Some(parent.pid), module)?;
     let context = new_proc.context_mut();
     let mut ret = Term::pid(new_proc.pid);
@@ -522,6 +521,8 @@ pub fn spawn(
     }
     // lastly, the tail
     context.x[i] = *cons;
+
+    println!("Spawning... pid={} mfa={}", new_proc.pid, MFA(unsafe {(*module).name}, func, i as u32));
 
     // TODO: func to ip offset
     let func = unsafe {
@@ -573,7 +574,7 @@ pub fn send_message(
             if let Some(process) = state.process_registry.lock().whereis(name) {
                 Some(process.clone())
             } else {
-                println!("registered name not found!");
+                println!("registered name {} not found!", pid);
                 return Err(Exception::new(Reason::EXC_BADARG));
             }
         }

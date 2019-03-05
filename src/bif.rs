@@ -229,6 +229,7 @@ pub fn is_bif(mfa: &module::MFA) -> bool {
 
 #[inline]
 pub fn apply(vm: &vm::Machine, process: &RcProcess, mfa: &module::MFA, args: &[Term]) -> Result {
+    println!("bif_apply {}", mfa);
     match BIFS.get(mfa) {
         Some(fun) => fun(vm, process, args),
         None => unimplemented!("BIF {} not implemented", mfa),
