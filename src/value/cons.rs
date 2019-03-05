@@ -103,28 +103,32 @@ impl Cons {
         heap: &Heap,
     ) -> Term {
         let len = iter.len();
+        // TODO: maybe just mut iter in the header
         let mut iter = iter.into_iter();
-        let val = iter.next().unwrap();
-        let c = heap.alloc(Cons {
-            head: val,
-            tail: Term::nil(),
-        });
-
-        unsafe {
-            (0..len - 1).fold(c as *mut Cons, |cons, _i| {
-                let Cons { ref mut tail, .. } = *cons;
-                let val = iter.next().unwrap();
-                let new_cons = heap.alloc(Cons {
-                    head: val,
-                    tail: Term::nil(),
-                });
-                let ptr = new_cons as *mut Cons;
-                std::mem::replace(&mut *tail, Term::from(new_cons));
-                ptr
+        if let Some(val) = iter.next() {
+            let c = heap.alloc(Cons {
+                head: val,
+                tail: Term::nil(),
             });
-        }
 
-        Term::from(c)
+            unsafe {
+                (0..len - 1).fold(c as *mut Cons, |cons, _i| {
+                    let Cons { ref mut tail, .. } = *cons;
+                    let val = iter.next().unwrap();
+                    let new_cons = heap.alloc(Cons {
+                        head: val,
+                        tail: Term::nil(),
+                    });
+                    let ptr = new_cons as *mut Cons;
+                    std::mem::replace(&mut *tail, Term::from(new_cons));
+                    ptr
+                });
+            }
+
+            Term::from(c)
+        } else {
+            Term::nil()
+        }
     }
 }
 
@@ -165,6 +169,16 @@ mod tests {
         assert_eq!(Some(&Term::int(2)), iter.next());
         assert_eq!(Some(&Term::int(3)), iter.next());
         assert_eq!(None, iter.next());
+    }
+
+    #[test]
+    fn test_from_empty_iter() {
+        let heap = Heap::new();
+
+        let items = vec![];
+
+        let res = Cons::from_iter(items.into_iter(), &heap);
+        assert!(res.is_nil());
     }
 
     #[test]
