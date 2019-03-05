@@ -8,6 +8,7 @@ pub struct Mailbox {
 
     /// Save pointer to track position to the current offset when scanning through the mailbox.
     save: usize,
+    mark: Option<usize>,
 }
 
 impl Mailbox {
@@ -15,6 +16,7 @@ impl Mailbox {
         Mailbox {
             queue: VecDeque::new(),
             save: 0,
+            mark: None,
         }
     }
 
@@ -26,12 +28,25 @@ impl Mailbox {
         self.queue.get(self.save)
     }
 
+    // recv_mark
+    pub fn mark(&mut self) {
+        self.mark = Some(self.save);
+    }
+
+    // recv_set
+    pub fn set(&mut self) {
+        if let Some(mark) = self.mark {
+            self.save = mark;
+        }
+    }
+
     pub fn advance(&mut self) {
         self.save += 1;
     }
 
     pub fn reset(&mut self) {
         self.save = 0;
+        self.mark = None;
     }
 
     /// We use a reference when we receive, because of pattern matching.

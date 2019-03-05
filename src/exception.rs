@@ -367,7 +367,8 @@ pub fn handle_error(
         context.x[3] = exc.trace;
         if let Some(new_pc) = next_catch(process) {
             context.cp = None; // To avoid keeping stale references.
-                               //ERTS_RECV_MARK_CLEAR(c_p); // No longer safe to use this position
+            process.local_data_mut().mailbox.reset(); // No longer safe to use this position
+                                                      // TODO: ^ maybe only reset mark and not save
             return Some(new_pc);
         } else {
             //erts_exit(ERTS_ERROR_EXIT, "Catch not found")

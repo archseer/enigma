@@ -1,4 +1,4 @@
-* Opcodes [118/138]
+* Opcodes [120/138]
 - [X] Label = 1
 - [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -118,8 +118,8 @@
 - [ ] BsPutUtf16 = 147
 - [ ] BsPutUtf32 = 148
 - [ ] OnLoad = 149
-- [ ] RecvMark = 150
-- [ ] RecvSet = 151
+- [X] RecvMark = 150
+- [X] RecvSet = 151
 - [X] GcBif3 = 152
 - [X] Line = 153
 - [X] PutMapAssoc = 154

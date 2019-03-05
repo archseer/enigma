@@ -771,14 +771,25 @@ impl Machine {
                     // @spec wait_timeout Lable Time
                     // @doc  Sets up a timeout of Time milliseconds and saves the address of the
                     //       following instruction as the entry point if the timeout triggers.
+                    let curr = context.ip.ptr;
 
-                    // TODO: timeout and jump to label if time expires
+                    // matches Wait
+                    let label = ins.args[0].to_u32();
+                    op_jump!(context, label);
+
+                    // TODO: timeout and jump back to `curr` if time expires
                     // set wait flag
                     process.set_waiting_for_message(true);
+
                     // return (suspend process)
                     return Ok(());
                 }
-                // TODO: RecvMark(label)/RecvSet(label) for ref based sends
+                Opcode::RecvMark => {
+                    process.local_data_mut().mailbox.mark();
+                },
+                Opcode::RecvSet => {
+                    process.local_data_mut().mailbox.set();
+                },
                 Opcode::Call => {
                     //literal arity, label jmp
                     // store arity as live
