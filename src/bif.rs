@@ -66,6 +66,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "demonitor", 1 => bif_erlang_demonitor_1,
             "self", 0 => bif_erlang_self_0,
             "send", 2 => bif_erlang_send_2,
+            "send", 3 => bif_erlang_send_2,// TODO: send/3 acts as send/2 until distributed nodes work
             "!", 2 => bif_erlang_send_2,
             "is_atom", 1 => bif_erlang_is_atom_1,
             "is_list", 1 => bif_erlang_is_list_1,
