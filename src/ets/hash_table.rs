@@ -54,7 +54,11 @@ impl Table for HashTable {
     }
 
     fn get(&self, process: &RcProcess, key: Term) -> Result<Term> {
-        unimplemented!()
+        Ok(self.hashmap
+           .get(&key)
+           // TODO: deep clone
+           .map(|v| v.clone())
+           .unwrap_or_else(|| Term::nil()))
     }
 
     fn get_element(&self, process: &RcProcess, key: Term, index: usize) -> Result<Term> {

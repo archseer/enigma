@@ -40,6 +40,12 @@ impl From<value::WrongBoxError> for Exception {
     }
 }
 
+impl From<crate::ets::error::Error> for Exception {
+    fn from(_value: crate::ets::error::Error) -> Self {
+        unimplemented!()
+    }
+}
+
 // impl From<std::io::Error> for Exception {
 //     fn from(error: std::io::Error) -> Self {
 //         let reason = match error {

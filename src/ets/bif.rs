@@ -238,25 +238,28 @@ pub fn whereis_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
     }
 }
 
-pub fn insert_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    /* Write lock table if more than one object to keep atomicity */
-    // let lock_kind = if (is_list(BIF_ARG_2) && CDR(list_val(BIF_ARG_2)) != NIL { LCK_WRITE } else { LCK_WRITE_REC };
-
-    // find table
+#[inline]
+fn get_table(vm: &vm::Machine, term: Term) -> std::result::Result<RcTable, Exception> {
     /*let key = match args[0].into_variant() {
         Variant::Atom(name) => name as usize,
         _ => unimplemented!()
     };*/
-    let key = args[0].to_ref().unwrap(); // TODO: HANDLE Atom
+    let key = term.to_ref().unwrap(); // TODO: HANDLE Atom
+
+    // get DB_WRITE, lock kind, ets_insert_2
+    let lock = vm.ets_tables.lock();
+    lock.get(key).ok_or_else(|| Exception::new(Reason::EXC_BADARG))
+    // TODO: get_named for atom
+}
+
+pub fn insert_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    /* Write lock table if more than one object to keep atomicity */
+    // let lock_kind = if (is_list(BIF_ARG_2) && CDR(list_val(BIF_ARG_2)) != NIL { LCK_WRITE } else { LCK_WRITE_REC };
 
     eprintln!("going in {}", args[0]);
-    let table = {
-        // get DB_WRITE, lock kind, ets_insert_2
-        let lock = vm.ets_tables.lock();
-        lock.get(key)
-            .ok_or_else(|| Exception::new(Reason::EXC_BADARG))?
-        // TODO: get_named for atom
-    }; // lock is dropped
+
+    // find table
+    let table = get_table(vm, args[0])?;
 
     if args[1].is_nil() {
         return Ok(atom!(TRUE));
@@ -295,7 +298,10 @@ pub fn insert_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
 }
 
 pub fn lookup_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    unimplemented!()
+    let table = get_table(vm, args[0])?;
+
+    // for some reason just returning won't work
+    Ok(table.get(process, args[1])?)
 }
 
 // safe_fixtable_2
