@@ -2,7 +2,7 @@ use crate::atom;
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{Cons, Term, TryFrom, Tuple, Variant};
+use crate::value::{Cons, Term, TryFrom, Tuple, Type, Variant};
 use crate::vm;
 use crate::Itertools;
 
@@ -244,12 +244,22 @@ fn get_table(vm: &vm::Machine, term: Term) -> std::result::Result<RcTable, Excep
         Variant::Atom(name) => name as usize,
         _ => unimplemented!()
     };*/
-    let key = term.to_ref().unwrap(); // TODO: HANDLE Atom
-
     // get DB_WRITE, lock kind, ets_insert_2
-    let lock = vm.ets_tables.lock();
-    lock.get(key).ok_or_else(|| Exception::new(Reason::EXC_BADARG))
-    // TODO: get_named for atom
+    match term.get_type() {
+        // TODO: inefficient
+        Type::Atom => {
+            let key = term.to_u32();
+            let lock = vm.ets_tables.lock();
+            lock.get_named(key as usize)
+        }
+        Type::Ref => {
+            let key = term.to_ref().unwrap(); // TODO: HANDLE Atom
+            let lock = vm.ets_tables.lock();
+            lock.get(key)
+        }
+        _ => None,
+    }
+    .ok_or_else(|| Exception::new(Reason::EXC_BADARG))
 }
 
 pub fn insert_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {

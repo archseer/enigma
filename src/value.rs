@@ -549,7 +549,8 @@ impl Term {
                 BOXED_CATCH => Type::Catch,
                 BOXED_MATCHSTATE => Type::MatchState,
                 BOXED_SUBBINARY => Type::Binary,
-                _ => unimplemented!(),
+                BOXED_MODULE => Type::Ref, // init expects a module in progress as a ref
+                i => unimplemented!("get_type for {}", i),
             },
             _ => unreachable!(),
         }
