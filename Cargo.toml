@@ -35,6 +35,7 @@ nodrop = "0.1.13"
 statrs = "0.10.0"
 lexical = "2.1.0"
 chashmap = { git = "https://gitlab.redox-os.org/redox-os/chashmap" } #"2.2.2"
+dirs = "1.0.5"
 
 [dev-dependencies]
 quickcheck = "0.8.0"

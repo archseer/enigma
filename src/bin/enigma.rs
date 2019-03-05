@@ -19,11 +19,12 @@ fn run() -> i32 {
         "enigma",
         "--",
         "-home",
-        "/Users/speed",
+        dirs::home_dir()
+            .expect("No home directory")
+            .to_str()
+            .unwrap(),
         "--",
-        "-kernel",
-        "shell_history",
-        "enabled",
+        "-kernel shell_history enabled",
     ]
     .iter()
     .map(|s| s.to_string())
