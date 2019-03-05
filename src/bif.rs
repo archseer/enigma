@@ -507,8 +507,7 @@ fn bif_erlang_send_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Re
     // args: dest <term (pid/atom)>, msg <term>
     let pid = args[0];
     let msg = args[1];
-    let res = process::send_message(&vm.state, process, pid, msg).unwrap();
-    Ok(res)
+    process::send_message(&vm.state, process, pid, msg)
 }
 
 fn bif_erlang_is_atom_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
