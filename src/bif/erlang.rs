@@ -81,6 +81,19 @@ pub fn setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
     Ok(Term::from(new_tuple))
 }
 
+// TODO swap with GetTupleElement ins?
+pub fn element_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    let number = match args[0].into_number() {
+        Ok(value::Num::Integer(i)) if !i < 1 => (i - 1) as usize,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    let t = Tuple::try_from(&args[1])?;
+    if number >= t.len() {
+        return Err(Exception::new(Reason::EXC_BADARG));
+    }
+    Ok(t[number])
+}
+
 pub fn tuple_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let t = Tuple::try_from(&args[0])?;
     let mut n = (t.len() - 1) as i32;

@@ -109,6 +109,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "make_tuple", 3 => erlang::make_tuple_3,
             "append_element", 2 => erlang::append_element_2,
             "setelement", 3 => erlang::setelement_3,
+            "element", 2 => erlang::element_2,
             "tuple_to_list", 1 => erlang::tuple_to_list_1,
             "binary_to_list", 1 => erlang::binary_to_list_1,
             "binary_to_term", 1 => erlang::binary_to_term_1,
