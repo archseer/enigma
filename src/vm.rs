@@ -828,16 +828,30 @@ impl Machine {
                         op_deallocate!(context, *nwords);
 
                         op_jump!(context, *i);
+
+                        let (mfa, _) = context.ip.lookup_func_info().unwrap();
+                        println!("pid={} action=call mfa={}", process.pid, mfa);
                     } else {
                         unreachable!()
                     }
                     safepoint_and_reduce!(self, process, context.reds);
                 }
+                // proc pid=38 reds=1974 mod="erl_parse" offs=2986 ins=CallOnly args=[Literal(7), Integer(2838)]
+
+                // proc pid=38 reds=1961 mod="erl_parse" offs=5604 ins=CallOnly args=[Literal(7), Integer(2620)]
+                // pid=38 action=call mfa=erl_parse:yeccpars2/7
+                // proc pid=38 reds=1960 mod="erl_parse" offs=2621 ins=CallOnly args=[Literal(7), Label(4019)]
+                // pid=38 action=call mfa=erl_parse:yeccpars2_139/7
                 Opcode::CallOnly => {
                     //literal arity, label jmp
                     // store arity as live
-                    if let [LValue::Literal(_a), LValue::Label(i)] = &ins.args[..] {
-                        op_jump!(context, *i);
+                    //
+                    // TODO: has a second arg as Integer???
+                    if let [LValue::Literal(_a), i] = &ins.args[..] {
+                        op_jump!(context, i.to_u32());
+
+                        let (mfa, _) = context.ip.lookup_func_info().unwrap();
+                        println!("pid={} action=call mfa={}", process.pid, mfa);
                     } else {
                         unreachable!()
                     }
