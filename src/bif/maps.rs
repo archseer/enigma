@@ -441,7 +441,7 @@ mod tests {
         let args = vec![map1, map2];
 
         let res = merge_2(&vm, &process, &args);
-        if let Ok(value::Map { map, .. }) = res.unwrap().try_into() {
+        if let Ok(Map(map)) = res.unwrap().try_into() {
             assert_eq!(map.len(), 3);
             assert_eq!(map.find(&str_to_atom!("test")), Some(&Term::int(1)));
             assert_eq!(map.find(&str_to_atom!("test2")), Some(&Term::int(2)));
@@ -507,7 +507,7 @@ mod tests {
 
         let res = put_3(&vm, &process, &args);
 
-        if let Ok(value::Map { map, .. }) = res.unwrap().try_into() {
+        if let Ok(value::Map(map)) = res.unwrap().try_into() {
             assert_eq!(map.find(&key), Some(&value));
         } else {
             panic!();
@@ -548,7 +548,7 @@ mod tests {
 
         let res = remove_2(&vm, &process, &args);
 
-        if let Ok(value::Map { map, .. }) = res.unwrap().try_into() {
+        if let Ok(value::Map(map)) = res.unwrap().try_into() {
             assert_eq!(map.find(&key).is_none(), true);
         } else {
             panic!();
@@ -588,7 +588,7 @@ mod tests {
 
         let res = update_3(&vm, &process, &args);
 
-        if let Ok(value::Map { map, .. }) = res.unwrap().try_into() {
+        if let Ok(value::Map(map)) = res.unwrap().try_into() {
             assert_eq!(map.find(&key), Some(&update_value));
         } else {
             panic!();
@@ -692,7 +692,7 @@ mod tests {
         if let Ok(tuple) = value::Tuple::try_from(&res.unwrap()) {
             let mut iter = tuple.iter();
             assert_eq!(&Term::int(2), iter.next().unwrap());
-            if let Ok(value::Map { map, .. }) = iter.next().unwrap().try_into() {
+            if let Ok(value::Map(map)) = iter.next().unwrap().try_into() {
                 assert_eq!(map.len(), 1);
                 assert_eq!(map.find(&str_to_atom!("test")), Some(&Term::int(1)));
             } else {

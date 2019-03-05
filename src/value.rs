@@ -978,7 +978,7 @@ impl std::fmt::Display for Variant {
                     BOXED_SUBBINARY => write!(f, "#SubBinary<>"),
                     BOXED_MATCHSTATE => write!(f, "#MatchState<>"),
                     BOXED_MAP => {
-                        let map = &*(*ptr as *const map::Map);
+                        let map = &(*(*ptr as *const Boxed<map::Map>)).value;
                         write!(f, "%{{")?;
                         let mut iter = map.0.iter().peekable();
                         while let Some((key, val)) = iter.next() {
