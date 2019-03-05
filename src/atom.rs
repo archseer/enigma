@@ -244,6 +244,10 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("compressed");
 
     atoms.register_atom("undefined_function");
+
+    atoms.register_atom("os_type");
+    atoms.register_atom("win32");
+    atoms.register_atom("unix");
     atoms
 };
 
@@ -374,6 +378,10 @@ pub const NAMED_TABLE: u32 = 108;
 pub const COMPRESSED: u32 = 109;
 
 pub const UNDEFINED_FUNCTION: u32 = 110;
+
+pub const OS_TYPE: u32 = 111;
+pub const WIN32: u32 = 112;
+pub const UNIX: u32 = 113;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)
