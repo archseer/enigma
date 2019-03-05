@@ -590,6 +590,9 @@ fn bif_erlang_map_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
 }
 
 fn bif_erlang_length_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+    if args[0].is_nil() {
+        return Ok(Term::int(0));
+    }
     let cons = Cons::try_from(&args[0])?;
     let heap = &process.context_mut().heap;
 
