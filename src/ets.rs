@@ -173,6 +173,20 @@ impl TableRegistry {
         false
     }
 
+    pub fn remove(&mut self, table: &RcTable) -> bool {
+        let meta = table.meta();
+
+        // remove table from index
+        self.tables.remove(&meta.tid);
+
+        // if named, remove from named index
+        if let Some(name) = meta.name {
+            self.named_tables.remove(&name);
+        }
+
+        true
+    }
+
     pub fn whereis(&self, name: usize) -> Option<process::Ref> {
         self.named_tables.get(&name).map(|table| table.meta().tid)
     }

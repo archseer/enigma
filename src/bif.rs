@@ -229,6 +229,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "insert", 2 => ets::bif::insert_2,
             "lookup", 2 => ets::bif::lookup_2,
             "lookup_element", 3 => ets::bif::lookup_element_3,
+            "delete", 1 => ets::bif::delete_1,
         },
     ]
 };

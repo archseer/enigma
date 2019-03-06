@@ -276,10 +276,10 @@
 
 - [ ] bif erlang:match_spec_test/3
 
-** ETS [3/37]
+** ETS [5/37]
 - [ ] bif ets:internal_request_all/0
 - [X] bif ets:new/2
-- [ ] bif ets:delete/1
+- [X] bif ets:delete/1
 - [ ] bif ets:delete/2
 - [ ] bif ets:delete_object/2
 - [ ] bif ets:first/1
@@ -298,7 +298,7 @@
 - [ ] bif ets:member/2
 - [ ] bif ets:next/2
 - [ ] bif ets:prev/2
-- [ ] bif ets:insert/2
+- [X] bif ets:insert/2
 - [ ] bif ets:insert_new/2
 - [ ] bif ets:rename/2
 - [ ] bif ets:safe_fixtable/2

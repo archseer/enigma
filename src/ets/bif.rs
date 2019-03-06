@@ -327,6 +327,25 @@ pub fn lookup_element_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     Ok(table.get_element(process, args[1], index)?)
 }
 
+/// Deletes an entire table.
+pub fn delete_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let table = get_table(vm, args[0])?;
+
+    // TODO: set access bits to none to disable access
+
+    // TODO: transfer ownership to current process just in case
+
+    {
+        // remove table from index
+        let mut tables = vm.ets_tables.lock();
+        tables.remove(&table);
+    }
+
+    // TODO: bump reds
+
+    Ok(atom!(TRUE))
+}
+
 // safe_fixtable_2
 // first_1
 // next_2
@@ -340,7 +359,6 @@ pub fn lookup_element_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
 // rename_2
 // lookup_2
 // member_2
-// delete_1
 // give_away_3
 // setopts_2
 // internal_delete_all_2
