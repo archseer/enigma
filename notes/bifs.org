@@ -197,7 +197,7 @@
 ** System [1/2]
 - [ ] bif erlang:system_flag/2
 - [X] bif erlang:system_info/1
-** New in R9C [10/44]
+** New in R9C [11/44]
 - [ ] bif erlang:system_monitor/0
 - [ ] bif erlang:system_monitor/1
 - [ ] bif erlang:system_monitor/2
@@ -209,7 +209,7 @@
 
 - [X] bif erlang:monitor/2
 - [X] bif erlang:demonitor/1
-- [ ] bif erlang:demonitor/2
+- [X] bif erlang:demonitor/2
 
 - [ ] bif erlang:is_process_alive/1
 - [ ] bif erts_internal:is_process_alive/2
@@ -276,7 +276,7 @@
 
 - [ ] bif erlang:match_spec_test/3
 
-** ETS [2/37]
+** ETS [3/37]
 - [ ] bif ets:internal_request_all/0
 - [X] bif ets:new/2
 - [ ] bif ets:delete/1
@@ -285,7 +285,7 @@
 - [ ] bif ets:first/1
 - [ ] bif ets:is_compiled_ms/1
 - [X] bif ets:lookup/2
-- [ ] bif ets:lookup_element/3
+- [X] bif ets:lookup_element/3
 - [ ] bif ets:info/1
 - [ ] bif ets:info/2
 - [ ] bif ets:last/1

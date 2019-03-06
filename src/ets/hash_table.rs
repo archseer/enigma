@@ -63,13 +63,25 @@ impl Table for HashTable {
         Ok(self
             .hashmap
             .get(&key)
-            // TODO: deep clone
-            .map(|v| v.deep_clone(heap))
+            // TODO: bag types
+            .map(|v| cons!(heap, v.deep_clone(heap), Term::nil()))
             .unwrap_or_else(|| Term::nil()))
     }
 
     fn get_element(&self, process: &RcProcess, key: Term, index: usize) -> Result<Term> {
-        unimplemented!()
+        let heap = &process.context_mut().heap;
+
+        Ok(self
+            .hashmap
+            .get(&key)
+            // TODO: deep clone
+            .map(|v| {
+                let tup = Tuple::try_from(&*v).unwrap();
+                assert!(tup.len() > index);
+                tup[index]
+            })
+            .map(|v| cons!(heap, v.deep_clone(heap), Term::nil()))
+            .unwrap_or_else(|| Term::nil()))
     }
 
     // contains_key ? why is result a Term, not bool

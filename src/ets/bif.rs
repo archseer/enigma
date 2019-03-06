@@ -2,6 +2,7 @@ use crate::atom;
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
+use crate::value;
 use crate::value::{Cons, Term, TryFrom, Tuple, Type, Variant};
 use crate::vm;
 use crate::Itertools;
@@ -312,6 +313,18 @@ pub fn lookup_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
 
     // for some reason just returning won't work
     Ok(table.get(process, args[1])?)
+}
+
+pub fn lookup_element_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let table = get_table(vm, args[0])?;
+
+    let index = match args[2].into_number() {
+        Ok(value::Num::Integer(i)) if i > 0 => (i - 1) as usize,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    // for some reason just returning won't work
+    Ok(table.get_element(process, args[1], index)?)
 }
 
 // safe_fixtable_2

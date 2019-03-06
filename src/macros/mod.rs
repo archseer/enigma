@@ -76,7 +76,7 @@ macro_rules! tup4 {
 #[macro_export]
 macro_rules! cons {
     ($heap:expr, $head:expr, $tail:expr) => {{
-        value::cons($heap, $head, $tail)
+        crate::value::cons($heap, $head, $tail)
     }};
 }
 
