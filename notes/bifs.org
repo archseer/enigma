@@ -1,4 +1,4 @@
-* BIFs [43/117]
+* BIFs [44/117]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
@@ -17,7 +17,7 @@
 - [X] bif erlang:display/1
 - [ ] bif erlang:display_string/1
 - [ ] bif erlang:display_nl/0
-- [ ] ubif erlang:element/2
+- [X] ubif erlang:element/2
 - [X] bif erlang:erase/0
 - [X] bif erlang:erase/1
 - [X] bif erlang:exit/1
@@ -194,9 +194,9 @@
 - [X] bif erlang:make_tuple/2
 - [X] bif erlang:append_element/2
 - [X] bif erlang:make_tuple/3
-** System [0/2]
+** System [1/2]
 - [ ] bif erlang:system_flag/2
-- [ ] bif erlang:system_info/1
+- [X] bif erlang:system_info/1
 ** New in R9C [10/44]
 - [ ] bif erlang:system_monitor/0
 - [ ] bif erlang:system_monitor/1
@@ -250,10 +250,10 @@
 - [ ] ubif erlang:'+'/1			splus_1
 
 
-** New operators [15/22]
+** New operators [16/22]
 - [X] bif erlang:'!'/2		ebif_bang_2
 - [X] bif erlang:send/2
-- [ ] bif erlang:send/3
+- [X] bif erlang:send/3
 - [X] bif erlang:'++'/2		ebif_plusplus_2
 - [X] bif erlang:append/2
 - [ ] bif erlang:'--'/2		ebif_minusminus_2
@@ -276,15 +276,15 @@
 
 - [ ] bif erlang:match_spec_test/3
 
-** ETS [0/37]
+** ETS [2/37]
 - [ ] bif ets:internal_request_all/0
-- [ ] bif ets:new/2
+- [X] bif ets:new/2
 - [ ] bif ets:delete/1
 - [ ] bif ets:delete/2
 - [ ] bif ets:delete_object/2
 - [ ] bif ets:first/1
 - [ ] bif ets:is_compiled_ms/1
-- [ ] bif ets:lookup/2
+- [X] bif ets:lookup/2
 - [ ] bif ets:lookup_element/3
 - [ ] bif ets:info/1
 - [ ] bif ets:info/2
@@ -540,12 +540,12 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 ** New in 20.1 [0/1]
 - [ ] bif erlang:iolist_to_iovec/1
 
-** New in 21.0 [0/11]
+** New in 21.0 [1/11]
 - [ ] bif erts_internal:get_dflags/0
 - [ ] bif erts_internal:new_connection/1
 - [ ] bif erts_internal:abort_connection/2
 - [ ] bif erts_internal:map_next/3
-- [ ] bif ets:whereis/1
+- [X] bif ets:whereis/1
 - [ ] bif erts_internal:gather_alloc_histograms/1
 - [ ] bif erts_internal:gather_carrier_info/1
 - [ ] ubif erlang:map_get/2

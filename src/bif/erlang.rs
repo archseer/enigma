@@ -316,6 +316,11 @@ pub fn append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
             iter = tail;
         }
 
+        if !iter.is_nil() {
+            // tail was a badly formed list
+            return Err(Exception::new(Reason::EXC_BADARG));
+        }
+
         // now link the copy to the rhs
         unsafe {
             (*ptr).tail = rhs;

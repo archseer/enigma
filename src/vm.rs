@@ -651,15 +651,24 @@ impl Machine {
         // safe, so take care when capturing new variables.
         //let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         if let Err(message) = self.run(process) {
-            // HAXX: TODO clone() for now since handle_error consumes the msg
-            if let Some(new_pc) = exception::handle_error(process, message.clone()) {
-                let context = process.context_mut();
-                context.ip = new_pc;
+            if message.reason != Reason::TRAP {
+                // just a regular error
+                // HAXX: TODO clone() for now since handle_error consumes the msg
+                if let Some(new_pc) = exception::handle_error(process, message.clone()) {
+                    let context = process.context_mut();
+                    context.ip = new_pc;
+                    self.state
+                        .process_pool
+                        .schedule(Job::normal(process.clone()));
+                } else {
+                    process.exit(&self.state, message);
+                }
+            } else {
+                // we're trapping, ip was already set, now reschedule the process
+                eprintln!("TRAP!");
                 self.state
                     .process_pool
                     .schedule(Job::normal(process.clone()));
-            } else {
-                process.exit(&self.state, message);
             }
         }
         // }));

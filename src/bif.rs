@@ -21,6 +21,19 @@ mod maps;
 mod pdict;
 mod prim_file;
 
+macro_rules! trap {
+    ($context:expr, $ptr:expr, $($arg:expr),*) => {{
+        // TODO set current arity
+        $context.ip = $ptr;
+        let mut _i = 0usize;
+        $(
+            $context.x[_i] = $arg;
+            _i += 1usize;
+        )*
+        return Err(Exception::new(Reason::TRAP));
+    }};
+}
+
 // maybe use https://github.com/sfackler/rust-phf
 
 macro_rules! bif_map {
@@ -64,6 +77,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "unlink", 1 => bif_erlang_unlink_1,
             "monitor", 2 => bif_erlang_monitor_2,
             "demonitor", 1 => bif_erlang_demonitor_1,
+            "demonitor", 2 => bif_erlang_demonitor_2,
             "self", 0 => bif_erlang_self_0,
             "send", 2 => bif_erlang_send_2,
             "send", 3 => bif_erlang_send_2,// TODO: send/3 acts as send/2 until distributed nodes work
@@ -425,52 +439,61 @@ fn bif_erlang_unlink_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
 
 fn bif_erlang_monitor_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
     // arg[0] = pid/port
+    let heap = &process.context_mut().heap;
+    let reference = vm.state.next_ref();
+    let ref_term = Term::reference(heap, reference);
+    // TODO: this will still alloc on badarg ^
+
     match args[0].into_variant() {
         Variant::Atom(atom::PROCESS) => {
-            match args[1].into_variant() {
+            let pid = match args[1].into_variant() {
                 Variant::Pid(pid) => {
-                    let heap = &process.context_mut().heap;
-                    let reference = vm.state.next_ref();
-                    let ref_term = Term::reference(heap, reference);
-
                     if pid == process.pid {
                         return Ok(ref_term);
                     }
-
-                    // add the pid to our monitor tree
-                    process.local_data_mut().monitors.insert(reference, pid);
-
-                    // send MONITOR signal to the other process return true
-                    let sent = process::send_signal(
-                        &vm.state,
-                        pid,
-                        process::Signal::Monitor {
-                            from: process.pid,
-                            reference,
-                        },
-                    );
-
-                    if !sent {
-                        process::send_signal(
-                            &vm.state,
-                            process.pid,
-                            process::Signal::MonitorDown {
-                                from: process.pid,
-                                // TODO: could be just reason: term
-                                reason: Exception::with_value(Reason::EXC_ERROR, atom!(NOPROC)),
-                                reference,
-                            },
-                        );
-                    }
-
-                    Ok(ref_term)
+                    pid
                 }
-                Variant::Atom(_) => unimplemented!(),
+                Variant::Atom(name) => {
+                    if let Some(process) = vm.state.process_registry.lock().whereis(name) {
+                        process.pid
+                    } else {
+                        println!("registered name {} not found!", args[1]);
+                        return Err(Exception::new(Reason::EXC_BADARG));
+                    }
+                },
                 // TODO: {atom name, node}
-                Variant::Pointer(_) => unimplemented!(),
-                Variant::Port(_) => unimplemented!(),
-                _ => Err(Exception::new(Reason::EXC_BADARG)),
+                Variant::Pointer(_) => unimplemented!("monitor for {}", args[1]),
+                Variant::Port(_) => unimplemented!("monitor for {}", args[1]),
+                _ => return Err(Exception::new(Reason::EXC_BADARG)),
+            };
+
+            // add the pid to our monitor tree
+            process.local_data_mut().monitors.insert(reference, pid);
+
+            // send MONITOR signal to the other process return true
+            let sent = process::send_signal(
+                &vm.state,
+                pid,
+                process::Signal::Monitor {
+                    from: process.pid,
+                    reference,
+                },
+            );
+
+            if !sent {
+                process::send_signal(
+                    &vm.state,
+                    process.pid,
+                    process::Signal::MonitorDown {
+                        from: process.pid,
+                        // TODO: could be just reason: term
+                        reason: Exception::with_value(Reason::EXC_ERROR, atom!(NOPROC)),
+                        reference,
+                    },
+                );
             }
+
+            Ok(ref_term)
         }
         Variant::Atom(atom::PORT) => unimplemented!(),
         Variant::Atom(atom::TIME_OFFSET) => unimplemented!(),
@@ -478,12 +501,14 @@ fn bif_erlang_monitor_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     }
 }
 
-fn bif_erlang_demonitor_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-    // arg[0] = ref
-
+fn demonitor(
+    vm: &vm::Machine,
+    process: &RcProcess,
+    reference: Term,
+) -> std::result::Result<bool, Exception> {
     // TODO: inefficient, we do get_boxed_ twice
-    if args[0].get_boxed_header() == Ok(value::BOXED_REF) {
-        let reference = args[0].get_boxed_value().unwrap();
+    if reference.get_boxed_header() == Ok(value::BOXED_REF) {
+        let reference = reference.get_boxed_value().unwrap();
         // remove the pid from our monitor tree
         if let Some(pid) = process.local_data_mut().monitors.remove(&reference) {
             // send DEMONITOR signal to the other process return true
@@ -495,10 +520,61 @@ fn bif_erlang_demonitor_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
                     reference: *reference,
                 },
             );
+            return Ok(true);
         }
-        return Ok(atom!(TRUE));
+        return Ok(false);
     }
     Err(Exception::new(Reason::EXC_BADARG))
+}
+
+fn bif_erlang_demonitor_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+    // arg[0] = ref
+    demonitor(vm, process, args[0])?;
+    Ok(atom!(TRUE))
+}
+
+fn bif_erlang_demonitor_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+    if args[1].is_nil() {
+        return bif_erlang_demonitor_1(vm, process, args);
+    }
+
+    let mut flush = false;
+    let mut info = false;
+
+    for val in Cons::try_from(&args[1])? {
+        match val.into_variant() {
+            Variant::Atom(atom::INFO) => info = true,
+            Variant::Atom(atom::FLUSH) => flush = true,
+            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        }
+    }
+
+    let mut res = atom!(TRUE);
+
+    if demonitor(vm, process, args[0])? {
+        // ok
+        // TODO: if multi and flush, also trap
+    } else {
+        if info {
+            res = atom!(FALSE);
+        }
+
+        if flush {
+            use crate::exports_table::Export;
+            // TODO: precompute this lookup
+            let multi = atom!(FALSE); // TODO: get this to work later
+            if let Some(Export::Fun(ptr)) = vm.exports.read().lookup(&module::MFA(
+                atom::ERTS_INTERNAL,
+                atom::FLUSH_MONITOR_MESSAGES,
+                3,
+            )) {
+                trap!(process.context_mut(), ptr, args[0], multi, res);
+            } else {
+                unreachable!()
+            }
+        }
+    }
+    Ok(res)
 }
 
 fn bif_erlang_self_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> Result {
