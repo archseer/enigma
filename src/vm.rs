@@ -193,7 +193,7 @@ const APPLY_2: bif::BifFn = bif::bif_erlang_apply_2;
 const APPLY_3: bif::BifFn = bif::bif_erlang_apply_3;
 
 macro_rules! op_call_ext {
-    ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr) => {{
+    ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr, $return: expr) => {{
         let mfa = unsafe { &(*$context.ip.module).imports[*$dest as usize] };
 
         println!("pid={} action=call_ext mfa={}", $process.pid, mfa);
@@ -208,7 +208,7 @@ macro_rules! op_call_ext {
             }
             Some(Export::Bif(APPLY_3)) => {
                 // I'm cheating here, *shrug*
-                op_apply!($vm, $context, $process);
+                op_apply!($vm, $context, $process, $return);
             }
             Some(Export::Bif(bif)) => {
                 // TODO: precompute which exports are bifs
@@ -234,6 +234,26 @@ macro_rules! op_call_ext {
     }};
 }
 
+macro_rules! op_call_bif {
+    ($vm:expr, $context:expr, $process:expr, $bif:expr, $arity:expr, $return:expr) => {{
+        // precompute export lookup. once Pin<> is a thing we can be sure that
+        // a ptr into the hashmap will always point to a module.
+        // call_ext_only Ar=u Bif=u$is_bif => \
+        // allocate u Ar | call_bif Bif | deallocate_return u
+
+        // make a slice out of arity x registers
+        let args = &$context.x[0..$arity];
+        match $bif($vm, $process, args) {
+            Ok(val) => {
+                set_register!($context, &LValue::X(0), val); // HAXX
+                if $return { // TODO: figure out returns
+                    op_return!($context);
+                }
+            }
+            Err(exc) => return Err(exc),
+        }
+    }};
+}
 macro_rules! op_call_fun {
     ($vm:expr, $context:expr, $closure:expr, $arity:expr) => {{
         // keep X regs set based on arity
@@ -264,7 +284,7 @@ macro_rules! op_call_fun {
 
 //TODO: need op_apply_fun, but it should use x0 as mod, x1 as fun, etc
 macro_rules! op_apply {
-    ($vm:expr, $context:expr, $process:expr) => {{
+    ($vm:expr, $context:expr, $process:expr, $return: expr) => {{
         // Walk down the 3rd parameter of apply (the argument list) and copy
         // the parameters to the x registers (reg[]).
         let module = $context.x[0];
@@ -324,21 +344,7 @@ macro_rules! op_apply {
             Some(Export::Bif(bif)) => {
                 // TODO: apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
                 // ^ only happens in apply/fixed_apply
-
-                // precompute export lookup. once Pin<> is a thing we can be sure that
-                // a ptr into the hashmap will always point to a module.
-                // call_ext_only Ar=u Bif=u$is_bif => \
-                // allocate u Ar | call_bif Bif | deallocate_return u
-
-                // make a slice out of arity x registers
-                let args = &$context.x[0..arity];
-                match bif($vm, $process, args) {
-                    Ok(val) => {
-                        set_register!($context, &LValue::X(0), val); // HAXX
-                        op_return!($context);
-                    }
-                    Err(exc) => return Err(exc),
-                }
+                op_call_bif!($vm, $context, $process, bif, arity, $return)
             }
             None => {
                 unimplemented!()
@@ -423,7 +429,7 @@ macro_rules! cond_fail {
 }
 
 macro_rules! op_fixed_apply {
-    ($vm:expr, $context:expr, $process:expr, $arity:expr) => {{
+    ($vm:expr, $context:expr, $process:expr, $arity:expr, $return:expr) => {{
         let arity = $arity as usize;
         let module = $context.x[arity];
         let func = $context.x[arity + 1];
@@ -459,20 +465,7 @@ macro_rules! op_fixed_apply {
                 // TODO: apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
                 // ^ only happens in apply/fixed_apply
 
-                // precompute export lookup. once Pin<> is a thing we can be sure that
-                // a ptr into the hashmap will always point to a module.
-                // call_ext_only Ar=u Bif=u$is_bif => \
-                // allocate u Ar | call_bif Bif | deallocate_return u
-
-                // make a slice out of arity x registers
-                let args = &$context.x[0..arity];
-                match bif($vm, $process, args) {
-                    Ok(val) => {
-                        set_register!($context, &LValue::X(0), val); // HAXX
-                        op_return!($context);
-                    }
-                    Err(exc) => return Err(exc),
-                }
+                op_call_bif!($vm, $context, $process, bif, arity, $return)
             }
             None => {
                 unimplemented!()
@@ -863,7 +856,7 @@ impl Machine {
                         // save pointer onto CP
                         context.cp = Some(context.ip);
 
-                        op_call_ext!(self, context, process, arity, dest);
+                        op_call_ext!(self, context, process, arity, dest, false); // don't return on call_ext
                     } else {
                         unreachable!()
                     }
@@ -872,7 +865,7 @@ impl Machine {
                 Opcode::CallExtOnly => {
                     //literal arity, literal destination (module.imports index)
                     if let [LValue::Literal(arity), LValue::Literal(dest)] = &ins.args[..] {
-                        op_call_ext!(self, context, process, arity, dest);
+                        op_call_ext!(self, context, process, arity, dest, true);
                     } else {
                         unreachable!()
                     }
@@ -885,7 +878,7 @@ impl Machine {
                     {
                         op_deallocate!(context, *nwords);
 
-                        op_call_ext!(self, context, process, arity, dest);
+                        op_call_ext!(self, context, process, arity, dest, true);
                     } else {
                         unreachable!()
                     }
@@ -1395,7 +1388,7 @@ impl Machine {
                     if let [LValue::Literal(arity)] = &ins.args[..] {
                         context.cp = Some(context.ip);
 
-                        op_fixed_apply!(self, context, process, *arity)
+                        op_fixed_apply!(self, context, process, *arity, false)
                     // call this fixed_apply, used for ops (apply, apply_last).
                     // apply is the func that's equivalent to erlang:apply/3 (and instrs)
                     } else {
@@ -1408,7 +1401,7 @@ impl Machine {
                     if let [LValue::Literal(arity), LValue::Literal(nwords)] = &ins.args[..] {
                         op_deallocate!(context, *nwords);
 
-                        op_fixed_apply!(self, context, process, *arity)
+                        op_fixed_apply!(self, context, process, *arity, true)
                     } else {
                         unreachable!()
                     }
