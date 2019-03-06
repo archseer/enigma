@@ -51,14 +51,8 @@ pub trait Table: Send + Sync {
 
     fn slot(&self, slot: Term) -> Result<Term>;
 
-    // int (*db_select_chunk)(process: &RcProcess, 
-			   // table: &Self, /* [in out] */
-    //                        Eterm tid,
-			   // Eterm pattern,
-			   // Sint chunk_size,
-			   // int reverse,
-	 		   // Eterm* ret);
-    
+    // int (*db_select_chunk)(process: &RcProcess, table: &Self, Eterm tid, Eterm pattern, Sint chunk_size, int reverse, Eterm* ret);
+
     // _continue is for when the main function traps, let's just use generators
     fn select(&self, process: &RcProcess, tid: Term, pattern: Term, reverse: bool) -> Result<Term>;
 
@@ -84,16 +78,11 @@ pub trait Table: Send + Sync {
     // don't think we'll need these
     // int (*db_free_empty_table)(DbTable* db);
     // SWord (*db_free_table_continue)(DbTable* db, SWord reds);
-    
-    // this is just Derive(Debug) + Display
-    // void (*db_print)(fmtfn_t to,
-		     // void* to_arg, 
-		     // int show, 
-		     // table: Self /* [in out] */ );
 
-    // void (*db_foreach_offheap)(DbTable* db,  /* [in out] */ 
-			       // void (*func)(ErlOffHeap *, void *),
-			       // void *arg);
+    // this is just Derive(Debug) + Display
+    // void (*db_print)(fmtfn_t to, void* to_arg, int show, table: Self);
+
+    // void (*db_foreach_offheap)(DbTable* db, void (*func)(ErlOffHeap *, void *), void *arg);
 
     // TODO: replace both with get_mut or alter
     // Lookup a dbterm for updating. Return false if not found.

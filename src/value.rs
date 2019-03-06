@@ -104,14 +104,14 @@ impl Hash for Term {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // maybe we could hash the f64 repr directly in some cases
         match self.into_variant() {
-            Variant::Pointer(_p) => match self.get_boxed_header().unwrap() {
+            Variant::Pointer(p) => match self.get_boxed_header().unwrap() {
                 BOXED_BINARY => {
                     let value = &self.get_boxed_value::<bitstring::RcBinary>().unwrap();
 
                     value.data.hash(state)
                 }
                 BOXED_TUPLE => {
-                    let value = &self.get_boxed_value::<Tuple>().unwrap();
+                    let value = unsafe { &*(p as *const Tuple) };
 
                     value.as_slice().hash(state)
                 }
@@ -783,6 +783,55 @@ impl Term {
             return Variant::Atom(atom::TRUE).into();
         }
         Variant::Atom(atom::FALSE).into()
+    }
+
+    /// deeply clone the value, copying heap allocated structures onto the new heap.
+    /// TODO: implementation without recursion
+    pub fn deep_clone(&self, heap: &Heap) -> Self {
+        match self.into_variant() {
+            Variant::Float(..)
+            | Variant::Nil(..)
+            | Variant::Integer(..)
+            | Variant::Atom(..)
+            | Variant::Port(..)
+            | Variant::Pid(..) => {
+                // immediates
+                *self
+            }
+            Variant::Cons(cons) => {
+                let cons = unsafe { &*cons };
+                // TODO: badly formed lists
+
+                // TODO: the intermediary collect into vec is not great but can't map without
+                // ExactSizeIterator
+                let vec: Vec<_> = cons.iter().collect();
+                Cons::from_iter(vec.iter().map(|v| v.deep_clone(heap)), heap)
+            }
+            Variant::Pointer(ptr) => unsafe {
+                match *ptr {
+                    BOXED_TUPLE => {
+                        eprintln!("deep copying {}", self);
+                        let tup = &*(ptr as *const Tuple);
+                        let new_tuple = self::tuple(heap, tup.len() as u32);
+                        for (i, val) in tup.iter().enumerate() {
+                            std::ptr::write(&mut new_tuple[i], val.deep_clone(heap));
+                        }
+                        Term::from(new_tuple)
+                    }
+                    BOXED_MAP => {
+                        eprintln!("deep copying {}", self);
+                        let map = &(*(ptr as *const Boxed<map::Map>)).value;
+                        // Term::map(heap, map.0.clone()) need to deep_clone kvs
+                        let mut new_map = HAMT::new();
+                        for (key, value) in map.0.iter() {
+                            new_map = new_map.plus(key.deep_clone(heap), value.deep_clone(heap));
+                        }
+                        Term::map(heap, new_map)
+                    }
+                    _ => unimplemented!("deep_clone for {}", self),
+                }
+            },
+        }
     }
 
     pub fn erl_partial_cmp(&self, other: &Self) -> Option<Ordering> {

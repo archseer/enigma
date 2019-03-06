@@ -1,10 +1,12 @@
 use super::*;
+use crate::immix::Heap;
 use crate::value::{Cons, Term, TryFrom, TryInto, Tuple, Variant};
 use chashmap::CHashMap;
 
 pub(crate) struct HashTable {
     meta: Metadata,
     hashmap: CHashMap<Term, Term>,
+    heap: Heap,
 }
 
 unsafe impl Sync for HashTable {}
@@ -15,6 +17,7 @@ impl HashTable {
         Self {
             meta,
             hashmap: CHashMap::new(),
+            heap: Heap::new(),
         }
     }
 }
@@ -48,17 +51,21 @@ impl Table for HashTable {
     // put
     fn insert(&self, process: &RcProcess, value: Term, key_clash_fail: bool) -> Result<()> {
         // TODO deep copy that value
+        let value = value.deep_clone(&self.heap);
         let key = get_key(self.meta().keypos, value);
         self.hashmap.insert(key, value);
         Ok(())
     }
 
     fn get(&self, process: &RcProcess, key: Term) -> Result<Term> {
-        Ok(self.hashmap
-           .get(&key)
-           // TODO: deep clone
-           .map(|v| v.clone())
-           .unwrap_or_else(|| Term::nil()))
+        let heap = &process.context_mut().heap;
+
+        Ok(self
+            .hashmap
+            .get(&key)
+            // TODO: deep clone
+            .map(|v| v.deep_clone(heap))
+            .unwrap_or_else(|| Term::nil()))
     }
 
     fn get_element(&self, process: &RcProcess, key: Term, index: usize) -> Result<Term> {
