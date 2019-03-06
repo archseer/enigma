@@ -340,7 +340,6 @@ pub fn lookup_element_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
 // rename_2
 // lookup_2
 // member_2
-// lookup_element_3
 // delete_1
 // give_away_3
 // setopts_2

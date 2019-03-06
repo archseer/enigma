@@ -348,6 +348,73 @@ pub fn node_1(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> bif::R
     Ok(atom!(NO_NODE_NO_HOST))
 }
 
+pub fn and_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    match (args[0].to_bool(), args[1].to_bool()) {
+        (Some(true), Some(true)) => Ok(atom!(TRUE)),
+        (Some(_), Some(_)) => Ok(atom!(FALSE)),
+        _ => Err(Exception::new(Reason::EXC_BADARG))
+    }
+}
+
+pub fn or_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    match (args[0].to_bool(), args[1].to_bool()) {
+        (Some(false), Some(false)) => Ok(atom!(FALSE)),
+        (Some(_), Some(_)) => Ok(atom!(TRUE)),
+        _ => Err(Exception::new(Reason::EXC_BADARG))
+    }
+}
+
+pub fn xor_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    match (args[0].to_bool(), args[1].to_bool()) {
+        (Some(true), Some(false)) => Ok(atom!(TRUE)),
+        (Some(false), Some(true)) => Ok(atom!(TRUE)),
+        (Some(_), Some(_)) => Ok(atom!(FALSE)),
+        _ => Err(Exception::new(Reason::EXC_BADARG))
+    }
+}
+
+pub fn not_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    match args[0].to_bool() {
+        Some(true) => Ok(atom!(FALSE)),
+        Some(false) => Ok(atom!(TRUE)),
+        None => Err(Exception::new(Reason::EXC_BADARG))
+    }
+}
+
+pub fn sgt_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    Ok(Term::boolean(args[0].cmp(&args[1]) == std::cmp::Ordering::Greater))
+}
+
+pub fn sge_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    // greater or equal
+    Ok(Term::boolean(args[0].cmp(&args[1]) != std::cmp::Ordering::Less))
+}
+
+pub fn slt_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    Ok(Term::boolean(args[0].cmp(&args[1]) == std::cmp::Ordering::Less))
+}
+
+pub fn sle_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    // less or equal
+    Ok(Term::boolean(args[0].cmp(&args[1]) != std::cmp::Ordering::Greater))
+}
+
+pub fn seq_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    Ok(Term::boolean(args[0].eq(&args[1])))
+}
+
+pub fn seqeq_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    Ok(Term::boolean(args[0].cmp(&args[1]) == std::cmp::Ordering::Equal))
+}
+
+pub fn sneq_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    Ok(Term::boolean(!args[0].eq(&args[1])))
+}
+
+pub fn sneqeq_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    Ok(Term::boolean(args[0].cmp(&args[1]) != std::cmp::Ordering::Equal))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

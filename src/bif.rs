@@ -141,7 +141,31 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "node", 1 => erlang::node_1,
             "display", 1 => erlang::display_1,
 
-            // loader
+            // logic
+            "and", 2 => erlang::and_2,
+            "or", 2 => erlang::or_2,
+            "xor", 2 => erlang::xor_2,
+            "not", 1 => erlang::not_1,
+
+            ">", 2 => erlang::sgt_2,
+            ">=", 2 => erlang::sge_2,
+            "<", 2 => erlang::slt_2,
+            "=<", 2 => erlang::sle_2,
+            "=:=", 2 => erlang::seq_2,
+            "==", 2 => erlang::seqeq_2,
+            "=/=", 2 => erlang::sneq_2,
+            "/=", 2 => erlang::sneqeq_2,
+            // "/", 2 => erlang::div_2,
+            // "bor", 2 => erlang::bor_2,
+            // "band", 2 => erlang::band_2,
+            // "bxor", 2 => erlang::bxor_2,
+            // "bsl", 2 => erlang::bsl_2,
+            // "bsr", 2 => erlang::bsr_2,
+            // "bnot", 1 => erlang::bnot_1,
+            // "-", 1 => erlang::sminus_1,
+            // "+", 1 => erlang::splus_1,
+
+           // loader
             "prepare_loading", 2 => load::prepare_loading_2,
             "has_prepared_code_on_load", 1 => load::has_prepared_code_on_load_1,
             "finish_loading", 1 => load::finish_loading_1,

@@ -197,7 +197,7 @@
 ** System [1/2]
 - [ ] bif erlang:system_flag/2
 - [X] bif erlang:system_info/1
-** New in R9C [11/44]
+** New in R9C [23/44]
 - [ ] bif erlang:system_monitor/0
 - [ ] bif erlang:system_monitor/1
 - [ ] bif erlang:system_monitor/2
@@ -221,19 +221,19 @@
 
 - [ ] bif erlang:is_builtin/3
 
-- [ ] ubif erlang:'and'/2
-- [ ] ubif erlang:'or'/2
-- [ ] ubif erlang:'xor'/2
-- [ ] ubif erlang:'not'/1
+- [X] ubif erlang:'and'/2
+- [X] ubif erlang:'or'/2
+- [X] ubif erlang:'xor'/2
+- [X] ubif erlang:'not'/1
 
-- [ ] ubif erlang:'>'/2			sgt_2
-- [ ] ubif erlang:'>='/2			sge_2
-- [ ] ubif erlang:'<'/2			slt_2
-- [ ] ubif erlang:'=<'/2			sle_2
-- [ ] ubif erlang:'=:='/2			seq_2
-- [ ] ubif erlang:'=='/2			seqeq_2
-- [ ] ubif erlang:'=/='/2			sneq_2
-- [ ] ubif erlang:'/='/2			sneqeq_2
+- [X] ubif erlang:'>'/2			sgt_2
+- [X] ubif erlang:'>='/2			sge_2
+- [X] ubif erlang:'<'/2			slt_2
+- [X] ubif erlang:'=<'/2			sle_2
+- [X] ubif erlang:'=:='/2			seq_2
+- [X] ubif erlang:'=='/2			seqeq_2
+- [X] ubif erlang:'=/='/2			sneq_2
+- [X] ubif erlang:'/='/2			sneqeq_2
 - [X] ubif erlang:'+'/2			splus_2
 - [X] ubif erlang:'-'/2			sminus_2
 - [X] ubif erlang:'*'/2			stimes_2
