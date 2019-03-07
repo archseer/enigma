@@ -547,7 +547,6 @@ fn match_compile(matchexpr: Vec<Term>, guards: Vec<Term>, body: Vec<Term>, num_p
     heap.vars = heap.vars_def;
 
     // Compile the match expression.
-restart:
     heap.vars_used = 0;
 
     for i in 0..num_progs { // long loop ahead
@@ -600,9 +599,6 @@ restart:
                         //             res = dmc_one_term(&context, &heap, &stack, &text,
                         //                                value);
                         //             ASSERT(res != retFail);
-                        //             if (res == retRestart) {
-                        //                 goto restart;
-                        //             }
                         //             if (old_stack != context.stack_used) {
                         //                 ASSERT(old_stack + 1 == context.stack_used);
                         //                 DMC_PUSH(text, matchSwap);
@@ -653,10 +649,6 @@ restart:
                                     res = dmc_one_term(&context, &heap, &stack, &text,
                                                     value);
                                     ASSERT(res != retFail);
-                                    if (res == retRestart) {
-                                        DESTROY_WSTACK(wstack);
-                                        goto restart;
-                                    }
                                     if (old_stack != context.stack_used) {
                                         ASSERT(old_stack + 1 == context.stack_used);
                                         DMC_PUSH(text, matchSwap);
@@ -679,9 +671,7 @@ restart:
                             structure_checked = false;
                             for val in t {
                                 if (res = dmc_one_term(&context, &heap, &stack, &text, val)) != retOk {
-                                    if (res == retRestart) {
-                                        goto restart; // restart the surrounding loop
-                                    } else goto error;
+                                    goto error;
                                 }
                             }
                             break;
@@ -696,9 +686,7 @@ restart:
                     }
                     structure_checked = false; // Whatever it is, we did not pop it
                     if (res = dmc_one_term(&context, &heap, &stack, &text, CAR(list_val(t)))) != retOk {
-                        if res == retRestart {
-                            goto restart;
-                        } else goto error;
+                        goto error;
                     }
                     t = CDR(list_val(t));
                     continue;
@@ -707,9 +695,7 @@ restart:
                 //simple_term:
                     structure_checked = false;
                     if (res = dmc_one_term(&context, &heap, &stack, &text, t)) != retOk {
-                        if res == retRestart {
-                            goto restart;
-                        } else goto error;
+                        goto error;
                     }
                     break;
                 }
