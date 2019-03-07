@@ -13,6 +13,7 @@ macro_rules! table_kind {
 }
 
 pub mod bif;
+pub mod pam;
 pub mod hash_table;
 
 pub mod error;
