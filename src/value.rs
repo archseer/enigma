@@ -279,7 +279,7 @@ pub struct Boxed<T> {
 
 // term order:
 // number < atom < reference < fun < port < pid < tuple < map < nil < list < bit string
-#[derive(Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Type {
     Number,
     Atom,
@@ -915,7 +915,7 @@ impl Ord for Term {
         // allow inexact number comparison
 
         let t1 = self.get_type();
-        let t2 = self.get_type();
+        let t2 = other.get_type();
 
         if t1 != t2 {
             // types don't match, use term ordering
@@ -966,7 +966,7 @@ impl Ord for Variant {
                     unimplemented!()
                 }
             },
-            _ => unimplemented!(),
+            _ => unimplemented!("cmp for {:?} and {:?}", self, other),
         }
     }
 }
