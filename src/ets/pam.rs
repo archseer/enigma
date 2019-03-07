@@ -17,6 +17,7 @@ pub(crate) struct Compiler {
 impl Compiler {
     pub(crate) fn new(matchexpr: Vec<Term>, guardexpr: Vec<Term>, bodyexpr: Vec<Term>, num_match: usize, cflags: usize) -> Self {
         Self {
+            heap: NULL,
             stack_need: 0,
             stack_used: 0,
             // save: NULL,
@@ -32,7 +33,6 @@ impl Compiler {
 
     /// The actual compiling of the match expression and the guards.
     pub(crate) fn match_compile(&mut self) -> Result<Vec<u8>, Error> {
-        // DMCHeap heap;
         // MatchProg *ret = NULL;
         // Eterm t;
         // Uint i;
@@ -47,14 +47,14 @@ impl Compiler {
         let stack = Vec::new();
         let text = Vec::new();
 
-        heap.size = DEFAULT_SIZE;
-        heap.vars = heap.vars_def;
+        self.heap.size = DEFAULT_SIZE;
+        self.heap.vars = self.heap.vars_def;
 
         // Compile the match expression.
-        heap.vars_used = 0;
+        self.heap.vars_used = 0;
 
         for i in 0..self.num_match { // long loop ahead
-            // sys_memset(heap.vars, 0, heap.size * sizeof(*heap.vars));
+            // sys_memset(self.heap.vars, 0, self.heap.size * sizeof(*self.heap.vars));
             self.current_match = i;
             let mut t = self.matchexpr[self.current_match];
             self.stack_used = 0;
@@ -105,12 +105,12 @@ impl Compiler {
                                     PUSH2(text, matchKey, private_copy(&self, key));
                                     {
                                         int old_stack = ++(self.stack_used);
-                                        res = self.one_term(&heap, &stack, &text,
+                                        res = self.one_term(&stack, &text,
                                                         value);
                                         ASSERT(res != retFail);
                                         if (old_stack != self.stack_used) {
                                             ASSERT(old_stack + 1 == self.stack_used);
-                                            PUSH(text, matchSwap);
+                                            text.push(matchSwap);
                                         }
                                         if (self.stack_used > self.stack_need) {
                                             self.stack_need = self.stack_used;
@@ -129,7 +129,7 @@ impl Compiler {
                                 }
                                 structure_checked = false;
                                 for val in t {
-                                    if (res = self.one_term(&heap, &stack, &text, val)) != retOk {
+                                    if (res = self.one_term(&stack, &text, val)) != retOk {
                                         return Err(());
                                     }
                                 }
@@ -145,7 +145,7 @@ impl Compiler {
                             text.push(Opcode::MatchList);
                         }
                         structure_checked = false; // Whatever it is, we did not pop it
-                        if self.one_term(&heap, &stack, &text, CAR(list_val(t))) != retOk {
+                        if self.one_term(&stack, &text, CAR(list_val(t))) != retOk {
                             return Err(());
                         }
                         t = CDR(list_val(t));
@@ -154,7 +154,7 @@ impl Compiler {
                     _ =>  {// Nil and non proper tail end's or single terms as match expressions.
                     //simple_term:
                         structure_checked = false;
-                        if self.one_term(&heap, &stack, &text, t) != retOk {
+                        if self.one_term(&stack, &text, t) != retOk {
                             return Err(());
                         }
                         break;
@@ -214,7 +214,7 @@ impl Compiler {
 
             // ... and the guards
             self.is_guard = true;
-            if compile_guard_expr(&self, &heap, &text, self.guardexpr[self.current_match]) != retOk {
+            if compile_guard_expr(&self, &text, self.guardexpr[self.current_match]) != retOk {
                 return Err(());
             }
             self.is_guard = false;
@@ -228,7 +228,7 @@ impl Compiler {
                 }
                 return Err(());
             }
-            if (compile_guard_expr(&self, &heap, &text, self.bodyexpr[self.current_match]) != retOk) {
+            if compile_guard_expr(&self, &text, self.bodyexpr[self.current_match]) != retOk {
                 return Err(());
             }
 
@@ -299,7 +299,7 @@ impl Compiler {
 
     /// Handle one term in the match expression (not the guard)
     #[inline]
-    fn one_term(&mut self, DMCHeap *heap, STACK_TYPE(Eterm) *stack, STACK_TYPE(UWord) *text, Eterm c) -> DMCRet {
+    fn one_term(&mut self, STACK_TYPE(Eterm) *stack, text: Vec<usize>, Eterm c) -> DMCRet {
         // Sint n;
         // Eterm *hp;
         // Uint sz, sz2, sz3;
@@ -307,15 +307,15 @@ impl Compiler {
 
         switch (c & _TAG_PRIMARY_MASK) {
             case TAG_PRIMARY_IMMED1:
-                if ((n = db_is_variable(c)) >= 0) { /* variable */
-                    if heap.vars[n].is_bound {
-                        PUSH2(*text, matchCmp, n);
+                if (n = db_is_variable(c)) >= 0 { /* variable */
+                    if self.heap.vars[n].is_bound {
+                        text.push(matchCmp(n))
                     } else { /* Not bound, bind! */
-                        if n >= heap.vars_used {
-                            heap.vars_used = n + 1;
+                        if n >= self.heap.vars_used {
+                            self.heap.vars_used = n + 1;
                         }
-                        PUSH2(*text, matchBind, n);
-                        heap.vars[n].is_bound = true;
+                        text.push(matchBind(n))
+                        self.heap.vars[n].is_bound = true;
                     }
                 } else if c == atom!(UNDERSCORE) {
                     text.push(Opcode::MatchSkip);
@@ -325,7 +325,7 @@ impl Compiler {
                 }
                 break;
             case TAG_PRIMARY_LIST:
-                PUSH(*text, matchPushL);
+                text.push(matchPushL);
                 ++(self.stack_used);
                 PUSH(*stack, c);
                 break;
@@ -342,7 +342,7 @@ impl Compiler {
                 switch ((hdr & _TAG_HEADER_MASK) >> _TAG_PRIMARY_SIZE) {
                 case (_TAG_HEADER_ARITYVAL >> _TAG_PRIMARY_SIZE):
                     n = arityval(*tuple_val(c));
-                    PUSH2(*text, matchPushT, n);
+                    text.push(matchPushT(n))
                     ++(self.stack_used);
                     PUSH(*stack, c);
                     break;
@@ -351,14 +351,14 @@ impl Compiler {
                         n = flatmap_get_size(flatmap_val(c));
                     else
                         n = hashmap_size(c);
-                    PUSH2(*text, matchPushM, n);
+                    text.push(matchPushM(n))
                     ++(self.stack_used);
                     PUSH(*stack, c);
                     break;
                 case (_TAG_HEADER_REF >> _TAG_PRIMARY_SIZE):
                 {
                     Eterm* ref_val = internal_ref_val(c);
-                    PUSH(*text, matchEqRef);
+                    text.push(matchEqRef);
                     n = thing_arityval(ref_val[0]);
                     for (i = 0; i <= n; ++i) {
                         PUSH(*text, ref_val[i]);
@@ -370,7 +370,7 @@ impl Compiler {
                 {
                     Eterm* bval = big_val(c);
                     n = thing_arityval(bval[0]);
-                    PUSH(*text, matchEqBig);
+                    text.push(matchEqBig);
                     for (i = 0; i <= n; ++i) {
                         PUSH(*text, (Uint) bval[i]);
                     }
@@ -388,7 +388,7 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_guard_expr(&self, DMCHeap *heap, STACK_TYPE(UWord) *text, Eterm l) -> DMCRet {
+    fn compile_guard_expr(&self, text: Vec<usize>, l: Term) -> DMCRet {
         // DMCRet ret;
         // int constant;
         // Eterm t;
@@ -397,23 +397,21 @@ impl Compiler {
             if !l.is_list(l) {
                 RETURN_ERROR("Match expression is not a list.", self, constant);
             }
-            if (!(self.is_guard)) {
-                PUSH(*text, matchCatch);
+            if !self.is_guard {
+                text.push(matchCatch);
             }
-            while (is_list(l)) {
+            while is_list(l) {
                 constant = 0;
                 t = CAR(list_val(l));
-                if ret = expr(self, heap, text, t, &constant)) != retOk {
-                    return ret;
-                }
-                if (constant) {
+                expr(self, text, t, &constant)?;
+                if constant {
                     do_emit_constant(self, text, t);
                 }
                 l = CDR(list_val(l));
-                if (self.is_guard) {
-                    PUSH(*text,matchTrue);
+                if self.is_guard {
+                    text.push(matchTrue);
                 } else {
-                    PUSH(*text,matchWaste);
+                    text.push(matchWaste);
                 }
                 --self.stack_used;
             }
@@ -423,7 +421,7 @@ impl Compiler {
             if !self.is_guard && (context.cflags & DCOMP_TABLE) {
                 ASSERT(matchWaste == TOP(*text));
                 (void) POP(*text);
-                PUSH(*text, matchReturn); // Same impact on stack as matchWaste
+                text.push(matchReturn); // Same impact on stack as matchWaste
             }
         }
         Ok(())
@@ -433,25 +431,25 @@ impl Compiler {
     ** Match guard compilation
     */
 
-    fn do_emit_constant(&self, STACK_TYPE(UWord) *text, Eterm t) {
-            int sz;
-            ErlHeapFragment *emb;
-            Eterm *hp;
-            Eterm tmp;
+    fn do_emit_constant(&self, text: Vec<usize>, t: Term) {
+        int sz;
+        ErlHeapFragment *emb;
+        Eterm *hp;
+        Eterm tmp;
 
-            if (IS_CONST(t)) {
-                tmp = t;
-            } else {
-                sz = my_size_object(t);
-                emb = new_message_buffer(sz);
-                hp = emb->mem;
-                tmp = my_copy_struct(t,&hp,&(emb->off_heap));
-                emb->next = self.save;
-                self.save = emb;
-            }
-            PUSH2(*text, matchPushC, (Uint)tmp);
-            if (++self.stack_used > self.stack_need)
-                self.stack_need = self.stack_used;
+        if IS_CONST(t) {
+            tmp = t;
+        } else {
+            sz = my_size_object(t);
+            emb = new_message_buffer(sz);
+            hp = emb->mem;
+            tmp = my_copy_struct(t,&hp,&(emb->off_heap));
+            emb->next = self.save;
+            self.save = emb;
+        }
+        PUSH2(*text, matchPushC, (Uint)tmp);
+        if (++self.stack_used > self.stack_need)
+            self.stack_need = self.stack_used;
     }
 
     #define RETURN_ERROR_X(VAR, ContextP, ConstantF, String, ARG)            \
@@ -479,52 +477,45 @@ impl Compiler {
     #define TERM_WARNING(String, T, ContextP) \
     add_err((ContextP)->err_info, String, -1, T, dmcWarning)
 
-    static DMCRet list(&mut self,
-                        DMCHeap *heap,
-                        STACK_TYPE(UWord) *text,
-                        Eterm t,
-                        int *constant)
-    {
+    fn list(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         int c1;
         int c2;
         int ret;
 
-        expr(context, heap, text, CAR(list_val(t)), &c1)?;
+        self.expr(text, CAR(list_val(t)), &c1)?;
 
-        expr(context, heap, text, CDR(list_val(t)), &c2)?;
+        self.expr(text, CDR(list_val(t)), &c2)?;
 
-        if (c1 && c2) {
-            *constant = 1;
+        if c1 && c2 {
+            *constant = true;
             return retOk;
         } 
-        *constant = 0;
-        if (!c1) {
+        *constant = false;
+        if !c1 {
             /* The CAR is not a constant, so if the CDR is, we just push it,
             otherwise it is already pushed. */
-            if (c2)
-                do_emit_constant(context, text, CDR(list_val(t)));
-            PUSH(*text, matchConsA);
+            if c2 {
+                self.do_emit_constant(text, CDR(list_val(t)));
+            }
+            text.push(matchConsA);
         } else { /* !c2 && c1 */
-            do_emit_constant(context, text, CAR(list_val(t)));
-            PUSH(*text, matchConsB);
+            self.do_emit_constant(text, CAR(list_val(t)));
+            text.push(matchConsB);
         }
         --self.stack_used; /* Two objects on stack becomes one */
-        return retOk;
+        Ok(())
     }
 
-    static void
-    rearrange_constants(&mut self, STACK_TYPE(UWord) *text,
-                            int textpos, Eterm *p, Uint nelems)
-    {
+    fn rearrange_constants(&mut self, text: Vec<usize>, int textpos, Eterm *p, nelems: usize) {
         STACK_TYPE(UWord) instr_save;
         Uint i;
 
         INIT_STACK(instr_save);
-        while (STACK_NUM(*text) > textpos) {
+        while STACK_NUM(*text) > textpos {
             PUSH(instr_save, POP(*text));
         }
         for (i = nelems; i--;) {
-            do_emit_constant(context, text, p[i]);
+            self.do_emit_constant(text, p[i]);
         }
         while(!EMPTY(instr_save)) {
             PUSH(*text, POP(instr_save));
@@ -532,10 +523,7 @@ impl Compiler {
         FREE(instr_save);
     }
 
-    static DMCRet
-    array(&mut self, DMCHeap *heap, STACK_TYPE(UWord) *text,
-            Eterm *p, Uint nelems, int *constant)
-    {
+    fn array(&mut self, text: Vec<usize>, Eterm *p, nelems: usize, constant: bool) -> DMCRet {
         int all_constant = 1;
         int textpos = STACK_NUM(*text);
         Uint i;
@@ -550,301 +538,251 @@ impl Compiler {
             DMCRet ret;
             int c;
 
-            ret = expr(context, heap, text, p[i], &c);
-            if (ret != retOk) {
-                return ret;
-            }
-            if (!c && all_constant) {
+            self.expr(text, p[i], &c)?;
+            if !c && all_constant {
                 all_constant = 0;
-                if (i < nelems - 1) {
-                    rearrange_constants(context, text, textpos,
+                if i < nelems - 1 {
+                    self.rearrange_constants(text, textpos,
                                             p + i + 1, nelems - i - 1);
                 }
-            } else if (c && !all_constant) {
-                do_emit_constant(context, text, p[i]);
+            } else if c && !all_constant {
+                self.do_emit_constant(text, p[i]);
             }
         }
         *constant = all_constant;
-        return retOk;
+        Ok(())
     }
 
-    static DMCRet
-    tuple(&mut self, DMCHeap *heap, STACK_TYPE(UWord) *text,
-            Eterm t, int *constant)
-    {
+    fn tuple(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         int all_constant;
         Eterm *p = tuple_val(t);
         Uint nelems = arityval(*p);
         DMCRet ret;
 
-        ret = array(context, heap, text, p + 1, nelems, &all_constant);
-        if (ret != retOk) {
-            return ret;
-        }
-        if (all_constant) {
-            *constant = 1;
+        ret = self.array(text, p + 1, nelems, &all_constant)?;
+        if all_constant {
+            *constant = true;
             return retOk;
         }
-        PUSH2(*text, matchMkTuple, nelems);
+        text.push(matchMkTuple(nelems))
         self.stack_used -= (nelems - 1);
-        *constant = 0;
-        return retOk;
+        *constant = false;
+        Ok(())
     }
 
-    static DMCRet
-    map(&mut self, DMCHeap *heap, STACK_TYPE(UWord) *text,
-            Eterm t, int *constant)
-    {
+    fn map(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         int nelems;
         int constant_values;
         DMCRet ret;
-        if (is_flatmap(t)) {
+        if is_flatmap(t) {
             flatmap_t *m = (flatmap_t *)flatmap_val(t);
             Eterm *values = flatmap_get_values(m);
 
             nelems = flatmap_get_size(m);
-            ret = array(context, heap, text, values, nelems, &constant_values);
+            self.array(text, values, nelems, &constant_values)?;
 
-            if (ret != retOk) {
-                return ret;
-            }
-            if (constant_values) {
-                *constant = 1;
+            if constant_values {
+                *constant = true;
                 return retOk;
             }
-            PUSH2(*text, matchPushC, private_copy(context, m->keys));
-            if (++self.stack_used > self.stack_need) {
+            PUSH2(*text, matchPushC, self.private_copy(m->keys));
+            if ++self.stack_used > self.stack_need {
                 self.stack_need = self.stack_used;
             }
-            PUSH2(*text, matchMkFlatMap, nelems);
+            text.push(matchMkFlatMap(nelems))
             self.stack_used -= nelems;
-            *constant = 0;
-            return retOk;
+            *constant = false;
+            Ok(())
         } else {
             DECLARE_WSTACK(wstack);
             Eterm *kv;
             int c;
 
-            ASSERT(is_hashmap(t));
+            assert!(is_hashmap(t));
 
             hashmap_iterator_init(&wstack, t, 1);
             constant_values = 1;
             nelems = hashmap_size(t);
 
             while ((kv=hashmap_iterator_prev(&wstack)) != NULL) {
-                if ((ret = expr(context, heap, text, CDR(kv), &c)) != retOk) {
+                if (ret = self.expr(text, CDR(kv), &c)) != retOk {
                     DESTROY_WSTACK(wstack);
                     return ret;
                 }
-                if (!c)
+                if !c {
                     constant_values = 0;
+                }
             }
 
-            if (constant_values) {
-                *constant = 1;
+            if constant_values {
+                *constant = true;
                 DESTROY_WSTACK(wstack);
                 return retOk;
             }
 
-            *constant = 0;
+            *constant = false;
 
             hashmap_iterator_init(&wstack, t, 1);
 
             while ((kv=hashmap_iterator_prev(&wstack)) != NULL) {
                 /* push key */
-                if ((ret = expr(context, heap, text, CAR(kv), &c)) != retOk) {
+                if ((ret = self.expr(text, CAR(kv), &c)) != retOk) {
                     DESTROY_WSTACK(wstack);
                     return ret;
                 }
-                if (c) {
-                    do_emit_constant(context, text, CAR(kv));
+                if c {
+                    self.do_emit_constant(text, CAR(kv));
                 }
                 /* push value */
-                if ((ret = expr(context, heap, text, CDR(kv), &c)) != retOk) {
+                if ((ret = self.expr(text, CDR(kv), &c)) != retOk) {
                     DESTROY_WSTACK(wstack);
                     return ret;
                 }
-                if (c) {
-                    do_emit_constant(context, text, CDR(kv));
+                if c {
+                    self.do_emit_constant(text, CDR(kv));
                 }
             }
-            PUSH2(*text, matchMkHashMap, nelems);
+            text.push(matchMkHashMap(nelems))
             self.stack_used -= nelems;
             DESTROY_WSTACK(wstack);
-            return retOk;
+            Ok(())
         }
     }
 
-    static DMCRet whole_expression(&mut self,
-                                    DMCHeap *heap,
-                                    STACK_TYPE(UWord) *text,
-                                    Eterm t,
-                                    int *constant)
-    {
-        if (self.cflags & DCOMP_TRACE) {
+    fn whole_expression(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+        if self.cflags & DCOMP_TRACE {
             /* Hmmm, convert array to list... */
-            if (self.special) {
-            PUSH(*text, matchPushArrayAsListU);
+            if self.special {
+            text.push(matchPushArrayAsListU);
             } else { 
                 ASSERT(is_tuple(self.matchexpr
                                 [self.current_match]));
-                PUSH(*text, matchPushArrayAsList);
+                text.push(matchPushArrayAsList);
             }
         } else {
-            PUSH(*text, matchPushExpr);
+            text.push(matchPushExpr);
         }
         ++self.stack_used;
-        if (self.stack_used > self.stack_need)
+        if self.stack_used > self.stack_need {
             self.stack_need = self.stack_used;
-        *constant = 0;
-        return retOk;
+        }
+        *constant = false;
+        Ok(())
     }
 
-    /* Figure out which PushV instruction to use.
-    */
-    static void add_pushv_variant(&mut self, DMCHeap *heap,
-                                    STACK_TYPE(UWord) *text, Uint n)
-    {
-        DMCVariable* v = &heap->vars[n];
+    /// Figure out which PushV instruction to use.
+    fn add_pushv_variant(&mut self, text: Vec<usize>, Uint n) {
+        DMCVariable* v = &self.heap.vars[n];
         MatchOps instr = matchPushV;
 
-        ASSERT(n < heap->vars_used && v->is_bound);
-        if (!self.is_guard) {
-            if(!v->is_in_body) {
+        assert!(n < self.heap.vars_used && v->is_bound);
+        if !self.is_guard {
+            if !v->is_in_body {
                 instr = matchPushVResult;
                 v->is_in_body = 1;
             }
         }
-        PUSH(*text, instr);
-        PUSH(*text, n);
+        text.push(instr);
+        text.push(n);
     }
 
-    static DMCRet variable(&mut self,
-                            DMCHeap *heap,
-                            STACK_TYPE(UWord) *text,
-                            Eterm t,
-                            int *constant)
-    {
+    fn variable(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Uint n = db_is_variable(t);
 
-        if (n >= heap->vars_used || !heap->vars[n].is_bound) {
+        if n >= self.heap.vars_used || !self.heap.vars[n].is_bound {
             RETURN_VAR_ERROR("Variable $%%d is unbound.", n, context, *constant);
         }
 
-        add_pushv_variant(context, heap, text, n);
+        self.add_pushv_variant(text, n);
 
         ++self.stack_used;
         if (self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        *constant = 0;
-        return retOk;
+        *constant = false;
+        Ok(())
     }
 
-    static DMCRet all_bindings(&mut self,
-                                DMCHeap *heap,
-                                STACK_TYPE(UWord) *text,
-                                Eterm t,
-                                int *constant)
-    {
+    fn all_bindings(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         int i;
         int heap_used = 0;
 
-        PUSH(*text, matchPushC);
-        PUSH(*text, NIL);
-        for (i = heap->vars_used - 1; i >= 0; --i) {
-            if (heap->vars[i].is_bound) {
-                add_pushv_variant(context, heap, text, i);
-                PUSH(*text, matchConsB);
+        text.push(matchPushC);
+        text.push(NIL);
+        for (i = self.heap.vars_used - 1; i >= 0; --i) {
+            if self.heap.vars[i].is_bound {
+                self.add_pushv_variant(text, i);
+                text.push(matchConsB);
                 heap_used += 2;
             }
         }
         ++self.stack_used;
-        if ((self.stack_used + 1) > self.stack_need)
+        if (self.stack_used + 1) > self.stack_need  {
             self.stack_need = (self.stack_used + 1);
-        *constant = 0;
-        return retOk;
+        }
+        *constant = false;
+        Ok(())
     }
 
-    static DMCRet const(&mut self,
-                        DMCHeap *heap,
-                        STACK_TYPE(UWord) *text,
-                        Eterm t,
-                        int *constant)
-    {
+    fn const(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
 
-        if (a != 2) {
+        if a != 2 {
             RETURN_TERM_ERROR("Special form 'const' called with more than one "
                             "argument in %T.", t, context, *constant);
         }
-        *constant = 1;
-        return retOk;
+        *constant = true;
+        Ok(())
     }
 
-    static DMCRet and(&mut self,
-                        DMCHeap *heap,
-                        STACK_TYPE(UWord) *text,
-                        Eterm t,
-                        int *constant)
-    {
+    fn and(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
         int i;
         int c;
         
-        if (a < 2) {
+        if a < 2 {
             RETURN_TERM_ERROR("Special form 'and' called without arguments "
                             "in %T.", t, context, *constant);
         }
-        *constant = 0;
+        *constant = false;
         for (i = a; i > 1; --i) {
-            expr(context, heap, text, p[i], &c)?;
-            if (c) 
-                do_emit_constant(context, text, p[i]);
+            self.expr(text, p[i], &c)?;
+            if c 
+                self.do_emit_constant(text, p[i]);
         }
-        PUSH(*text, matchAnd);
+        text.push(matchAnd);
         PUSH(*text, (Uint) a - 1);
         self.stack_used -= (a - 2);
-        return retOk;
+        Ok(())
     }
 
-    static DMCRet or(&mut self,
-                        DMCHeap *heap,
-                        STACK_TYPE(UWord) *text,
-                        Eterm t,
-                        int *constant)
-    {
+    fn or(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
         int i;
         int c;
         
-        if (a < 2) {
+        if a < 2 {
             RETURN_TERM_ERROR("Special form 'or' called without arguments "
                             "in %T.", t, context, *constant);
         }
-        *constant = 0;
+        *constant = false;
         for (i = a; i > 1; --i) {
-            expr(context, heap, text, p[i], &c)?;
-            if (c) 
-                do_emit_constant(context, text, p[i]);
+            self.expr(text, p[i], &c)?;
+            if c 
+                self.do_emit_constant(text, p[i]);
         }
-        PUSH(*text, matchOr);
+        text.push(matchOr);
         PUSH(*text, (Uint) a - 1);
         self.stack_used -= (a - 2);
-        return retOk;
+        Ok(())
     }
 
 
-    static DMCRet andalso(&mut self,
-                            DMCHeap *heap,
-                            STACK_TYPE(UWord) *text,
-                            Eterm t,
-                            int *constant)
-    {
+    fn andalso(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
@@ -854,45 +792,41 @@ impl Compiler {
         Uint lbl_next;
         Uint lbl_val;
 
-        if (a < 2) {
+        if a < 2 {
             RETURN_TERM_ERROR("Special form 'andalso' called without"
                             " arguments "
                             "in %T.", t, context, *constant);
         }
-        *constant = 0;
+        *constant = false;
         lbl = 0;
         for (i = 2; i <= a; ++i) {
-            expr(context, heap, text, p[i], &c)?;
-            if (c) 
-                do_emit_constant(context, text, p[i]);
-            if (i == a) {
-                PUSH(*text, matchJump);
+            self.expr(text, p[i], &c)?;
+            if c 
+                self.do_emit_constant(text, p[i]);
+            if i == a {
+                text.push(matchJump);
             } else {
-                PUSH(*text, matchAndAlso);
+                text.push(matchAndAlso);
             }
-            PUSH(*text, lbl);
+            text.push(lbl);
             lbl = STACK_NUM(*text)-1;
             --(self.stack_used);
         }
-        PUSH(*text, matchPushC);
-        PUSH(*text, am_true);
+        text.push(matchPushC);
+        text.push(am_true);
         lbl_val = STACK_NUM(*text);
         while (lbl) {
             lbl_next = PEEK(*text, lbl);
             POKE(*text, lbl, lbl_val-lbl-1);
             lbl = lbl_next;
         }
-        if (++self.stack_used > self.stack_need)
+        if ++self.stack_used > self.stack_need {
             self.stack_need = self.stack_used;
-        return retOk;
+        }
+        Ok(())
     }
 
-    static DMCRet orelse(&mut self,
-                            DMCHeap *heap,
-                            STACK_TYPE(UWord) *text,
-                            Eterm t,
-                            int *constant)
-    {
+    fn orelse(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
@@ -902,256 +836,223 @@ impl Compiler {
         Uint lbl_next;
         Uint lbl_val;
         
-        if (a < 2) {
+        if a < 2 {
             RETURN_TERM_ERROR("Special form 'orelse' called without arguments "
                             "in %T.", t, context, *constant);
         }
-        *constant = 0;
+        *constant = false;
         lbl = 0;
         for (i = 2; i <= a; ++i) {
-            expr(context, heap, text, p[i], &c)?;
-            if (c) 
-                do_emit_constant(context, text, p[i]);
+            self.expr(text, p[i], &c)?;
+            if c 
+                self.do_emit_constant(text, p[i]);
             if (i == a) {
-                PUSH(*text, matchJump);
+                text.push(matchJump);
             } else {
-                PUSH(*text, matchOrElse);
+                text.push(matchOrElse);
             }
-            PUSH(*text, lbl);
+            text.push(lbl);
             lbl = STACK_NUM(*text)-1;
             --(self.stack_used);
         }
-        PUSH(*text, matchPushC);
-        PUSH(*text, am_false);
+        text.push(matchPushC);
+        text.push(am_false);
         lbl_val = STACK_NUM(*text);
-        while (lbl) {
+        while lbl {
             lbl_next = PEEK(*text, lbl);
             POKE(*text, lbl, lbl_val-lbl-1);
             lbl = lbl_next;
         }
         if (++self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        return retOk;
+        Ok(())
     }
 
-    static DMCRet message(&mut self,
-                            DMCHeap *heap,
-                            STACK_TYPE(UWord) *text,
-                            Eterm t,
-                            int *constant)
-    {
+    fn message(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
         int c;
         
 
-        if (!(self.cflags & DCOMP_TRACE)) {
+        if !(self.cflags & DCOMP_TRACE) {
             RETURN_ERROR("Special form 'message' used in wrong dialect.",
                         context, 
                         *constant);
         }
-        if (self.is_guard) {
+        if self.is_guard {
             RETURN_ERROR("Special form 'message' called in guard context.",
                         context, 
                         *constant);
         }
 
-        if (a != 2) {
+        if a != 2 {
             RETURN_TERM_ERROR("Special form 'message' called with wrong "
                             "number of arguments in %T.", t, context, 
                             *constant);
         }
-        *constant = 0;
-        expr(context, heap, text, p[2], &c)?;
-        if (c) { 
-            do_emit_constant(context, text, p[2]);
+        *constant = false;
+        self.expr(text, p[2], &c)?;
+        if c { 
+            self.do_emit_constant(text, p[2]);
         }
-        PUSH(*text, matchReturn);
-        PUSH(*text, matchPushC);
-        PUSH(*text, am_true);
+        text.push(matchReturn);
+        text.push(matchPushC);
+        text.push(am_true);
         /* Push as much as we remove, stack_need is untouched */
-        return retOk;
+        Ok(())
     }
 
-    static DMCRet self(&mut self,
-                        DMCHeap *heap,
-                        STACK_TYPE(UWord) *text,
-                        Eterm t,
-                        int *constant)
-    {
+    fn self(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         
-        if (a != 1) {
+        if a != 1 {
             RETURN_TERM_ERROR("Special form 'self' called with arguments "
                             "in %T.", t, context, *constant);
         }
-        *constant = 0;
-        PUSH(*text, matchSelf);
+        *constant = false;
+        text.push(matchSelf);
         if (++self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        return retOk;
+        Ok(())
     }
 
-    static DMCRet return_trace(&mut self,
-                                DMCHeap *heap,
-                                STACK_TYPE(UWord) *text,
-                                Eterm t,
-                                int *constant)
-    {
+    fn return_trace(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         
-        if (!(self.cflags & DCOMP_TRACE)) {
+        if !(self.cflags & DCOMP_TRACE) {
             RETURN_ERROR("Special form 'return_trace' used in wrong dialect.",
                         context, 
                         *constant);
         }
-        if (self.is_guard) {
+        if self.is_guard {
             RETURN_ERROR("Special form 'return_trace' called in "
                         "guard context.", context, *constant);
         }
 
-        if (a != 1) {
+        if a != 1 {
             RETURN_TERM_ERROR("Special form 'return_trace' called with "
                             "arguments in %T.", t, context, *constant);
         }
-        *constant = 0;
-        PUSH(*text, matchSetReturnTrace); /* Pushes 'true' on the stack */
+        *constant = false;
+        text.push(matchSetReturnTrace); /* Pushes 'true' on the stack */
         if (++self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        return retOk;
+        Ok(())
     }
 
     static DMCRet exception_trace(&mut self,
-                                DMCHeap *heap,
-                                STACK_TYPE(UWord) *text,
+                                text: Vec<usize>,
                                 Eterm t,
-                                int *constant)
+                                constant: bool)
     {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         
-        if (!(self.cflags & DCOMP_TRACE)) {
+        if !(self.cflags & DCOMP_TRACE) {
             RETURN_ERROR("Special form 'exception_trace' used in wrong dialect.",
                         context, 
                         *constant);
         }
-        if (self.is_guard) {
+        if self.is_guard {
             RETURN_ERROR("Special form 'exception_trace' called in "
                         "guard context.", context, *constant);
         }
 
-        if (a != 1) {
+        if a != 1 {
             RETURN_TERM_ERROR("Special form 'exception_trace' called with "
                             "arguments in %T.", t, context, *constant);
         }
-        *constant = 0;
-        PUSH(*text, matchSetExceptionTrace); /* Pushes 'true' on the stack */
+        *constant = false;
+        text.push(matchSetExceptionTrace); /* Pushes 'true' on the stack */
         if (++self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        return retOk;
+        Ok(())
     }
 
-    static int check_trace(const char* op,
-                        DMCContext *context,
-                        int *constant,
-                        int need_cflags,
-                        int allow_in_guard,
-                        DMCRet* retp)
-    {
-        if (!(self.cflags & DCOMP_TRACE)) {
+    fn check_trace(&self, const char* op, constant: bool, int need_cflags, int allow_in_guard, DMCRet* retp) -> bool {
+        if !(self.cflags & DCOMP_TRACE) {
             *retp = RETURN_ERROR_X(-1, context, *constant, "Special form '%s' "
                                 "used in wrong dialect.", op);
-            return 0;
+            return false;
         }
-        if ((self.cflags & need_cflags) != need_cflags) {
+        if (self.cflags & need_cflags) != need_cflags {
             *retp = RETURN_ERROR_X(-1, context, *constant, "Special form '%s' "
                                 "not allow for this trace event.", op);
-            return 0;
+            return false;
         }
-        if (self.is_guard && !allow_in_guard) {
+        if self.is_guard && !allow_in_guard {
             *retp = RETURN_ERROR_X(-1, context, *constant, "Special form '%s' "
                                 "called in guard context.", op);
-            return 0;
+            return false;
         }
-        return 1;
+        true
     }
 
-    static DMCRet is_seq_trace(&mut self,
-                                DMCHeap *heap,
-                                STACK_TYPE(UWord) *text,
-                                Eterm t,
-                                int *constant)
-    {
+    fn is_seq_trace(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
         
-        if (!check_trace("is_seq_trace", context, constant, DCOMP_ALLOW_TRACE_OPS, 1, &ret))
+        if (!self.check_trace("is_seq_trace", constant, DCOMP_ALLOW_TRACE_OPS, 1, &ret))
             return ret;
 
-        if (a != 1) {
+        if a != 1 {
             RETURN_TERM_ERROR("Special form 'is_seq_trace' called with "
                             "arguments in %T.", t, context, *constant);
         }
-        *constant = 0;
-        PUSH(*text, matchIsSeqTrace); 
+        *constant = false;
+        text.push(matchIsSeqTrace); 
         /* Pushes 'true' or 'false' on the stack */
         if (++self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        return retOk;
+        Ok(())
     }
 
     static DMCRet set_seq_token(&mut self,
-                                    DMCHeap *heap,
-                                    STACK_TYPE(UWord) *text,
+                                    text: Vec<usize>,
                                     Eterm t,
-                                    int *constant)
+                                    constant: bool)
     {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
         int c;
         
-        if (!check_trace("set_seq_trace", context, constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
+        if (!self.check_trace("set_seq_trace", constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
             return ret;
 
-        if (a != 3) {
+        if a != 3 {
             RETURN_TERM_ERROR("Special form 'set_seq_token' called with wrong "
                             "number of arguments in %T.", t, context, 
                             *constant);
         }
-        *constant = 0;
-        expr(context, heap, text, p[3], &c)?;
-        if (c) { 
-            do_emit_constant(context, text, p[3]);
+        *constant = false;
+        self.expr(text, p[3], &c)?;
+        if c { 
+            self.do_emit_constant(text, p[3]);
         }
-        expr(context, heap, text, p[2], &c)?;
-        if (c) { 
-            do_emit_constant(context, text, p[2]);
+        self.expr(text, p[2], &c)?;
+        if c { 
+            self.do_emit_constant(text, p[2]);
         }
         if (self.cflags & DCOMP_FAKE_DESTRUCTIVE) {
-            PUSH(*text, matchSetSeqTokenFake);
+            text.push(matchSetSeqTokenFake);
         } else {
-            PUSH(*text, matchSetSeqToken);
+            text.push(matchSetSeqToken);
         }
         --self.stack_used; /* Remove two and add one */
-        return retOk;
+        Ok(())
     }
 
-    static DMCRet get_seq_token(&mut self,
-                                    DMCHeap *heap,
-                                    STACK_TYPE(UWord) *text,
-                                    Eterm t,
-                                    int *constant)
-    {
+    fn get_seq_token(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
 
-        if (!check_trace("get_seq_token", context, constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
+        if (!self.check_trace("get_seq_token", constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
             return ret;
 
         if (a != 1) {
@@ -1160,21 +1061,14 @@ impl Compiler {
                             *constant);
         }
 
-        *constant = 0;
-        PUSH(*text, matchGetSeqToken);
+        *constant = false;
+        text.push(matchGetSeqToken);
         if (++self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        return retOk;
+        Ok(())
     }
 
-
-
-    static DMCRet display(&mut self,
-                            DMCHeap *heap,
-                            STACK_TYPE(UWord) *text,
-                            Eterm t,
-                            int *constant)
-    {
+    fn display(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
@@ -1197,75 +1091,65 @@ impl Compiler {
                             "number of arguments in %T.", t, context, 
                             *constant);
         }
-        *constant = 0;
-        expr(context, heap, text, p[2], &c)?;
-        if (c) { 
-            do_emit_constant(context, text, p[2]);
+        *constant = false;
+        self.expr(text, p[2], &c)?;
+        if c { 
+            self.do_emit_constant(text, p[2]);
         }
-        PUSH(*text, matchDisplay);
+        text.push(matchDisplay);
         /* Push as much as we remove, stack_need is untouched */
-        return retOk;
+        Ok(())
     }
 
-    static DMCRet process_dump(&mut self,
-                                DMCHeap *heap,
-                                STACK_TYPE(UWord) *text,
-                                Eterm t,
-                                int *constant)
-    {
+    fn process_dump(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
 
-        if (!check_trace("process_dump", context, constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
+        if (!self.check_trace("process_dump", constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
             return ret;
 
         if (a != 1) {
             RETURN_TERM_ERROR("Special form 'process_dump' called with "
                             "arguments in %T.", t, context, *constant);
         }
-        *constant = 0;
-        PUSH(*text, matchProcessDump); /* Creates binary */
+        *constant = false;
+        text.push(matchProcessDump); /* Creates binary */
         if (++self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        return retOk;
+        Ok(())
     }
 
-    static DMCRet enable_trace(&mut self,
-                                DMCHeap *heap,
-                                STACK_TYPE(UWord) *text,
-                                Eterm t,
-                                int *constant)
-    {
+    fn enable_trace(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
         int c;
         
-        if (!check_trace("enable_trace", context, constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
+        if (!self.check_trace("enable_trace", constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
             return ret;
 
         switch (a) {
         case 2:
-            *constant = 0;
-            expr(context, heap, text, p[2], &c)?;
-            if (c) { 
-                do_emit_constant(context, text, p[2]);
+            *constant = false;
+            self.expr(text, p[2], &c)?;
+            if c { 
+                self.do_emit_constant(text, p[2]);
             }
-            PUSH(*text, matchEnableTrace);
+            text.push(matchEnableTrace);
             /* Push as much as we remove, stack_need is untouched */
             break;
         case 3:
-            *constant = 0;
-            expr(context, heap, text, p[3], &c)?;
-            if (c) { 
-                do_emit_constant(context, text, p[3]);
+            *constant = false;
+            self.expr(text, p[3], &c)?;
+            if c { 
+                self.do_emit_constant(text, p[3]);
             }
-            expr(context, heap, text, p[2], &c)?;
+            self.expr(text, p[2], &c)?;
             if (c) { 
-                do_emit_constant(context, text, p[2]);
+                self.do_emit_constant(text, p[2]);
             }
-            PUSH(*text, matchEnableTrace2);
+            text.push(matchEnableTrace2);
             --self.stack_used; /* Remove two and add one */
             break;
         default:
@@ -1273,44 +1157,39 @@ impl Compiler {
                             "number of arguments in %T.", t, context, 
                             *constant);
         }
-        return retOk;
+        Ok(())
     }
 
-    static DMCRet disable_trace(&mut self,
-                                    DMCHeap *heap,
-                                    STACK_TYPE(UWord) *text,
-                                    Eterm t,
-                                    int *constant)
-    {
+    fn disable_trace(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
         int c;
 
-        if (!check_trace("disable_trace", context, constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
+        if (!self.check_trace("disable_trace", constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
             return ret;
 
         switch (a) {
         case 2:
-            *constant = 0;
-            expr(context, heap, text, p[2], &c)?;
-            if (c) { 
-                do_emit_constant(context, text, p[2]);
+            *constant = false;
+            self.expr(text, p[2], &c)?;
+            if c { 
+                self.do_emit_constant(text, p[2]);
             }
-            PUSH(*text, matchDisableTrace);
+            text.push(matchDisableTrace);
             /* Push as much as we remove, stack_need is untouched */
             break;
         case 3:
-            *constant = 0;
-            expr(context, heap, text, p[3], &c)?;
-            if (c) { 
-                do_emit_constant(context, text, p[3]);
+            *constant = false;
+            self.expr(text, p[3], &c)?;
+            if c { 
+                self.do_emit_constant(text, p[3]);
             }
-            expr(context, heap, text, p[2], &c)?;
-            if (c) { 
-                do_emit_constant(context, text, p[2]);
+            self.expr(text, p[2], &c)?;
+            if c { 
+                self.do_emit_constant(text, p[2]);
             }
-            PUSH(*text, matchDisableTrace2);
+            text.push(matchDisableTrace2);
             --self.stack_used; /* Remove two and add one */
             break;
         default:
@@ -1318,52 +1197,47 @@ impl Compiler {
                             "number of arguments in %T.", t, context, 
                             *constant);
         }
-        return retOk;
+        Ok(())
     }
 
-    static DMCRet trace(&mut self,
-                            DMCHeap *heap,
-                            STACK_TYPE(UWord) *text,
-                            Eterm t,
-                            int *constant)
-    {
+    fn trace(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
         int c;
         
-        if (!check_trace("trace", context, constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
+        if (!self.check_trace("trace", constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
             return ret;
 
         switch (a) {
         case 3:
-            *constant = 0;
-            expr(context, heap, text, p[3], &c)?;
-            if (c) { 
-                do_emit_constant(context, text, p[3]);
+            *constant = false;
+            self.expr(text, p[3], &c)?;
+            if c { 
+                self.do_emit_constant(text, p[3]);
             }
-            expr(context, heap, text, p[2], &c)?;
-            if (c) { 
-                do_emit_constant(context, text, p[2]);
+            self.expr(text, p[2], &c)?;
+            if c { 
+                self.do_emit_constant(text, p[2]);
             }
-            PUSH(*text, matchTrace2);
+            text.push(matchTrace2);
             --self.stack_used; /* Remove two and add one */
             break;
         case 4:
-            *constant = 0;
-            expr(context, heap, text, p[4], &c)?;
-            if (c) { 
-                do_emit_constant(context, text, p[4]);
+            *constant = false;
+            self.expr(text, p[4], &c)?;
+            if c { 
+                self.do_emit_constant(text, p[4]);
             }
-            expr(context, heap, text, p[3], &c)?;
-            if (c) { 
-                do_emit_constant(context, text, p[3]);
+            self.expr(text, p[3], &c)?;
+            if c { 
+                self.do_emit_constant(text, p[3]);
             }
-            expr(context, heap, text, p[2], &c)?;
-            if (c) { 
-                do_emit_constant(context, text, p[2]);
+            self.expr(text, p[2], &c)?;
+            if c { 
+                self.do_emit_constant(text, p[2]);
             }
-            PUSH(*text, matchTrace3);
+            text.push(matchTrace3);
             self.stack_used -= 2; /* Remove three and add one */
             break;
         default:
@@ -1371,50 +1245,39 @@ impl Compiler {
                             "number of arguments in %T.", t, context, 
                             *constant);
         }
-        return retOk;
+        Ok(())
     }
 
 
 
-    static DMCRet caller(&mut self,
-                            DMCHeap *heap,
-                            STACK_TYPE(UWord) *text,
-                            Eterm t,
-                            int *constant)
-    {
+    fn caller(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
         
-        if (!check_trace("caller", context, constant,
-                        (DCOMP_CALL_TRACE|DCOMP_ALLOW_TRACE_OPS), 0, &ret))
+        if (!self.check_trace("caller", constant, (DCOMP_CALL_TRACE|DCOMP_ALLOW_TRACE_OPS), 0, &ret))
             return ret;
     
         if (a != 1) {
             RETURN_TERM_ERROR("Special form 'caller' called with "
                             "arguments in %T.", t, context, *constant);
         }
-        *constant = 0;
-        PUSH(*text, matchCaller); /* Creates binary */
+        *constant = false;
+        text.push(matchCaller); /* Creates binary */
         if (++self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        return retOk;
+        Ok(())
     }
 
 
     
-    static DMCRet silent(&mut self,
-                            DMCHeap *heap,
-                            STACK_TYPE(UWord) *text,
-                            Eterm t,
-                            int *constant)
-    {
+    fn silent(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
         int c;
-        
-        if (!check_trace("silent", context, constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
+      
+        if (!self.check_trace("silent", constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
             return ret;
     
         if (a != 2) {
@@ -1422,26 +1285,21 @@ impl Compiler {
                             "number of arguments in %T.", t, context, 
                             *constant);
         }
-        *constant = 0;
-        expr(context, heap, text, p[2], &c)?;
-        if (c) { 
-            do_emit_constant(context, text, p[2]);
+        *constant = false;
+        self.expr(text, p[2], &c)?;
+        if c { 
+            self.do_emit_constant(text, p[2]);
         }
-        PUSH(*text, matchSilent);
-        PUSH(*text, matchPushC);
-        PUSH(*text, am_true);
+        text.push(matchSilent);
+        text.push(matchPushC);
+        text.push(am_true);
         /* Push as much as we remove, stack_need is untouched */
-        return retOk;
+        Ok(())
     }
     
 
 
-    static DMCRet fun(&mut self,
-                        DMCHeap *heap,
-                        STACK_TYPE(UWord) *text,
-                        Eterm t,
-                        int *constant)
-    {
+    fn fun(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         int c;
@@ -1452,44 +1310,44 @@ impl Compiler {
         /* Special forms. */
         switch (p[1]) {
         case am_const:
-            return const(context, heap, text, t, constant);
+            return self.const(text, t, constant);
         case am_and:
-            return and(context, heap, text, t, constant);
+            return self.and(text, t, constant);
         case am_or:
-            return or(context, heap, text, t, constant);
+            return self.or(text, t, constant);
         case am_andalso:
         case am_andthen:
-            return andalso(context, heap, text, t, constant);
+            return self.andalso(text, t, constant);
         case am_orelse:
-            return orelse(context, heap, text, t, constant);
+            return self.orelse(text, t, constant);
         case am_self:
-            return self(context, heap, text, t, constant);
+            return self.self(text, t, constant);
         case am_message:
-            return message(context, heap, text, t, constant);
+            return self.message(text, t, constant);
         case am_is_seq_trace:
-            return is_seq_trace(context, heap, text, t, constant);
+            return self.is_seq_trace(text, t, constant);
         case am_set_seq_token:
-            return set_seq_token(context, heap, text, t, constant);
+            return self.set_seq_token(text, t, constant);
         case am_get_seq_token:
-            return get_seq_token(context, heap, text, t, constant);
+            return self.get_seq_token(text, t, constant);
         case am_return_trace:
-            return return_trace(context, heap, text, t, constant);
+            return self.return_trace(text, t, constant);
         case am_exception_trace:
-            return exception_trace(context, heap, text, t, constant);
+            return self.exception_trace(text, t, constant);
         case am_display:
-            return display(context, heap, text, t, constant);
+            return self.display(text, t, constant);
         case am_process_dump:
-            return process_dump(context, heap, text, t, constant);
+            return self.process_dump(text, t, constant);
         case am_enable_trace:
-            return enable_trace(context, heap, text, t, constant);
+            return self.enable_trace(text, t, constant);
         case am_disable_trace:
-            return disable_trace(context, heap, text, t, constant);
+            return self.disable_trace(text, t, constant);
         case am_trace:
-            return trace(context, heap, text, t, constant);
+            return self.trace(text, t, constant);
         case am_caller:
-            return caller(context, heap, text, t, constant);
+            return self.caller(text, t, constant);
         case am_silent:
-            return silent(context, heap, text, t, constant);
+            return self.silent(text, t, constant);
         case am_set_tcw:
             if (self.cflags & DCOMP_FAKE_DESTRUCTIVE) {
                 b = lookup_bif(am_set_tcw_fake, ((int) a) - 1);
@@ -1532,25 +1390,25 @@ impl Compiler {
             }
         }	
 
-        *constant = 0;
+        *constant = false;
 
         for (i = a; i > 1; --i) {
-            expr(context, heap, text, p[i], &c)?;
-            if (c) 
-                do_emit_constant(context, text, p[i]);
+            self.expr(text, p[i], &c)?;
+            if c 
+                self.do_emit_constant(text, p[i]);
         }
         switch (b->arity) {
         case 0:
-            PUSH(*text, matchCall0);
+            text.push(matchCall0);
             break;
         case 1:
-            PUSH(*text, matchCall1);
+            text.push(matchCall1);
             break;
         case 2:
-            PUSH(*text, matchCall2);
+            text.push(matchCall2);
             break;
         case 3:
-            PUSH(*text, matchCall3);
+            text.push(matchCall3);
             break;
         default:
             erts_exit(ERTS_ERROR_EXIT,"ets:match() internal error, "
@@ -1560,22 +1418,22 @@ impl Compiler {
         self.stack_used -= (((int) a) - 2);
         if (self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        return retOk;
+        Ok(())
     }
 
     
-    fn expr(&mut self, DMCHeap *heap, STACK_TYPE(UWord) *text, Eterm t, int *constant) -> DMCRet {
+    fn expr(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
         DMCRet ret;
         Eterm tmp;
         Eterm *p;
 
         switch (t & _TAG_PRIMARY_MASK) {
             case TAG_PRIMARY_LIST:
-                list(context, heap, text, t, constant)?;
+                self.list(text, t, constant)?;
                 break;
             case TAG_PRIMARY_BOXED:
                 if (is_map(t)) {
-                    return map(context, heap, text, t, constant);
+                    return self.map(text, t, constant);
                 }
                 if (!is_tuple(t)) {
                     goto simple_term;
@@ -1586,10 +1444,10 @@ impl Compiler {
                 is_atom(p[1]),db_is_variable(p[1]));
 #endif
                 if (arityval(*p) == 1 && is_tuple(tmp = p[1])) {
-                    tuple(context, heap, text, tmp, constant)?;
+                    self.tuple(text, tmp, constant)?;
                 } else if (arityval(*p) >= 1 && is_atom(p[1]) && 
                            !(db_is_variable(p[1]) >= 0)) {
-                    fun(context, heap, text, t, constant)?;
+                    self.fun(text, t, constant)?;
                 } else
                     RETURN_TERM_ERROR("%T is neither a function call, nor a tuple "
                                       "(tuples are written {{ ... }}).", t,
@@ -1597,21 +1455,21 @@ impl Compiler {
                 break;
             case TAG_PRIMARY_IMMED1:
                 if (db_is_variable(t) >= 0) {
-                    variable(context, heap, text, t, constant)?;
+                    self.variable(text, t, constant)?;
                     break;
                 } else if (t == am_DollarUnderscore) {
-                    whole_expression(context, heap, text, t, constant)?;
+                    self.whole_expression(text, t, constant)?;
                     break;
                 } else if (t == am_DollarDollar) {
-                    all_bindings(context, heap, text, t, constant)?;
+                    self.all_bindings(text, t, constant)?;
                     break;
                 }	    
                 /* Fall through */
             default:
                 simple_term:
-                    *constant = 1;
+                    *constant = true;
         }
-        return retOk;
+        Ok(())
     }
 
 
