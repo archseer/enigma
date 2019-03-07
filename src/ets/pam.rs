@@ -489,11 +489,9 @@ impl Compiler {
         int c2;
         int ret;
 
-        if ((ret = expr(context, heap, text, CAR(list_val(t)), &c1)) != retOk)
-            return ret;
+        expr(context, heap, text, CAR(list_val(t)), &c1)?;
 
-        if ((ret = expr(context, heap, text, CDR(list_val(t)), &c2)) != retOk)
-            return ret;
+        expr(context, heap, text, CDR(list_val(t)), &c2)?;
 
         if (c1 && c2) {
             *constant = 1;
@@ -802,8 +800,7 @@ impl Compiler {
         }
         *constant = 0;
         for (i = a; i > 1; --i) {
-            if ((ret = expr(context, heap, text, p[i], &c)) != retOk)
-                return ret;
+            expr(context, heap, text, p[i], &c)?;
             if (c) 
                 do_emit_constant(context, text, p[i]);
         }
@@ -831,8 +828,7 @@ impl Compiler {
         }
         *constant = 0;
         for (i = a; i > 1; --i) {
-            if ((ret = expr(context, heap, text, p[i], &c)) != retOk)
-                return ret;
+            expr(context, heap, text, p[i], &c)?;
             if (c) 
                 do_emit_constant(context, text, p[i]);
         }
@@ -866,8 +862,7 @@ impl Compiler {
         *constant = 0;
         lbl = 0;
         for (i = 2; i <= a; ++i) {
-            if ((ret = expr(context, heap, text, p[i], &c)) != retOk)
-                return ret;
+            expr(context, heap, text, p[i], &c)?;
             if (c) 
                 do_emit_constant(context, text, p[i]);
             if (i == a) {
@@ -914,8 +909,7 @@ impl Compiler {
         *constant = 0;
         lbl = 0;
         for (i = 2; i <= a; ++i) {
-            if ((ret = expr(context, heap, text, p[i], &c)) != retOk)
-                return ret;
+            expr(context, heap, text, p[i], &c)?;
             if (c) 
                 do_emit_constant(context, text, p[i]);
             if (i == a) {
@@ -969,9 +963,7 @@ impl Compiler {
                             *constant);
         }
         *constant = 0;
-        if ((ret = expr(context, heap, text, p[2], &c)) != retOk) {
-            return ret;
-        }
+        expr(context, heap, text, p[2], &c)?;
         if (c) { 
             do_emit_constant(context, text, p[2]);
         }
@@ -1132,15 +1124,11 @@ impl Compiler {
                             *constant);
         }
         *constant = 0;
-        if ((ret = expr(context, heap, text, p[3], &c)) != retOk) {
-            return ret;
-        }
+        expr(context, heap, text, p[3], &c)?;
         if (c) { 
             do_emit_constant(context, text, p[3]);
         }
-        if ((ret = expr(context, heap, text, p[2], &c)) != retOk) {
-            return ret;
-        }
+        expr(context, heap, text, p[2], &c)?;
         if (c) { 
             do_emit_constant(context, text, p[2]);
         }
@@ -1210,9 +1198,7 @@ impl Compiler {
                             *constant);
         }
         *constant = 0;
-        if ((ret = expr(context, heap, text, p[2], &c)) != retOk) {
-            return ret;
-        }
+        expr(context, heap, text, p[2], &c)?;
         if (c) { 
             do_emit_constant(context, text, p[2]);
         }
@@ -1262,9 +1248,7 @@ impl Compiler {
         switch (a) {
         case 2:
             *constant = 0;
-            if ((ret = expr(context, heap, text, p[2], &c)) != retOk) {
-                return ret;
-            }
+            expr(context, heap, text, p[2], &c)?;
             if (c) { 
                 do_emit_constant(context, text, p[2]);
             }
@@ -1273,15 +1257,11 @@ impl Compiler {
             break;
         case 3:
             *constant = 0;
-            if ((ret = expr(context, heap, text, p[3], &c)) != retOk) {
-                return ret;
-            }
+            expr(context, heap, text, p[3], &c)?;
             if (c) { 
                 do_emit_constant(context, text, p[3]);
             }
-            if ((ret = expr(context, heap, text, p[2], &c)) != retOk) {
-                return ret;
-            }
+            expr(context, heap, text, p[2], &c)?;
             if (c) { 
                 do_emit_constant(context, text, p[2]);
             }
@@ -1313,9 +1293,7 @@ impl Compiler {
         switch (a) {
         case 2:
             *constant = 0;
-            if ((ret = expr(context, heap, text, p[2], &c)) != retOk) {
-                return ret;
-            }
+            expr(context, heap, text, p[2], &c)?;
             if (c) { 
                 do_emit_constant(context, text, p[2]);
             }
@@ -1324,15 +1302,11 @@ impl Compiler {
             break;
         case 3:
             *constant = 0;
-            if ((ret = expr(context, heap, text, p[3], &c)) != retOk) {
-                return ret;
-            }
+            expr(context, heap, text, p[3], &c)?;
             if (c) { 
                 do_emit_constant(context, text, p[3]);
             }
-            if ((ret = expr(context, heap, text, p[2], &c)) != retOk) {
-                return ret;
-            }
+            expr(context, heap, text, p[2], &c)?;
             if (c) { 
                 do_emit_constant(context, text, p[2]);
             }
@@ -1364,15 +1338,11 @@ impl Compiler {
         switch (a) {
         case 3:
             *constant = 0;
-            if ((ret = expr(context, heap, text, p[3], &c)) != retOk) {
-                return ret;
-            }
+            expr(context, heap, text, p[3], &c)?;
             if (c) { 
                 do_emit_constant(context, text, p[3]);
             }
-            if ((ret = expr(context, heap, text, p[2], &c)) != retOk) {
-                return ret;
-            }
+            expr(context, heap, text, p[2], &c)?;
             if (c) { 
                 do_emit_constant(context, text, p[2]);
             }
@@ -1381,21 +1351,15 @@ impl Compiler {
             break;
         case 4:
             *constant = 0;
-            if ((ret = expr(context, heap, text, p[4], &c)) != retOk) {
-                return ret;
-            }
+            expr(context, heap, text, p[4], &c)?;
             if (c) { 
                 do_emit_constant(context, text, p[4]);
             }
-            if ((ret = expr(context, heap, text, p[3], &c)) != retOk) {
-                return ret;
-            }
+            expr(context, heap, text, p[3], &c)?;
             if (c) { 
                 do_emit_constant(context, text, p[3]);
             }
-            if ((ret = expr(context, heap, text, p[2], &c)) != retOk) {
-                return ret;
-            }
+            expr(context, heap, text, p[2], &c)?;
             if (c) { 
                 do_emit_constant(context, text, p[2]);
             }
@@ -1459,9 +1423,7 @@ impl Compiler {
                             *constant);
         }
         *constant = 0;
-        if ((ret = expr(context, heap, text, p[2], &c)) != retOk) {
-            return ret;
-        }
+        expr(context, heap, text, p[2], &c)?;
         if (c) { 
             do_emit_constant(context, text, p[2]);
         }
@@ -1573,8 +1535,7 @@ impl Compiler {
         *constant = 0;
 
         for (i = a; i > 1; --i) {
-            if ((ret = expr(context, heap, text, p[i], &c)) != retOk)
-                return ret;
+            expr(context, heap, text, p[i], &c)?;
             if (c) 
                 do_emit_constant(context, text, p[i]);
         }
@@ -1610,8 +1571,7 @@ impl Compiler {
 
         switch (t & _TAG_PRIMARY_MASK) {
             case TAG_PRIMARY_LIST:
-                if ((ret = list(context, heap, text, t, constant)) != retOk)
-                    return ret;
+                list(context, heap, text, t, constant)?;
                 break;
             case TAG_PRIMARY_BOXED:
                 if (is_map(t)) {
@@ -1626,12 +1586,10 @@ impl Compiler {
                 is_atom(p[1]),db_is_variable(p[1]));
 #endif
                 if (arityval(*p) == 1 && is_tuple(tmp = p[1])) {
-                    if ((ret = tuple(context, heap, text, tmp, constant)) != retOk)
-                        return ret;
+                    tuple(context, heap, text, tmp, constant)?;
                 } else if (arityval(*p) >= 1 && is_atom(p[1]) && 
                            !(db_is_variable(p[1]) >= 0)) {
-                    if ((ret = fun(context, heap, text, t, constant)) != retOk)
-                        return ret;
+                    fun(context, heap, text, t, constant)?;
                 } else
                     RETURN_TERM_ERROR("%T is neither a function call, nor a tuple "
                                       "(tuples are written {{ ... }}).", t,
@@ -1639,19 +1597,13 @@ impl Compiler {
                 break;
             case TAG_PRIMARY_IMMED1:
                 if (db_is_variable(t) >= 0) {
-                    if ((ret = variable(context, heap, text, t, constant)) 
-                        != retOk)
-                        return ret;
+                    variable(context, heap, text, t, constant)?;
                     break;
                 } else if (t == am_DollarUnderscore) {
-                    if ((ret = whole_expression(context, heap, text, t, constant)) 
-                        != retOk)
-                        return ret;
+                    whole_expression(context, heap, text, t, constant)?;
                     break;
                 } else if (t == am_DollarDollar) {
-                    if ((ret = all_bindings(context, heap, text, t, constant)) 
-                        != retOk)
-                        return ret;
+                    all_bindings(context, heap, text, t, constant)?;
                     break;
                 }	    
                 /* Fall through */
