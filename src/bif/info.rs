@@ -12,6 +12,7 @@ pub fn process_info_aux(
     item: Term,
     always_wrap: bool,
 ) -> bif::Result {
+    use crate::process::{self, Flag};
     let heap = &process.context_mut().heap;
 
     // TODO: bump process regs
@@ -41,9 +42,11 @@ pub fn process_info_aux(
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
 
+    let local_data = process.local_data();
+
     let res = match item {
         atom::REGISTERED_NAME => {
-            if let Some(name) = process.local_data().name {
+            if let Some(name) = local_data.name {
                 Term::atom(name)
             } else {
                 if always_wrap {
@@ -59,12 +62,28 @@ pub fn process_info_aux(
         atom::INITIAL_CALL => unimplemented!(),
         atom::STATUS => unimplemented!(),
         atom::MESSAGES => unimplemented!(),
-        atom::MESSAGE_QUEUE_LEN => unimplemented!(),
+        atom::MESSAGE_QUEUE_LEN => {
+            Term::uint(heap, local_data.mailbox.len() as u32)
+        },
         atom::MESSAGE_QUEUE_DATA => unimplemented!(),
         atom::LINKS => unimplemented!(),
         atom::MONITORED_BY => unimplemented!(),
-        atom::DICTIONARY => unimplemented!(),
-        atom::TRAP_EXIT => unimplemented!(),
+        atom::DICTIONARY => {
+            // TODO $ancestors ?
+            let pdict = &process.local_data_mut().dictionary;
+            let heap = &process.context_mut().heap;
+
+            pdict.iter().fold(Term::nil(), |res, (key, val)| {
+                // make tuple
+                let tuple = tup2!(heap, *key, *val);
+
+                // make cons
+                cons!(heap, tuple, res)
+            })
+        },
+        atom::TRAP_EXIT => {
+            Term::boolean(local_data.flags.contains(Flag::TRAP_EXIT))
+        },
         atom::ERROR_HANDLER => unimplemented!(),
         atom::HEAP_SIZE => unimplemented!(),
         atom::STACK_SIZE => unimplemented!(),

@@ -60,4 +60,8 @@ impl Mailbox {
 
         // TODO: take sig queue in account?
     }
+
+    pub fn len(&self) -> usize {
+        self.queue.len()
+    }
 }
