@@ -5,6 +5,9 @@ use crate::value::{Variant};
 
 struct Pattern {}
 
+/// bool tells us if is_constant
+type DMCRet = Result<bool, Error>;
+
 pub(crate) struct Compiler {
     matchexpr: Vec<Term>,
     guardexpr: Vec<Term>,
@@ -403,7 +406,7 @@ impl Compiler {
             while is_list(l) {
                 constant = 0;
                 t = CAR(list_val(l));
-                expr(self, text, t, &constant)?;
+                let constant = expr(self, text, t)?;
                 if constant {
                     do_emit_constant(self, text, t);
                 }
@@ -477,20 +480,13 @@ impl Compiler {
     #define TERM_WARNING(String, T, ContextP) \
     add_err((ContextP)->err_info, String, -1, T, dmcWarning)
 
-    fn list(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
-        int c1;
-        int c2;
-        int ret;
-
-        self.expr(text, CAR(list_val(t)), &c1)?;
-
-        self.expr(text, CDR(list_val(t)), &c2)?;
+    fn list(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
+        let c1 = self.expr(text, CAR(list_val(t)))?;
+        let c2 = self.expr(text, CDR(list_val(t)))?;
 
         if c1 && c2 {
-            *constant = true;
-            return retOk;
+            return Ok(true);
         } 
-        *constant = false;
         if !c1 {
             /* The CAR is not a constant, so if the CDR is, we just push it,
             otherwise it is already pushed. */
@@ -503,7 +499,7 @@ impl Compiler {
             text.push(matchConsB);
         }
         --self.stack_used; /* Two objects on stack becomes one */
-        Ok(())
+        Ok(false)
     }
 
     fn rearrange_constants(&mut self, text: Vec<usize>, int textpos, Eterm *p, nelems: usize) {
@@ -523,8 +519,8 @@ impl Compiler {
         FREE(instr_save);
     }
 
-    fn array(&mut self, text: Vec<usize>, Eterm *p, nelems: usize, constant: bool) -> DMCRet {
-        int all_constant = 1;
+    fn array(&mut self, text: Vec<usize>, Eterm *p, nelems: usize) -> DMCRet {
+        let mut all_constant = true;
         int textpos = STACK_NUM(*text);
         Uint i;
 
@@ -535,55 +531,45 @@ impl Compiler {
         ** so we can memcpy it to the eheap.
         */
         for (i = nelems; i--;) {
-            DMCRet ret;
-            int c;
-
-            self.expr(text, p[i], &c)?;
-            if !c && all_constant {
-                all_constant = 0;
+            let res = self.expr(text, p[i])?;
+            if !res && all_constant {
+                all_constant = false;
                 if i < nelems - 1 {
                     self.rearrange_constants(text, textpos,
                                             p + i + 1, nelems - i - 1);
                 }
-            } else if c && !all_constant {
+            } else if res && !all_constant {
                 self.do_emit_constant(text, p[i]);
             }
         }
-        *constant = all_constant;
-        Ok(())
+        Ok(all_constant)
     }
 
-    fn tuple(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn tuple(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         int all_constant;
         Eterm *p = tuple_val(t);
         Uint nelems = arityval(*p);
-        DMCRet ret;
 
-        ret = self.array(text, p + 1, nelems, &all_constant)?;
+        let all_constant = self.array(text, p + 1, nelems)?;
         if all_constant {
-            *constant = true;
-            return retOk;
+            return Ok(true)
         }
         text.push(matchMkTuple(nelems))
         self.stack_used -= (nelems - 1);
-        *constant = false;
-        Ok(())
+        Ok(false)
     }
 
-    fn map(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn map(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         int nelems;
-        int constant_values;
-        DMCRet ret;
         if is_flatmap(t) {
             flatmap_t *m = (flatmap_t *)flatmap_val(t);
             Eterm *values = flatmap_get_values(m);
 
             nelems = flatmap_get_size(m);
-            self.array(text, values, nelems, &constant_values)?;
+            let constant_values = self.array(text, values, nelems)?;
 
             if constant_values {
-                *constant = true;
-                return retOk;
+                return Ok(true);
             }
             PUSH2(*text, matchPushC, self.private_copy(m->keys));
             if ++self.stack_used > self.stack_need {
@@ -591,8 +577,7 @@ impl Compiler {
             }
             text.push(matchMkFlatMap(nelems))
             self.stack_used -= nelems;
-            *constant = false;
-            Ok(())
+            Ok(false)
         } else {
             DECLARE_WSTACK(wstack);
             Eterm *kv;
@@ -601,43 +586,32 @@ impl Compiler {
             assert!(is_hashmap(t));
 
             hashmap_iterator_init(&wstack, t, 1);
-            constant_values = 1;
+            let mut constant_values = true;
             nelems = hashmap_size(t);
 
             while ((kv=hashmap_iterator_prev(&wstack)) != NULL) {
-                if (ret = self.expr(text, CDR(kv), &c)) != retOk {
-                    DESTROY_WSTACK(wstack);
-                    return ret;
-                }
+                let c = self.expr(text, CDR(kv))?;
                 if !c {
-                    constant_values = 0;
+                    constant_values = false;
                 }
             }
 
             if constant_values {
-                *constant = true;
-                DESTROY_WSTACK(wstack);
-                return retOk;
+                return Ok(true);
             }
 
-            *constant = false;
+            // not constant
 
             hashmap_iterator_init(&wstack, t, 1);
 
-            while ((kv=hashmap_iterator_prev(&wstack)) != NULL) {
+            while (kv=hashmap_iterator_prev(&wstack)) != NULL {
                 /* push key */
-                if ((ret = self.expr(text, CAR(kv), &c)) != retOk) {
-                    DESTROY_WSTACK(wstack);
-                    return ret;
-                }
+                let c = self.expr(text, CAR(kv))?;
                 if c {
                     self.do_emit_constant(text, CAR(kv));
                 }
                 /* push value */
-                if ((ret = self.expr(text, CDR(kv), &c)) != retOk) {
-                    DESTROY_WSTACK(wstack);
-                    return ret;
-                }
+                let c = self.expr(text, CDR(kv))?;
                 if c {
                     self.do_emit_constant(text, CDR(kv));
                 }
@@ -645,18 +619,17 @@ impl Compiler {
             text.push(matchMkHashMap(nelems))
             self.stack_used -= nelems;
             DESTROY_WSTACK(wstack);
-            Ok(())
+            Ok(false)
         }
     }
 
-    fn whole_expression(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn whole_expression(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         if self.cflags & DCOMP_TRACE {
             /* Hmmm, convert array to list... */
             if self.special {
-            text.push(matchPushArrayAsListU);
+                text.push(matchPushArrayAsListU);
             } else { 
-                ASSERT(is_tuple(self.matchexpr
-                                [self.current_match]));
+                assert!(is_tuple(self.matchexpr [self.current_match]));
                 text.push(matchPushArrayAsList);
             }
         } else {
@@ -666,8 +639,7 @@ impl Compiler {
         if self.stack_used > self.stack_need {
             self.stack_need = self.stack_used;
         }
-        *constant = false;
-        Ok(())
+        Ok(false)
     }
 
     /// Figure out which PushV instruction to use.
@@ -686,11 +658,11 @@ impl Compiler {
         text.push(n);
     }
 
-    fn variable(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn variable(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Uint n = db_is_variable(t);
 
         if n >= self.heap.vars_used || !self.heap.vars[n].is_bound {
-            RETURN_VAR_ERROR("Variable $%%d is unbound.", n, context, *constant);
+            RETURN_VAR_ERROR("Variable $%%d is unbound.", n, context);
         }
 
         self.add_pushv_variant(text, n);
@@ -698,11 +670,10 @@ impl Compiler {
         ++self.stack_used;
         if (self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        *constant = false;
-        Ok(())
+        Ok(false)
     }
 
-    fn all_bindings(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn all_bindings(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         int i;
         int heap_used = 0;
 
@@ -719,23 +690,21 @@ impl Compiler {
         if (self.stack_used + 1) > self.stack_need  {
             self.stack_need = (self.stack_used + 1);
         }
-        *constant = false;
-        Ok(())
+        Ok(false)
     }
 
-    fn const(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn const(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
 
         if a != 2 {
             RETURN_TERM_ERROR("Special form 'const' called with more than one "
-                            "argument in %T.", t, context, *constant);
+                            "argument in %T.", t, context);
         }
-        *constant = true;
-        Ok(())
+        Ok(true)
     }
 
-    fn and(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn and(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
@@ -744,21 +713,21 @@ impl Compiler {
         
         if a < 2 {
             RETURN_TERM_ERROR("Special form 'and' called without arguments "
-                            "in %T.", t, context, *constant);
+                            "in %T.", t, context);
         }
-        *constant = false;
         for (i = a; i > 1; --i) {
-            self.expr(text, p[i], &c)?;
-            if c 
+            let c = self.expr(text, p[i])?;
+            if c {
                 self.do_emit_constant(text, p[i]);
+            }
         }
         text.push(matchAnd);
         PUSH(*text, (Uint) a - 1);
         self.stack_used -= (a - 2);
-        Ok(())
+        Ok(false)
     }
 
-    fn or(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn or(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
@@ -769,20 +738,20 @@ impl Compiler {
             RETURN_TERM_ERROR("Special form 'or' called without arguments "
                             "in %T.", t, context, *constant);
         }
-        *constant = false;
         for (i = a; i > 1; --i) {
-            self.expr(text, p[i], &c)?;
-            if c 
+            let c = self.expr(text, p[i])?;
+            if c {
                 self.do_emit_constant(text, p[i]);
+            }
         }
         text.push(matchOr);
         PUSH(*text, (Uint) a - 1);
         self.stack_used -= (a - 2);
-        Ok(())
+        Ok(false)
     }
 
 
-    fn andalso(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn andalso(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
@@ -795,14 +764,14 @@ impl Compiler {
         if a < 2 {
             RETURN_TERM_ERROR("Special form 'andalso' called without"
                             " arguments "
-                            "in %T.", t, context, *constant);
+                            "in %T.", t, context);
         }
-        *constant = false;
         lbl = 0;
         for (i = 2; i <= a; ++i) {
-            self.expr(text, p[i], &c)?;
-            if c 
+            let c = self.expr(text, p[i])?;
+            if c {
                 self.do_emit_constant(text, p[i]);
+            }
             if i == a {
                 text.push(matchJump);
             } else {
@@ -823,7 +792,7 @@ impl Compiler {
         if ++self.stack_used > self.stack_need {
             self.stack_need = self.stack_used;
         }
-        Ok(())
+        Ok(false)
     }
 
     fn orelse(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
@@ -838,14 +807,14 @@ impl Compiler {
         
         if a < 2 {
             RETURN_TERM_ERROR("Special form 'orelse' called without arguments "
-                            "in %T.", t, context, *constant);
+                            "in %T.", t, context);
         }
-        *constant = false;
         lbl = 0;
         for (i = 2; i <= a; ++i) {
-            self.expr(text, p[i], &c)?;
-            if c 
+            let c = self.expr(text, p[i])?;
+            if c {
                 self.do_emit_constant(text, p[i]);
+            }
             if (i == a) {
                 text.push(matchJump);
             } else {
@@ -865,15 +834,13 @@ impl Compiler {
         }
         if (++self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        Ok(())
+        Ok(false)
     }
 
-    fn message(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn message(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
-        int c;
-        
 
         if !(self.cflags & DCOMP_TRACE) {
             RETURN_ERROR("Special form 'message' used in wrong dialect.",
@@ -891,8 +858,7 @@ impl Compiler {
                             "number of arguments in %T.", t, context, 
                             *constant);
         }
-        *constant = false;
-        self.expr(text, p[2], &c)?;
+        let c = self.expr(text, p[2])?;
         if c { 
             self.do_emit_constant(text, p[2]);
         }
@@ -900,10 +866,10 @@ impl Compiler {
         text.push(matchPushC);
         text.push(am_true);
         /* Push as much as we remove, stack_need is untouched */
-        Ok(())
+        Ok(false)
     }
 
-    fn self(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn self(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         
@@ -911,14 +877,13 @@ impl Compiler {
             RETURN_TERM_ERROR("Special form 'self' called with arguments "
                             "in %T.", t, context, *constant);
         }
-        *constant = false;
         text.push(matchSelf);
         if (++self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        Ok(())
+        Ok(false)
     }
 
-    fn return_trace(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn return_trace(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         
@@ -936,18 +901,13 @@ impl Compiler {
             RETURN_TERM_ERROR("Special form 'return_trace' called with "
                             "arguments in %T.", t, context, *constant);
         }
-        *constant = false;
         text.push(matchSetReturnTrace); /* Pushes 'true' on the stack */
         if (++self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        Ok(())
+        Ok(false)
     }
 
-    static DMCRet exception_trace(&mut self,
-                                text: Vec<usize>,
-                                Eterm t,
-                                constant: bool)
-    {
+    fn exception_trace(&mut self, text: Vec<usize>, Eterm t) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         
@@ -965,11 +925,10 @@ impl Compiler {
             RETURN_TERM_ERROR("Special form 'exception_trace' called with "
                             "arguments in %T.", t, context, *constant);
         }
-        *constant = false;
         text.push(matchSetExceptionTrace); /* Pushes 'true' on the stack */
         if (++self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        Ok(())
+        Ok(false)
     }
 
     fn check_trace(&self, const char* op, constant: bool, int need_cflags, int allow_in_guard, DMCRet* retp) -> bool {
@@ -1011,15 +970,10 @@ impl Compiler {
         Ok(())
     }
 
-    static DMCRet set_seq_token(&mut self,
-                                    text: Vec<usize>,
-                                    Eterm t,
-                                    constant: bool)
-    {
+    fn set_seq_token(&mut self, text: Vec<usize>, Eterm t) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
-        int c;
         
         if (!self.check_trace("set_seq_trace", constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
             return ret;
@@ -1029,12 +983,11 @@ impl Compiler {
                             "number of arguments in %T.", t, context, 
                             *constant);
         }
-        *constant = false;
-        self.expr(text, p[3], &c)?;
+        let c = self.expr(text, p[3])?;
         if c { 
             self.do_emit_constant(text, p[3]);
         }
-        self.expr(text, p[2], &c)?;
+        let c = self.expr(text, p[2])?;
         if c { 
             self.do_emit_constant(text, p[2]);
         }
@@ -1044,10 +997,10 @@ impl Compiler {
             text.push(matchSetSeqToken);
         }
         --self.stack_used; /* Remove two and add one */
-        Ok(())
+        Ok(false)
     }
 
-    fn get_seq_token(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn get_seq_token(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
@@ -1061,18 +1014,16 @@ impl Compiler {
                             *constant);
         }
 
-        *constant = false;
         text.push(matchGetSeqToken);
         if (++self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        Ok(())
+        Ok(false)
     }
 
-    fn display(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn display(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
-        int c;
         
 
         if (!(self.cflags & DCOMP_TRACE)) {
@@ -1091,17 +1042,16 @@ impl Compiler {
                             "number of arguments in %T.", t, context, 
                             *constant);
         }
-        *constant = false;
-        self.expr(text, p[2], &c)?;
+        let c = self.expr(text, p[2])?;
         if c { 
             self.do_emit_constant(text, p[2]);
         }
         text.push(matchDisplay);
         /* Push as much as we remove, stack_need is untouched */
-        Ok(())
+        Ok(false)
     }
 
-    fn process_dump(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn process_dump(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
@@ -1109,22 +1059,20 @@ impl Compiler {
         if (!self.check_trace("process_dump", constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
             return ret;
 
-        if (a != 1) {
+        if a != 1 {
             RETURN_TERM_ERROR("Special form 'process_dump' called with "
                             "arguments in %T.", t, context, *constant);
         }
-        *constant = false;
         text.push(matchProcessDump); /* Creates binary */
         if (++self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        Ok(())
+        Ok(false)
     }
 
-    fn enable_trace(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn enable_trace(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
-        int c;
         
         if (!self.check_trace("enable_trace", constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
             return ret;
@@ -1132,7 +1080,7 @@ impl Compiler {
         switch (a) {
         case 2:
             *constant = false;
-            self.expr(text, p[2], &c)?;
+            let c = self.expr(text, p[2])?;
             if c { 
                 self.do_emit_constant(text, p[2]);
             }
@@ -1140,13 +1088,12 @@ impl Compiler {
             /* Push as much as we remove, stack_need is untouched */
             break;
         case 3:
-            *constant = false;
-            self.expr(text, p[3], &c)?;
+            let c = self.expr(text, p[3])?;
             if c { 
                 self.do_emit_constant(text, p[3]);
             }
-            self.expr(text, p[2], &c)?;
-            if (c) { 
+            let c = self.expr(text, p[2])?;
+            if c { 
                 self.do_emit_constant(text, p[2]);
             }
             text.push(matchEnableTrace2);
@@ -1157,22 +1104,20 @@ impl Compiler {
                             "number of arguments in %T.", t, context, 
                             *constant);
         }
-        Ok(())
+        Ok(false)
     }
 
-    fn disable_trace(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn disable_trace(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
-        int c;
 
         if (!self.check_trace("disable_trace", constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
             return ret;
 
         switch (a) {
         case 2:
-            *constant = false;
-            self.expr(text, p[2], &c)?;
+            let c = self.expr(text, p[2])?;
             if c { 
                 self.do_emit_constant(text, p[2]);
             }
@@ -1180,12 +1125,11 @@ impl Compiler {
             /* Push as much as we remove, stack_need is untouched */
             break;
         case 3:
-            *constant = false;
-            self.expr(text, p[3], &c)?;
+            let c = self.expr(text, p[3])?;
             if c { 
                 self.do_emit_constant(text, p[3]);
             }
-            self.expr(text, p[2], &c)?;
+            let c = self.expr(text, p[2])?;
             if c { 
                 self.do_emit_constant(text, p[2]);
             }
@@ -1197,26 +1141,24 @@ impl Compiler {
                             "number of arguments in %T.", t, context, 
                             *constant);
         }
-        Ok(())
+        Ok(false)
     }
 
-    fn trace(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn trace(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
-        int c;
         
         if (!self.check_trace("trace", constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
             return ret;
 
         switch (a) {
         case 3:
-            *constant = false;
-            self.expr(text, p[3], &c)?;
+            let c = self.expr(text, p[3])?;
             if c { 
                 self.do_emit_constant(text, p[3]);
             }
-            self.expr(text, p[2], &c)?;
+            let c = self.expr(text, p[2])?;
             if c { 
                 self.do_emit_constant(text, p[2]);
             }
@@ -1224,16 +1166,15 @@ impl Compiler {
             --self.stack_used; /* Remove two and add one */
             break;
         case 4:
-            *constant = false;
-            self.expr(text, p[4], &c)?;
+            let c = self.expr(text, p[4])?;
             if c { 
                 self.do_emit_constant(text, p[4]);
             }
-            self.expr(text, p[3], &c)?;
+            let c = self.expr(text, p[3])?;
             if c { 
                 self.do_emit_constant(text, p[3]);
             }
-            self.expr(text, p[2], &c)?;
+            let c = self.expr(text, p[2])?;
             if c { 
                 self.do_emit_constant(text, p[2]);
             }
@@ -1245,12 +1186,12 @@ impl Compiler {
                             "number of arguments in %T.", t, context, 
                             *constant);
         }
-        Ok(())
+        Ok(false)
     }
 
 
 
-    fn caller(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn caller(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
@@ -1262,20 +1203,18 @@ impl Compiler {
             RETURN_TERM_ERROR("Special form 'caller' called with "
                             "arguments in %T.", t, context, *constant);
         }
-        *constant = false;
         text.push(matchCaller); /* Creates binary */
         if (++self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        Ok(())
+        Ok(false)
     }
 
 
     
-    fn silent(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn silent(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         DMCRet ret;
-        int c;
       
         if (!self.check_trace("silent", constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
             return ret;
@@ -1285,8 +1224,7 @@ impl Compiler {
                             "number of arguments in %T.", t, context, 
                             *constant);
         }
-        *constant = false;
-        self.expr(text, p[2], &c)?;
+        let c = self.expr(text, p[2])?;
         if c { 
             self.do_emit_constant(text, p[2]);
         }
@@ -1294,12 +1232,12 @@ impl Compiler {
         text.push(matchPushC);
         text.push(am_true);
         /* Push as much as we remove, stack_need is untouched */
-        Ok(())
+        Ok(false)
     }
     
 
 
-    fn fun(&mut self, text: Vec<usize>, t: Term, constant: bool) -> DMCRet {
+    fn fun(&mut self, text: Vec<usize>, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
         int c;
@@ -1310,44 +1248,44 @@ impl Compiler {
         /* Special forms. */
         switch (p[1]) {
         case am_const:
-            return self.const(text, t, constant);
+            return self.const(text, t);
         case am_and:
-            return self.and(text, t, constant);
+            return self.and(text, t);
         case am_or:
-            return self.or(text, t, constant);
+            return self.or(text, t);
         case am_andalso:
         case am_andthen:
-            return self.andalso(text, t, constant);
+            return self.andalso(text, t);
         case am_orelse:
-            return self.orelse(text, t, constant);
+            return self.orelse(text, t);
         case am_self:
-            return self.self(text, t, constant);
+            return self.self(text, t);
         case am_message:
-            return self.message(text, t, constant);
+            return self.message(text, t);
         case am_is_seq_trace:
-            return self.is_seq_trace(text, t, constant);
+            return self.is_seq_trace(text, t);
         case am_set_seq_token:
-            return self.set_seq_token(text, t, constant);
+            return self.set_seq_token(text, t);
         case am_get_seq_token:
-            return self.get_seq_token(text, t, constant);
+            return self.get_seq_token(text, t);
         case am_return_trace:
-            return self.return_trace(text, t, constant);
+            return self.return_trace(text, t);
         case am_exception_trace:
-            return self.exception_trace(text, t, constant);
+            return self.exception_trace(text, t);
         case am_display:
-            return self.display(text, t, constant);
+            return self.display(text, t);
         case am_process_dump:
-            return self.process_dump(text, t, constant);
+            return self.process_dump(text, t);
         case am_enable_trace:
-            return self.enable_trace(text, t, constant);
+            return self.enable_trace(text, t);
         case am_disable_trace:
-            return self.disable_trace(text, t, constant);
+            return self.disable_trace(text, t);
         case am_trace:
-            return self.trace(text, t, constant);
+            return self.trace(text, t);
         case am_caller:
-            return self.caller(text, t, constant);
+            return self.caller(text, t);
         case am_silent:
-            return self.silent(text, t, constant);
+            return self.silent(text, t);
         case am_set_tcw:
             if (self.cflags & DCOMP_FAKE_DESTRUCTIVE) {
                 b = lookup_bif(am_set_tcw_fake, ((int) a) - 1);
@@ -1390,12 +1328,13 @@ impl Compiler {
             }
         }	
 
-        *constant = false;
+        // not constant
 
         for (i = a; i > 1; --i) {
-            self.expr(text, p[i], &c)?;
-            if c 
+            let c = self.expr(text, p[i]);
+            if c {
                 self.do_emit_constant(text, p[i]);
+            }
         }
         switch (b->arity) {
         case 0:
@@ -1418,7 +1357,7 @@ impl Compiler {
         self.stack_used -= (((int) a) - 2);
         if (self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
-        Ok(())
+        Ok(false)
     }
 
     
@@ -1429,47 +1368,41 @@ impl Compiler {
 
         switch (t & _TAG_PRIMARY_MASK) {
             case TAG_PRIMARY_LIST:
-                self.list(text, t, constant)?;
-                break;
+                self.list(text, t, constant)
             case TAG_PRIMARY_BOXED:
                 if (is_map(t)) {
                     return self.map(text, t, constant);
                 }
-                if (!is_tuple(t)) {
-                    goto simple_term;
+                if (is_tuple(t)) {
+                    p = tuple_val(t);
+                    // #ifdef HARDDEBUG
+                    //                 erts_fprintf(stderr,"%d %d %d %d\n",arityval(*p),is_tuple(tmp = p[1]),
+                    //                 is_atom(p[1]),db_is_variable(p[1]));
+                    // #endif
+                    if (arityval(*p) == 1 && is_tuple(tmp = p[1])) {
+                        self.tuple(text, tmp, constant)
+                    } else if (arityval(*p) >= 1 && is_atom(p[1]) && 
+                               !(db_is_variable(p[1]) >= 0)) {
+                        self.fun(text, t, constant)
+                    } else
+                        RETURN_TERM_ERROR("%T is neither a function call, nor a tuple "
+                                          "(tuples are written {{ ... }}).", t,
+                                          context, *constant);
                 }
-                p = tuple_val(t);
-#ifdef HARDDEBUG
-                erts_fprintf(stderr,"%d %d %d %d\n",arityval(*p),is_tuple(tmp = p[1]),
-                is_atom(p[1]),db_is_variable(p[1]));
-#endif
-                if (arityval(*p) == 1 && is_tuple(tmp = p[1])) {
-                    self.tuple(text, tmp, constant)?;
-                } else if (arityval(*p) >= 1 && is_atom(p[1]) && 
-                           !(db_is_variable(p[1]) >= 0)) {
-                    self.fun(text, t, constant)?;
-                } else
-                    RETURN_TERM_ERROR("%T is neither a function call, nor a tuple "
-                                      "(tuples are written {{ ... }}).", t,
-                                      context, *constant);
-                break;
+                else 
+                    return Ok(true)
             case TAG_PRIMARY_IMMED1:
                 if (db_is_variable(t) >= 0) {
-                    self.variable(text, t, constant)?;
-                    break;
+                    self.variable(text, t, constant)
                 } else if (t == am_DollarUnderscore) {
-                    self.whole_expression(text, t, constant)?;
-                    break;
+                    self.whole_expression(text, t, constant)
                 } else if (t == am_DollarDollar) {
-                    self.all_bindings(text, t, constant)?;
-                    break;
+                    self.all_bindings(text, t, constant)
                 }	    
                 /* Fall through */
-            default:
-                simple_term:
-                    *constant = true;
+            _ => Ok(true)
         }
-        Ok(())
+        Ok(true)
     }
 
 
