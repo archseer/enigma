@@ -166,8 +166,9 @@ impl Compiler {
                 // The *program's* stack just *grows* while we are traversing one composite data
                 // structure, we can check the stack usage here
 
-                // if (self.stack_used > self.stack_need)
-                // self.stack_need = self.stack_used;
+                if (self.stack_used > self.stack_need) {
+                    self.stack_need = self.stack_used;
+                }
 
                 // We are at the end of one composite data structure, pop sub structures and emit
                 // a matchPop instruction (or break)
@@ -175,7 +176,7 @@ impl Compiler {
                     t = val;
                     self.text.push(Opcode::MatchPop);
                     structure_checked = true; // Checked with matchPushT or matchPushL
-                    --(self.stack_used);
+                    self.stack_used -= 1;
                 } else {
                     break;
                 }
@@ -216,23 +217,17 @@ impl Compiler {
 
             // ... and the guards
             self.is_guard = true;
-            if compile_guard_expr(&self, self.guardexpr[self.current_match]) != retOk {
-                return Err(());
-            }
+            compile_guard_expr(&self, self.guardexpr[self.current_match])?;
             self.is_guard = false;
-            if ((self.cflags & DCOMP_TABLE) &&
-                !is_list(self.bodyexpr[self.current_match])) {
+
+            if (self.cflags & DCOMP_TABLE) && !is_list(self.bodyexpr[self.current_match]) {
                 if (self.err_info) {
-                    add_err(self.err_info,
-                                "Body clause does not return "
-                                "anything.", -1, 0UL,
-                                dmcError);
+                    add_err(self.err_info, "Body clause does not return anything.", -1, 0UL, dmcError);
                 }
                 return Err(());
             }
-            if compile_guard_expr(&self, self.bodyexpr[self.current_match]) != retOk {
-                return Err(());
-            }
+
+            compile_guard_expr(&self, self.bodyexpr[self.current_match])?;
 
             // The compilation does not bail out when error information is requested, so we need to
             // detect that here...
@@ -284,8 +279,7 @@ impl Compiler {
         ret.term_save = self.save;
         ret.num_bindings = heap.vars_used;
         ret.single_variable = self.special;
-        sys_memcpy(ret.text, STACK_DATA(text),
-                STACK_NUM(text) * sizeof(UWord));
+        sys_memcpy(ret.text, STACK_DATA(text), STACK_NUM(text) * sizeof(UWord));
         ret.stack_offset = heap.vars_used*sizeof(MatchVariable) + FENCE_PATTERN_SIZE;
         ret.heap_size = ret.stack_offset + self.stack_need * sizeof(Eterm*) + FENCE_PATTERN_SIZE;
 
@@ -535,8 +529,7 @@ impl Compiler {
             if !res && all_constant {
                 all_constant = false;
                 if i < nelems - 1 {
-                    self.rearrange_constants(textpos,
-                                            p + i + 1, nelems - i - 1);
+                    self.rearrange_constants(textpos, p + i + 1, nelems - i - 1);
                 }
             } else if res && !all_constant {
                 self.do_emit_constant(p[i]);
@@ -1245,8 +1238,6 @@ impl Compiler {
         Ok(false)
     }
     
-
-
     fn fun(&mut self, t: Term) -> DMCRet {
         Eterm *p = tuple_val(t);
         Uint a = arityval(*p);
@@ -1308,7 +1299,7 @@ impl Compiler {
 
 
         if b == NULL {
-            if (self.err_info != NULL) {
+            if self.err_info != NULL {
                 /* Ugly, should define a better RETURN_TERM_ERROR interface... */
                 char buff[100];
                 erts_snprintf(buff, sizeof(buff),
@@ -1316,14 +1307,14 @@ impl Compiler {
                         (int)a - 1);
                 RETURN_TERM_ERROR(buff, p[1], context, *constant);
             } else {
-                return retFail;
+                return Err(());
             }
         } 
         assert!(b->arity == ((int) a) - 1);
-        if (! (b->flags & 
+        if !(b->flags & 
             (1 << 
                 ((self.cflags & DCOMP_DIALECT_MASK) + 
-                (self.is_guard ? DBIF_GUARD : DBIF_BODY))))) {
+                (self.is_guard ? DBIF_GUARD : DBIF_BODY)))) {
             /* Body clause used in wrong context. */
             if (self.err_info != NULL) {
                 /* Ugly, should define a better RETURN_TERM_ERROR interface... */
@@ -1333,7 +1324,7 @@ impl Compiler {
                         (int)a - 1);
                 RETURN_TERM_ERROR(buff, p[1], context, *constant);
             } else {
-                return retFail;
+                return Err(());
             }
         }	
 
@@ -1345,24 +1336,14 @@ impl Compiler {
                 self.do_emit_constant(p[i]);
             }
         }
-        switch (b->arity) {
-        case 0:
-            self.text.push(matchCall0);
-            break;
-        case 1:
-            self.text.push(matchCall1);
-            break;
-        case 2:
-            self.text.push(matchCall2);
-            break;
-        case 3:
-            self.text.push(matchCall3);
-            break;
-        default:
-            erts_exit(ERTS_ERROR_EXIT,"ets:match() internal error, "
-                    "guard with more than 3 arguments.");
+        match b.arity {
+            0 => self.text.push(matchCall0);
+            1 => self.text.push(matchCall1),
+            2 => self.text.push(matchCall2),
+            3 => self.text.push(matchCall3),
+            _ => panic!("ets:match() internal error, guard with more than 3 arguments.");
         }
-        PUSH(*text, (UWord) b->biff);
+        self.text.push(b.biff as usize);
         self.stack_used -= (((int) a) - 2);
         if (self.stack_used > self.stack_need)
             self.stack_need = self.stack_used;
@@ -1371,7 +1352,6 @@ impl Compiler {
 
     
     fn expr(&mut self, t: Term, constant: bool) -> DMCRet {
-        DMCRet ret;
         Eterm tmp;
         Eterm *p;
 
