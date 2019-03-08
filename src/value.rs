@@ -78,14 +78,14 @@ impl Hash for Float {
     }
 }
 
-const TERM_FLOAT: u8 = 0;
-const TERM_NIL: u8 = 1;
-const TERM_INTEGER: u8 = 2;
-const TERM_ATOM: u8 = 3;
-const TERM_PORT: u8 = 4;
-const TERM_PID: u8 = 5;
-const TERM_CONS: u8 = 6;
-const TERM_POINTER: u8 = 7;
+pub const TERM_FLOAT: u8 = 0;
+pub const TERM_NIL: u8 = 1;
+pub const TERM_INTEGER: u8 = 2;
+pub const TERM_ATOM: u8 = 3;
+pub const TERM_PORT: u8 = 4;
+pub const TERM_PID: u8 = 5;
+pub const TERM_CONS: u8 = 6;
+pub const TERM_POINTER: u8 = 7;
 
 #[derive(Debug)]
 pub struct WrongBoxError;

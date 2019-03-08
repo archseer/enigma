@@ -1,5 +1,7 @@
 //! Pattern matching abstract machine (PAM)
 use super::*;
+mod error;
+use error::*;
 
 use crate::value::{self, Variant, Cons, Tuple, TryFrom};
 
@@ -132,6 +134,7 @@ pub(crate) struct Compiler {
     current_match: usize,
     special: bool,
     is_guard: bool,
+    errors: Vec<Error>,
 }
 
 impl Compiler {
@@ -148,7 +151,7 @@ impl Compiler {
             matchexpr,
             guardexpr,
             bodyexpr,
-            err_info,
+            errors: Vec::new(),
             cflags,
             special: false,
             is_guard: false,
@@ -187,6 +190,7 @@ impl Compiler {
             }
 
             let clause_start = self.text.len() - 1; // the "special" test needs it
+            // TODO, are all these -1 ?
             loop {
                 match t.into_variant() {
                     Variant::Pointer(..) => {
@@ -200,7 +204,7 @@ impl Compiler {
                                 structure_checked = false;
 
                                 for (key, value) in map.iter() {
-                                    if db_is_variable(key) >= 0 {
+                                    if self.db_is_variable(key) >= 0 {
                                         if self.err_info {
                                             add_err(self.err_info, "Variable found in map key.", -1, 0usize, dmcError);
                                         }
@@ -285,26 +289,26 @@ impl Compiler {
             // if the text is two Uint's and the single instruction
             // is 'matchBind' or it is only a skip.
             self.special =
-                ((text.len() - 1) == 2 + clause_start &&
-                 PEEK(text,clause_start) == Opcode::MatchBind) ||
-                ((text.len() - 1) == 1 + clause_start &&
-                 PEEK(text, clause_start) == Opcode::MatchSkip);
+                ((self.text.len() - 1) == 2 + clause_start &&
+                 self.text[clause_start] == Opcode::MatchBind) ||
+                ((self.text.len() - 1) == 1 + clause_start &&
+                 self.text[clause_start] == Opcode::MatchSkip);
 
             if self.cflags.contains(Flag::DCOMP_TRACE) {
                 if self.special {
-                    if (PEEK(text, clause_start) == Opcode::MatchBind) {
-                        text[clause_start] = Opcode::MatchArrayBind;
+                    if self.text[clause_start] == Opcode::MatchBind {
+                        self.text[clause_start] = Opcode::MatchArrayBind;
                     }
                 } else {
-                    assert!(STACK_NUM(text) >= 1);
-                    if PEEK(text, clause_start) != Opcode::MatchTuple {
+                    assert!(STACK_NUM(self.text) >= 1);
+                    if self.text[clause_start] != Opcode::MatchTuple {
                         // If it isn't "special" and the argument is not a tuple, the expression is not valid when matching an array
                         if self.err_info {
                             add_err(self.err_info, "Match head is invalid in this self.", -1, 0usize, dmcError);
                         }
                         return Err(());
                     }
-                    text[clause_start] = Opcode::MatchArray;
+                    self.text[clause_start] = Opcode::MatchArray;
                 }
             }
 
@@ -333,7 +337,7 @@ impl Compiler {
             self.text.push(Opcode::MatchHalt);
             // Fill in try-me-else label if there is one.
             if current_try_label >= 0 {
-                self.text[current_try_label] = STACK_NUM(text);
+                self.text[current_try_label] = STACK_NUM(self.text);
             }
             
         } /* for (self.current_match = 0 ...) */
@@ -396,7 +400,7 @@ impl Compiler {
 
         match c.value.tag() as u8 {
             value::TERM_ATOM => {
-                if (n = db_is_variable(c)) >= 0 { /* variable */
+                if (n = self.db_is_variable(c)) >= 0 { /* variable */
                     if self.heap.vars[n].is_bound {
                         self.text.push(Opcode::MatchCmp(n));
                     } else { /* Not bound, bind! */
@@ -419,26 +423,24 @@ impl Compiler {
                 self.stack.push(c);
             }
             value::TERM_FLOAT => {
-                PUSH2(*self.text, matchEqFloat, (Uint) float_val(c)[1]);
-            #ifdef ARCH_64
-                PUSH(*self.text, (Uint) 0);
-            #else
-                PUSH(*self.text, (Uint) float_val(c)[2]);
-            #endif
+                self.text.push(Opcode::MatchEqFloat(c));
+            // #ifdef ARCH_64
+            //     PUSH(*self.text, 0);
+            // #else
+            //     PUSH(*self.text, float_val(c)[2] as usize);
+            // #endif
             }
-            value::TERM_POINTER(ptr) => {
-                match t.get_boxed_header().unwrap() { // inefficient, cast directly
+            value::TERM_POINTER => {
+                match c.get_boxed_header().unwrap() { // inefficient, cast directly
                     value::BOXED_TUPLE => {
                         let n = Tuple::try_from(&c).unwrap().len();
-                        self.text.push(Opcode::MatchPushT(n))
+                        self.text.push(Opcode::MatchPushT(n));
                         self.stack_used += 1;
                         self.stack.push(c);
                     }
                     value::BOXED_MAP => {
-                        // if (is_flatmap(c))
-                        //     n = flatmap_get_size(flatmap_val(c));
-                        let n = hashmap_size(c);
-                        self.text.push(Opcode::MatchPushM(n))
+                        let n = value::Map::try_from(&c).unwrap().0.len();
+                        self.text.push(Opcode::MatchPushM(n));
                         self.stack_used += 1;
                         self.stack.push(c);
                     }
@@ -459,7 +461,7 @@ impl Compiler {
                         }
                     }
                     _ => { /* BINARY, FUN, VECTOR, or EXTERNAL */
-                        PUSH2(*self.text, matchEqBin, private_copy(self, c));
+                        self.text.push(Opcode::MatchEqBin(private_copy(self, c)));
                     }
                 }
             }
@@ -472,7 +474,7 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_guard_expr(&self, l: Term) -> DMCRet {
+    fn compile_guard_expr(&self, mut l: Term) -> DMCRet {
         // DMCRet ret;
         // int constant;
         // Eterm t;
@@ -484,13 +486,12 @@ impl Compiler {
             if !self.is_guard {
                 self.text.push(Opcode::MatchCatch);
             }
-            while l.is_list() {
-                t = CAR(list_val(l));
-                let constant = self.expr(self, t)?;
+            while let Ok(Cons { head: t, tail }) = l.try_into() {
+                let constant = self.expr(t)?;
                 if constant {
-                    self.do_emit_constant(self, t);
+                    self.do_emit_constant(t);
                 }
-                l = CDR(list_val(l));
+                l = tail;
                 if self.is_guard {
                     self.text.push(Opcode::MatchTrue);
                 } else {
@@ -502,7 +503,7 @@ impl Compiler {
                 RETURN_ERROR("Match expression is not a proper list.", self);
             }
             if !self.is_guard && self.cflags.contains(Flag::DCOMP_TABLE) {
-                assert!(Opcode::MatchWaste == TOP(*text));
+                assert!(Some(Opcode::MatchWaste) == self.text.last());
                 self.text.pop();
                 self.text.push(Opcode::MatchReturn); // Same impact on stack as matchWaste
             }
@@ -525,42 +526,17 @@ impl Compiler {
         } else {
             sz = my_size_object(t);
             emb = new_message_buffer(sz);
-            hp = emb->mem;
-            tmp = my_copy_struct(t,&hp,&(emb->off_heap));
+            hp = emb.mem;
+            tmp = my_copy_struct(t,&hp,&emb.off_heap);
             emb->next = self.save;
             self.save = emb;
         }
-        PUSH2(*self.text, Opcode::MatchPushC, tmp);
+        self.text.push(Opcode::MatchPushC(tmp));
         self.stack_used += 1;
         if self.stack_used > self.stack_need {
            self.stack_need = self.stack_used;
         }
     }
-
-    // #define RETURN_ERROR_X(VAR, ContextP, ConstantF, String, ARG)            \
-    //     (((ContextP)->err_info != NULL)				         \
-    //     ? ((ConstantF) = 0,						 \
-    //         vadd_err((ContextP)->err_info, dmcError, VAR, String, ARG),  \
-    //         retOk)						                 \
-    //     : retFail)
-
-    // #define RETURN_ERROR(String, ContextP, ConstantF) \
-    //     return RETURN_ERROR_X(-1, ContextP, ConstantF, String, 0)
-
-    // #define RETURN_VAR_ERROR(String, N, ContextP, ConstantF) \
-    //     return RETURN_ERROR_X(N, ContextP, ConstantF, String, 0)
-
-    // #define RETURN_TERM_ERROR(String, T, ContextP, ConstantF) \
-    //     return RETURN_ERROR_X(-1, ContextP, ConstantF, String, T)
-
-    // #define WARNING(String, ContextP) \
-    // add_err((ContextP)->err_info, String, -1, 0usize, dmcWarning)
-
-    // #define VAR_WARNING(String, N, ContextP) \
-    // add_err((ContextP)->err_info, String, N, 0usize, dmcWarning)
-
-    // #define TERM_WARNING(String, T, ContextP) \
-    // add_err((ContextP)->err_info, String, -1, T, dmcWarning)
 
     fn list(&mut self, t: Term) -> DMCRet {
         let cons = Cons::try_from(&t).unwrap();
@@ -642,38 +618,14 @@ impl Compiler {
     }
 
     fn map(&mut self, t: Term) -> DMCRet {
-        // if is_flatmap(t) {
-        //     flatmap_t *m = (flatmap_t *)flatmap_val(t);
-        //     Eterm *values = flatmap_get_values(m);
+        assert!(t.is_map());
 
-        //     nelems = flatmap_get_size(m);
-        //     let constant_values = self.array(values, nelems)?;
-
-        //     if constant_values {
-        //         return Ok(true);
-        //     }
-        //     PUSH2(*text, matchPushC, self.private_copy(m->keys));
-        //     self.stack_used += 1;
-        //     if self.stack_used > self.stack_need {
-        //         self.stack_need = self.stack_used;
-        //     }
-        //     self.text.push(Opcode::MatchMkFlatMap(nelems))
-        //     self.stack_used -= nelems;
-        //     Ok(false)
-
-        int nelems;
-        DECLARE_WSTACK(wstack);
-        Eterm *kv;
-        int c;
-
-        assert!(is_hashmap(t));
-
-        hashmap_iterator_init(&wstack, t, 1);
+        let map = value::Map::try_from(&t).unwrap().0;
         let mut constant_values = true;
-        nelems = hashmap_size(t);
+        let nelems = map.len();
 
-        while ((kv=hashmap_iterator_prev(&wstack)) != NULL) {
-            let c = self.expr(CDR(kv))?;
+        for (_, val) in map {
+            let c = self.expr(val)?;
             if !c {
                 constant_values = false;
             }
@@ -685,15 +637,13 @@ impl Compiler {
 
         // not constant
 
-        hashmap_iterator_init(&wstack, t, 1);
-
-        for (key, value) in wstack.iter() {
-            /* push key */
+        for (key, value) in map {
+            // push key
             let c = self.expr(key)?;
             if c {
                 self.do_emit_constant(key);
             }
-            /* push value */
+            // push value
             let c = self.expr(value)?;
             if c {
                 self.do_emit_constant(value);
@@ -701,7 +651,6 @@ impl Compiler {
         }
         self.text.push(Opcode::MatchMkHashMap(nelems));
         self.stack_used -= nelems;
-        DESTROY_WSTACK(wstack);
         Ok(false)
     }
 
@@ -740,17 +689,19 @@ impl Compiler {
         self.text.push(n);
     }
 
-    fn variable(&mut self, t: Term) -> DMCRet {
-        Uint n = db_is_variable(t);
+    fn variable(&mut self, n: usize) -> DMCRet {
+        // TODO this is already called inside expr(), just pass number in instead
+        // optimize this in beam too
+        // Uint n = db_is_variable(t);
 
         if n >= self.heap.vars_used || !self.heap.vars[n].is_bound {
-            RETURN_VAR_ERROR("Variable $%%d is unbound.", n, context);
+            RETURN_VAR_ERROR("Variable $%%d is unbound.", n);
         }
 
         self.add_pushv_variant(n);
 
         self.stack_used += 1;
-        if (self.stack_used > self.stack_need) {
+        if self.stack_used > self.stack_need {
             self.stack_need = self.stack_used;
         }
         Ok(false)
@@ -781,7 +732,7 @@ impl Compiler {
         let a = t.len();
 
         if a != 2 {
-            RETURN_TERM_ERROR("Special form 'const' called with more than one argument in %T.", t, context);
+            return Err(new_error(ErrorKind::Argument { form: "const", value: t, reason: "with more than one argument" }));
         }
         Ok(true)
     }
@@ -791,7 +742,7 @@ impl Compiler {
         let a = t.len();
         
         if a < 2 {
-            RETURN_TERM_ERROR("Special form 'and' called without arguments in %T.", t, context);
+            return Err(new_error(ErrorKind::Argument { form: "and", value: t, reason: "without arguments" }));
         }
         for val in &t[1..] { // skip the :&&
             let c = self.expr(val)?;
@@ -800,7 +751,7 @@ impl Compiler {
             }
         }
         self.text.push(Opcode::MatchAnd);
-        PUSH(*text, a - 1);
+        self.text.push(a - 1);
         self.stack_used -= a - 2;
         Ok(false)
     }
@@ -810,7 +761,7 @@ impl Compiler {
         let a = t.len();
         
         if a < 2 {
-            RETURN_TERM_ERROR("Special form 'or' called without arguments in %T.", t, context);
+            return Err(new_error(ErrorKind::Argument { form: "or", value: t, reason: "without arguments" }));
         }
         for val in &t[1..] { // skip the :||
             let c = self.expr(val)?;
@@ -819,7 +770,7 @@ impl Compiler {
             }
         }
         self.text.push(Opcode::MatchOr);
-        PUSH(*text, a - 1);
+        self.text.push(a - 1);
         self.stack_used -= a - 2;
         Ok(false)
     }
@@ -835,7 +786,7 @@ impl Compiler {
         Uint lbl_val;
 
         if a < 2 {
-            RETURN_TERM_ERROR("Special form 'andalso' called without arguments in %T.", t, context);
+            return Err(new_error(ErrorKind::Argument { form: "andalso", value: t, reason: "without arguments" }));
         }
         lbl = 0;
         for (i = 2; i <= a; ++i) {
@@ -877,7 +828,7 @@ impl Compiler {
         Uint lbl_val;
         
         if a < 2 {
-            RETURN_TERM_ERROR("Special form 'orelse' called without arguments in %T.", t, context);
+            return Err(new_error(ErrorKind::Argument { form: "orelse", value: t, reason: "without arguments" }));
         }
         lbl = 0;
         for (i = 2; i <= a; ++i) {
@@ -910,26 +861,26 @@ impl Compiler {
     }
 
     fn message(&mut self, t: Term) -> DMCRet {
-        let t = Tuple::try_from(&t).unwrap();
+        let p = Tuple::try_from(&t).unwrap();
         let a = p.len();
 
         if !self.cflags.contains(Flag::DCOMP_TRACE) {
-            RETURN_ERROR("Special form 'message' used in wrong dialect.", context);
+            return Err(new_error(ErrorKind::WrongDialect { form: "message" }));
         }
         if self.is_guard {
-            RETURN_ERROR("Special form 'message' called in guard context.", context);
+            return Err(new_error(ErrorKind::CalledInGuard { form: "message" }));
         }
 
         if a != 2 {
-            RETURN_TERM_ERROR("Special form 'message' called with wrong number of arguments in %T.", t, context);
+            return Err(new_error(ErrorKind::Argument { form: "message", value: t, reason: "with wrong number of arguments" }));
         }
-        let c = self.expr(t[1])?;
+        let c = self.expr(p[1])?;
         if c { 
-            self.do_emit_constant(t[1]);
+            self.do_emit_constant(p[1]);
         }
         self.text.push(Opcode::MatchReturn);
         self.text.push(Opcode::MatchPushC);
-        self.text.push(am_true);
+        self.text.push(atom!(TRUE));
         /* Push as much as we remove, stack_need is untouched */
         Ok(false)
     }
@@ -939,7 +890,7 @@ impl Compiler {
         let a = p.len();
         
         if a != 1 {
-            RETURN_TERM_ERROR("Special form 'self' called with arguments in %T.", t, context);
+            return Err(new_error(ErrorKind::Argument { form: "self", value: t, reason: "with arguments" }));
         }
         self.text.push(Opcode::MatchSelf);
         self.stack_used += 1;
@@ -954,14 +905,14 @@ impl Compiler {
         let a = p.len();
         
         if !self.cflags.contains(Flag::DCOMP_TRACE) {
-            RETURN_ERROR("Special form 'return_trace' used in wrong dialect.", context);
+            return Err(new_error(ErrorKind::WrongDialect { form: "return_trace" }));
         }
         if self.is_guard {
-            RETURN_ERROR("Special form 'return_trace' called in " "guard context.", context);
+            return Err(new_error(ErrorKind::CalledInGuard { form: "return_trace" }));
         }
 
         if a != 1 {
-            RETURN_TERM_ERROR("Special form 'return_trace' called with arguments in %T.", t, context);
+            return Err(new_error(ErrorKind::Argument { form: "return_trace", value: t, reason: "with arguments" }));
         }
         self.text.push(Opcode::MatchSetReturnTrace); /* Pushes 'true' on the stack */
         self.stack_used += 1;
@@ -976,14 +927,14 @@ impl Compiler {
         let a = p.len();
         
         if !self.cflags.contains(Flag::DCOMP_TRACE) {
-            RETURN_ERROR("Special form 'exception_trace' used in wrong dialect.", context);
+            return Err(new_error(ErrorKind::WrongDialect { form: "exception_trace" }));
         }
         if self.is_guard {
-            RETURN_ERROR("Special form 'exception_trace' called in guard context.", context);
+            return Err(new_error(ErrorKind::CalledInGuard { form: "exception_trace" }));
         }
 
         if a != 1 {
-            RETURN_TERM_ERROR("Special form 'exception_trace' called with arguments in %T.", t, context);
+            return Err(new_error(ErrorKind::Argument { form: "exception_trace", value: t, reason: "with arguments" }));
         }
         self.text.push(Opcode::MatchSetExceptionTrace); /* Pushes 'true' on the stack */
         self.stack_used += 1;
@@ -993,18 +944,15 @@ impl Compiler {
         Ok(false)
     }
 
-    fn check_trace(&self, const char* op, bool, int need_cflags, int allow_in_guard, DMCRet* retp) -> bool {
+    fn check_trace(&self, op: &str, need_cflags: Flag, allow_in_guard: bool) -> DMCRet {
         if !self.cflags.contains(Flag::DCOMP_TRACE) {
-            *retp = RETURN_ERROR_X(-1, context, "Special form '%s' used in wrong dialect.", op);
-            return false;
+            return Err(new_error(ErrorKind::WrongDialect { form: op }))
         }
         if (self.cflags & need_cflags) != need_cflags {
-            *retp = RETURN_ERROR_X(-1, context, "Special form '%s' not allow for this trace event.", op);
-            return false;
+            RETURN_ERROR_X(-1, "Special form '%s' not allowed for this trace event.", op);
         }
         if self.is_guard && !allow_in_guard {
-            *retp = RETURN_ERROR_X(-1, context, "Special form '%s' called in guard context.", op);
-            return false;
+            return Err(new_error(ErrorKind::CalledInGuard { form: op }));
         }
         true
     }
@@ -1013,16 +961,15 @@ impl Compiler {
         let p = Tuple::try_from(&t).unwrap();
         let a = p.len();
         
-        if (!self.check_trace("is_seq_trace", DCOMP_ALLOW_TRACE_OPS, 1, &ret))
-            return ret;
+        self.check_trace("is_seq_trace", Flag::DCOMP_ALLOW_TRACE_OPS, true)?;
 
         if a != 1 {
-            RETURN_TERM_ERROR("Special form 'is_seq_trace' called with " "arguments in %T.", t, context);
+            return Err(new_error(ErrorKind::Argument { form: "is_seq_trace", value: t, reason: "with arguments" }));
         }
         self.text.push(Opcode::MatchIsSeqTrace); 
         /* Pushes 'true' or 'false' on the stack */
         self.stack_used += 1;
-        if (self.stack_used > self.stack_need) {
+        if self.stack_used > self.stack_need {
             self.stack_need = self.stack_used;
         }
         Ok(false)
@@ -1032,11 +979,10 @@ impl Compiler {
         let p = Tuple::try_from(&t).unwrap();
         let a = p.len();
         
-        if (!self.check_trace("set_seq_trace", DCOMP_ALLOW_TRACE_OPS, 0, &ret))
-            return ret;
+        self.check_trace("set_seq_trace", Flag::DCOMP_ALLOW_TRACE_OPS, false)?;
 
         if a != 3 {
-            RETURN_TERM_ERROR("Special form 'set_seq_token' called with wrong " "number of arguments in %T.", t, context);
+            return Err(new_error(ErrorKind::Argument { form: "set_seq_token", value: t, reason: "with wrong number of arguments" }));
         }
         let c = self.expr(p[2])?;
         if c { 
@@ -1059,11 +1005,10 @@ impl Compiler {
         let p = Tuple::try_from(&t).unwrap();
         let a = p.len();
 
-        if (!self.check_trace("get_seq_token", DCOMP_ALLOW_TRACE_OPS, 0, &ret))
-            return ret;
+        self.check_trace("get_seq_token", Flag::DCOMP_ALLOW_TRACE_OPS, false)?;
 
         if a != 1 {
-            RETURN_TERM_ERROR("Special form 'get_seq_token' called with arguments in %T.", t, context);
+            return Err(new_error(ErrorKind::Argument { form: "get_seq_token", value: t, reason: "with arguments" }));
         }
 
         self.text.push(Opcode::MatchGetSeqToken);
@@ -1079,14 +1024,14 @@ impl Compiler {
         let a = p.len();
 
         if !self.cflags.contains(Flag::DCOMP_TRACE) {
-            RETURN_ERROR("Special form 'display' used in wrong dialect.", context);
+            return Err(new_error(ErrorKind::WrongDialect { form: "display" }));
         }
-        if (self.is_guard) {
-            RETURN_ERROR("Special form 'display' called in guard context.", context);
+        if self.is_guard {
+            return Err(new_error(ErrorKind::CalledInGuard { form: "display" }));
         }
 
         if a != 2 {
-            RETURN_TERM_ERROR("Special form 'display' called with wrong number of arguments in %T.", t, context);
+            return Err(new_error(ErrorKind::Argument { form: "display", value: t, reason: "with wrong number of arguments" }));
         }
         let c = self.expr(p[1])?;
         if c { 
@@ -1101,15 +1046,14 @@ impl Compiler {
         let p = Tuple::try_from(&t).unwrap();
         let a = p.len();
 
-        if (!self.check_trace("process_dump", DCOMP_ALLOW_TRACE_OPS, 0, &ret))
-            return ret;
+        self.check_trace("process_dump", Flag::DCOMP_ALLOW_TRACE_OPS, false)?;
 
         if a != 1 {
-            RETURN_TERM_ERROR("Special form 'process_dump' called with arguments in %T.", t, context);
+            return Err(new_error(ErrorKind::Argument { form: "process_dump", value: t, reason: "with arguments" }));
         }
         self.text.push(Opcode::MatchProcessDump); /* Creates binary */
         self.stack_used += 1;
-        if (self.stack_used > self.stack_need) {
+        if self.stack_used > self.stack_need {
             self.stack_need = self.stack_used;
         }
         Ok(false)
@@ -1119,8 +1063,7 @@ impl Compiler {
         let p = Tuple::try_from(&t).unwrap();
         let arity = p.len();
         
-        if (!self.check_trace("enable_trace", DCOMP_ALLOW_TRACE_OPS, 0, &ret))
-            return ret;
+        self.check_trace("enable_trace", Flag::DCOMP_ALLOW_TRACE_OPS, false)?;
 
         match arity {
             2 => {
@@ -1143,7 +1086,7 @@ impl Compiler {
                 self.text.push(Opcode::MatchEnableTrace2);
                 self.stack_used -= 1; /* Remove two and add one */
             }
-            _ => RETURN_TERM_ERROR("Special form 'enable_trace' called with wrong number of arguments in %T.", t, context) 
+            _ => return Err(new_error(ErrorKind::Argument { form: "enable_trace", value: t, reason: "with wrong number of arguments" }))
         }
         Ok(false)
     }
@@ -1152,8 +1095,7 @@ impl Compiler {
         let p = Tuple::try_from(&t).unwrap();
         let arity = p.len();
 
-        if (!self.check_trace("disable_trace", DCOMP_ALLOW_TRACE_OPS, 0, &ret))
-            return ret;
+        self.check_trace("disable_trace", Flag::DCOMP_ALLOW_TRACE_OPS, false)?;
 
         match arity {
             2 => {
@@ -1176,7 +1118,7 @@ impl Compiler {
                 self.text.push(Opcode::MatchDisableTrace2);
                 self.stack_used -= 1; // Remove two and add one
             }
-            _ => RETURN_TERM_ERROR("Special form 'disable_trace' called with wrong " "number of arguments in %T.", t, context)
+            _ => return Err(new_error(ErrorKind::Argument { form: "disable_trace", value: t, reason: "with wrong number of arguments" }))
         }
         Ok(false)
     }
@@ -1185,8 +1127,7 @@ impl Compiler {
         let p = Tuple::try_from(&t).unwrap();
         let arity = p.len();
         
-        if (!self.check_trace("trace", constant, DCOMP_ALLOW_TRACE_OPS, 0, &ret))
-            return ret;
+        self.check_trace("trace", Flag::DCOMP_ALLOW_TRACE_OPS, false)?;
 
         match arity {
             3 => {
@@ -1217,7 +1158,7 @@ impl Compiler {
                 self.text.push(Opcode::MatchTrace3);
                 self.stack_used -= 2; /* Remove three and add one */
             }
-            _ => RETURN_TERM_ERROR("Special form 'trace' called with wrong " "number of arguments in %T.", t, context);
+            _ => return Err(new_error(ErrorKind::Argument { form: "trace", value: t, reason: "with wrong number of arguments" }))
         }
         Ok(false)
     }
@@ -1226,11 +1167,10 @@ impl Compiler {
         let p = Tuple::try_from(&t).unwrap();
         let a = p.len();
         
-        if (!self.check_trace("caller", (DCOMP_CALL_TRACE|DCOMP_ALLOW_TRACE_OPS), 0, &ret))
-            return ret;
+        self.check_trace("caller", (Flag::DCOMP_CALL_TRACE|Flag::DCOMP_ALLOW_TRACE_OPS), false)?;
     
         if a != 1 {
-            RETURN_TERM_ERROR("Special form 'caller' called with arguments in %T.", t, context);
+            return Err(new_error(ErrorKind::Argument { form: "caller", value: t, reason: "with arguments" }));
         }
         self.text.push(Opcode::MatchCaller); /* Creates binary */
         self.stack_used += 1;
@@ -1244,11 +1184,10 @@ impl Compiler {
         let p = Tuple::try_from(&t).unwrap();
         let a = p.len();
       
-        if (!self.check_trace("silent", DCOMP_ALLOW_TRACE_OPS, 0, &ret))
-            return ret;
+        self.check_trace("silent", Flag::DCOMP_ALLOW_TRACE_OPS, false)?;
     
         if a != 2 {
-            RETURN_TERM_ERROR("Special form 'silent' called with wrong number of arguments in %T.", t, context);
+            return Err(new_error(ErrorKind::Argument { form: "silent", value: t, reason: "with wrong number of arguments" }));
         }
         let c = self.expr(p[1])?;
         if c { 
@@ -1256,14 +1195,14 @@ impl Compiler {
         }
         self.text.push(Opcode::MatchSilent);
         self.text.push(Opcode::MatchPushC);
-        self.text.push(am_true);
+        self.text.push(atom!(TRUE));
         /* Push as much as we remove, stack_need is untouched */
         Ok(false)
     }
     
     fn fun(&mut self, t: Term) -> DMCRet {
-        Eterm *p = tuple_val(t);
-        Uint a = arityval(*p);
+        let p = Tuple::try_from(&t).unwrap();
+        let a = p.len();
         int i;
         DMCGuardBif *b;
     
@@ -1291,12 +1230,12 @@ impl Compiler {
             Variant::Atom(atom::SILENT) => return self.silent(t),
             Variant::Atom(atom::SET_TCW) => {
                 b = if self.cflags.contains(Flag::DCOMP_FAKE_DESTRUCTIVE) {
-                    lookup_bif(am_set_tcw_fake, ((int) a) - 1);
+                    lookup_bif(am_set_tcw_fake, a - 1);
                 } else {
-                    lookup_bif(p[1], ((int) a) - 1);
+                    lookup_bif(p[1], a - 1);
                 }
             }
-            _ => b = lookup_bif(p[1], ((int) a) - 1),
+            _ => b = lookup_bif(p[1],  a - 1),
         }
 
 
@@ -1315,7 +1254,7 @@ impl Compiler {
         assert!(b.arity == ((int) a) - 1);
         if !(b.flags & 
             (1 << 
-                ((self.cflags & DCOMP_DIALECT_MASK) + 
+                ((self.cflags & Flag::DCOMP_DIALECT_MASK) + 
                 (self.is_guard ? DBIF_GUARD : DBIF_BODY)))) {
             /* Body clause used in wrong context. */
             if (self.err_info != NULL) {
@@ -1346,13 +1285,12 @@ impl Compiler {
             _ => panic!("ets:match() internal error, guard with more than 3 arguments.");
         }
         self.text.push(b.biff as usize);
-        self.stack_used -= (((int) a) - 2);
-        if (self.stack_used > self.stack_need) {
+        self.stack_used -= a - 2;
+        if self.stack_used > self.stack_need {
             self.stack_need = self.stack_used;
         }
         Ok(false)
     }
-
     
     fn expr(&mut self, t: Term, constant: bool) -> DMCRet {
         match t.value.tag() as u8 {
@@ -1362,26 +1300,27 @@ impl Compiler {
                     return self.map(t);
                 }
                 if t.is_tuple() {
-                    p = tuple_val(t);
+                    let p = Tuple::try_from(&t).unwrap();
                     // #ifdef HARDDEBUG
                     //                 erts_fprintf(stderr,"%d %d %d %d\n",arityval(*p),is_tuple(tmp = p[1]),
                     //                 is_atom(p[1]),db_is_variable(p[1]));
                     // #endif
-                    if (arityval(*p) == 1 && is_tuple(tmp = p[1])) {
-                        self.tuple(tmp)
-                    } else if (arityval(*p) >= 1 && is_atom(p[1]) && 
-                               !(self.db_is_variable(p[1]) >= 0)) {
+                    if p.len() == 1 && p[0].is_tuple() {
+                        self.tuple(p[0])
+                    } else if p.len() >= 1 && p[0].is_atom() && self.db_is_variable().is_none() {
                         self.fun(t)
                     } else {
-                        RETURN_TERM_ERROR("%T is neither a function call, nor a tuple (tuples are written {{ ... }}).", t, context);
+                        RETURN_TERM_ERROR("%T is neither a function call, nor a tuple (tuples are written {{ ... }}).", t);
                     }
                 } else {
                     Ok(true)
                 }
             }
             value::TERM_ATOM => { // immediate
-                if db_is_variable(t) >= 0 {
-                    self.variable(t)
+                let n = self.db_is_variable(t);
+
+                if n >= 0 {
+                    self.variable(n)
                 } else if t == atom!(DOLLAR_UNDERSCORE) {
                     self.whole_expression(t)
                 } else if t == atom!(DOLLAR_DOLLAR) {

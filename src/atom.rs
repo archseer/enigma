@@ -254,6 +254,10 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
 
     atoms.register_atom("erts_internal");
     atoms.register_atom("flush_monitor_messages");
+
+    atoms.register_atom("$_");
+    atoms.register_atom("$$");
+    atoms.register_atom("_");
     atoms
 };
 
@@ -393,6 +397,10 @@ pub const INFO: u32 = 114;
 pub const FLUSH: u32 = 115;
 pub const ERTS_INTERNAL: u32 = 116;
 pub const FLUSH_MONITOR_MESSAGES: u32 = 117;
+
+pub const DOLLAR_UNDERSCORE: u32 = 118;
+pub const DOLLAR_DOLLAR: u32 = 119;
+pub const UNDERSCORE: u32 = 120;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)
