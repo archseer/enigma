@@ -94,14 +94,14 @@ macro_rules! bitstring {
 #[macro_export]
 macro_rules! atom {
     ($const:ident) => {
-        Term::atom(atom::$const)
+        Term::atom(crate::atom::$const)
     };
 }
 
 #[macro_export]
 macro_rules! str_to_atom {
     ($str:expr) => {
-        Term::atom(atom::from_str($str))
+        Term::atom(crate::atom::from_str($str))
     };
 }
 
