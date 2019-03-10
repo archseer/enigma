@@ -258,6 +258,28 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("$_");
     atoms.register_atom("$$");
     atoms.register_atom("_");
+
+    atoms.register_atom("const");
+    atoms.register_atom("and");
+    atoms.register_atom("or");
+    atoms.register_atom("andalso");
+    atoms.register_atom("andthen");
+    atoms.register_atom("orelse");
+    atoms.register_atom("self");
+    atoms.register_atom("is_seq_trace");
+    atoms.register_atom("set_seq_token");
+    atoms.register_atom("get_seq_token");
+    atoms.register_atom("return_trace");
+    atoms.register_atom("exception_trace");
+    atoms.register_atom("display");
+    atoms.register_atom("process_dump");
+    atoms.register_atom("enable_trace");
+    atoms.register_atom("disable_trace");
+    atoms.register_atom("trace");
+    atoms.register_atom("caller");
+    atoms.register_atom("silent");
+    atoms.register_atom("set_tcw");
+    atoms.register_atom("set_tcw_fake");
     atoms
 };
 
@@ -401,6 +423,28 @@ pub const FLUSH_MONITOR_MESSAGES: u32 = 117;
 pub const DOLLAR_UNDERSCORE: u32 = 118;
 pub const DOLLAR_DOLLAR: u32 = 119;
 pub const UNDERSCORE: u32 = 120;
+
+pub const CONST: u32 = 120;
+pub const AND: u32 = 121;
+pub const OR: u32 = 122;
+pub const ANDALSO: u32 = 123;
+pub const ANDTHEN: u32 = 124;
+pub const ORELSE: u32 = 125;
+pub const SELF: u32 = 126;
+pub const MESSAGE: u32 = 127;
+pub const IS_SEQ_TRACE: u32 = 128;
+pub const SET_SEQ_TOKEN: u32 = 129;
+pub const GET_SEQ_TOKEN: u32 = 130;
+pub const RETURN_TRACE: u32 = 131;
+pub const EXCEPTION_TRACE: u32 = 132;
+pub const DISPLAY: u32 = 133;
+pub const PROCESS_DUMP: u32 = 134;
+pub const ENABLE_TRACE: u32 = 135;
+pub const DISABLE_TRACE: u32 = 136;
+pub const CALLER: u32 = 137;
+pub const SILENT: u32 = 138;
+pub const SET_TCW: u32 = 139;
+pub const SET_TCW_FAKE: u32 = 140;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

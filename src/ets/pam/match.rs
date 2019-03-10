@@ -11,7 +11,7 @@ fn prog_match(c_p: &RcProcess, pself: &RcProcess, bprog: pam::Pattern, term: Ter
     const Eterm *ep, *tp, **sp;
     Eterm t;
     Eterm *esp;
-    MatchVariable* variables;
+    MatchVariable* variables; // a vec with default len of non_value values, will be actual var bindings
     ErtsCodeMFA *cp;
     const UWord *pc = prog->text;
     Eterm *ehp;
@@ -42,8 +42,8 @@ fn prog_match(c_p: &RcProcess, pself: &RcProcess, bprog: pam::Pattern, term: Ter
     mpsp = get_match_pseudo_process(c_p, prog->heap_size);
     psp = &mpsp->process;
 
-    /* We need to lure the scheduler into believing in the pseudo process, 
-       because of floating point exceptions. Do *after* mpsp is set!!! */
+    // We need to lure the scheduler into believing in the pseudo process, 
+    // because of floating point exceptions. Do *after* mpsp is set!!!
 
     esdp = erts_get_scheduler_data();
     if (esdp) {
@@ -70,15 +70,21 @@ fn prog_match(c_p: &RcProcess, pself: &RcProcess, bprog: pam::Pattern, term: Ter
     variables = mpsp->u.variables;
 
 restart:
-    ep = &term;
-    esp = (Eterm*)((char*)mpsp->u.heap + prog->stack_offset); // seems to be estack pointer
-    sp = (const Eterm **)esp; // current stack pointer
+    let mut esp = &term;
+    // esp = (Eterm*)((char*)mpsp->u.heap + prog->stack_offset); // seems to be estack pointer
+    let esp = Vec::new(); // TODO with some default capacity -- seems to be used as a stack for special form & guard bifs
+    // sp = (const Eterm **)esp; // current stack pointer
+    let mut sp = iter;
     let mut ret = atom!(TRUE);
     let mut do_catch = false;
     let mut fail_label = -1;
     build_proc = psp;
     if (esdp)
         esdp->current_process = psp;
+
+    // ep ==> current element (iter.next())
+    // sp ==> current iterator (could be iter) - tuple or list
+    // esp ==> stack of iterators
 
 // #ifdef DEBUG
 //     assert!(variables == mpsp->u.variables);
@@ -107,16 +113,16 @@ restart:
             Opcode::MatchTryMeElse(fail_label) => {
                 assert!(fail_label == -1);
             }
-            Opcode::MatchArray(n) => { // only when DCOMP_TRACE, is always first instruction.
-                if n != arity {
-                    FAIL();
-                }
-                ep = termp;
-            }
-            Opcode::MatchArrayBind => { // When the array size is unknown.
-                assert!(termp || arity==0);
-                variables[n].term = dpm_array_to_list(psp, termp, arity);
-            }
+            // Opcode::MatchArray(n) => { // only when DCOMP_TRACE, is always first instruction.
+            //     if n != arity {
+            //         FAIL();
+            //     }
+            //     ep = termp;
+            // }
+            // Opcode::MatchArrayBind() => { // When the array size is unknown. (also only on DCOMP_TRACE)
+            //     assert!(termp || arity == 0);
+            //     variables[n].term = dpm_array_to_list(psp, termp, arity);
+            // }
             Opcode::MatchTuple(n) => { // *ep is a tuple of arity n
                 if !is_tuple(*ep) {
                     FAIL();
@@ -138,19 +144,19 @@ restart:
                 *sp++ = tp + 1;
                 ++ep;
             }
-            Opcode::MatchList => {
+            Opcode::MatchList() => {
                 if !is_list(*ep) {
                     FAIL();
                 }
                 ep = list_val(*ep);
             }
-            Opcode::MatchPushL => {
+            Opcode::MatchPushL() => {
                 if !is_list(*ep)
                     FAIL();
                 *sp++ = list_val(*ep);
                 ++ep;
             }
-            Opcode::MatchMap => {
+            Opcode::MatchMap() => {
                 if !is_map(*ep) {
                     FAIL();
                 }
@@ -166,7 +172,7 @@ restart:
                 }
                 ep = flatmap_val(*ep);
             }
-            Opcode::MatchPushM => {
+            Opcode::MatchPushM() => {
                 if !is_map(*ep) {
                     FAIL();
                 }
@@ -190,10 +196,10 @@ restart:
                 *sp++ = ep;
                 ep = tp;
             }
-            Opcode::MatchPop => {
+            Opcode::MatchPop() => {
                 ep = *(--sp);
             }
-            Opcode::MatchSwap => {
+            Opcode::MatchSwap() => {
                 tp = sp[-1];
                 sp[-1] = sp[-2];
                 sp[-2] = tp;
@@ -246,7 +252,7 @@ restart:
                     FAIL();
                 }
             }
-            Opcode::MatchSkip => {
+            Opcode::MatchSkip() => {
                 ++ep;
             }
             /* 
@@ -261,13 +267,13 @@ restart:
                     *esp++ = c;
                 }
             }
-            Opcode::MatchConsA => {
+            Opcode::MatchConsA() => {
                 ehp = HAllocX(build_proc, 2, HEAP_XTRA);
                 CDR(ehp) = *--esp;
                 CAR(ehp) = esp[-1];
                 esp[-1] = make_list(ehp);
             }
-            Opcode::MatchConsB => {
+            Opcode::MatchConsB() => {
                 ehp = HAllocX(build_proc, 2, HEAP_XTRA);
                 CAR(ehp) = *--esp;
                 CDR(ehp) = esp[-1];
@@ -361,22 +367,27 @@ restart:
                 esp[-1] = t;
             }
             Opcode::MatchPushVResult(n) => {
-                if (!(in_flags & ERTS_PAM_COPY_RESULT)) goto case_matchPushV;
-                /* Build copy on callers heap */
                 assert!(is_value(variables[n].term));
-                assert!(!variables[n].proc);
-                variables[n].term = copy_object_x(variables[n].term, c_p, HEAP_XTRA);
-                *esp++ = variables[n].term;
-                #ifdef DEBUG
-                variables[n].proc = c_p;
-                #endif
+                if (!(in_flags & ERTS_PAM_COPY_RESULT)) {
+                    // equivalent to MatchPushV
+                    *esp++ = variables[n].term;
+                } else {
+                    // Build copy on callers heap
+                    assert!(is_value(variables[n].term));
+                    assert!(!variables[n].proc);
+                    variables[n].term = copy_object_x(variables[n].term, c_p, HEAP_XTRA);
+                    *esp++ = variables[n].term;
+                    #ifdef DEBUG
+                    variables[n].proc = c_p;
+                    #endif
+
+                }
             }
             Opcode::MatchPushV(n) => {
-            //case_matchPushV:
                 assert!(is_value(variables[n].term));
                 *esp++ = variables[n].term;
             }
-            Opcode::MatchPushExpr => {
+            Opcode::MatchPushExpr() => {
                 if in_flags & ERTS_PAM_COPY_RESULT {
                     Uint sz;
                     Eterm* top;
@@ -392,7 +403,7 @@ restart:
                     *esp++ = term;
                 }
             }
-            Opcode::MatchPushArrayAsList => {
+            Opcode::MatchPushArrayAsList() => {
                 n = arity; /* Only happens when 'term' is an array */
                 tp = termp;
                 ehp = HAllocX(build_proc, n*2, HEAP_XTRA);
@@ -406,11 +417,11 @@ restart:
                 }
                 ehp[-1] = NIL;
             }
-            Opcode::MatchPushArrayAsListU => {
+            Opcode::MatchPushArrayAsListU() => {
                 // This instruction is NOT efficient.
                 *esp++ = dpm_array_to_list(build_proc, termp, arity);
             }
-            Opcode::MatchTrue => {
+            Opcode::MatchTrue() => {
                 if *--esp != atom!(TRUE) {
                     FAIL();
                 }
@@ -478,13 +489,13 @@ restart:
             Opcode::MatchJump(n) => {
                 pc += n;
             }
-            Opcode::MatchSelf => {
+            Opcode::MatchSelf() => {
                 *esp++ = self->common.id;
             }
-            Opcode::MatchWaste => {
+            Opcode::MatchWaste() => {
                 --esp;
             }
-            Opcode::MatchReturn => {
+            Opcode::MatchReturn() => {
                 ret = *--esp;
             }
             // Opcode::MatchProcessDump => {
@@ -708,7 +719,7 @@ restart:
             //         ERTS_TRACER_CLEAR(&tracer);
             //     }
             // }
-            Opcode::MatchCatch => {  // Match success, now build result
+            Opcode::MatchCatch() => {  // Match success, now build result
                 do_catch = true;
                 if in_flags & ERTS_PAM_COPY_RESULT {
                     build_proc = c_p;
@@ -717,7 +728,7 @@ restart:
                     }
                 }
             }
-            Opcode::MatchHalt => {
+            Opcode::MatchHalt() => {
                 goto success;
             }
             _ => erts_exit(ERTS_ERROR_EXIT, "Internal error: unexpected opcode in match program.");

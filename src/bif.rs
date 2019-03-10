@@ -614,47 +614,47 @@ fn bif_erlang_send_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Re
     process::send_message(&vm.state, process, pid, msg)
 }
 
-fn bif_erlang_is_atom_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_atom_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_atom()))
 }
 
-fn bif_erlang_is_list_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_list_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_list()))
 }
 
-fn bif_erlang_is_tuple_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_tuple_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_tuple()))
 }
 
-fn bif_erlang_is_float_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_float_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_float()))
 }
 
-fn bif_erlang_is_integer_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_integer_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_integer()))
 }
 
-fn bif_erlang_is_number_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_number_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_number()))
 }
 
-fn bif_erlang_is_port_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_port_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_port()))
 }
 
-fn bif_erlang_is_reference_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_reference_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_ref()))
 }
 
-fn bif_erlang_is_binary_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_binary_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_binary()))
 }
 
-fn bif_erlang_is_bitstring_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_bitstring_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_bitstring()))
 }
 
-fn bif_erlang_is_function_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_function_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_function()))
 }
 
@@ -664,7 +664,7 @@ fn bif_erlang_is_boolean_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term
     Ok(Term::boolean(args[0].is_boolean()))
 }
 
-fn bif_erlang_is_map_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_map_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_map()))
 }
 
@@ -686,7 +686,7 @@ fn bif_erlang_byte_size_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]
     Ok(Term::int(res as i32)) // TODO: cast potentially unsafe
 }
 
-fn bif_erlang_map_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_map_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
     let val = value::Map::try_from(&args[0])?;
     let heap = &process.context_mut().heap;
 
@@ -950,18 +950,18 @@ fn bif_erlang_module_loaded_1(vm: &vm::Machine, _process: &RcProcess, args: &[Te
 // kept the original OTP comment
 /* returns the head of a list - this function is unecessary
 and is only here to keep Robert happy (Even more, since it's OP as well) */
-fn bif_erlang_hd_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_hd_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     let cons = Cons::try_from(&args[0])?;
     Ok(cons.head)
 }
 
 /* returns the tails of a list - same comment as above */
-fn bif_erlang_tl_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_tl_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     let cons = Cons::try_from(&args[0])?;
     Ok(cons.tail)
 }
 
-fn bif_erlang_trunc_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_trunc_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
     let heap = &process.context_mut().heap;
     match &args[0].into_number() {
         Ok(value::Num::Integer(i)) => Ok(Term::int(*i)),

@@ -3,6 +3,8 @@ use super::*;
 mod error;
 use error::*;
 
+use once_cell::sync::Lazy;
+
 use crate::value::{self, Variant, Cons, Tuple, Map, TryFrom, TryInto};
 use crate::immix::Heap;
 use crate::atom;
@@ -14,7 +16,7 @@ struct Pattern {}
 ///
 /// The dialect is in the 3 least significant bits and are to be interspaced by
 /// by at least 2 (decimal), thats why ((Uint) 2) isn't used. This is to be 
-/// able to add DBIF_GUARD or DBIF BODY to it to use in the match_spec bif
+/// able to add Flag::DBIF_GUARD or Flag::DBIF BODY to it to use in the match_spec bif
 /// table. The rest of the word is used like ordinary flags, one bit for each 
 /// flag. Note that DCOMP_TABLE and DCOMP_TRACE are mutually exclusive.
 bitflags! {
@@ -34,23 +36,19 @@ bitflags! {
         /// This is call trace
         const DCOMP_CALL_TRACE = 0x20;
 
+        // Flags for the guard bifs
 
-        // /*
-        // ** Flags for the guard bif's
-        // */
+        // These are offsets from the DCOMP_* value
+        const DBIF_GUARD = 1;
+        const DBIF_BODY  = 0;
 
-        // /* These are offsets from the DCOMP_* value */
-        // #define DBIF_GUARD 1
-        // #define DBIF_BODY  0
-
-        // /* These are the DBIF flag bits corresponding to the DCOMP_* value.
-        //  * If a bit is set, the BIF is allowed in that context. */
-        // #define DBIF_TABLE_GUARD (1 << (DCOMP_TABLE + DBIF_GUARD))
-        // #define DBIF_TABLE_BODY  (1 << (DCOMP_TABLE + DBIF_BODY))
-        // #define DBIF_TRACE_GUARD (1 << (DCOMP_TRACE + DBIF_GUARD))
-        // #define DBIF_TRACE_BODY  (1 << (DCOMP_TRACE + DBIF_BODY))
-        // #define DBIF_ALL \
-        // DBIF_TABLE_GUARD | DBIF_TABLE_BODY | DBIF_TRACE_GUARD | DBIF_TRACE_BODY
+        // These are the DBIF flag bits corresponding to the DCOMP_* value.
+        // If a bit is set, the BIF is allowed in that context.
+        const DBIF_TABLE_GUARD = (1 << (Flag::DCOMP_TABLE.bits + Flag::DBIF_GUARD.bits));
+        const DBIF_TABLE_BODY  = (1 << (Flag::DCOMP_TABLE.bits + Flag::DBIF_BODY.bits));
+        const DBIF_TRACE_GUARD = (1 << (Flag::DCOMP_TRACE.bits + Flag::DBIF_GUARD.bits));
+        const DBIF_TRACE_BODY  = (1 << (Flag::DCOMP_TRACE.bits + Flag::DBIF_BODY.bits));
+        const DBIF_ALL = Flag::DBIF_TABLE_GUARD.bits | Flag::DBIF_TABLE_BODY.bits | Flag::DBIF_TRACE_GUARD.bits | Flag::DBIF_TRACE_BODY.bits;
     }
 }
 
@@ -119,6 +117,71 @@ enum Opcode {
     MatchTrace2(),
     MatchTrace3(),
 }
+
+// The table of callable bif's, i e guard bif's and 
+// some special animals that can provide us with trace
+// information. This array is sorted on init.
+pub static GUARD_BIFS: Lazy<HashMap<(u32, usize), (bif::Fn, Flag)>> = sync_lazy! {
+    let mut table: HashMap<(u32, usize), (bif::Fn, Flag)> = HashMap::new();
+
+    table.insert((atom::IS_ATOM, 1), (bif::bif_erlang_is_atom_1, Flag::DBIF_ALL));
+    table.insert((atom::IS_FLOAT, 1), (bif::bif_erlang_is_float_1, Flag::DBIF_ALL));
+    table.insert((atom::IS_INTEGER, 1), (bif::bif_erlang_is_integer_1, Flag::DBIF_ALL));
+    table.insert((atom::IS_LIST, 1), (bif::bif_erlang_is_list_1, Flag::DBIF_ALL));
+    table.insert((atom::IS_NUMBER, 1), (bif::bif_erlang_is_number_1, Flag::DBIF_ALL));
+    table.insert((atom::IS_PID, 1), (bif::bif_erlang_is_pid_1, Flag::DBIF_ALL));
+    table.insert((atom::IS_PORT, 1), (bif::bif_erlang_is_port_1, Flag::DBIF_ALL));
+    table.insert((atom::IS_REFERENCE, 1), (bif::bif_erlang_is_reference_1, Flag::DBIF_ALL));
+    table.insert((atom::IS_TUPLE, 1), (bif::bif_erlang_is_tuple_1, Flag::DBIF_ALL));
+    table.insert((atom::IS_MAP, 1), (bif::bif_erlang_is_map_1, Flag::DBIF_ALL));
+    table.insert((atom::IS_BINARY, 1), (bif::bif_erlang_is_binary_1, Flag::DBIF_ALL));
+    table.insert((atom::IS_FUNCTION, 1), (bif::bif_erlang_is_function_1, Flag::DBIF_ALL));
+    table.insert((atom::IS_RECORD, 3), (bif::bif_erlang_is_record_3, Flag::DBIF_ALL));
+    table.insert((atom::ABS, 1), (bif::arith_abs_1, Flag::DBIF_ALL));
+    table.insert((atom::ELEMENT, 2), (bif::erlang::element_2, Flag::DBIF_ALL));
+    table.insert((atom::HD, 1), (bif::bif_erlang_hd_1, Flag::DBIF_ALL));
+    table.insert((atom::LENGTH, 1), (&db_length_1, Flag::DBIF_ALL));
+    table.insert((atom::NODE, 1), (bif::erlang::node_1, Flag::DBIF_ALL));
+    table.insert((atom::NODE, 0), (erlang::node_0, Flag::DBIF_ALL));
+    table.insert((atom::ROUND, 1), (&round_1, Flag::DBIF_ALL));
+    table.insert((atom::SIZE, 1), (&size_1, Flag::DBIF_ALL));
+    table.insert((atom::MAP_SIZE, 1), (&map_size_1, Flag::DBIF_ALL));
+    table.insert((atom::MAP_GET, 2), (&map_get_2, Flag::DBIF_ALL));
+    table.insert((atom::IS_MAP_KEY, 2), (&is_map_key_2, Flag::DBIF_ALL));
+    table.insert((atom::BIT_SIZE, 1), (&bit_size_1, Flag::DBIF_ALL));
+    table.insert((atom::TL, 1), (bif::bif_erlang_tl_1, Flag::DBIF_ALL));
+    table.insert((atom::TRUNC, 1), (bif::bif_erlang_trunc_1, Flag::DBIF_ALL));
+    table.insert((atom::FLOAT, 1), (&float_1, Flag::DBIF_ALL));
+    table.insert((atom::PLUS, 1), (&splus_1, Flag::DBIF_ALL));
+    table.insert((atom::MINUS, 1), (&sminus_1, Flag::DBIF_ALL));
+    table.insert((atom::PLUS, 2), (&splus_2, Flag::DBIF_ALL));
+    table.insert((atom::MINUS, 2), (&sminus_2, Flag::DBIF_ALL));
+    table.insert((atom::TIMES, 2), (&stimes_2, Flag::DBIF_ALL));
+    table.insert((atom::DIV, 2), (&div_2, Flag::DBIF_ALL)); // different sym
+    table.insert((atom::DIV, 2), (&intdiv_2, Flag::DBIF_ALL));
+    table.insert((atom::REM, 2), (&rem_2, Flag::DBIF_ALL));
+    table.insert((atom::BAND, 2), (erlang::band_2, Flag::DBIF_ALL));
+    table.insert((atom::BOR, 2), (erlang::bor_2, Flag::DBIF_ALL));
+    table.insert((atom::BXOR, 2), (erlang::bxor_2, Flag::DBIF_ALL));
+    table.insert((atom::BNOT, 1), (erlang::bnot_1, Flag::DBIF_ALL));
+    table.insert((atom::BSL, 2), (erlang::bsl_2, Flag::DBIF_ALL));
+    table.insert((atom::BSR, 2), (erlang::bsr_2, Flag::DBIF_ALL));
+    table.insert((atom::GT, 2), (erlang::sgt_2, Flag::DBIF_ALL));
+    table.insert((atom::GE, 2), (erlang::sge_2, Flag::DBIF_ALL));
+    table.insert((atom::LT, 2), (erlang::slt_2, Flag::DBIF_ALL));
+    table.insert((atom::LE, 2), (erlang::sle_2, Flag::DBIF_ALL));
+    table.insert((atom::EQ, 2), (erlang::seq_2, Flag::DBIF_ALL));
+    table.insert((atom::EQEQ, 2), (erlang::seqeq_2, Flag::DBIF_ALL));
+    table.insert((atom::NEQ, 2), (erlang::sneq_2, Flag::DBIF_ALL));
+    table.insert((atom::NEQEQ, 2), (erlang::sneqeq_2, Flag::DBIF_ALL));
+    table.insert((atom::NOT, 1), (erlang::not_1, Flag::DBIF_ALL));
+    table.insert((atom::XOR, 2), (erlang::xor_2, Flag::DBIF_ALL));
+
+    // table.insert((atom::GET_TCW, 0), (&get_trace_control_word_0, Flag::DBIF_TRACE_GUARD | Flag::DBIF_TRACE_BODY));
+    // table.insert((atom::SET_TCW, 1), (&set_trace_control_word_1, Flag::DBIF_TRACE_BODY));
+    // table.insert((atom::SET_TCW_FAKE, 1), (&set_trace_control_word_fake_1, Flag::DBIF_TRACE_BODY));
+    table
+};
 
 pub fn is_variable(obj: Term) -> Option<usize> {
     // byte *b;
@@ -193,7 +256,7 @@ impl Compiler {
         // Uint num_iters;
         // int structure_checked;
         // DMCRet res;
-        let mut current_try_label = -1;
+        let mut current_try_label = None;
         // Binary *bp = NULL;
 
         // Compile the match expression.
@@ -204,10 +267,10 @@ impl Compiler {
             let structure_checked = false;
 
             if self.current_match < self.num_match - 1 {
+                current_try_label = Some(self.text.len());
                 self.text.push(Opcode::MatchTryMeElse(0));
-                current_try_label = self.text.len();
             } else {
-                current_try_label = -1;
+                current_try_label = None;
             }
 
             let clause_start = self.text.len(); // the "special" test needs it
@@ -346,8 +409,8 @@ impl Compiler {
             // If the matchprogram comes here, the match is successful
             self.text.push(Opcode::MatchHalt());
             // Fill in try-me-else label if there is one.
-            if current_try_label >= 0 {
-                self.text[current_try_label] = self.text.len();
+            if let Some(label) = current_try_label {
+                self.text[label] = Opcode::MatchTryMeElse(self.text.len());
             }
             
         } /* for (self.current_match = 0 ...) */
@@ -395,16 +458,11 @@ impl Compiler {
     //     ret.prog_end = ret.text + text.len();
     // #endif
 
-        return bp;
+        bp
     }
 
     /// Handle one term in the match expression (not the guard)
     fn one_term(&mut self, c: Term) -> DMCRet {
-        // Sint n;
-        // Eterm *hp;
-        // Uint sz, sz2, sz3;
-        // Uint i, j;
-
         match c.value.tag() as u8 {
             value::TERM_ATOM => {
                 let n = is_variable(c);
@@ -470,10 +528,6 @@ impl Compiler {
     }
 
     fn compile_guard_expr(&self, mut l: Term) -> DMCRet {
-        // DMCRet ret;
-        // int constant;
-        // Eterm t;
-
         if l != Term::nil() {
             if !l.is_list() {
                 return Err(new_error(ErrorKind::Generic("Match expression is not a list.")));
@@ -544,7 +598,7 @@ impl Compiler {
 
     fn rearrange_constants(&mut self, textpos: usize, p: &[Term], nelems: usize) {
         //STACK_TYPE(UWord) instr_save;
-        Uint i;
+        // Uint i;
 
         INIT_STACK(instr_save);
         while self.text.len() > textpos {
@@ -749,11 +803,6 @@ impl Compiler {
     fn andalso(&mut self, t: Term) -> DMCRet {
         let p = Tuple::try_from(&t).unwrap();
         let a = p.len();
-        // int i;
-        // int c;
-        // Uint lbl;
-        // Uint lbl_next;
-        // Uint lbl_val;
 
         if a < 2 {
             return Err(new_error(ErrorKind::Argument { form: "andalso", value: t, reason: "without arguments" }));
@@ -786,8 +835,8 @@ impl Compiler {
         self.text.push(Opcode::MatchPushC(atom!(TRUE)));
         let lbl_val = self.text.len();
         while lbl {
-            lbl_next = text[lbl];
-            text[lbl] = lbl_val-lbl-1;
+            let lbl_next = self.text[lbl];
+            self.text[lbl] = lbl_val-lbl-1;
             lbl = lbl_next;
         }
         self.stack_used += 1;
@@ -798,13 +847,8 @@ impl Compiler {
     }
 
     fn orelse(&mut self, t: Term) -> DMCRet {
-        let t = Tuple::try_from(&t).unwrap();
-        let a = t.len();
-        // int i;
-        // int c;
-        // Uint lbl;
-        // Uint lbl_next;
-        // Uint lbl_val;
+        let p = Tuple::try_from(&t).unwrap();
+        let a = p.len();
         
         if a < 2 {
             return Err(new_error(ErrorKind::Argument { form: "orelse", value: t, reason: "without arguments" }));
@@ -825,20 +869,20 @@ impl Compiler {
         }
         // repeat for last operand, but use a jump
         let last = iter.next().unwrap();
-        let c = self.expr(last)?;
+        let c = self.expr(*last)?;
         if c {
-            self.do_emit_constant(last);
+            self.do_emit_constant(*last);
         }
         self.text.push(Opcode::MatchJump(lbl));
-        lbl = self.text.len()-1;
+        let lbl = self.text.len()-1;
         self.stack_used -= 1;
         // -- end
 
         self.text.push(Opcode::MatchPushC(atom!(FALSE)));
         let lbl_val = self.text.len();
         while lbl {
-            lbl_next = text[lbl];
-            text[lbl] = lbl_val-lbl-1;
+            let lbl_next = self.text[lbl];
+            self.text[lbl] = lbl_val-lbl-1;
             lbl = lbl_next;
         }
         self.stack_used += 1;
@@ -931,7 +975,7 @@ impl Compiler {
         Ok(false)
     }
 
-    fn check_trace(&self, op: &str, need_cflags: Flag, allow_in_guard: bool) -> DMCRet {
+    fn check_trace(&self, op: &'static str, need_cflags: Flag, allow_in_guard: bool) -> DMCRet {
         if !self.cflags.contains(Flag::DCOMP_TRACE) {
             return Err(new_error(ErrorKind::WrongDialect { form: op }))
         }
@@ -1190,11 +1234,9 @@ impl Compiler {
         let p = Tuple::try_from(&t).unwrap();
         let a = p.len();
         let arity = a - 1;
-        // int i;
-        // DMCGuardBif *b;
     
-        /* Special forms. */
-        let b = match p[0].into_variant() {
+        // Special forms.
+        let res = match p[0].into_variant() {
             Variant::Atom(atom::CONST) => return self.constant(t),
             Variant::Atom(atom::AND) => return self.and(t),
             Variant::Atom(atom::OR) => return self.or(t),
@@ -1217,28 +1259,24 @@ impl Compiler {
             Variant::Atom(atom::SILENT) => return self.silent(t),
             Variant::Atom(atom::SET_TCW) => {
                 if self.cflags.contains(Flag::DCOMP_FAKE_DESTRUCTIVE) {
-                    lookup_bif(atom!(SET_TCW_FAKE), arity);
+                    GUARD_BIFS.get(&(atom::SET_TCW_FAKE, arity))
                 } else {
-                    lookup_bif(p[0], arity);
+                    GUARD_BIFS.get(&(atom::SET_TCW, arity))
                 }
             }
-            _ => lookup_bif(p[0],  arity),
+            Variant::Atom(name) => GUARD_BIFS.get(&(name,  arity)),
         };
 
+        let (bif, flags) = match res {
+            None => return Err(new_error(ErrorKind::Generic(&format!("Function {}/{} does not exist", p[0], arity)))),
+            Some(res) => res,
+        };
 
-        if let None = b {
-            if self.err_info != NULL {
-                return Err(new_error(ErrorKind::Generic(&format!("Function {}/{} does not exist", p[0], arity))));
-            } else {
-                return Err(());
-            }
-        } 
-        assert!(b.arity == arity);
-        if !(b.flags & 
+        if !(flags & 
             (1 << 
                 ((self.cflags & Flag::DCOMP_DIALECT_MASK) + 
                 (if self.is_guard { Flag::DBIF_GUARD } else { Flag::DBIF_BODY })))) {
-            /* Body clause used in wrong context. */
+            // Body clause used in wrong context.
             if self.err_info != NULL {
                 return Err(new_error(ErrorKind::Generic(&format!("Function {}/{} cannot be called in this context.", p[0], arity))));
             } else {
@@ -1257,10 +1295,10 @@ impl Compiler {
         }
 
         match b.arity {
-            0 => self.text.push(Opcode::MatchCall0(b.biff)),
-            1 => self.text.push(Opcode::MatchCall1(b.biff)),
-            2 => self.text.push(Opcode::MatchCall2(b.biff)),
-            3 => self.text.push(Opcode::MatchCall3(b.biff)),
+            0 => self.text.push(Opcode::MatchCall0(bif)),
+            1 => self.text.push(Opcode::MatchCall1(bif)),
+            2 => self.text.push(Opcode::MatchCall2(bif)),
+            3 => self.text.push(Opcode::MatchCall3(bif)),
             _ => panic!("ets:match() internal error, guard with more than 3 arguments."),
         }
         self.stack_used -= a - 2;
@@ -1288,7 +1326,7 @@ impl Compiler {
                     } else if p.len() >= 1 && p[0].is_atom() && is_variable(p[0]).is_none() {
                         self.fun(t)
                     } else {
-                        RETURN_TERM_ERROR("%T is neither a function call, nor a tuple (tuples are written {{ ... }}).", t);
+                        return Err(new_error(ErrorKind::Generic(&format!("{} is neither a function call, nor a tuple (tuples are written {{{{ ... }}}}).", t))));
                     }
                 } else {
                     Ok(true)
