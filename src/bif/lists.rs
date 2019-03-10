@@ -1,5 +1,5 @@
 use crate::atom;
-use crate::bif::{self, BifFn};
+use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
 use crate::value::{self, Cons, Term, TryFrom, TryInto, Tuple};
@@ -139,7 +139,7 @@ pub fn keyfind_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::
 /// Swap process out after this number
 const CONTEXT_REDS: usize = 4000;
 
-fn keyfind(_func: BifFn, _process: &RcProcess, args: &[Term]) -> bif::Result {
+fn keyfind(_func: bif::Fn, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let mut max_iter: isize = 10 * CONTEXT_REDS as isize;
 
     let key = args[0];

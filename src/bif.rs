@@ -50,8 +50,8 @@ macro_rules! bif_map {
 }
 
 pub type Result = std::result::Result<Term, Exception>;
-pub type BifFn = fn(&vm::Machine, &RcProcess, &[Term]) -> Result;
-type BifTable = HashMap<module::MFA, BifFn>;
+pub type Fn = fn(&vm::Machine, &RcProcess, &[Term]) -> Result;
+type BifTable = HashMap<module::MFA, Fn>;
 
 pub static BIFS: Lazy<BifTable> = sync_lazy! {
     bif_map![
@@ -234,7 +234,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
     ]
 };
 
-type NifTable = HashMap<u32, Vec<(u32, u32, BifFn)>>;
+type NifTable = HashMap<u32, Vec<(u32, u32, Fn)>>;
 
 macro_rules! nif_map {
     ($($module:expr => {$($fun:expr, $arity:expr => $rust_fn:path,)*},)*) => {
@@ -486,7 +486,7 @@ fn bif_erlang_monitor_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
                         println!("registered name {} not found!", args[1]);
                         return Err(Exception::new(Reason::EXC_BADARG));
                     }
-                },
+                }
                 // TODO: {atom name, node}
                 Variant::Pointer(_) => unimplemented!("monitor for {}", args[1]),
                 Variant::Port(_) => unimplemented!("monitor for {}", args[1]),

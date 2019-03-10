@@ -12,7 +12,7 @@ pub type RcExportsTable = Arc<RwLock<ExportsTable>>; // TODO: I don't like this 
 #[derive(Copy, Clone)]
 pub enum Export {
     Fun(InstrPtr),
-    Bif(bif::BifFn),
+    Bif(bif::Fn),
 }
 
 impl fmt::Debug for Export {

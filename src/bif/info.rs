@@ -62,9 +62,7 @@ pub fn process_info_aux(
         atom::INITIAL_CALL => unimplemented!(),
         atom::STATUS => unimplemented!(),
         atom::MESSAGES => unimplemented!(),
-        atom::MESSAGE_QUEUE_LEN => {
-            Term::uint(heap, local_data.mailbox.len() as u32)
-        },
+        atom::MESSAGE_QUEUE_LEN => Term::uint(heap, local_data.mailbox.len() as u32),
         atom::MESSAGE_QUEUE_DATA => unimplemented!(),
         atom::LINKS => unimplemented!(),
         atom::MONITORED_BY => unimplemented!(),
@@ -80,10 +78,8 @@ pub fn process_info_aux(
                 // make cons
                 cons!(heap, tuple, res)
             })
-        },
-        atom::TRAP_EXIT => {
-            Term::boolean(local_data.flags.contains(Flag::TRAP_EXIT))
-        },
+        }
+        atom::TRAP_EXIT => Term::boolean(local_data.flags.contains(Flag::TRAP_EXIT)),
         atom::ERROR_HANDLER => unimplemented!(),
         atom::HEAP_SIZE => unimplemented!(),
         atom::STACK_SIZE => unimplemented!(),
@@ -153,6 +149,6 @@ pub fn system_info_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
 
     match args[0].into_variant() {
         Variant::Atom(atom::OS_TYPE) => Ok(tup2!(heap, atom!(OS_TYPE), Term::atom(OS_FAMILY))),
-        _ => unimplemented!("system_info for {}", args[0])
+        _ => unimplemented!("system_info for {}", args[0]),
     }
 }

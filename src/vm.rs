@@ -189,8 +189,8 @@ fn call_error_handler(
     Ok(())
 }
 
-const APPLY_2: bif::BifFn = bif::bif_erlang_apply_2;
-const APPLY_3: bif::BifFn = bif::bif_erlang_apply_3;
+const APPLY_2: bif::Fn = bif::bif_erlang_apply_2;
+const APPLY_3: bif::Fn = bif::bif_erlang_apply_3;
 
 macro_rules! op_call_ext {
     ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr, $return: expr) => {{
@@ -246,7 +246,8 @@ macro_rules! op_call_bif {
         match $bif($vm, $process, args) {
             Ok(val) => {
                 set_register!($context, &LValue::X(0), val); // HAXX
-                if $return { // TODO: figure out returns
+                if $return {
+                    // TODO: figure out returns
                     op_return!($context);
                 }
             }
@@ -806,10 +807,10 @@ impl Machine {
                 }
                 Opcode::RecvMark => {
                     process.local_data_mut().mailbox.mark();
-                },
+                }
                 Opcode::RecvSet => {
                     process.local_data_mut().mailbox.set();
-                },
+                }
                 Opcode::Call => {
                     //literal arity, label jmp
                     // store arity as live

@@ -7,10 +7,10 @@ use crate::value::{Cons, Term, TryFrom, Tuple, Type, Variant};
 use crate::vm;
 use crate::Itertools;
 
+use super::error::{new_error, ErrorKind};
 use super::hash_table::HashTable;
-use super::{Status, pam};
 use super::*;
-use super::error::{ErrorKind, new_error};
+use super::{pam, Status};
 
 pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     if !args[0].is_atom() {
@@ -353,26 +353,6 @@ pub fn select_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
 
 // Check if object represents a "match" variable i.e and atom $N where N is an integer.
 
-fn is_variable(obj: Term) -> Option<usize> {
-    // byte *b;
-    // int n;
-    // int N;
-    match obj.into_variant() {
-        // TODO original checked for < 2 as error but we use nil, true, false as 0,1,2
-        Variant::Atom(i) if i > 2 => {
-            crate::atom::to_str(i)
-                .ok()
-                .map(|v| v.as_bytes())
-                .and_then(|name| {
-                    if name[0] == '$' as u8 {
-                        lexical::try_parse::<usize, _>(&name[1..]).ok()
-                    } else { None }
-                })
-        }
-        _ => None
-    }
-}
-
 struct MpInfo {
     /// The match_spec is not "impossible"
     something_can_match: bool,
@@ -386,13 +366,15 @@ struct MpInfo {
     // num_lists: usize,
 
     ///  The compiled match program
-    mp: Vec<u8>
+    mp: Vec<u8>,
 }
-
 
 /// For the select functions, analyzes the pattern and determines which
 /// slots should be searched. Also compiles the match program
-fn analyze_pattern(table: &RcTable, pattern: Term, /* extra_validator: Fn optional callback */) -> Result<MpInfo> {
+fn analyze_pattern(
+    table: &RcTable,
+    pattern: Term, /* extra_validator: Fn optional callback */
+) -> Result<MpInfo> {
     // Eterm *ptpl;
     // Eterm sbuff[30];
     // Eterm *buff = sbuff;
@@ -404,8 +386,9 @@ fn analyze_pattern(table: &RcTable, pattern: Term, /* extra_validator: Fn option
     let lst = pattern.iter();
     let num_heads = lst.count();
 
-    if !lst.is_nil() {// proper list...
-	return Err(new_error(ErrorKind::BadParameter));
+    if !lst.is_nil() {
+        // proper list...
+        return Err(new_error(ErrorKind::BadParameter));
     }
 
     // let lists = Vec::with_capacity(num_heads);
@@ -429,75 +412,77 @@ fn analyze_pattern(table: &RcTable, pattern: Term, /* extra_validator: Fn option
         // Eterm body;
 
         let ptpl = Tuple::try_from(&tup)?;
-	if ptpl.len() != 3  {
+        if ptpl.len() != 3 {
             return Err(new_error(ErrorKind::BadParameter));
-	}
+        }
 
         let tpl = ptpl[0];
         let body = ptpl[2];
-	matches.push(ptpl[0]);
-	guards.push(ptpl[1]);
-	bodies.push(ptpl[2]);
+        matches.push(ptpl[0]);
+        guards.push(ptpl[1]);
+        bodies.push(ptpl[2]);
 
         // if extra_validator != NULL && !extra_validator(tb->common.keypos, match, guard, body) {
         //    return Err(new_error(ErrorKind::BadParameter));
         // }
 
-	if (!is_list(body) || CDR(list_val(body)) != NIL ||
-	    CAR(list_val(body)) != atom!(DOLLAR_UNDERSCORE)) {
-	}
+        if (!is_list(body)
+            || CDR(list_val(body)) != NIL
+            || CAR(list_val(body)) != atom!(DOLLAR_UNDERSCORE))
+        {}
 
-	if !mpi.key_given {
-	    continue;
-	}
+        if !mpi.key_given {
+            continue;
+        }
 
-	if tpl == atom!(UNDERSCORE) || is_variable(tpl).is_some() {
-	    mpi.key_given = false;
-	    mpi.something_can_match = true;
-	} else {
+        if tpl == atom!(UNDERSCORE) || pam::is_variable(tpl).is_some() {
+            mpi.key_given = false;
+            mpi.something_can_match = true;
+        } else {
             if let Some(key) = tpl.get(table.meta().keypos) {
-		if !db_has_variable(key) { // Bound key
-		    int ix, search_slot;
-		    HashDbTerm** bp;
-		    erts_rwmtx_t* lck;
-		    hval = MAKE_HASH(key);
-		    lck = RLOCK_HASH(tb,hval);
-		    ix = hash_to_ix(tb, hval);
-		    bp = &BUCKET(tb,ix);
-		    if lck == NULL {
-			search_slot = search_list(tb,key,hval,*bp) != NULL;
-		    } else {
-			/* No point to verify if key exist now as there may be
-			   concurrent inserters/deleters anyway */
-			RUNLOCK_HASH(lck);
-			search_slot = true;
-		    }
+                if !db_has_variable(key) {
+                    // Bound key
+                    // int ix, search_slot;
+                    // HashDbTerm** bp;
+                    // erts_rwmtx_t* lck;
+                    hval = MAKE_HASH(key);
+                    lck = RLOCK_HASH(tb, hval);
+                    ix = hash_to_ix(tb, hval);
+                    bp = &BUCKET(tb, ix);
+                    if lck == NULL {
+                        search_slot = search_list(tb, key, hval, *bp) != NULL;
+                    } else {
+                        /* No point to verify if key exist now as there may be
+                        concurrent inserters/deleters anyway */
+                        RUNLOCK_HASH(lck);
+                        search_slot = true;
+                    }
 
-		    if search_slot {
+                    if search_slot {
                         // let j = 0;
                         // loop {
-			    // if j == mpi->num_lists) {
-				// mpi->lists[mpi->num_lists].bucket = bp;
-				// mpi->lists[mpi->num_lists].ix = ix;
-				// ++mpi->num_lists;
-				// break;
-			    // }
-			    // if mpi->lists[j].bucket == bp {
-				// assert!(mpi->lists[j].ix == ix);
-				// break;
-			    // }
-			    // assert!(mpi->lists[j].ix != ix);
+                        // if j == mpi->num_lists) {
+                        // mpi->lists[mpi->num_lists].bucket = bp;
+                        // mpi->lists[mpi->num_lists].ix = ix;
+                        // ++mpi->num_lists;
+                        // break;
+                        // }
+                        // if mpi->lists[j].bucket == bp {
+                        // assert!(mpi->lists[j].ix == ix);
+                        // break;
+                        // }
+                        // assert!(mpi->lists[j].ix != ix);
 
                         //     j += 1;
                         // }
-			mpi.something_can_match = true;
-		    }
-		} else {
-		    mpi.key_given = false;
-		    mpi.something_can_match = true;
-		}
-	    }
-	}
+                        mpi.something_can_match = true;
+                    }
+                } else {
+                    mpi.key_given = false;
+                    mpi.something_can_match = true;
+                }
+            }
+        }
     }
 
     // It would be nice not to compile the match_spec if nothing could match,
@@ -507,8 +492,8 @@ fn analyze_pattern(table: &RcTable, pattern: Term, /* extra_validator: Fn option
     let compiler = pam::Compiler::new(matches, guards, bodies, num_heads, DCOMP_TABLE, flags);
     mpi.mp = compiler.match_compile();
     if mpi.mp == NULL {
-	//if buff != sbuff { erts_free(ERTS_ALC_T_DB_TMP, buff); }
-	return Err(new_error(ErrorKind::BadParameter));
+        //if buff != sbuff { erts_free(ERTS_ALC_T_DB_TMP, buff); }
+        return Err(new_error(ErrorKind::BadParameter));
     }
     //if buff != sbuff { erts_free(ERTS_ALC_T_DB_TMP, buff); }
 
