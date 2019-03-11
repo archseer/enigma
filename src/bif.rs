@@ -122,6 +122,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "module_loaded", 1 => bif_erlang_module_loaded_1,
             "process_flag", 2 => bif_erlang_process_flag_2,
             "process_info", 2 => info::process_info_2,
+            "group_leader", 0 => info::group_leader_0,
             "make_tuple", 2 => erlang::make_tuple_2,
             "make_tuple", 3 => erlang::make_tuple_3,
             "append_element", 2 => erlang::append_element_2,
@@ -230,10 +231,14 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "new", 2 => ets::bif::new_2,
             "whereis", 1 => ets::bif::whereis_1,
             "insert", 2 => ets::bif::insert_2,
+            "insert_new", 2 => ets::bif::insert_new_2,
             "lookup", 2 => ets::bif::lookup_2,
             "lookup_element", 3 => ets::bif::lookup_element_3,
             "delete", 1 => ets::bif::delete_1,
             "select", 2 => ets::bif::select_2,
+        },
+        "erts_internal" => {
+            "group_leader", 2 => info::group_leader_2,
         },
     ]
 };

@@ -156,3 +156,29 @@ pub fn system_info_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
 pub fn group_leader_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     Ok(Term::pid(process.local_data().group_leader))
 }
+
+pub fn group_leader_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    if !args[0].is_pid() {
+        return Err(Exception::new(Reason::EXC_BADARG));
+    }
+    let pid = args[0].to_u32();
+
+    if !args[1].is_pid() {
+        return Err(Exception::new(Reason::EXC_BADARG));
+    }
+    let target = args[1].to_u32();
+
+    // TODO optimize for if process.pid == pid
+    let proc = {
+        let table = vm.state.process_table.lock();
+        table.get(pid)
+    };
+
+    if let Some(proc) = proc {
+        // TODO: no locks, unsafe!
+        proc.local_data_mut().group_leader = pid;
+        Ok(atom!(TRUE))
+    } else {
+        Err(Exception::new(Reason::EXC_BADARG))
+    }
+}

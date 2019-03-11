@@ -1,4 +1,4 @@
-* BIFs [44/117]
+* BIFs [47/117]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
@@ -15,7 +15,7 @@
 - [X] bif erlang:date/0
 - [ ] bif erlang:delete_module/1
 - [X] bif erlang:display/1
-- [ ] bif erlang:display_string/1
+- [X] bif erlang:display_string/1
 - [ ] bif erlang:display_nl/0
 - [X] ubif erlang:element/2
 - [X] bif erlang:erase/0
@@ -33,8 +33,8 @@
 - [X] bif erlang:get/0
 - [X] bif erlang:get/1
 - [X] bif erlang:get_keys/1
-- [ ] bif erlang:group_leader/0
-- [ ] bif erts_internal:group_leader/2
+- [X] bif erlang:group_leader/0
+- [X] bif erts_internal:group_leader/2
 - [ ] bif erts_internal:group_leader/3
 - [ ] bif erlang:halt/2
 - [ ] bif erlang:phash/2

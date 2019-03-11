@@ -821,7 +821,6 @@ impl Term {
             Variant::Pointer(ptr) => unsafe {
                 match *ptr {
                     BOXED_TUPLE => {
-                        eprintln!("deep copying {}", self);
                         let tup = &*(ptr as *const Tuple);
                         let new_tuple = self::tuple(heap, tup.len() as u32);
                         for (i, val) in tup.iter().enumerate() {
@@ -830,7 +829,6 @@ impl Term {
                         Term::from(new_tuple)
                     }
                     BOXED_MAP => {
-                        eprintln!("deep copying {}", self);
                         let map = &(*(ptr as *const Boxed<map::Map>)).value;
                         // Term::map(heap, map.0.clone()) need to deep_clone kvs
                         let mut new_map = HAMT::new();

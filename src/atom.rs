@@ -338,6 +338,12 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("microsecond");
     atoms.register_atom("perf_counter");
 
+    atoms.register_atom("exiting");
+    atoms.register_atom("garbage_collecting");
+    atoms.register_atom("waiting");
+    atoms.register_atom("running");
+    atoms.register_atom("runnable");
+    atoms.register_atom("suspended");
     atoms
 };
 
@@ -560,6 +566,13 @@ pub const SECOND: u32 = 191;
 pub const MILLISECOND: u32 = 192;
 pub const MICROSECOND: u32 = 193;
 pub const PERF_COUNTER: u32 = 194;
+
+pub const EXITING: u32 = 195;
+pub const GARBAGE_COLLECTING: u32 = 196;
+pub const WAITING: u32 = 197;
+pub const RUNNING: u32 = 198;
+pub const RUNNABLE: u32 = 199;
+pub const SUSPENDED: u32 = 200;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)
