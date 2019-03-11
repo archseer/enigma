@@ -256,20 +256,36 @@ pub fn atom_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
 }
 
 pub fn integer_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    match args[0].into_variant() {
-        Variant::Integer(i) => {
+    match args[0].into_number() {
+        Ok(value::Num::Integer(i)) => {
             let string = lexical::to_string(i);
             let heap = &process.context_mut().heap;
 
             Ok(bitstring!(heap, string))
         }
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        Ok(value::Num::Bignum(i)) => {
+            let string = i.to_string();
+            let heap = &process.context_mut().heap;
+
+            Ok(bitstring!(heap, string))
+        }
+        _ => {
+            println!("integer_to_list_1 called with {}", args[0]);
+            Err(Exception::new(Reason::EXC_BADARG))
+        }
     }
 }
 
 pub fn display_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     println!("{}", args[0]);
-    Ok(atom!(OK))
+    Ok(atom!(TRUE))
+}
+
+pub fn display_string_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let cons = Cons::try_from(&args[0])?;
+    let string = value::cons::unicode_list_to_buf(cons, 2048)?;
+    print!("{}", string);
+    Ok(atom!(TRUE))
 }
 
 /// erlang:'++'/2
