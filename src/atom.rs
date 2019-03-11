@@ -331,6 +331,13 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("/=");
     atoms.register_atom("not");
     atoms.register_atom("xor");
+
+    atoms.register_atom("native");
+    atoms.register_atom("second");
+    atoms.register_atom("millisecond");
+    atoms.register_atom("microsecond");
+    atoms.register_atom("perf_counter");
+
     atoms
 };
 
@@ -547,6 +554,12 @@ pub const NEQ: u32 = 186;
 pub const NEQEQ: u32 = 187;
 pub const NOT: u32 = 188;
 pub const XOR: u32 = 189;
+
+pub const NATIVE: u32 = 190;
+pub const SECOND: u32 = 191;
+pub const MILLISECOND: u32 = 192;
+pub const MICROSECOND: u32 = 193;
+pub const PERF_COUNTER: u32 = 194;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)
