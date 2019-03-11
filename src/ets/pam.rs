@@ -269,7 +269,7 @@ pub fn is_variable(obj: Term) -> Option<usize> {
                 .ok()
                 .and_then(|name| {
                     let name = name.as_bytes();
-                    if name[0] == '$' as u8 {
+                    if name[0] == b'$' {
                         lexical::try_parse::<usize, _>(&name[1..]).ok()
                     } else { None }
                 })
@@ -851,11 +851,9 @@ impl Compiler {
         let v = self.vars.get_mut(&n).unwrap();
         let mut instr = Opcode::PushV(n);
 
-        if !self.is_guard {
-            if !*v {
-                instr = Opcode::PushVResult(n);
-                *v = true;
-            }
+        if !self.is_guard && !*v {
+            instr = Opcode::PushVResult(n);
+            *v = true;
         }
         self.text.push(instr);
     }
@@ -996,7 +994,7 @@ impl Compiler {
             return Err(new_error(ErrorKind::Argument { form: "orelse", value: t, reason: "without arguments" }));
         }
         let mut lbl = 0;
-        let mut iter = &mut p.iter();
+        let iter = &mut p.iter();
         let len = iter.len();
         iter.next(); // drop the operator
 

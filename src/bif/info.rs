@@ -152,3 +152,7 @@ pub fn system_info_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
         _ => unimplemented!("system_info for {}", args[0]),
     }
 }
+
+pub fn group_leader_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
+    Ok(Term::pid(process.local_data().group_leader))
+}

@@ -134,7 +134,9 @@ pub struct LocalData {
 
     pub state: StateFlag,
 
-    parent: Option<PID>,
+    parent: PID,
+
+    pub group_leader: PID,
 
     // name (atom)
     pub name: Option<u32>,
@@ -184,7 +186,7 @@ impl RefUnwindSafe for Process {}
 impl Process {
     pub fn with_rc(
         pid: PID,
-        parent: Option<PID>,
+        parent: PID,
         context: ExecutionContext,
         // global_allocator: RcGlobalAllocator,
         // config: &Config,
@@ -195,6 +197,7 @@ impl Process {
             flags: Flag::INITIAL,
             state: StateFlag::INITIAL,
             parent,
+            group_leader: parent,
             name: None,
             error_handler: atom::ERROR_HANDLER,
             links: HashSet::new(),
@@ -215,7 +218,7 @@ impl Process {
 
     pub fn from_block(
         pid: PID,
-        parent: Option<PID>,
+        parent: PID,
         module: *const Module,
         // global_allocator: RcGlobalAllocator,
         // config: &Config,
@@ -468,7 +471,7 @@ impl Process {
 
 pub fn allocate(
     state: &RcState,
-    parent: Option<PID>,
+    parent: PID,
     module: *const Module,
 ) -> Result<RcProcess, Exception> {
     let mut process_table = state.process_table.lock();
@@ -506,7 +509,7 @@ pub fn spawn(
     args: Term,
     flags: SpawnFlag,
 ) -> Result<Term, Exception> {
-    let new_proc = allocate(state, Some(parent.pid), module)?;
+    let new_proc = allocate(state, parent.pid, module)?;
     let context = new_proc.context_mut();
     let mut ret = Term::pid(new_proc.pid);
 
@@ -522,7 +525,11 @@ pub fn spawn(
     // lastly, the tail
     context.x[i] = *cons;
 
-    println!("Spawning... pid={} mfa={}", new_proc.pid, MFA(unsafe {(*module).name}, func, i as u32));
+    println!(
+        "Spawning... pid={} mfa={}",
+        new_proc.pid,
+        MFA(unsafe { (*module).name }, func, i as u32)
+    );
 
     // TODO: func to ip offset
     let func = unsafe {
