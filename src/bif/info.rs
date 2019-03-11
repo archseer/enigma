@@ -60,34 +60,45 @@ pub fn process_info_aux(
         atom::CURRENT_LOCATION => unimplemented!(),
         atom::CURRENT_STACKTRACE => unimplemented!(),
         atom::INITIAL_CALL => unimplemented!(),
-        atom::STATUS => unimplemented!(),
-        atom::MESSAGES => unimplemented!(),
+        atom::STATUS => {
+            // TODO: quick cheat
+            atom!(RUNNING)
+        }
+        atom::MESSAGES => {
+            // TODO: quick cheat
+            Term::nil()
+        }
         atom::MESSAGE_QUEUE_LEN => Term::uint(heap, local_data.mailbox.len() as u32),
         atom::MESSAGE_QUEUE_DATA => unimplemented!(),
-        atom::LINKS => unimplemented!(),
+        atom::LINKS => local_data
+            .links
+            .iter()
+            .fold(Term::nil(), |acc, pid| cons!(heap, Term::pid(*pid), acc)),
         atom::MONITORED_BY => unimplemented!(),
         atom::DICTIONARY => {
-            // TODO $ancestors ?
             let pdict = &process.local_data_mut().dictionary;
             let heap = &process.context_mut().heap;
 
             pdict.iter().fold(Term::nil(), |res, (key, val)| {
-                // make tuple
                 let tuple = tup2!(heap, *key, *val);
-
-                // make cons
                 cons!(heap, tuple, res)
             })
         }
         atom::TRAP_EXIT => Term::boolean(local_data.flags.contains(Flag::TRAP_EXIT)),
         atom::ERROR_HANDLER => unimplemented!(),
-        atom::HEAP_SIZE => unimplemented!(),
-        atom::STACK_SIZE => unimplemented!(),
+        atom::HEAP_SIZE => {
+            // TODO: temporary
+            Term::int(512)
+        }
+        atom::STACK_SIZE => {
+            // TODO: temporary
+            Term::int(512)
+        }
         atom::MEMORY => unimplemented!(),
         atom::GARBAGE_COLLECTION => unimplemented!(),
         atom::GARBAGE_COLLECTION_INFO => unimplemented!(),
         atom::GROUP_LEADER => unimplemented!(),
-        atom::REDUCTIONS => unimplemented!(),
+        atom::REDUCTIONS => Term::uint(heap, process.context().reds as u32),
         atom::PRIORITY => unimplemented!(),
         atom::TRACE => unimplemented!(),
         atom::BINARY => unimplemented!(),
