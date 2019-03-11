@@ -209,32 +209,32 @@ pub fn is_variable(obj: Term) -> Option<usize> {
 /// check if obj is (or contains) a variable
 /// return true if obj contains a variable or underscore
 /// return false if obj is fully ground
-pub fn has_variable(node: Term) -> bool {
+pub fn has_variable(mut node: Term) -> bool {
     let s: Vec<Term> = Vec::new();
     s.push(node);
 
     while let Some(node) = s.pop() {
         match node.tag() {
             value::TERM_CONS => {
-                while (is_list(node)) {
-                    ESTACK_PUSH(s,CAR(list_val(node)));
-                    node = CDR(list_val(node));
+                while let Ok(Cons { head, tail }) = node.try_into() {
+                    s.push(*head);
+                    node = *tail;
                 }
                 s.push(node) // Non wellformed list or []
             }
             value::TERM_POINTER => {
-                if (is_tuple(node)) {
-                    Eterm *tuple = tuple_val(node);
-                    int arity = arityval(*tuple);
-                    while(arity--) {
-                        s.push(*(++tuple));
+                if node.is_tuple() {
+                    let tuple = Tuple::try_from(&node).unwrap();
+                    for val in tuple.iter() {
+                        s.push(*val);
                     }
-                } else if (is_map(node)) { /* other map-nodes or map-heads */
-                    Eterm *ptr = hashmap_val(node);
-                    int i = hashmap_bitcount(MAP_HEADER_VAL(*ptr));
-                    ptr += MAP_HEADER_ARITY(*ptr);
-                    // check both keys and vals
-                    while(i--) { ESTACK_PUSH(s, *++ptr); }
+                } else if node.is_map() { // other map-nodes or map-heads
+                    let map = Map::try_from(&node).unwrap().0;
+                    // TODO: check both keys and vals? is that correct
+                    for (key, val) in map.iter() {
+                        s.push(*key);
+                        s.push(*val);
+                    }
                 }
             }
             value::TERM_ATOM => {
@@ -325,7 +325,7 @@ impl Compiler {
                     Variant::Pointer(..) => {
                         match t.get_boxed_header().unwrap() {
                             BOXED_MAP => {
-                                let map = value::Map::try_from(&t).unwrap().0;
+                                let map = Map::try_from(&t).unwrap().0;
                                 let num_iters = map.len();
                                 if !structure_checked {
                                     self.text.push(Opcode::MatchMap(num_iters));
@@ -552,7 +552,7 @@ impl Compiler {
                         self.stack.push(c);
                     }
                     value::BOXED_MAP => {
-                        let n = value::Map::try_from(&c).unwrap().0.len();
+                        let n = Map::try_from(&c).unwrap().0.len();
                         self.text.push(Opcode::MatchPushM(n));
                         self.stack_used += 1;
                         self.stack.push(c);
@@ -708,7 +708,7 @@ impl Compiler {
     fn map(&mut self, t: Term) -> DMCRet {
         assert!(t.is_map());
 
-        let map = value::Map::try_from(&t).unwrap().0;
+        let map = Map::try_from(&t).unwrap().0;
         let mut constant_values = true;
         let nelems = map.len();
 
@@ -880,17 +880,19 @@ impl Compiler {
         if c {
             self.do_emit_constant(*last);
         }
-        self.text.push(Opcode::MatchJump(lbl));
-        lbl = self.text.len()-1;
+        self.text.push(Opcode::MatchJump(self.text.len() + 1)); // skips that PushC(true)
+        // lbl = self.text.len()-1; we do this manually above
         self.stack_used -= 1;
         // -- end
 
         self.text.push(Opcode::MatchPushC(atom!(TRUE)));
         let lbl_val = self.text.len();
-        while lbl {
-            let lbl_next = self.text[lbl];
-            self.text[lbl] = lbl_val-lbl-1;
-            lbl = lbl_next;
+        // go back and modify all the MatchAndAlso instructions to jump to the correct spot
+        while lbl > 0 {
+            if let Opcode::MatchAndAlso(lbl_next) = self.text[lbl] {
+                self.text[lbl] = Opcode::MatchAndAlso(lbl_val-lbl-1);
+                lbl = lbl_next;
+            } else { unreachable!() }
         }
         self.stack_used += 1;
         if self.stack_used > self.stack_need {
@@ -916,7 +918,7 @@ impl Compiler {
             if c {
                 self.do_emit_constant(*val);
             }
-            self.text.push(Opcode::MatchAndAlso(lbl));
+            self.text.push(Opcode::MatchOrElse(lbl));
             lbl = self.text.len()-1;
             self.stack_used -= 1;
         }
@@ -926,17 +928,17 @@ impl Compiler {
         if c {
             self.do_emit_constant(*last);
         }
-        self.text.push(Opcode::MatchJump(lbl));
-        let lbl = self.text.len()-1;
-        self.stack_used -= 1;
+        self.text.push(Opcode::MatchJump(self.text.len() + 1)); // skips that PushC(true)
+        // lbl = self.text.len()-1; we do this manually above
         // -- end
 
         self.text.push(Opcode::MatchPushC(atom!(FALSE)));
         let lbl_val = self.text.len();
-        while lbl {
-            let lbl_next = self.text[lbl];
-            self.text[lbl] = lbl_val-lbl-1;
-            lbl = lbl_next;
+        while lbl > 0 {
+            if let Opcode::MatchOrElse(lbl_next) = self.text[lbl] {
+                self.text[lbl] = Opcode::MatchOrElse(lbl_val-lbl-1);
+                lbl = lbl_next;
+            } else { unreachable!() }
         }
         self.stack_used += 1;
         if self.stack_used > self.stack_need {
@@ -1326,7 +1328,7 @@ impl Compiler {
         };
 
         let dialect = self.cflags & Flag::DCOMP_DIALECT_MASK;
-        let guard if self.is_guard { Flag::DBIF_GUARD } else { Flag::DBIF_BODY };
+        let guard = if self.is_guard { Flag::DBIF_GUARD } else { Flag::DBIF_BODY };
 
         if !flags.contains(dialect | guard) {
             // Body clause used in wrong context.

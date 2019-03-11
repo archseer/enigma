@@ -462,8 +462,8 @@ restart:
                 *esp++ = t;
             }
             Opcode::MatchOrElse(n) => {
-                if *--esp == atom!(TRUE) {
-                    ++esp;
+                if *--esp == atom!(TRUE) { // check top item
+                    ++esp; // undo --
                     pc += n;
                 } else if *esp != atom!(FALSE) {
                     if do_catch {
@@ -475,8 +475,8 @@ restart:
                 }
             }
             Opcode::MatchAndAlso(n) => {
-                if *--esp == atom!(FALSE) {
-                    esp++;
+                if *--esp == atom!(FALSE) { // check top item
+                    esp++; // undo --
                     pc += n;
                 } else if *esp != atom!(TRUE) {
                     if do_catch {
