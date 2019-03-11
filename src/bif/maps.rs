@@ -60,6 +60,18 @@ pub fn from_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif
     Ok(Term::map(heap, map))
 }
 
+pub fn to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let heap = &process.context_mut().heap;
+    let map = &args[0];
+    if let Ok(value::Map(map)) = map.try_into() {
+        let res = map.iter().fold(Term::nil(), |acc, (key, val)| {
+            cons!(heap, tup2!(heap, *key, *val), acc)
+        });
+        return Ok(res);
+    }
+    Err(Exception::with_value(Reason::EXC_BADMAP, *map))
+}
+
 pub fn is_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let map = &args[1];
     if let Ok(value::Map(map)) = map.try_into() {

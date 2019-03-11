@@ -218,6 +218,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "find", 2 => maps::find_2,
             "get", 2 => maps::get_2,
             "from_list", 1 => maps::from_list_1,
+            "to_list", 1 => maps::to_list_1,
             "is_key", 2 => maps::is_key_2,
             "keys", 1 => maps::keys_1,
             "merge", 2 => maps::merge_2,
