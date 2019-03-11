@@ -146,7 +146,7 @@ fn keyfind(_func: bif::Fn, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let pos_val = args[1];
     let mut list = &args[2];
 
-    let pos = pos_val.to_u32() as usize;
+    let pos = pos_val.to_u32() as usize - 1; // it's always 1-indexed
 
     // OTP does 3 different loops based on key type (simple, immed, boxed), but luckily in rust we
     // just rely on Eq/PartialEq.
