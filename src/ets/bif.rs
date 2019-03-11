@@ -366,7 +366,7 @@ struct MpInfo {
     // num_lists: usize,
 
     ///  The compiled match program
-    mp: Vec<u8>,
+    mp: pam::Pattern,
 }
 
 /// For the select functions, analyzes the pattern and determines which
@@ -399,7 +399,7 @@ fn analyze_pattern(
         // num_lists: 0,
         key_given: true,
         something_can_match: false,
-        mp: Vec::new(),
+        mp: std::mem::uninitialized(),
     };
 
     let matches: Vec<Term> = Vec::with_capacity(num_heads);

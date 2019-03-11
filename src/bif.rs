@@ -11,9 +11,9 @@ use crate::vm;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 
-mod arith;
+pub mod arith;
 mod chrono;
-mod erlang;
+pub mod erlang;
 mod info;
 mod lists;
 mod load;
@@ -69,7 +69,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "-", 2 => arith::sub_2,
             "*", 2 => arith::mult_2,
             "div", 2 => arith::intdiv_2,
-            "rem", 2 => arith::mod_2,
+            "rem", 2 => arith::mod_2,// TODO: confirm if this is ok
             "spawn", 3 => bif_erlang_spawn_3,
             "spawn_link", 3 => bif_erlang_spawn_link_3,
             "spawn_opt", 1 => bif_erlang_spawn_opt_1,
@@ -90,6 +90,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "is_number", 1 => bif_erlang_is_number_1,
             "is_port", 1 => bif_erlang_is_port_1,
             "is_reference" , 1 => bif_erlang_is_reference_1,
+            "is_pid" , 1 => bif_erlang_is_pid_1,
             "is_binary", 1 => bif_erlang_is_binary_1,
             "is_bitstring", 1 => bif_erlang_is_bitstring_1,
             "is_function", 1 => bif_erlang_is_function_1,
@@ -646,6 +647,10 @@ pub fn bif_erlang_is_reference_1(_vm: &vm::Machine, _process: &RcProcess, args: 
     Ok(Term::boolean(args[0].is_ref()))
 }
 
+pub fn bif_erlang_is_pid_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+    Ok(Term::boolean(args[0].is_pid()))
+}
+
 pub fn bif_erlang_is_binary_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_binary()))
 }
@@ -693,7 +698,7 @@ pub fn bif_erlang_map_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Ter
     Ok(Term::uint(heap, val.0.len() as u32))
 }
 
-fn bif_erlang_length_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_length_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
     if args[0].is_nil() {
         return Ok(Term::int(0));
     }
