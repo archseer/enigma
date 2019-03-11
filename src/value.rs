@@ -307,6 +307,11 @@ pub enum Num {
 
 impl Term {
     #[inline(always)]
+    pub fn tag(&self) -> u8 {
+        self.value.tag() as u8
+    }
+
+    #[inline(always)]
     pub fn nil() -> Self {
         unsafe {
             Term {

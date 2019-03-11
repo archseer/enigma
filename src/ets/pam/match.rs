@@ -70,7 +70,7 @@ fn prog_match(c_p: &RcProcess, pself: &RcProcess, bprog: pam::Pattern, term: Ter
     variables = mpsp->u.variables;
 
 restart:
-    let mut esp = &term;
+    let mut ep = &[term].iter();
     // esp = (Eterm*)((char*)mpsp->u.heap + prog->stack_offset); // seems to be estack pointer
     let esp = Vec::new(); // TODO with some default capacity -- seems to be used as a stack for special form & guard bifs
     // sp = (const Eterm **)esp; // current stack pointer
@@ -124,7 +124,8 @@ restart:
             //     variables[n].term = dpm_array_to_list(psp, termp, arity);
             // }
             Opcode::MatchTuple(n) => { // *ep is a tuple of arity n
-                if !is_tuple(*ep) {
+                let e = ep.next().unwrap();
+                if !ep.is_tuple(*ep) {
                     FAIL();
                 }
                 ep = tuple_val(*ep);

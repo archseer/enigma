@@ -426,10 +426,10 @@ fn analyze_pattern(
         //    return Err(new_error(ErrorKind::BadParameter));
         // }
 
-        if (!is_list(body)
-            || CDR(list_val(body)) != NIL
-            || CAR(list_val(body)) != atom!(DOLLAR_UNDERSCORE))
-        {}
+        // if (!is_list(body)
+        //     || CDR(list_val(body)) != NIL
+        //     || CAR(list_val(body)) != atom!(DOLLAR_UNDERSCORE))
+        // {}
 
         if !mpi.key_given {
             continue;
@@ -489,12 +489,12 @@ fn analyze_pattern(
     // but then the select calls would not fail like they should on bad
     // match specs that happen to specify non existent keys etc.
 
-    let compiler = pam::Compiler::new(matches, guards, bodies, num_heads, DCOMP_TABLE, flags);
-    mpi.mp = compiler.match_compile();
-    if mpi.mp == NULL {
-        //if buff != sbuff { erts_free(ERTS_ALC_T_DB_TMP, buff); }
-        return Err(new_error(ErrorKind::BadParameter));
-    }
+    let compiler = pam::Compiler::new(matches, guards, bodies, num_heads, pam::Flag::DCOMP_TABLE);
+    mpi.mp = compiler.match_compile().unwrap();
+    //if mpi.mp == NULL {
+    //    //if buff != sbuff { erts_free(ERTS_ALC_T_DB_TMP, buff); }
+    //    return Err(new_error(ErrorKind::BadParameter));
+    //}
     //if buff != sbuff { erts_free(ERTS_ALC_T_DB_TMP, buff); }
 
     Ok(mpi)
