@@ -533,6 +533,12 @@ impl Term {
         // TODO: is nil also ok?
     }
 
+    #[inline(always)]
+    pub fn is_immed(self) -> bool {
+        let tag = self.value.tag() as u8;
+        tag != TERM_CONS || tag != TERM_POINTER
+    }
+
     #[inline]
     pub fn get_type(self) -> Type {
         match self.value.tag() as u8 {

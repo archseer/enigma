@@ -2,6 +2,7 @@
 use super::*;
 mod error;
 use error::*;
+pub mod r#match;
 
 use once_cell::sync::Lazy;
 
@@ -12,8 +13,9 @@ use crate::bif::{self};
 
 pub struct Pattern {
     heap: Heap,
-    pub program: Vec<Opcode>,
-    stack_need: usize,
+    pub(crate) program: Vec<Opcode>,
+    pub(crate) stack_need: usize,
+    pub(crate) num_bindings: usize,
 }
 
 /// Compilation flags
@@ -98,7 +100,7 @@ pub enum Opcode {
     OrElse(usize),
     AndAlso(usize),
     Jump(usize),
-    Self(),
+    Selff(),
     Waste(),
     Return(),
     ProcessDump(),
@@ -165,7 +167,7 @@ impl std::fmt::Display for Opcode {
             Opcode::OrElse(n) => write!(f, "orelse({})", n),
             Opcode::AndAlso(n) => write!(f, "andalso({})", n),
             Opcode::Jump(n) => write!(f, "jump({})", n),
-            Opcode::Self() => write!(f, "self"),
+            Opcode::Selff() => write!(f, "self"),
             Opcode::Waste() => write!(f, "waste"),
             Opcode::Return() => write!(f, "return"),
             Opcode::ProcessDump() => write!(f, "processdump"),
@@ -393,7 +395,6 @@ impl Compiler {
             let clause_start = self.text.len(); // the "special" test needs it
             // TODO, are all these -1 ?
             loop {
-                println!("looping");
                 match t.into_variant() {
                     Variant::Pointer(..) => {
                         match t.get_boxed_header().unwrap() {
@@ -477,7 +478,6 @@ impl Compiler {
                 // We are at the end of one composite data structure, pop sub structures and emit
                 // a matchPop instruction (or break)
                 if let Some(val) = self.stack.pop() {
-                    println!("popping");
                     t = val;
                     self.text.push(Opcode::Pop());
                     structure_checked = true; // Checked with matchPushT or matchPushL
@@ -587,6 +587,7 @@ impl Compiler {
             program: self.text,
             heap: self.constant_heap,
             stack_need: self.stack_need,
+            num_bindings: self.vars.len(),
             // TODO: num_bindings: heap.len(), single_variable: special
         })
     }
@@ -1064,7 +1065,7 @@ impl Compiler {
         if a != 1 {
             return Err(new_error(ErrorKind::Argument { form: "self", value: t, reason: "with arguments" }));
         }
-        self.text.push(Opcode::Self());
+        self.text.push(Opcode::Selff());
         self.stack_used += 1;
         if self.stack_used > self.stack_need {
             self.stack_need = self.stack_used;

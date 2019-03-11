@@ -1,4 +1,5 @@
 use crate::value::Term;
+use crate::vm;
 //use crate::servo_arc::Arc;
 use crate::process::{self, RcProcess};
 use hashbrown::HashMap;
@@ -13,8 +14,8 @@ macro_rules! table_kind {
 }
 
 pub mod bif;
-pub mod pam;
 pub mod hash_table;
+pub mod pam;
 
 pub mod error;
 // use std::error::Error;
@@ -55,7 +56,14 @@ pub trait Table: Send + Sync {
     // int (*db_select_chunk)(process: &RcProcess, table: &Self, Eterm tid, Eterm pattern, Sint chunk_size, int reverse, Eterm* ret);
 
     // _continue is for when the main function traps, let's just use generators
-    fn select(&self, process: &RcProcess, tid: Term, pattern: Term, reverse: bool) -> Result<Term>;
+    fn select(
+        &self,
+        vm: &vm::Machine,
+        process: &RcProcess,
+        pattern: &pam::Pattern,
+        flags: pam::r#match::Flag,
+        reverse: bool,
+    ) -> Result<Term>;
 
     fn select_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term>;
 

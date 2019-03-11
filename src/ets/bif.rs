@@ -349,9 +349,12 @@ pub fn delete_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
 
 pub fn select_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let table = get_table(vm, args[0])?;
+    let pattern = analyze_pattern(&table, args[1]).unwrap();
 
-    analyze_pattern(&table, args[1]);
-    unimplemented!()
+    let flags = pam::r#match::Flag::COPY_RESULT | pam::r#match::Flag::CONTIGUOUS_TUPLE;
+
+    // TODO: run match with a callback in a loop
+    Ok(table.select(vm, process, &pattern, flags, false)?)
 }
 
 // Check if object represents a "match" variable i.e and atom $N where N is an integer.
@@ -360,16 +363,15 @@ struct MpInfo {
     /// The match_spec is not "impossible"
     something_can_match: bool,
     key_given: bool,
-
-    /// Default list of "pre-found" buckets
+    // Default list of "pre-found" buckets
     // wmp_prefound: dlists[10],
-    /// Buckets to search if keys are given, = dlists initially
+    // Buckets to search if keys are given, = dlists initially
     // struct mp_prefound* lists,
-    /// Number of elements in "lists", = 0 initially
+    // Number of elements in "lists", = 0 initially
     // num_lists: usize,
 
-    ///  The compiled match program
-    mp: pam::Pattern,
+    //  The compiled match program
+    // mp: pam::Pattern,
 }
 
 /// For the select functions, analyzes the pattern and determines which
@@ -377,7 +379,7 @@ struct MpInfo {
 fn analyze_pattern(
     table: &RcTable,
     pattern: Term, /* extra_validator: Fn optional callback */
-) -> Result<MpInfo> {
+) -> Result<pam::Pattern> {
     // Eterm *ptpl;
     // Eterm sbuff[30];
     // Eterm *buff = sbuff;
@@ -404,7 +406,7 @@ fn analyze_pattern(
         // num_lists: 0,
         key_given: true,
         something_can_match: false,
-        mp: unsafe { std::mem::uninitialized() },
+        //mp: ,
     };
 
     let mut matches: Vec<Term> = Vec::with_capacity(num_heads);
@@ -506,8 +508,7 @@ fn analyze_pattern(
     //if buff != sbuff { erts_free(ERTS_ALC_T_DB_TMP, buff); }
     mp.program.iter().for_each(|op| eprintln!("{}", op));
 
-    unimplemented!();
-    // Ok(mpi)
+    Ok(mp)
 }
 
 // safe_fixtable_2

@@ -111,8 +111,28 @@ impl Table for HashTable {
     // Eterm* ret);
 
     // _continue is for when the main function traps, let's just use generators
-    fn select(&self, process: &RcProcess, tid: Term, pattern: Term, reverse: bool) -> Result<Term> {
-        unimplemented!()
+    fn select(
+        &self,
+        vm: &vm::Machine,
+        process: &RcProcess,
+        pattern: &pam::Pattern,
+        flags: pam::r#match::Flag,
+        reverse: bool,
+    ) -> Result<Term> {
+        let heap = &process.context_mut().heap;
+        let res = self
+            .hashmap
+            .clone() // TODO: eww, temporary until I implement my own buckets
+            .into_iter()
+            .fold(Term::nil(), |acc, (_key, val)| {
+                println!("running select for {}", val);
+                match pam::r#match::run(vm, process, pattern, val, flags) {
+                    Some(val) => cons!(heap, val, acc),
+                    None => acc,
+                }
+            });
+        println!("PAM res: {}", res);
+        Ok(res)
     }
 
     fn select_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term> {
