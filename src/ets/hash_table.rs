@@ -85,8 +85,8 @@ impl Table for HashTable {
     }
 
     // contains_key ? why is result a Term, not bool
-    fn member(&self, key: Term) -> Result<Term> {
-        unimplemented!()
+    fn member(&self, key: Term) -> bool {
+        self.hashmap.contains_key(&key)
     }
 
     // erase  (remove_entry in rust)

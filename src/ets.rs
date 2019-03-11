@@ -43,8 +43,7 @@ pub trait Table: Send + Sync {
 
     fn get_element(&self, process: &RcProcess, key: Term, index: usize) -> Result<Term>;
 
-    // contains_key ? why is result a Term, not bool
-    fn member(&self, key: Term) -> Result<Term>;
+    fn member(&self, key: Term) -> bool;
 
     // erase  (remove_entry in rust)
     fn remove(&mut self, key: Term) -> Result<Term>;

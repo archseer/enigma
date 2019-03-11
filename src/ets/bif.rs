@@ -309,6 +309,56 @@ pub fn insert_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
     }
 }
 
+pub fn insert_new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    /* Write lock table if more than one object to keep atomicity */
+    // let lock_kind = if (is_list(BIF_ARG_2) && CDR(list_val(BIF_ARG_2)) != NIL { LCK_WRITE } else { LCK_WRITE_REC };
+
+    // find table
+    let table = get_table(vm, args[0])?;
+
+    if args[1].is_nil() {
+        return Ok(atom!(TRUE));
+    }
+
+    let keypos = table.meta().keypos;
+
+    let validate = |val: &Term| val.is_tuple() && Tuple::try_from(val).unwrap().len() > keypos;
+
+    let res: Result<()> = if let Ok(cons) = Cons::try_from(&args[1]) {
+        let valid = cons.iter().all(validate);
+        // TODO if bad list
+        // if (lst != NIL) { goto badarg; }
+        if !valid {
+            return Err(Exception::new(Reason::EXC_BADARG));
+        }
+
+        // check if the key already exists first.
+        for val in cons.iter() {
+            if table.member(*val) {
+                return Ok(atom!(FALSE));
+            }
+        }
+
+        cons.iter()
+            .map(|val| table.insert(process, *val, false))
+            .collect::<Result<Vec<()>>>() // this is not efficient at all
+            .map(|_| ())
+    } else {
+        // single param
+        if !validate(&args[1]) {
+            return Err(Exception::new(Reason::EXC_BADARG));
+        }
+        table.insert(process, args[1], false)
+    };
+
+    match res {
+        Ok(_) => Ok(atom!(TRUE)),
+        // TODO use From ets::Error
+        // TODO ERROR_SYSRES on SYSTEM_LIMIT
+        Err(_) => Err(Exception::new(Reason::EXC_BADARG)),
+    }
+}
+
 pub fn lookup_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let table = get_table(vm, args[0])?;
 
