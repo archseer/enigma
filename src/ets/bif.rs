@@ -384,6 +384,8 @@ fn analyze_pattern(
     // Eterm key = NIL;
     // HashValue hval = NIL;
 
+    println!("compiling PAM {}", pattern);
+
     let pattern = Cons::try_from(&pattern)?;
 
     let lst = pattern.iter();
@@ -489,8 +491,6 @@ fn analyze_pattern(
         //     }
         // }
     }
-
-    println!("compiling");
 
     // It would be nice not to compile the match_spec if nothing could match,
     // but then the select calls would not fail like they should on bad

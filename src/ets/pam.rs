@@ -58,135 +58,135 @@ bitflags! {
 
 /// match VM instructions
 pub enum Opcode {
-    MatchArray(usize), /* Only when parameter is an array (DCOMP_TRACE) */
-    MatchArrayBind(usize), /* ------------- " ------------ */
-    MatchTuple(usize),
-    MatchPushT(usize),
-    MatchPushL(Term),
-    MatchPushM(usize),
-    MatchPop(),
-    MatchSwap(),
-    MatchBind(usize),
-    MatchCmp(usize),
-    MatchEqBin(Term),
-    MatchEqFloat(Term), // TODO: raw float
-    MatchEqBig(Term), // TODO: pointer to raw bignum
-    MatchEqRef(Term), // TODO: maybe use raw term &ref to heap
-    MatchEq(Term),
-    MatchList(),
-    MatchMap(usize),
-    MatchKey(Term),
-    MatchSkip(),
-    MatchPushC(Term), // constant
-    MatchConsA(), /* Car is below Cdr */
-    MatchConsB(), /* Cdr is below Car (unusual) */
-    MatchMkTuple(usize),
-    MatchMkFlatMap(usize),
-    MatchMkHashMap(usize),
-    MatchCall0(bif::Fn),
-    MatchCall1(bif::Fn),
-    MatchCall2(bif::Fn),
-    MatchCall3(bif::Fn),
-    MatchPushV(usize),
-    MatchPushVResult(usize), // First variable reference in result
-    MatchPushExpr(), // Push the whole expression we're matching ('$_')
-    MatchPushArrayAsList(), // Only when parameter is an Array and not an erlang term  (DCOMP_TRACE)
-    MatchPushArrayAsListU(), // As above but unknown size
-    MatchTrue(),
-    MatchOr(usize),
-    MatchAnd(usize),
-    MatchOrElse(usize),
-    MatchAndAlso(usize),
-    MatchJump(usize),
-    MatchSelf(),
-    MatchWaste(),
-    MatchReturn(),
-    MatchProcessDump(),
-    MatchDisplay(),
-    MatchIsSeqTrace(),
-    MatchSetSeqToken(),
-    MatchGetSeqToken(),
-    MatchSetReturnTrace(),
-    MatchSetExceptionTrace(),
-    MatchCatch(),
-    MatchEnableTrace(),
-    MatchDisableTrace(),
-    MatchEnableTrace2(),
-    MatchDisableTrace2(),
-    MatchTryMeElse(usize), // fail_label
-    MatchCaller(),
-    MatchHalt(),
-    MatchSilent(),
-    MatchSetSeqTokenFake(),
-    MatchTrace2(),
-    MatchTrace3(),
+    Array(usize), /* Only when parameter is an array (DCOMP_TRACE) */
+    ArrayBind(usize), /* ------------- " ------------ */
+    Tuple(usize),
+    PushT(usize),
+    PushL(Term),
+    PushM(usize),
+    Pop(),
+    Swap(),
+    Bind(usize),
+    Cmp(usize),
+    EqBin(Term),
+    EqFloat(Term), // TODO: raw float
+    EqBig(Term), // TODO: pointer to raw bignum
+    EqRef(Term), // TODO: maybe use raw term &ref to heap
+    Eq(Term),
+    List(),
+    Map(usize),
+    Key(Term),
+    Skip(),
+    PushC(Term), // constant
+    ConsA(), /* Car is below Cdr */
+    ConsB(), /* Cdr is below Car (unusual) */
+    MkTuple(usize),
+    MkFlatMap(usize),
+    MkHashMap(usize),
+    Call0(bif::Fn),
+    Call1(bif::Fn),
+    Call2(bif::Fn),
+    Call3(bif::Fn),
+    PushV(usize),
+    PushVResult(usize), // First variable reference in result
+    PushExpr(), // Push the whole expression we're matching ('$_')
+    PushArrayAsList(), // Only when parameter is an Array and not an erlang term  (DCOMP_TRACE)
+    PushArrayAsListU(), // As above but unknown size
+    True(),
+    Or(usize),
+    And(usize),
+    OrElse(usize),
+    AndAlso(usize),
+    Jump(usize),
+    Self(),
+    Waste(),
+    Return(),
+    ProcessDump(),
+    Display(),
+    IsSeqTrace(),
+    SetSeqToken(),
+    GetSeqToken(),
+    SetReturnTrace(),
+    SetExceptionTrace(),
+    Catch(),
+    EnableTrace(),
+    DisableTrace(),
+    EnableTrace2(),
+    DisableTrace2(),
+    TryMeElse(usize), // fail_label
+    Caller(),
+    Halt(),
+    Silent(),
+    SetSeqTokenFake(),
+    Trace2(),
+    Trace3(),
 }
 
 impl std::fmt::Display for Opcode {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Opcode::MatchArray(n) => write!(f, "array({})", n),
-            Opcode::MatchArrayBind(n) => write!(f, "array_bind({})", n),
-            Opcode::MatchTuple(n) => write!(f, "tuple({})", n),
-            Opcode::MatchPushT(n) => write!(f, "pusht({})", n),
-            Opcode::MatchPushL(n) => write!(f, "pushl({})", n),
-            Opcode::MatchPushM(n) => write!(f, "pushm({})", n),
-            Opcode::MatchPop() => write!(f, "pop"),
-            Opcode::MatchSwap() => write!(f, "swap"),
-            Opcode::MatchBind(n) => write!(f, "bind({})", n),
-            Opcode::MatchCmp(n) => write!(f, "cmp({})", n),
-            Opcode::MatchEqBin(n) => write!(f, "eq_bin({})", n),
-            Opcode::MatchEqFloat(n) => write!(f, "eq_float({})", n),
-            Opcode::MatchEqBig(n) => write!(f, "eq_big({})", n),
-            Opcode::MatchEqRef(n) => write!(f, "eq_ref({})", n),
-            Opcode::MatchEq(n) => write!(f, "eq({})", n),
-            Opcode::MatchList() => write!(f, "list"),
-            Opcode::MatchMap(n) => write!(f, "map({})", n),
-            Opcode::MatchKey(n) => write!(f, "key({})", n),
-            Opcode::MatchSkip() => write!(f, "skip)"),
-            Opcode::MatchPushC(n) => write!(f, "push_c({})", n),
-            Opcode::MatchConsA() => write!(f, "cons_a"),
-            Opcode::MatchConsB() => write!(f, "cons_b"),
-            Opcode::MatchMkTuple(n) => write!(f, "mktuple({})", n),
-            Opcode::MatchMkFlatMap(n) => write!(f, "mkflatmap({})", n),
-            Opcode::MatchMkHashMap(n) => write!(f, "mkhashmap({})", n),
-            Opcode::MatchCall0(..) => write!(f, "call0()"),
-            Opcode::MatchCall1(..) => write!(f, "call1()"),
-            Opcode::MatchCall2(..) => write!(f, "call2()"),
-            Opcode::MatchCall3(..) => write!(f, "call3()"),
-            Opcode::MatchPushV(n) => write!(f, "pushv({})", n),
-            Opcode::MatchPushVResult(n) => write!(f, "pushv_result({})", n),
-            Opcode::MatchPushExpr() => write!(f, "push_expr"),
-            Opcode::MatchPushArrayAsList() => write!(f, "push_array_as_list"),
-            Opcode::MatchPushArrayAsListU() => write!(f, "push_array_as_list_u"),
-            Opcode::MatchTrue() => write!(f, "true"),
-            Opcode::MatchOr(n) => write!(f, "or({})", n),
-            Opcode::MatchAnd(n) => write!(f, "and({})", n),
-            Opcode::MatchOrElse(n) => write!(f, "orelse({})", n),
-            Opcode::MatchAndAlso(n) => write!(f, "andalso({})", n),
-            Opcode::MatchJump(n) => write!(f, "jump({})", n),
-            Opcode::MatchSelf() => write!(f, "self"),
-            Opcode::MatchWaste() => write!(f, "waste"),
-            Opcode::MatchReturn() => write!(f, "return"),
-            Opcode::MatchProcessDump() => write!(f, "processdump"),
-            Opcode::MatchDisplay() => write!(f, "display"),
-            Opcode::MatchIsSeqTrace() => write!(f, "isseqtrace"),
-            Opcode::MatchSetSeqToken() => write!(f, "setseqtoken"),
-            Opcode::MatchGetSeqToken() => write!(f, "getseqtoken"),
-            Opcode::MatchSetReturnTrace() => write!(f, "setreturntrace"),
-            Opcode::MatchSetExceptionTrace() => write!(f, "setexceptiontrace"),
-            Opcode::MatchCatch() => write!(f, "catch"),
-            Opcode::MatchEnableTrace() => write!(f, "enabletrace"),
-            Opcode::MatchDisableTrace() => write!(f, "disabletrace"),
-            Opcode::MatchEnableTrace2() => write!(f, "enabletrace2"),
-            Opcode::MatchDisableTrace2() => write!(f, "disabletrace2"),
-            Opcode::MatchTryMeElse(n) => write!(f, "try_me_else({})", n),
-            Opcode::MatchCaller() => write!(f, "caller"),
-            Opcode::MatchHalt() => write!(f, "halt"),
-            Opcode::MatchSilent() => write!(f, "silent"),
-            Opcode::MatchSetSeqTokenFake() => write!(f, "setseqtokenfake"),
-            Opcode::MatchTrace2() => write!(f, "trace2"),
-            Opcode::MatchTrace3() => write!(f, "trace3"),
+            Opcode::Array(n) => write!(f, "array({})", n),
+            Opcode::ArrayBind(n) => write!(f, "array_bind({})", n),
+            Opcode::Tuple(n) => write!(f, "tuple({})", n),
+            Opcode::PushT(n) => write!(f, "pusht({})", n),
+            Opcode::PushL(n) => write!(f, "pushl({})", n),
+            Opcode::PushM(n) => write!(f, "pushm({})", n),
+            Opcode::Pop() => write!(f, "pop"),
+            Opcode::Swap() => write!(f, "swap"),
+            Opcode::Bind(n) => write!(f, "bind({})", n),
+            Opcode::Cmp(n) => write!(f, "cmp({})", n),
+            Opcode::EqBin(n) => write!(f, "eq_bin({})", n),
+            Opcode::EqFloat(n) => write!(f, "eq_float({})", n),
+            Opcode::EqBig(n) => write!(f, "eq_big({})", n),
+            Opcode::EqRef(n) => write!(f, "eq_ref({})", n),
+            Opcode::Eq(n) => write!(f, "eq({})", n),
+            Opcode::List() => write!(f, "list"),
+            Opcode::Map(n) => write!(f, "map({})", n),
+            Opcode::Key(n) => write!(f, "key({})", n),
+            Opcode::Skip() => write!(f, "skip)"),
+            Opcode::PushC(n) => write!(f, "push_c({})", n),
+            Opcode::ConsA() => write!(f, "cons_a"),
+            Opcode::ConsB() => write!(f, "cons_b"),
+            Opcode::MkTuple(n) => write!(f, "mktuple({})", n),
+            Opcode::MkFlatMap(n) => write!(f, "mkflatmap({})", n),
+            Opcode::MkHashMap(n) => write!(f, "mkhashmap({})", n),
+            Opcode::Call0(..) => write!(f, "call0()"),
+            Opcode::Call1(..) => write!(f, "call1()"),
+            Opcode::Call2(..) => write!(f, "call2()"),
+            Opcode::Call3(..) => write!(f, "call3()"),
+            Opcode::PushV(n) => write!(f, "pushv({})", n),
+            Opcode::PushVResult(n) => write!(f, "pushv_result({})", n),
+            Opcode::PushExpr() => write!(f, "push_expr"),
+            Opcode::PushArrayAsList() => write!(f, "push_array_as_list"),
+            Opcode::PushArrayAsListU() => write!(f, "push_array_as_list_u"),
+            Opcode::True() => write!(f, "true"),
+            Opcode::Or(n) => write!(f, "or({})", n),
+            Opcode::And(n) => write!(f, "and({})", n),
+            Opcode::OrElse(n) => write!(f, "orelse({})", n),
+            Opcode::AndAlso(n) => write!(f, "andalso({})", n),
+            Opcode::Jump(n) => write!(f, "jump({})", n),
+            Opcode::Self() => write!(f, "self"),
+            Opcode::Waste() => write!(f, "waste"),
+            Opcode::Return() => write!(f, "return"),
+            Opcode::ProcessDump() => write!(f, "processdump"),
+            Opcode::Display() => write!(f, "display"),
+            Opcode::IsSeqTrace() => write!(f, "isseqtrace"),
+            Opcode::SetSeqToken() => write!(f, "setseqtoken"),
+            Opcode::GetSeqToken() => write!(f, "getseqtoken"),
+            Opcode::SetReturnTrace() => write!(f, "setreturntrace"),
+            Opcode::SetExceptionTrace() => write!(f, "setexceptiontrace"),
+            Opcode::Catch() => write!(f, "catch"),
+            Opcode::EnableTrace() => write!(f, "enabletrace"),
+            Opcode::DisableTrace() => write!(f, "disabletrace"),
+            Opcode::EnableTrace2() => write!(f, "enabletrace2"),
+            Opcode::DisableTrace2() => write!(f, "disabletrace2"),
+            Opcode::TryMeElse(n) => write!(f, "try_me_else({})", n),
+            Opcode::Caller() => write!(f, "caller"),
+            Opcode::Halt() => write!(f, "halt"),
+            Opcode::Silent() => write!(f, "silent"),
+            Opcode::SetSeqTokenFake() => write!(f, "setseqtokenfake"),
+            Opcode::Trace2() => write!(f, "trace2"),
+            Opcode::Trace3() => write!(f, "trace3"),
         }
     }
 }
@@ -385,7 +385,7 @@ impl Compiler {
 
             if self.current_match < self.num_match - 1 {
                 current_try_label = Some(self.text.len());
-                self.text.push(Opcode::MatchTryMeElse(0));
+                self.text.push(Opcode::TryMeElse(0));
             } else {
                 current_try_label = None;
             }
@@ -402,7 +402,7 @@ impl Compiler {
                                 let map = Map::try_from(&t).unwrap();
                                 let num_iters = map.0.len();
                                 if !structure_checked {
-                                    self.text.push(Opcode::MatchMap(num_iters));
+                                    self.text.push(Opcode::Map(num_iters));
                                 }
                                 structure_checked = false;
 
@@ -412,19 +412,19 @@ impl Compiler {
                                     } else if *key == atom!(UNDERSCORE) {
                                         return Err(new_error(ErrorKind::Generic("Underscore found in map key.".to_string())));
                                     }
-                                    self.text.push(Opcode::MatchKey(key.deep_clone(&self.constant_heap)));
+                                    self.text.push(Opcode::Key(key.deep_clone(&self.constant_heap)));
                                     {
                                         self.stack_used += 1;
                                         let old_stack = self.stack_used;
                                         self.one_term(*value).unwrap();
                                         if old_stack != self.stack_used {
                                             assert!(old_stack + 1 == self.stack_used);
-                                            self.text.push(Opcode::MatchSwap());
+                                            self.text.push(Opcode::Swap());
                                         }
                                         if self.stack_used > self.stack_need {
                                             self.stack_need = self.stack_used;
                                         }
-                                        self.text.push(Opcode::MatchPop());
+                                        self.text.push(Opcode::Pop());
                                         self.stack_used -= 1;
                                     }
                                 }
@@ -433,7 +433,7 @@ impl Compiler {
                                 println!("tup");
                                 let p = Tuple::try_from(&t).unwrap();
                                 if !structure_checked { // i.e. we did not pop it
-                                    self.text.push(Opcode::MatchTuple(p.len()));
+                                    self.text.push(Opcode::Tuple(p.len()));
                                 }
                                 structure_checked = false;
                                 for val in p.iter() {
@@ -451,7 +451,7 @@ impl Compiler {
                     Variant::Cons(..) => {
                         println!("cons");
                         if !structure_checked {
-                            self.text.push(Opcode::MatchList());
+                            self.text.push(Opcode::List());
                         }
                         structure_checked = false; // Whatever it is, we did not pop it
                         let cons = Cons::try_from(&t).unwrap();
@@ -479,7 +479,7 @@ impl Compiler {
                 if let Some(val) = self.stack.pop() {
                     println!("popping");
                     t = val;
-                    self.text.push(Opcode::MatchPop());
+                    self.text.push(Opcode::Pop());
                     structure_checked = true; // Checked with matchPushT or matchPushL
                     self.stack_used -= 1;
                 } else {
@@ -492,23 +492,23 @@ impl Compiler {
             // is 'matchBind' or it is only a skip.
             // self.special =
             //     ((self.text.len() - 1) == 2 + clause_start &&
-            //      self.text[clause_start] == Opcode::MatchBind()) ||
+            //      self.text[clause_start] == Opcode::Bind()) ||
             //     ((self.text.len() - 1) == 1 + clause_start &&
-            //      self.text[clause_start] == Opcode::MatchSkip());
+            //      self.text[clause_start] == Opcode::Skip());
 
             // tracing stuff
             // if self.cflags.contains(Flag::DCOMP_TRACE) {
             //     if self.special {
-            //         if let Opcode::MatchBind(n) = self.text[clause_start] {
-            //             self.text[clause_start] = Opcode::MatchArrayBind(n);
+            //         if let Opcode::Bind(n) = self.text[clause_start] {
+            //             self.text[clause_start] = Opcode::ArrayBind(n);
             //         }
             //     } else {
             //         assert!(self.text.len() >= 1);
-            //         if self.text[clause_start] != Opcode::MatchTuple() {
+            //         if self.text[clause_start] != Opcode::Tuple() {
             //             // If it isn't "special" and the argument is not a tuple, the expression is not valid when matching an array
             //             return Err(new_error(ErrorKind::Generic("Match head is invalid in this self.")));
             //         }
-            //         self.text[clause_start] = Opcode::MatchArray();
+            //         self.text[clause_start] = Opcode::Array();
             //     }
             // }
 
@@ -532,10 +532,10 @@ impl Compiler {
 
 
             // If the matchprogram comes here, the match is successful
-            self.text.push(Opcode::MatchHalt());
+            self.text.push(Opcode::Halt());
             // Fill in try-me-else label if there is one.
             if let Some(label) = current_try_label {
-                self.text[label] = Opcode::MatchTryMeElse(self.text.len());
+                self.text[label] = Opcode::TryMeElse(self.text.len());
             }
 
         } /* for (self.current_match = 0 ...) */
@@ -599,25 +599,25 @@ impl Compiler {
 
                 if let Some(n) = n { // variable
                     if self.vars.get(&n).is_some() {
-                        self.text.push(Opcode::MatchCmp(n));
+                        self.text.push(Opcode::Cmp(n));
                     } else { /* Not bound, bind! */
-                        self.text.push(Opcode::MatchBind(n));
+                        self.text.push(Opcode::Bind(n));
                         self.vars.insert(n, false); // bind var, set in_guard to false
                     }
                 } else if c == atom!(UNDERSCORE) {
-                    self.text.push(Opcode::MatchSkip());
+                    self.text.push(Opcode::Skip());
                 } else {
                     // Any other atom value
-                    self.text.push(Opcode::MatchEq(c));
+                    self.text.push(Opcode::Eq(c));
                 }
             }
             value::TERM_CONS => {
-                self.text.push(Opcode::MatchPushL(c));
+                self.text.push(Opcode::PushL(c));
                 self.stack_used += 1;
                 self.stack.push(c);
             }
             value::TERM_FLOAT => {
-                self.text.push(Opcode::MatchEqFloat(c));
+                self.text.push(Opcode::EqFloat(c));
             // #ifdef ARCH_64
             //     PUSH(*self.text, 0);
             // #else
@@ -628,30 +628,30 @@ impl Compiler {
                 match c.get_boxed_header().unwrap() { // inefficient, cast directly
                     value::BOXED_TUPLE => {
                         let n = Tuple::try_from(&c).unwrap().len();
-                        self.text.push(Opcode::MatchPushT(n));
+                        self.text.push(Opcode::PushT(n));
                         self.stack_used += 1;
                         self.stack.push(c);
                     }
                     value::BOXED_MAP => {
                         let n = Map::try_from(&c).unwrap().0.len();
-                        self.text.push(Opcode::MatchPushM(n));
+                        self.text.push(Opcode::PushM(n));
                         self.stack_used += 1;
                         self.stack.push(c);
                     }
                     value::BOXED_REF => {
-                        self.text.push(Opcode::MatchEqRef(c));
+                        self.text.push(Opcode::EqRef(c));
                     }
                     value::BOXED_BIGINT => {
-                        self.text.push(Opcode::MatchEqBig(c));
+                        self.text.push(Opcode::EqBig(c));
                     }
                     _ => { /* BINARY, FUN, VECTOR, or EXTERNAL */
-                        self.text.push(Opcode::MatchEqBin(c.deep_clone(&self.constant_heap)));
+                        self.text.push(Opcode::EqBin(c.deep_clone(&self.constant_heap)));
                     }
                 }
             }
             _ => {
                 // Any immediate value
-                self.text.push(Opcode::MatchEq(c));
+                self.text.push(Opcode::Eq(c));
             }
         }
 
@@ -664,7 +664,7 @@ impl Compiler {
                 return Err(new_error(ErrorKind::Generic("Match expression is not a list.".to_string())));
             }
             if !self.is_guard {
-                self.text.push(Opcode::MatchCatch());
+                self.text.push(Opcode::Catch());
             }
             while let Ok(Cons { head: t, tail }) = l.try_into() {
                 let constant = self.expr(*t)?;
@@ -673,9 +673,9 @@ impl Compiler {
                 }
                 l = *tail;
                 if self.is_guard {
-                    self.text.push(Opcode::MatchTrue());
+                    self.text.push(Opcode::True());
                 } else {
-                    self.text.push(Opcode::MatchWaste());
+                    self.text.push(Opcode::Waste());
                 }
                 self.stack_used -= 1;
             }
@@ -683,10 +683,10 @@ impl Compiler {
                 return Err(new_error(ErrorKind::Generic("Match expression is not a proper list.".to_string())));
             }
             if !self.is_guard && self.cflags.contains(Flag::DCOMP_TABLE) {
-                if let Some(Opcode::MatchWaste()) = self.text.pop() {
-                    self.text.push(Opcode::MatchReturn()); // Same impact on stack as matchWaste
+                if let Some(Opcode::Waste()) = self.text.pop() {
+                    self.text.push(Opcode::Return()); // Same impact on stack as matchWaste
                 } else {
-                    //assert!(Some(&Opcode::MatchWaste()) == self.text.last());
+                    //assert!(Some(&Opcode::Waste()) == self.text.last());
                     unreachable!();
                 }
             }
@@ -700,7 +700,7 @@ impl Compiler {
 
     fn do_emit_constant(&mut self, t: Term) {
         let tmp = t.deep_clone(&self.constant_heap);
-        self.text.push(Opcode::MatchPushC(tmp));
+        self.text.push(Opcode::PushC(tmp));
         self.stack_used += 1;
         if self.stack_used > self.stack_need {
             self.stack_need = self.stack_used;
@@ -721,10 +721,10 @@ impl Compiler {
             if c2 {
                 self.do_emit_constant(cons.tail);
             }
-            self.text.push(Opcode::MatchConsA());
+            self.text.push(Opcode::ConsA());
         } else { /* !c2 && c1 */
             self.do_emit_constant(cons.head);
-            self.text.push(Opcode::MatchConsB());
+            self.text.push(Opcode::ConsB());
         }
         self.stack_used -= 1; /* Two objects on stack becomes one */
         Ok(false)
@@ -784,7 +784,7 @@ impl Compiler {
         if all_constant {
             return Ok(true);
         }
-        self.text.push(Opcode::MatchMkTuple(nelems));
+        self.text.push(Opcode::MkTuple(nelems));
         self.stack_used -= nelems - 1;
         Ok(false)
     }
@@ -821,7 +821,7 @@ impl Compiler {
                 self.do_emit_constant(*value);
             }
         }
-        self.text.push(Opcode::MatchMkHashMap(nelems));
+        self.text.push(Opcode::MkHashMap(nelems));
         self.stack_used -= nelems;
         Ok(false)
     }
@@ -830,13 +830,13 @@ impl Compiler {
         if self.cflags.contains(Flag::DCOMP_TRACE) {
             // Hmmm, convert array to list...
             if self.special {
-                self.text.push(Opcode::MatchPushArrayAsListU());
+                self.text.push(Opcode::PushArrayAsListU());
             } else {
                 assert!(self.matchexpr[self.current_match].is_tuple());
-                self.text.push(Opcode::MatchPushArrayAsList());
+                self.text.push(Opcode::PushArrayAsList());
             }
         } else {
-            self.text.push(Opcode::MatchPushExpr());
+            self.text.push(Opcode::PushExpr());
         }
         self.stack_used += 1;
         if self.stack_used > self.stack_need {
@@ -848,11 +848,11 @@ impl Compiler {
     /// Figure out which PushV instruction to use.
     fn add_pushv_variant(&mut self, n: usize) {
         let v = self.vars.get_mut(&n).unwrap();
-        let mut instr = Opcode::MatchPushV(n);
+        let mut instr = Opcode::PushV(n);
 
         if !self.is_guard {
             if !*v {
-                instr = Opcode::MatchPushVResult(n);
+                instr = Opcode::PushVResult(n);
                 *v = true;
             }
         }
@@ -878,11 +878,11 @@ impl Compiler {
     }
 
     fn all_bindings(&mut self) -> DMCRet {
-        self.text.push(Opcode::MatchPushC(Term::nil()));
+        self.text.push(Opcode::PushC(Term::nil()));
         let keys: Vec<_> = self.vars.keys().cloned().collect();
         keys.into_iter().for_each(|n| {
             self.add_pushv_variant(n);
-            self.text.push(Opcode::MatchConsB());
+            self.text.push(Opcode::ConsB());
         });
 
         self.stack_used += 1;
@@ -915,7 +915,7 @@ impl Compiler {
                 self.do_emit_constant(*val);
             }
         }
-        self.text.push(Opcode::MatchAnd(a - 1));
+        self.text.push(Opcode::And(a - 1));
         self.stack_used -= a - 2;
         Ok(false)
     }
@@ -933,7 +933,7 @@ impl Compiler {
                 self.do_emit_constant(*val);
             }
         }
-        self.text.push(Opcode::MatchOr(a - 1));
+        self.text.push(Opcode::Or(a - 1));
         self.stack_used -= a - 2;
         Ok(false)
     }
@@ -956,7 +956,7 @@ impl Compiler {
             if c {
                 self.do_emit_constant(*val);
             }
-            self.text.push(Opcode::MatchAndAlso(lbl));
+            self.text.push(Opcode::AndAlso(lbl));
             lbl = self.text.len()-1;
             self.stack_used -= 1;
         }
@@ -966,17 +966,17 @@ impl Compiler {
         if c {
             self.do_emit_constant(*last);
         }
-        self.text.push(Opcode::MatchJump(self.text.len() + 1)); // skips that PushC(true)
+        self.text.push(Opcode::Jump(self.text.len() + 1)); // skips that PushC(true)
         // lbl = self.text.len()-1; we do this manually above
         self.stack_used -= 1;
         // -- end
 
-        self.text.push(Opcode::MatchPushC(atom!(TRUE)));
+        self.text.push(Opcode::PushC(atom!(TRUE)));
         let lbl_val = self.text.len();
         // go back and modify all the MatchAndAlso instructions to jump to the correct spot
         while lbl > 0 {
-            if let Opcode::MatchAndAlso(lbl_next) = self.text[lbl] {
-                self.text[lbl] = Opcode::MatchAndAlso(lbl_val-lbl-1);
+            if let Opcode::AndAlso(lbl_next) = self.text[lbl] {
+                self.text[lbl] = Opcode::AndAlso(lbl_val-lbl-1);
                 lbl = lbl_next;
             } else { unreachable!() }
         }
@@ -1004,7 +1004,7 @@ impl Compiler {
             if c {
                 self.do_emit_constant(*val);
             }
-            self.text.push(Opcode::MatchOrElse(lbl));
+            self.text.push(Opcode::OrElse(lbl));
             lbl = self.text.len()-1;
             self.stack_used -= 1;
         }
@@ -1014,15 +1014,15 @@ impl Compiler {
         if c {
             self.do_emit_constant(*last);
         }
-        self.text.push(Opcode::MatchJump(self.text.len() + 1)); // skips that PushC(true)
+        self.text.push(Opcode::Jump(self.text.len() + 1)); // skips that PushC(true)
         // lbl = self.text.len()-1; we do this manually above
         // -- end
 
-        self.text.push(Opcode::MatchPushC(atom!(FALSE)));
+        self.text.push(Opcode::PushC(atom!(FALSE)));
         let lbl_val = self.text.len();
         while lbl > 0 {
-            if let Opcode::MatchOrElse(lbl_next) = self.text[lbl] {
-                self.text[lbl] = Opcode::MatchOrElse(lbl_val-lbl-1);
+            if let Opcode::OrElse(lbl_next) = self.text[lbl] {
+                self.text[lbl] = Opcode::OrElse(lbl_val-lbl-1);
                 lbl = lbl_next;
             } else { unreachable!() }
         }
@@ -1051,8 +1051,8 @@ impl Compiler {
         if c {
             self.do_emit_constant(p[1]);
         }
-        self.text.push(Opcode::MatchReturn());
-        self.text.push(Opcode::MatchPushC(atom!(TRUE)));
+        self.text.push(Opcode::Return());
+        self.text.push(Opcode::PushC(atom!(TRUE)));
         /* Push as much as we remove, stack_need is untouched */
         Ok(false)
     }
@@ -1064,7 +1064,7 @@ impl Compiler {
         if a != 1 {
             return Err(new_error(ErrorKind::Argument { form: "self", value: t, reason: "with arguments" }));
         }
-        self.text.push(Opcode::MatchSelf());
+        self.text.push(Opcode::Self());
         self.stack_used += 1;
         if self.stack_used > self.stack_need {
             self.stack_need = self.stack_used;
@@ -1086,7 +1086,7 @@ impl Compiler {
         if a != 1 {
             return Err(new_error(ErrorKind::Argument { form: "return_trace", value: t, reason: "with arguments" }));
         }
-        self.text.push(Opcode::MatchSetReturnTrace()); /* Pushes 'true' on the stack */
+        self.text.push(Opcode::SetReturnTrace()); /* Pushes 'true' on the stack */
         self.stack_used += 1;
         if self.stack_used > self.stack_need {
             self.stack_need = self.stack_used;
@@ -1108,7 +1108,7 @@ impl Compiler {
         if a != 1 {
             return Err(new_error(ErrorKind::Argument { form: "exception_trace", value: t, reason: "with arguments" }));
         }
-        self.text.push(Opcode::MatchSetExceptionTrace()); /* Pushes 'true' on the stack */
+        self.text.push(Opcode::SetExceptionTrace()); /* Pushes 'true' on the stack */
         self.stack_used += 1;
         if self.stack_used > self.stack_need {
             self.stack_need = self.stack_used;
@@ -1138,7 +1138,7 @@ impl Compiler {
         if a != 1 {
             return Err(new_error(ErrorKind::Argument { form: "is_seq_trace", value: t, reason: "with arguments" }));
         }
-        self.text.push(Opcode::MatchIsSeqTrace());
+        self.text.push(Opcode::IsSeqTrace());
         /* Pushes 'true' or 'false' on the stack */
         self.stack_used += 1;
         if self.stack_used > self.stack_need {
@@ -1165,9 +1165,9 @@ impl Compiler {
             self.do_emit_constant(p[1]);
         }
         if self.cflags.contains(Flag::DCOMP_FAKE_DESTRUCTIVE) {
-            self.text.push(Opcode::MatchSetSeqTokenFake());
+            self.text.push(Opcode::SetSeqTokenFake());
         } else {
-            self.text.push(Opcode::MatchSetSeqToken());
+            self.text.push(Opcode::SetSeqToken());
         }
         self.stack_used -= 1; /* Remove two and add one */
         Ok(false)
@@ -1183,7 +1183,7 @@ impl Compiler {
             return Err(new_error(ErrorKind::Argument { form: "get_seq_token", value: t, reason: "with arguments" }));
         }
 
-        self.text.push(Opcode::MatchGetSeqToken());
+        self.text.push(Opcode::GetSeqToken());
         self.stack_used += 1;
         if self.stack_used > self.stack_need {
             self.stack_need = self.stack_used;
@@ -1209,7 +1209,7 @@ impl Compiler {
         if c {
             self.do_emit_constant(p[1]);
         }
-        self.text.push(Opcode::MatchDisplay());
+        self.text.push(Opcode::Display());
         /* Push as much as we remove, stack_need is untouched */
         Ok(false)
     }
@@ -1223,7 +1223,7 @@ impl Compiler {
         if a != 1 {
             return Err(new_error(ErrorKind::Argument { form: "process_dump", value: t, reason: "with arguments" }));
         }
-        self.text.push(Opcode::MatchProcessDump()); /* Creates binary */
+        self.text.push(Opcode::ProcessDump()); /* Creates binary */
         self.stack_used += 1;
         if self.stack_used > self.stack_need {
             self.stack_need = self.stack_used;
@@ -1243,7 +1243,7 @@ impl Compiler {
                 if c {
                     self.do_emit_constant(p[1]);
                 }
-                self.text.push(Opcode::MatchEnableTrace());
+                self.text.push(Opcode::EnableTrace());
                 /* Push as much as we remove, stack_need is untouched */
             }
             3 => {
@@ -1255,7 +1255,7 @@ impl Compiler {
                 if c {
                     self.do_emit_constant(p[1]);
                 }
-                self.text.push(Opcode::MatchEnableTrace2());
+                self.text.push(Opcode::EnableTrace2());
                 self.stack_used -= 1; /* Remove two and add one */
             }
             _ => return Err(new_error(ErrorKind::Argument { form: "enable_trace", value: t, reason: "with wrong number of arguments" }))
@@ -1275,7 +1275,7 @@ impl Compiler {
                 if c {
                     self.do_emit_constant(p[1]);
                 }
-                self.text.push(Opcode::MatchDisableTrace());
+                self.text.push(Opcode::DisableTrace());
                 /* Push as much as we remove, stack_need is untouched */
             }
             3 => {
@@ -1287,7 +1287,7 @@ impl Compiler {
                 if c {
                     self.do_emit_constant(p[1]);
                 }
-                self.text.push(Opcode::MatchDisableTrace2());
+                self.text.push(Opcode::DisableTrace2());
                 self.stack_used -= 1; // Remove two and add one
             }
             _ => return Err(new_error(ErrorKind::Argument { form: "disable_trace", value: t, reason: "with wrong number of arguments" }))
@@ -1311,7 +1311,7 @@ impl Compiler {
                 if c {
                     self.do_emit_constant(p[1]);
                 }
-                self.text.push(Opcode::MatchTrace2());
+                self.text.push(Opcode::Trace2());
                 self.stack_used -= 1; /* Remove two and add one */
             }
             4 => {
@@ -1327,7 +1327,7 @@ impl Compiler {
                 if c {
                     self.do_emit_constant(p[1]);
                 }
-                self.text.push(Opcode::MatchTrace3());
+                self.text.push(Opcode::Trace3());
                 self.stack_used -= 2; /* Remove three and add one */
             }
             _ => return Err(new_error(ErrorKind::Argument { form: "trace", value: t, reason: "with wrong number of arguments" }))
@@ -1344,7 +1344,7 @@ impl Compiler {
         if a != 1 {
             return Err(new_error(ErrorKind::Argument { form: "caller", value: t, reason: "with arguments" }));
         }
-        self.text.push(Opcode::MatchCaller()); /* Creates binary */
+        self.text.push(Opcode::Caller()); /* Creates binary */
         self.stack_used += 1;
         if self.stack_used > self.stack_need {
             self.stack_need = self.stack_used;
@@ -1365,8 +1365,8 @@ impl Compiler {
         if c {
             self.do_emit_constant(p[1]);
         }
-        self.text.push(Opcode::MatchSilent());
-        self.text.push(Opcode::MatchPushC(atom!(TRUE)));
+        self.text.push(Opcode::Silent());
+        self.text.push(Opcode::PushC(atom!(TRUE)));
         /* Push as much as we remove, stack_need is untouched */
         Ok(false)
     }
@@ -1438,10 +1438,10 @@ impl Compiler {
         }
 
         match arity {
-            0 => self.text.push(Opcode::MatchCall0(*bif)),
-            1 => self.text.push(Opcode::MatchCall1(*bif)),
-            2 => self.text.push(Opcode::MatchCall2(*bif)),
-            3 => self.text.push(Opcode::MatchCall3(*bif)),
+            0 => self.text.push(Opcode::Call0(*bif)),
+            1 => self.text.push(Opcode::Call1(*bif)),
+            2 => self.text.push(Opcode::Call2(*bif)),
+            3 => self.text.push(Opcode::Call3(*bif)),
             _ => panic!("ets:match() internal error, guard with more than 3 arguments."),
         }
         self.stack_used -= a - 2;
