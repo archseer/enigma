@@ -348,6 +348,9 @@ pub fn delete_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
 }
 
 pub fn select_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let table = get_table(vm, args[0])?;
+
+    analyze_pattern(&table, args[1]);
     unimplemented!()
 }
 
@@ -386,10 +389,10 @@ fn analyze_pattern(
     let lst = pattern.iter();
     let num_heads = lst.count();
 
-    if !lst.is_nil() {
-        // proper list...
-        return Err(new_error(ErrorKind::BadParameter));
-    }
+    // if !lst.is_nil() {
+    //     // proper list...
+    //     return Err(new_error(ErrorKind::BadParameter));
+    // }
 
     // let lists = Vec::with_capacity(num_heads);
 
@@ -399,12 +402,12 @@ fn analyze_pattern(
         // num_lists: 0,
         key_given: true,
         something_can_match: false,
-        mp: std::mem::uninitialized(),
+        mp: unsafe { std::mem::uninitialized() },
     };
 
-    let matches: Vec<Term> = Vec::with_capacity(num_heads);
-    let guards: Vec<Term> = Vec::with_capacity(num_heads);
-    let bodies: Vec<Term> = Vec::with_capacity(num_heads);
+    let mut matches: Vec<Term> = Vec::with_capacity(num_heads);
+    let mut guards: Vec<Term> = Vec::with_capacity(num_heads);
+    let mut bodies: Vec<Term> = Vec::with_capacity(num_heads);
 
     for tup in pattern {
         // Eterm match;
@@ -431,73 +434,80 @@ fn analyze_pattern(
         //     || CAR(list_val(body)) != atom!(DOLLAR_UNDERSCORE))
         // {}
 
-        if !mpi.key_given {
-            continue;
-        }
+        // if !mpi.key_given {
+        //     continue;
+        // }
 
-        if tpl == atom!(UNDERSCORE) || pam::is_variable(tpl).is_some() {
-            mpi.key_given = false;
-            mpi.something_can_match = true;
-        } else {
-            if let Some(key) = tpl.get(table.meta().keypos) {
-                if !db_has_variable(key) {
-                    // Bound key
-                    // int ix, search_slot;
-                    // HashDbTerm** bp;
-                    // erts_rwmtx_t* lck;
-                    hval = MAKE_HASH(key);
-                    lck = RLOCK_HASH(tb, hval);
-                    ix = hash_to_ix(tb, hval);
-                    bp = &BUCKET(tb, ix);
-                    if lck == NULL {
-                        search_slot = search_list(tb, key, hval, *bp) != NULL;
-                    } else {
-                        /* No point to verify if key exist now as there may be
-                        concurrent inserters/deleters anyway */
-                        RUNLOCK_HASH(lck);
-                        search_slot = true;
-                    }
+        // if tpl == atom!(UNDERSCORE) || pam::is_variable(tpl).is_some() {
+        //     mpi.key_given = false;
+        //     mpi.something_can_match = true;
+        // } else {
+        //     if let Ok(tuple) = Tuple::try_from(&tpl) {
+        //         if let Some(key) = tuple.get(table.meta().keypos) {
+        //             if !pam::has_variable(*key) {
+        //                 // Bound key
+        //                 // int ix, search_slot;
+        //                 // HashDbTerm** bp;
+        //                 // erts_rwmtx_t* lck;
+        //                 hval = MAKE_HASH(key);
+        //                 lck = RLOCK_HASH(tb, hval);
+        //                 ix = hash_to_ix(tb, hval);
+        //                 bp = &BUCKET(tb, ix);
+        //                 if lck == NULL {
+        //                     search_slot = search_list(tb, key, hval, *bp) != NULL;
+        //                 } else {
+        //                     /* No point to verify if key exist now as there may be
+        //                     concurrent inserters/deleters anyway */
+        //                     RUNLOCK_HASH(lck);
+        //                     search_slot = true;
+        //                 }
 
-                    if search_slot {
-                        // let j = 0;
-                        // loop {
-                        // if j == mpi->num_lists) {
-                        // mpi->lists[mpi->num_lists].bucket = bp;
-                        // mpi->lists[mpi->num_lists].ix = ix;
-                        // ++mpi->num_lists;
-                        // break;
-                        // }
-                        // if mpi->lists[j].bucket == bp {
-                        // assert!(mpi->lists[j].ix == ix);
-                        // break;
-                        // }
-                        // assert!(mpi->lists[j].ix != ix);
+        //                 if search_slot {
+        //                     // let j = 0;
+        //                     // loop {
+        //                     // if j == mpi->num_lists) {
+        //                     // mpi->lists[mpi->num_lists].bucket = bp;
+        //                     // mpi->lists[mpi->num_lists].ix = ix;
+        //                     // ++mpi->num_lists;
+        //                     // break;
+        //                     // }
+        //                     // if mpi->lists[j].bucket == bp {
+        //                     // assert!(mpi->lists[j].ix == ix);
+        //                     // break;
+        //                     // }
+        //                     // assert!(mpi->lists[j].ix != ix);
 
-                        //     j += 1;
-                        // }
-                        mpi.something_can_match = true;
-                    }
-                } else {
-                    mpi.key_given = false;
-                    mpi.something_can_match = true;
-                }
-            }
-        }
+        //                     //     j += 1;
+        //                     // }
+        //                     mpi.something_can_match = true;
+        //                 }
+        //             } else {
+        //                 mpi.key_given = false;
+        //                 mpi.something_can_match = true;
+        //             }
+        //         }
+        //     }
+        // }
     }
+
+    println!("compiling");
 
     // It would be nice not to compile the match_spec if nothing could match,
     // but then the select calls would not fail like they should on bad
     // match specs that happen to specify non existent keys etc.
 
     let compiler = pam::Compiler::new(matches, guards, bodies, num_heads, pam::Flag::DCOMP_TABLE);
-    mpi.mp = compiler.match_compile().unwrap();
+    let mp = compiler.match_compile().unwrap();
+    // mpi.mp = compiler.match_compile().unwrap();
     //if mpi.mp == NULL {
     //    //if buff != sbuff { erts_free(ERTS_ALC_T_DB_TMP, buff); }
     //    return Err(new_error(ErrorKind::BadParameter));
     //}
     //if buff != sbuff { erts_free(ERTS_ALC_T_DB_TMP, buff); }
+    mp.program.iter().for_each(|op| eprintln!("{}", op));
 
-    Ok(mpi)
+    unimplemented!();
+    // Ok(mpi)
 }
 
 // safe_fixtable_2

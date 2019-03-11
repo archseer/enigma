@@ -1,3 +1,20 @@
+// Sample program
+// tuple(3)
+// pusht(2)
+// bind(1)
+// bind(2)
+// pop
+// eq(:$handler_config$)
+// eq(:simple)
+// pushv(1)
+// push_c(6)
+// call2()
+// true
+// catch
+// pushv_result(2)
+// return
+// halt
+
 /// Execution of the match program, this is Pam.
 /// May return THE_NON_VALUE, which is a bailout.
 /// the parameter 'arity' is only used if 'term' is actually an array,
@@ -72,7 +89,7 @@ fn prog_match(c_p: &RcProcess, pself: &RcProcess, bprog: pam::Pattern, term: Ter
 restart:
     let mut ep = &[term].iter();
     // esp = (Eterm*)((char*)mpsp->u.heap + prog->stack_offset); // seems to be estack pointer
-    let esp = Vec::new(); // TODO with some default capacity -- seems to be used as a stack for special form & guard bifs
+    let esp = Vec::with_capacity(prog.stack_need); // TODO with some default capacity -- seems to be used as a stack for special form & guard bifs
     // sp = (const Eterm **)esp; // current stack pointer
     let mut sp = iter;
     let mut ret = atom!(TRUE);

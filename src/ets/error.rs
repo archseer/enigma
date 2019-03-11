@@ -42,6 +42,12 @@ pub enum ErrorKind {
     __Nonexhaustive,
 }
 
+impl From<crate::value::WrongBoxError> for Error {
+    fn from(_value: crate::value::WrongBoxError) -> Self {
+        new_error(ErrorKind::BadParameter)
+    }
+}
+
 // impl From<io::Error> for Error {
 //     fn from(err: io::Error) -> Error {
 //         new_error(ErrorKind::Io(err))

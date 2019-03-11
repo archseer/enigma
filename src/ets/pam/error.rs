@@ -46,7 +46,7 @@ pub enum ErrorKind {
     CalledInGuard {
         form: &'static str,
     },
-    Generic(&'static str),
+    Generic(String),
     /// Hints that destructuring should not be exhaustive.
     ///
     /// This enum may grow additional variants, so this makes sure clients
@@ -73,7 +73,7 @@ impl StdError for Error {
         match *self.0 {
             ErrorKind::Argument { reason, .. } => reason,
             ErrorKind::WrongDialect { .. } => "wrong dialect",
-            ErrorKind::Generic(reason) => reason,
+            ErrorKind::Generic(..) => "generic",
             // ErrorKind::Io(ref err) => err.description(),
             // ErrorKind::Utf8 { ref err, .. } => err.description(),
             // ErrorKind::UnequalLengths { .. } => "record of different length found",
@@ -114,7 +114,7 @@ impl fmt::Display for Error {
             ErrorKind::CalledInGuard { form } => {
                 write!(f, "Special form '{}' called in guard.", form)
             }
-            ErrorKind::Generic(reason) => write!(f, "{}", reason),
+            ErrorKind::Generic(ref reason) => write!(f, "{}", reason),
             _ => unreachable!(),
         }
     }

@@ -10,9 +10,10 @@ use crate::immix::Heap;
 use crate::atom;
 use crate::bif::{self};
 
-struct Pattern {
+pub struct Pattern {
     heap: Heap,
-    program: Vec<Opcode>
+    pub program: Vec<Opcode>,
+    stack_need: usize,
 }
 
 /// Compilation flags
@@ -56,7 +57,7 @@ bitflags! {
 }
 
 /// match VM instructions
-enum Opcode {
+pub enum Opcode {
     MatchArray(usize), /* Only when parameter is an array (DCOMP_TRACE) */
     MatchArrayBind(usize), /* ------------- " ------------ */
     MatchTuple(usize),
@@ -68,9 +69,9 @@ enum Opcode {
     MatchBind(usize),
     MatchCmp(usize),
     MatchEqBin(Term),
-    MatchEqFloat(value::Float),
-    MatchEqBig(Bignum),
-    MatchEqRef(process::Ref),
+    MatchEqFloat(Term), // TODO: raw float
+    MatchEqBig(Term), // TODO: pointer to raw bignum
+    MatchEqRef(Term), // TODO: maybe use raw term &ref to heap
     MatchEq(Term),
     MatchList(),
     MatchMap(usize),
@@ -119,6 +120,75 @@ enum Opcode {
     MatchSetSeqTokenFake(),
     MatchTrace2(),
     MatchTrace3(),
+}
+
+impl std::fmt::Display for Opcode {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Opcode::MatchArray(n) => write!(f, "array({})", n),
+            Opcode::MatchArrayBind(n) => write!(f, "array_bind({})", n),
+            Opcode::MatchTuple(n) => write!(f, "tuple({})", n),
+            Opcode::MatchPushT(n) => write!(f, "pusht({})", n),
+            Opcode::MatchPushL(n) => write!(f, "pushl({})", n),
+            Opcode::MatchPushM(n) => write!(f, "pushm({})", n),
+            Opcode::MatchPop() => write!(f, "pop"),
+            Opcode::MatchSwap() => write!(f, "swap"),
+            Opcode::MatchBind(n) => write!(f, "bind({})", n),
+            Opcode::MatchCmp(n) => write!(f, "cmp({})", n),
+            Opcode::MatchEqBin(n) => write!(f, "eq_bin({})", n),
+            Opcode::MatchEqFloat(n) => write!(f, "eq_float({})", n),
+            Opcode::MatchEqBig(n) => write!(f, "eq_big({})", n),
+            Opcode::MatchEqRef(n) => write!(f, "eq_ref({})", n),
+            Opcode::MatchEq(n) => write!(f, "eq({})", n),
+            Opcode::MatchList() => write!(f, "list"),
+            Opcode::MatchMap(n) => write!(f, "map({})", n),
+            Opcode::MatchKey(n) => write!(f, "key({})", n),
+            Opcode::MatchSkip() => write!(f, "skip)"),
+            Opcode::MatchPushC(n) => write!(f, "push_c({})", n),
+            Opcode::MatchConsA() => write!(f, "cons_a"),
+            Opcode::MatchConsB() => write!(f, "cons_b"),
+            Opcode::MatchMkTuple(n) => write!(f, "mktuple({})", n),
+            Opcode::MatchMkFlatMap(n) => write!(f, "mkflatmap({})", n),
+            Opcode::MatchMkHashMap(n) => write!(f, "mkhashmap({})", n),
+            Opcode::MatchCall0(..) => write!(f, "call0()"),
+            Opcode::MatchCall1(..) => write!(f, "call1()"),
+            Opcode::MatchCall2(..) => write!(f, "call2()"),
+            Opcode::MatchCall3(..) => write!(f, "call3()"),
+            Opcode::MatchPushV(n) => write!(f, "pushv({})", n),
+            Opcode::MatchPushVResult(n) => write!(f, "pushv_result({})", n),
+            Opcode::MatchPushExpr() => write!(f, "push_expr"),
+            Opcode::MatchPushArrayAsList() => write!(f, "push_array_as_list"),
+            Opcode::MatchPushArrayAsListU() => write!(f, "push_array_as_list_u"),
+            Opcode::MatchTrue() => write!(f, "true"),
+            Opcode::MatchOr(n) => write!(f, "or({})", n),
+            Opcode::MatchAnd(n) => write!(f, "and({})", n),
+            Opcode::MatchOrElse(n) => write!(f, "orelse({})", n),
+            Opcode::MatchAndAlso(n) => write!(f, "andalso({})", n),
+            Opcode::MatchJump(n) => write!(f, "jump({})", n),
+            Opcode::MatchSelf() => write!(f, "self"),
+            Opcode::MatchWaste() => write!(f, "waste"),
+            Opcode::MatchReturn() => write!(f, "return"),
+            Opcode::MatchProcessDump() => write!(f, "processdump"),
+            Opcode::MatchDisplay() => write!(f, "display"),
+            Opcode::MatchIsSeqTrace() => write!(f, "isseqtrace"),
+            Opcode::MatchSetSeqToken() => write!(f, "setseqtoken"),
+            Opcode::MatchGetSeqToken() => write!(f, "getseqtoken"),
+            Opcode::MatchSetReturnTrace() => write!(f, "setreturntrace"),
+            Opcode::MatchSetExceptionTrace() => write!(f, "setexceptiontrace"),
+            Opcode::MatchCatch() => write!(f, "catch"),
+            Opcode::MatchEnableTrace() => write!(f, "enabletrace"),
+            Opcode::MatchDisableTrace() => write!(f, "disabletrace"),
+            Opcode::MatchEnableTrace2() => write!(f, "enabletrace2"),
+            Opcode::MatchDisableTrace2() => write!(f, "disabletrace2"),
+            Opcode::MatchTryMeElse(n) => write!(f, "try_me_else({})", n),
+            Opcode::MatchCaller() => write!(f, "caller"),
+            Opcode::MatchHalt() => write!(f, "halt"),
+            Opcode::MatchSilent() => write!(f, "silent"),
+            Opcode::MatchSetSeqTokenFake() => write!(f, "setseqtokenfake"),
+            Opcode::MatchTrace2() => write!(f, "trace2"),
+            Opcode::MatchTrace3() => write!(f, "trace3"),
+        }
+    }
 }
 
 // The table of callable bif's, i e guard bif's and
@@ -195,8 +265,8 @@ pub fn is_variable(obj: Term) -> Option<usize> {
         Variant::Atom(i) if i > 2 => {
             crate::atom::to_str(i)
                 .ok()
-                .map(|v| v.as_bytes())
                 .and_then(|name| {
+                    let name = name.as_bytes();
                     if name[0] == '$' as u8 {
                         lexical::try_parse::<usize, _>(&name[1..]).ok()
                     } else { None }
@@ -209,16 +279,17 @@ pub fn is_variable(obj: Term) -> Option<usize> {
 /// check if obj is (or contains) a variable
 /// return true if obj contains a variable or underscore
 /// return false if obj is fully ground
-pub fn has_variable(mut node: Term) -> bool {
-    let s: Vec<Term> = Vec::new();
+pub fn has_variable(node: Term) -> bool {
+    let mut s: Vec<Term> = Vec::new();
     s.push(node);
 
     while let Some(node) = s.pop() {
         match node.tag() {
             value::TERM_CONS => {
-                while let Ok(Cons { head, tail }) = node.try_into() {
+                let mut list = node;
+                while let Ok(Cons { head, tail }) = list.try_into() {
                     s.push(*head);
-                    node = *tail;
+                    list = *tail;
                 }
                 s.push(node) // Non wellformed list or []
             }
@@ -229,9 +300,9 @@ pub fn has_variable(mut node: Term) -> bool {
                         s.push(*val);
                     }
                 } else if node.is_map() { // other map-nodes or map-heads
-                    let map = Map::try_from(&node).unwrap().0;
+                    let map = Map::try_from(&node).unwrap();
                     // TODO: check both keys and vals? is that correct
-                    for (key, val) in map.iter() {
+                    for (key, val) in map.0.iter() {
                         s.push(*key);
                         s.push(*val);
                     }
@@ -294,7 +365,7 @@ impl Compiler {
     }
 
     /// The actual compiling of the match expression and the guards.
-    pub(crate) fn match_compile(self) -> std::result::Result<Pattern, Error> {
+    pub(crate) fn match_compile(mut self) -> std::result::Result<Pattern, Error> {
         // MatchProg *ret = NULL;
         // Eterm t;
         // Uint i;
@@ -307,9 +378,10 @@ impl Compiler {
         // Compile the match expression.
         for i in 0..self.num_match { // long loop ahead
             self.current_match = i;
+            println!("current_match: {}", i);
             let mut t = self.matchexpr[self.current_match];
             self.stack_used = 0;
-            let structure_checked = false;
+            let mut structure_checked = false;
 
             if self.current_match < self.num_match - 1 {
                 current_try_label = Some(self.text.len());
@@ -321,22 +393,24 @@ impl Compiler {
             let clause_start = self.text.len(); // the "special" test needs it
             // TODO, are all these -1 ?
             loop {
+                println!("looping");
                 match t.into_variant() {
                     Variant::Pointer(..) => {
                         match t.get_boxed_header().unwrap() {
-                            BOXED_MAP => {
-                                let map = Map::try_from(&t).unwrap().0;
-                                let num_iters = map.len();
+                            value::BOXED_MAP => {
+                                println!("map");
+                                let map = Map::try_from(&t).unwrap();
+                                let num_iters = map.0.len();
                                 if !structure_checked {
                                     self.text.push(Opcode::MatchMap(num_iters));
                                 }
                                 structure_checked = false;
 
-                                for (key, value) in map.iter() {
+                                for (key, value) in map.0.iter() {
                                     if is_variable(*key).is_some() {
-                                        return Err(new_error(ErrorKind::Generic("Variable found in map key.")));
+                                        return Err(new_error(ErrorKind::Generic("Variable found in map key.".to_string())));
                                     } else if *key == atom!(UNDERSCORE) {
-                                        return Err(new_error(ErrorKind::Generic("Underscore found in map key.")));
+                                        return Err(new_error(ErrorKind::Generic("Underscore found in map key.".to_string())));
                                     }
                                     self.text.push(Opcode::MatchKey(key.deep_clone(&self.constant_heap)));
                                     {
@@ -355,17 +429,19 @@ impl Compiler {
                                     }
                                 }
                             }
-                            BOXED_TUPLE => {
+                            value::BOXED_TUPLE => {
+                                println!("tup");
                                 let p = Tuple::try_from(&t).unwrap();
                                 if !structure_checked { // i.e. we did not pop it
                                     self.text.push(Opcode::MatchTuple(p.len()));
                                 }
                                 structure_checked = false;
                                 for val in p.iter() {
-                                    self.one_term(t)?;
+                                    self.one_term(*val)?;
                                 }
                             }
                             _ => {
+                                println!("simple");
                                 // goto simple_term;
                                 structure_checked = false;
                                 self.one_term(t)?;
@@ -373,6 +449,7 @@ impl Compiler {
                         }
                     }
                     Variant::Cons(..) => {
+                        println!("cons");
                         if !structure_checked {
                             self.text.push(Opcode::MatchList());
                         }
@@ -384,6 +461,7 @@ impl Compiler {
                     }
                     _ =>  { // Nil and non proper tail end's or single terms as match expressions.
                         //simple_term:
+                        println!("simple");
                         structure_checked = false;
                         self.one_term(t)?;
                     }
@@ -399,6 +477,7 @@ impl Compiler {
                 // We are at the end of one composite data structure, pop sub structures and emit
                 // a matchPop instruction (or break)
                 if let Some(val) = self.stack.pop() {
+                    println!("popping");
                     t = val;
                     self.text.push(Opcode::MatchPop());
                     structure_checked = true; // Checked with matchPushT or matchPushL
@@ -439,7 +518,7 @@ impl Compiler {
             self.is_guard = false;
 
             if self.cflags.contains(Flag::DCOMP_TABLE) && !self.bodyexpr[self.current_match].is_list() {
-                return Err(new_error(ErrorKind::Generic("Body clause does not return anything.")));
+                return Err(new_error(ErrorKind::Generic("Body clause does not return anything.".to_string())));
             }
 
             self.compile_guard_expr(self.bodyexpr[self.current_match])?;
@@ -507,6 +586,7 @@ impl Compiler {
         Ok(Pattern {
             program: self.text,
             heap: self.constant_heap,
+            stack_need: self.stack_need,
             // TODO: num_bindings: heap.len(), single_variable: special
         })
     }
@@ -522,7 +602,7 @@ impl Compiler {
                         self.text.push(Opcode::MatchCmp(n));
                     } else { /* Not bound, bind! */
                         self.text.push(Opcode::MatchBind(n));
-                        self.vars[&n] = false; // bind var, set in_guard to false
+                        self.vars.insert(n, false); // bind var, set in_guard to false
                     }
                 } else if c == atom!(UNDERSCORE) {
                     self.text.push(Opcode::MatchSkip());
@@ -534,6 +614,7 @@ impl Compiler {
             value::TERM_CONS => {
                 self.text.push(Opcode::MatchPushL(c));
                 self.stack_used += 1;
+                self.stack.push(c);
             }
             value::TERM_FLOAT => {
                 self.text.push(Opcode::MatchEqFloat(c));
@@ -577,10 +658,10 @@ impl Compiler {
         Ok(true)
     }
 
-    fn compile_guard_expr(&self, mut l: Term) -> std::result::Result<(), Error> {
+    fn compile_guard_expr(&mut self, mut l: Term) -> std::result::Result<(), Error> {
         if l != Term::nil() {
             if !l.is_list() {
-                return Err(new_error(ErrorKind::Generic("Match expression is not a list.")));
+                return Err(new_error(ErrorKind::Generic("Match expression is not a list.".to_string())));
             }
             if !self.is_guard {
                 self.text.push(Opcode::MatchCatch());
@@ -599,7 +680,7 @@ impl Compiler {
                 self.stack_used -= 1;
             }
             if !l.is_nil() {
-                return Err(new_error(ErrorKind::Generic("Match expression is not a proper list.")));
+                return Err(new_error(ErrorKind::Generic("Match expression is not a proper list.".to_string())));
             }
             if !self.is_guard && self.cflags.contains(Flag::DCOMP_TABLE) {
                 if let Some(Opcode::MatchWaste()) = self.text.pop() {
@@ -617,7 +698,7 @@ impl Compiler {
     ** Match guard compilation
     */
 
-    fn do_emit_constant(&self, t: Term) {
+    fn do_emit_constant(&mut self, t: Term) {
         let tmp = t.deep_clone(&self.constant_heap);
         self.text.push(Opcode::MatchPushC(tmp));
         self.stack_used += 1;
@@ -649,22 +730,22 @@ impl Compiler {
         Ok(false)
     }
 
-    fn rearrange_constants(&mut self, textpos: usize, p: &[Term], nelems: usize) {
-        //STACK_TYPE(UWord) instr_save;
-        // Uint i;
+    //fn rearrange_constants(&mut self, textpos: usize, p: &[Term], nelems: usize) {
+    //    //STACK_TYPE(UWord) instr_save;
+    //    // Uint i;
 
-        INIT_STACK(instr_save);
-        while self.text.len() > textpos {
-            PUSH(instr_save, POP(*text));
-        }
-        for (i = nelems; i--;) {
-            self.do_emit_constant(p[i]);
-        }
-        while(!EMPTY(instr_save)) {
-            PUSH(*text, POP(instr_save));
-        }
-        FREE(instr_save);
-    }
+    //    INIT_STACK(instr_save);
+    //    while self.text.len() > textpos {
+    //        PUSH(instr_save, POP(*text));
+    //    }
+    //    for (i = nelems; i--;) {
+    //        self.do_emit_constant(p[i]);
+    //    }
+    //    while(!EMPTY(instr_save)) {
+    //        PUSH(*text, POP(instr_save));
+    //    }
+    //    FREE(instr_save);
+    //}
 
     fn array(&mut self, terms: &[Term]) -> DMCRet {
         let mut all_constant = true;
@@ -676,19 +757,22 @@ impl Compiler {
         // The array should be laid out with the last element first,
         // so we can memcpy it to the eheap.
 
-        // p = terms, nemels = terms.len()
 
-        for (i = nelems; i--;) {
-            let res = self.expr(p[i])?;
-            if !res && all_constant {
-                all_constant = false;
-                if i < nelems - 1 {
-                    self.rearrange_constants(textpos, p + i + 1, nelems - i - 1);
-                }
-            } else if res && !all_constant {
-                self.do_emit_constant(p[i]);
-            }
+        // TODO: checking if we can avoid rearranging
+        for val in terms.iter() {
+            self.do_emit_constant(*val);
         }
+        // for (val, i) in terms.iter().enumerate() { // i is current index
+        //     let res = self.expr(*val)?;
+        //     if !res && all_constant {
+        //         all_constant = false;
+        //         if i < nelems - 1 {
+        //             self.rearrange_constants(textpos, &mut terms[i + 1..terms.len() - i - 1]);
+        //         }
+        //     } else if res && !all_constant {
+        //         self.do_emit_constant(p[i]);
+        //     }
+        // }
         Ok(all_constant)
     }
 
@@ -708,11 +792,11 @@ impl Compiler {
     fn map(&mut self, t: Term) -> DMCRet {
         assert!(t.is_map());
 
-        let map = Map::try_from(&t).unwrap().0;
+        let map = Map::try_from(&t).unwrap();
         let mut constant_values = true;
-        let nelems = map.len();
+        let nelems = map.0.len();
 
-        for (_, val) in map.iter() {
+        for (_, val) in map.0.iter() {
             let c = self.expr(*val)?;
             if !c {
                 constant_values = false;
@@ -725,7 +809,7 @@ impl Compiler {
 
         // not constant
 
-        for (key, value) in map.iter() {
+        for (key, value) in map.0.iter() {
             // push key
             let c = self.expr(*key)?;
             if c {
@@ -763,7 +847,7 @@ impl Compiler {
 
     /// Figure out which PushV instruction to use.
     fn add_pushv_variant(&mut self, n: usize) {
-        let v = &mut self.vars[&n];
+        let v = self.vars.get_mut(&n).unwrap();
         let mut instr = Opcode::MatchPushV(n);
 
         if !self.is_guard {
@@ -781,7 +865,7 @@ impl Compiler {
         // Uint n = db_is_variable(t);
 
         if self.vars.get(&n).is_none() {
-            return Err(new_error(ErrorKind::Generic(&format!("Variable ${} is unbound", n))));
+            return Err(new_error(ErrorKind::Generic(format!("Variable ${} is unbound", n))));
         }
 
         self.add_pushv_variant(n);
@@ -793,12 +877,14 @@ impl Compiler {
         Ok(false)
     }
 
-    fn all_bindings(&mut self, t: Term) -> DMCRet {
+    fn all_bindings(&mut self) -> DMCRet {
         self.text.push(Opcode::MatchPushC(Term::nil()));
-        for (n, _) in self.vars.iter() {
-            self.add_pushv_variant(*n);
+        let keys: Vec<_> = self.vars.keys().cloned().collect();
+        keys.into_iter().for_each(|n| {
+            self.add_pushv_variant(n);
             self.text.push(Opcode::MatchConsB());
-        }
+        });
+
         self.stack_used += 1;
         if (self.stack_used + 1) > self.stack_need  {
             self.stack_need = self.stack_used + 1;
@@ -861,7 +947,7 @@ impl Compiler {
             return Err(new_error(ErrorKind::Argument { form: "andalso", value: t, reason: "without arguments" }));
         }
         let mut lbl = 0;
-        let mut iter = p.iter();
+        let mut iter = &mut p.iter();
         let len = iter.len();
         iter.next(); // drop the operator
 
@@ -909,7 +995,7 @@ impl Compiler {
             return Err(new_error(ErrorKind::Argument { form: "orelse", value: t, reason: "without arguments" }));
         }
         let mut lbl = 0;
-        let mut iter = p.iter();
+        let mut iter = &mut p.iter();
         let len = iter.len();
         iter.next(); // drop the operator
 
@@ -1035,7 +1121,7 @@ impl Compiler {
             return Err(new_error(ErrorKind::WrongDialect { form: op }))
         }
         if (self.cflags & need_cflags) != need_cflags {
-            return Err(new_error(ErrorKind::Generic(&format!("Special form '{}' not allowed for this trace event.", op))));
+            return Err(new_error(ErrorKind::Generic(format!("Special form '{}' not allowed for this trace event.", op))));
         }
         if self.is_guard && !allow_in_guard {
             return Err(new_error(ErrorKind::CalledInGuard { form: op }));
@@ -1320,20 +1406,22 @@ impl Compiler {
                 }
             }
             Variant::Atom(name) => GUARD_BIFS.get(&(name,  arity)),
+            _ => None
         };
 
         let (bif, flags) = match res {
-            None => return Err(new_error(ErrorKind::Generic(&format!("Function {}/{} does not exist", p[0], arity)))),
+            None => return Err(new_error(ErrorKind::Generic(format!("Function {}/{} does not exist", p[0], arity)))),
             Some(res) => res,
         };
 
         let dialect = self.cflags & Flag::DCOMP_DIALECT_MASK;
         let guard = if self.is_guard { Flag::DBIF_GUARD } else { Flag::DBIF_BODY };
+        let mask = Flag::from_bits_truncate(1 << (dialect.bits + guard.bits));
 
-        if !flags.contains(dialect | guard) {
+        if !flags.contains(mask) {
             // Body clause used in wrong context.
             // if self.err_info != NULL {
-                return Err(new_error(ErrorKind::Generic(&format!("Function {}/{} cannot be called in this context.", p[0], arity))));
+                return Err(new_error(ErrorKind::Generic(format!("Function {}/{} cannot be called in this context.", p[0], arity))));
             // } else {
             //     return Err(());
             // }
@@ -1381,7 +1469,7 @@ impl Compiler {
                     } else if p.len() >= 1 && p[0].is_atom() && is_variable(p[0]).is_none() {
                         self.fun(t)
                     } else {
-                        return Err(new_error(ErrorKind::Generic(&format!("{} is neither a function call, nor a tuple (tuples are written {{{{ ... }}}}).", t))));
+                        return Err(new_error(ErrorKind::Generic(format!("{} is neither a function call, nor a tuple (tuples are written {{{{ ... }}}}).", t))));
                     }
                 } else {
                     Ok(true)
@@ -1395,7 +1483,7 @@ impl Compiler {
                 } else if t == atom!(DOLLAR_UNDERSCORE) {
                     self.whole_expression(t)
                 } else if t == atom!(DOLLAR_DOLLAR) {
-                    self.all_bindings(t)
+                    self.all_bindings()
                 } else {
                     Ok(true)
                 }
