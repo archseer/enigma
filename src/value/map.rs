@@ -1,4 +1,4 @@
-use super::{Term, TryFrom, Variant, WrongBoxError, BOXED_MAP, Boxed};
+use super::{Boxed, Term, TryFrom, Variant, WrongBoxError, BOXED_MAP};
 use hamt_rs::HamtMap;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
@@ -33,9 +33,8 @@ impl Hash for Map {
 }
 
 impl PartialEq for Map {
-    fn eq(&self, _other: &Self) -> bool {
-        // Some(self.cmp(other))
-        unimplemented!()
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(&other.0)
     }
 }
 

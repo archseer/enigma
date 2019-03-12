@@ -885,7 +885,11 @@ impl PartialEq for Variant {
                             let t2 = &*(*p2 as *const Tuple);
                             t1.eq(t2)
                         }
-                        BOXED_MAP => unimplemented!(),
+                        BOXED_MAP => {
+                            let m1 = &*(*p1 as *const Boxed<Map>);
+                            let m2 = &*(*p2 as *const Boxed<Map>);
+                            m1.value.eq(&m2.value)
+                        }
                         BOXED_CLOSURE => unreachable!(),
                         // TODO: handle other boxed types
                         // ref, bigint, cp, catch, stacktrace, binary, subbinary
