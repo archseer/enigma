@@ -23,6 +23,24 @@ impl std::fmt::Display for MFA {
     }
 }
 
+// TODO: to be TryFrom once rust stabilizes the trait
+use crate::value::{Boxed, WrongBoxError, BOXED_EXPORT};
+impl TryFrom<Term> for MFA {
+    type Error = WrongBoxError;
+
+    #[inline]
+    fn try_from(value: &Term) -> Result<&Self, WrongBoxError> {
+        if let Variant::Pointer(ptr) = value.into_variant() {
+            unsafe {
+                if *ptr == BOXED_EXPORT {
+                    return Ok(&(*(ptr as *const Boxed<MFA>)).value);
+                }
+            }
+        }
+        Err(WrongBoxError)
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Lambda {
     pub name: u32,

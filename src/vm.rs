@@ -72,7 +72,7 @@ macro_rules! set_register {
                 let len = $context.stack.len();
                 $context.stack[(len - (reg + 2) as usize)] = $value;
             }
-            _reg => unimplemented!(),
+            _reg => unimplemented!("set_reg"),
         }
     }};
 }
@@ -169,7 +169,7 @@ fn call_error_handler(
             .lookup(&module::MFA(process.local_data().error_handler, func, 3))
         {
             Some(Export::Fun(ptr)) => ptr,
-            Some(_) => unimplemented!(),
+            Some(_) => unimplemented!("call_error_handler for non-fun"),
             None => {
                 // no error handler
                 // TODO: set current to mfa
@@ -219,6 +219,7 @@ macro_rules! op_call_ext {
                 // make a slice out of arity x registers
                 let args = &$context.x[0..*$arity as usize];
                 match bif($vm, $process, args) {
+                    // TODO: should use call_bif?
                     Ok(val) => {
                         set_register!($context, &LValue::X(0), val); // HAXX
                         op_return!($context);
@@ -306,7 +307,7 @@ macro_rules! op_apply {
 
         // Handle apply of apply/3...
         if module.to_u32() == atom::ERLANG && func.to_u32() == atom::APPLY {
-            unimplemented!()
+            unimplemented!("apply of apply")
             // continually loop over args to resolve
         }
 
@@ -348,7 +349,8 @@ macro_rules! op_apply {
                 op_call_bif!($vm, $context, $process, bif, arity, $return)
             }
             None => {
-                unimplemented!()
+                println!("apply setup_error_handler pid={}", $process.pid);
+                call_error_handler!($vm, $process, &mfa);
                 // apply_setup_error_handler
             }
         }
@@ -392,7 +394,7 @@ macro_rules! op_apply_fun {
             op_call_fun!($vm, $context, closure, arity);
         } else {
             // TODO raise error
-            unimplemented!()
+            unimplemented!("TODO: possible EXPORT")
         }
     }};
 }
@@ -445,7 +447,7 @@ macro_rules! op_fixed_apply {
 
         // Handle apply of apply/3...
         if module.to_u32() == atom::ERLANG && func.to_u32() == atom::APPLY && $arity == 3 {
-            unimplemented!()
+            unimplemented!("fixed_apply of apply")
             // return apply(p, reg, I, stack_offset);
         }
 
@@ -469,7 +471,8 @@ macro_rules! op_fixed_apply {
                 op_call_bif!($vm, $context, $process, bif, arity, $return)
             }
             None => {
-                unimplemented!()
+                println!("fixed_apply setup_error_handler pid={}", $process.pid);
+                call_error_handler!($vm, $process, &mfa);
                 // apply_setup_error_handler
             }
         }
@@ -1103,10 +1106,16 @@ impl Machine {
                 Opcode::IsBoolean => op_is_type!(context, ins.args, is_boolean),
                 Opcode::IsMap => op_is_type!(context, ins.args, is_map),
                 Opcode::IsFunction2 => {
-                    if let Ok(closure) = value::Closure::try_from(&context.expand_arg(&ins.args[1]))
-                    {
-                        let arity = ins.args[2].to_u32();
+                    // TODO: needs to verify exports too
+                    let arity = ins.args[2].to_u32();
+                    let value = &context.expand_arg(&ins.args[1]);
+                    if let Ok(closure) = value::Closure::try_from(value) {
                         if closure.mfa.2 == arity {
+                            continue;
+                        }
+                    }
+                    if let Ok(mfa) = module::MFA::try_from(value) {
+                        if mfa.2 == arity {
                             continue;
                         }
                     }
@@ -1276,6 +1285,7 @@ impl Machine {
                 Opcode::CaseEnd => {
                     // Raises the case_clause exception with the value of Arg0
                     let value = context.expand_arg(&ins.args[0]);
+                    println!("err=case_clause val={}", value);
                     return Err(Exception::with_value(Reason::EXC_CASE_CLAUSE, value));
                 }
                 Opcode::Try => {
@@ -1371,7 +1381,6 @@ impl Machine {
                                 tup2!(&context.heap, Term::atom(atom::EXIT), context.x[2]);
                         }
                     }
-                    // unimplemented!();
                 }
                 Opcode::Raise => {
                     debug_assert_eq!(ins.args.len(), 2);
@@ -1489,13 +1498,13 @@ impl Machine {
                 Opcode::BsPutInteger => {
                     // gen_put_integer(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
                     // Size can be atom all
-                    unimplemented!()
+                    unimplemented!("bs_put_integer")
                 }
                 Opcode::BsPutBinary => {
                     if let [fail, size, LValue::Literal(unit), _flags, src] = &ins.args[..] {
                         // TODO: fail label
                         if *unit != 8 {
-                            unimplemented!();
+                            unimplemented!("bs_put_binary unit != 8");
                             //fail!(context, fail);
                         }
 
@@ -1504,7 +1513,7 @@ impl Machine {
                                 LValue::Atom(atom::ALL) => unsafe {
                                     (*context.bs).extend_from_slice(&value.data);
                                 },
-                                _ => unimplemented!(),
+                                _ => unimplemented!("bs_put_binary size {:?}", size),
                             }
                         } else {
                             panic!("Bad argument to {:?}", ins.op)
@@ -1519,7 +1528,7 @@ impl Machine {
                     if let [fail, size, LValue::Literal(unit), _flags, src] = &ins.args[..] {
                         // TODO: fail label
                         if *unit != 8 {
-                            unimplemented!();
+                            unimplemented!("bs_put_float unit != 8");
                             //fail!(context, fail);
                         }
 
@@ -1531,7 +1540,7 @@ impl Machine {
                                     let bytes: [u8; 8] = transmute(f);
                                     (*context.bs).extend_from_slice(&bytes);
                                 },
-                                _ => unimplemented!(),
+                                _ => unimplemented!("bs_put_float size {:?}", size),
                             }
                         } else {
                             panic!("Bad argument to {:?}", ins.op)
@@ -1906,7 +1915,7 @@ impl Machine {
                     } else {
                         unreachable!()
                     }
-                    unimplemented!() // TODO
+                    unimplemented!("bs_test_unit") // TODO
                 }
                 Opcode::BsMatchString => {
                     debug_assert_eq!(ins.args.len(), 4);
@@ -2000,12 +2009,12 @@ impl Machine {
                         /* TODO not yet: c_p->freason is already set (to BADARG or SYSTEM_LIMIT). */
                         fail!(context, ins.args[0]);
                     }
-                    unimplemented!() // TODO
+                    unimplemented!("bs_private_append") // TODO
                 }
                 Opcode::BsInitBits => {
                     debug_assert_eq!(ins.args.len(), 6);
                     // TODO: RcBinary has to be set to is_writable = false
-                    unimplemented!() // TODO
+                    unimplemented!("bs_init_bits") // TODO
                 }
                 Opcode::BsGetUtf8 => {
                     debug_assert_eq!(ins.args.len(), 5);
@@ -2213,12 +2222,27 @@ impl Machine {
                 Opcode::CallFun => {
                     // literal arity
                     let arity = ins.args[0].to_u32();
+                    let value = context.x[arity as usize];
                     // TODO: this clone is bad but the borrow checker complains (but doesn't on GetTl/GetHd)
-                    if let Ok(closure) =
-                        value::Closure::try_from(&context.x[arity as usize].clone())
-                    {
+                    if let Ok(closure) = value::Closure::try_from(&value) {
                         context.cp = Some(context.ip);
                         op_call_fun!(self, context, closure, arity)
+                    } else if let Ok(mfa) = module::MFA::try_from(&value) {
+                        println!("callfun with export!");
+                        // TODO: deduplicate this part
+                        let export = { self.exports.read().lookup(&mfa) }; // drop the exports lock
+
+                        match export {
+                            Some(Export::Fun(ptr)) => op_jump_ptr!(context, ptr),
+                            Some(Export::Bif(bif)) => {
+                                op_call_bif!(self, context, process, bif, mfa.2 as usize, true) // TODO is return true ok
+                            }
+                            None => {
+                                println!("apply setup_error_handler");
+                                call_error_handler!(self, process, &mfa);
+                                // apply_setup_error_handler
+                            }
+                        }
                     } else {
                         unreachable!()
                     }

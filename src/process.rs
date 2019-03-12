@@ -526,9 +526,10 @@ pub fn spawn(
     context.x[i] = *cons;
 
     println!(
-        "Spawning... pid={} mfa={}",
+        "Spawning... pid={} mfa={} args={}",
         new_proc.pid,
-        MFA(unsafe { (*module).name }, func, i as u32)
+        MFA(unsafe { (*module).name }, func, i as u32),
+        args
     );
 
     // TODO: func to ip offset

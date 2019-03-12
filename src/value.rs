@@ -561,6 +561,7 @@ impl Term {
                 BOXED_MATCHSTATE => Type::MatchState,
                 BOXED_SUBBINARY => Type::Binary,
                 BOXED_MODULE => Type::Ref, // init expects a module in progress as a ref
+                BOXED_EXPORT => Type::Closure, // exports are a type of function
                 i => unimplemented!("get_type for {}", i),
             },
             _ => unreachable!(),
@@ -837,6 +838,10 @@ impl Term {
                         }
                         Term::map(heap, new_map)
                     }
+                    BOXED_EXPORT => {
+                        let export = &(*(ptr as *const Boxed<module::MFA>)).value;
+                        Term::export(heap, *export)
+                    }
                     _ => unimplemented!("deep_clone for {}", self),
                 }
             },
@@ -894,6 +899,11 @@ impl PartialEq for Variant {
                             let r1 = &*(*p1 as *const Boxed<process::Ref>);
                             let r2 = &*(*p2 as *const Boxed<process::Ref>);
                             r1.value.eq(&r2.value)
+                        }
+                        BOXED_EXPORT => {
+                            let e1 = &*(*p1 as *const Boxed<module::MFA>);
+                            let e2 = &*(*p2 as *const Boxed<module::MFA>);
+                            e1.value.eq(&e2.value)
                         }
                         i => unimplemented!("boxed_value eq for {}", i),
                     }
@@ -1057,7 +1067,10 @@ impl std::fmt::Display for Variant {
                     BOXED_CATCH => write!(f, "CATCH"),
                     BOXED_STACKTRACE => write!(f, "STRACE"),
                     BOXED_MODULE => write!(f, "MODULE<>"),
-                    BOXED_EXPORT => write!(f, "EXPORT<>"),
+                    BOXED_EXPORT => {
+                        let ptr = &*(*ptr as *const Boxed<module::MFA>);
+                        write!(f, "&{}", ptr.value)
+                    }
                     _ => unimplemented!(),
                 }
             },
