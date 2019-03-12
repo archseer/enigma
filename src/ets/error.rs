@@ -31,8 +31,20 @@ impl Error {
 /// The specific type of an error.
 #[derive(Debug)]
 pub enum ErrorKind {
+    /// The item was malformed ie no tuple or to small
+    BadItem,
+    /// The table is inconsistent
+    BadTable,
+    /// Out of system resources
     SystemLimit,
+    /// Returned if a key that should exist does not.
+    BadKey,
+    /// Returned if a specified slot does not exist (hash table only) or the state parameter in
+    /// db_match_object is broken.
     BadParameter,
+    /// Unspecified error
+    Unspecified,
+
     /// Hints that destructuring should not be exhaustive.
     ///
     /// This enum may grow additional variants, so this makes sure clients

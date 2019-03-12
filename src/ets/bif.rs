@@ -24,7 +24,7 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
     let heap = &process.context_mut().heap;
 
     let mut status = Status::DB_SET | Status::DB_PROTECTED;
-    let mut keypos = 1;
+    let mut keypos = 0;
     let mut is_named = false;
     let mut is_fine_locked = false;
     let mut frequent_read = false;
@@ -71,7 +71,7 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
                     match tup[0].into_variant() {
                         Variant::Atom(atom::KEYPOS) => {
                             match tup[1].to_int() {
-                                Some(i) if i > 0 => keypos = i as usize,
+                                Some(i) if i > 0 => keypos = (i - 1) as usize,
                                 _ => return Err(Exception::new(Reason::EXC_BADARG)),
                             };
                         }
@@ -397,8 +397,33 @@ pub fn delete_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
     Ok(atom!(TRUE))
 }
 
+pub fn update_element_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let heap = &process.context_mut().heap;
+    // DB_BIF_GET_TABLE(tb, DB_WRITE, LCK_WRITE_REC, BIF_ets_update_element_3);
+    let table = get_table(vm, args[0])?;
+    println!("pam=update_element {}", args[1]);
+
+    if table
+        .meta()
+        .kind
+        .contains(Status::DB_SET | Status::DB_ORDERED_SET | Status::DB_CA_ORDERED_SET)
+    {
+        // Err(new_error(ErrorKind::BadItem))
+        return Err(Exception::new(Reason::EXC_BADARG));
+    };
+
+    let list = if args[2].is_tuple() {
+        cons!(heap, args[2], Term::nil())
+    } else {
+        args[2]
+    };
+
+    Ok(table.update_element(process, args[1], list)?)
+}
+
 pub fn select_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let table = get_table(vm, args[0])?;
+    println!("pam=select {}", args[1]);
     let pattern = analyze_pattern(&table, args[1]).unwrap();
 
     let flags = pam::r#match::Flag::COPY_RESULT | pam::r#match::Flag::CONTIGUOUS_TUPLE;
@@ -407,7 +432,16 @@ pub fn select_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
     Ok(table.select(vm, process, &pattern, flags, false)?)
 }
 
-// Check if object represents a "match" variable i.e and atom $N where N is an integer.
+pub fn select_delete_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let table = get_table(vm, args[0])?;
+    println!("pam=select_delete {}", args[1]);
+    let pattern = analyze_pattern(&table, args[1]).unwrap();
+
+    let flags = pam::r#match::Flag::COPY_RESULT | pam::r#match::Flag::CONTIGUOUS_TUPLE;
+
+    // TODO: run match with a callback in a loop
+    Ok(table.select_delete(vm, process, &pattern, flags)?)
+}
 
 struct MpInfo {
     /// The match_spec is not "impossible"

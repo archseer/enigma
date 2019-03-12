@@ -41,8 +41,11 @@ impl From<value::WrongBoxError> for Exception {
 }
 
 impl From<crate::ets::error::Error> for Exception {
-    fn from(_value: crate::ets::error::Error) -> Self {
-        unimplemented!()
+    fn from(value: crate::ets::error::Error) -> Self {
+        match value.kind() {
+            crate::ets::error::ErrorKind::BadItem => Exception::new(Reason::EXC_BADARG),
+            _ => unimplemented!(),
+        }
     }
 }
 

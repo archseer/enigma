@@ -163,6 +163,7 @@ dependencies = [
  "nom 4.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "num 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "once_cell 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "owning_ref 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "parking_lot 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "quickcheck 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "statrs 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",

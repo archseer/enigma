@@ -1,7 +1,8 @@
 use super::*;
+use crate::chashmap::CHashMap;
 use crate::immix::Heap;
-use crate::value::{Cons, Term, TryFrom, TryInto, Tuple, Variant};
-use chashmap::CHashMap;
+use crate::value::{Cons, Term, TryFrom, TryInto, TryIntoMut, Tuple, Variant};
+use error::*;
 
 pub(crate) struct HashTable {
     meta: Metadata,
@@ -24,7 +25,7 @@ impl HashTable {
 
 fn get_key(pos: usize, value: Term) -> Term {
     let tuple = Tuple::try_from(&value).unwrap();
-    tuple[pos - 1]
+    tuple[pos]
 }
 
 impl Table for HashTable {
@@ -89,6 +90,57 @@ impl Table for HashTable {
         self.hashmap.contains_key(&key)
     }
 
+    fn update_element(&self, process: &RcProcess, key: Term, list: Term) -> Result<Term> {
+        let item = match self.hashmap.get_mut(&key) {
+            Some(item) => item,
+            None => return Ok(atom!(FALSE)), // return BadKey
+        };
+
+        println!("item! {}", *item);
+        println!("values {}", list);
+        // TODO verify that items are always tuples
+        let item: &mut Tuple = match item.try_into_mut() {
+            Ok(t) => t,
+            Err(_) => unreachable!(),
+        };
+
+        // First verify that list is ok to avoid nasty rollback scenarios
+        let list = Cons::try_from(&list).unwrap();
+        let res: std::result::Result<Vec<_>, _> = list
+            .iter()
+            .map(|val| {
+                // value contains tuple
+                // tuple is arity 2 {pos, val}
+                // and has pos as integer, >= 1 and isn't == to keypos and is in the db term tuple
+                // arity range
+                if let Ok(tup) = Tuple::try_from(&val) {
+                    println!("a");
+                    if tup.len() == 2 && tup[0].is_smallint() {
+                        println!("tuplen");
+                        let pos = (tup[0].to_int().unwrap() - 1) as usize; // 1 indexed
+                        println!(
+                            "pos {}, keypos {} len {}",
+                            pos,
+                            self.meta().keypos,
+                            item.len()
+                        );
+                        if pos != self.meta().keypos && pos < item.len() {
+                            return Ok((pos, tup[1]));
+                        }
+                    }
+                }
+                println!("update_element_3 failed!");
+                Err(new_error(ErrorKind::BadItem))
+            })
+            .collect();
+
+        // The point of no return, no failures from here on.
+        res?.iter()
+            .for_each(|(pos, val)| item[*pos] = val.deep_clone(&self.heap));
+        println!("Updated items!");
+        Ok(atom!(TRUE))
+    }
+
     // erase  (remove_entry in rust)
     fn remove(&mut self, key: Term) -> Result<Term> {
         unimplemented!()
@@ -135,33 +187,53 @@ impl Table for HashTable {
         Ok(res)
     }
 
-    fn select_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term> {
-        unimplemented!()
+    // fn select_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term> {
+    //     unimplemented!()
+    // }
+
+    fn select_delete(
+        &self,
+        vm: &vm::Machine,
+        process: &RcProcess,
+        pattern: &pam::Pattern,
+        flags: pam::r#match::Flag,
+    ) -> Result<Term> {
+        let heap = &process.context_mut().heap;
+        let mut count = 0;
+        let am_true = atom!(TRUE);
+        self.hashmap.retain(|_key, val| {
+            println!("running retain for {}", val);
+            match pam::r#match::run(vm, process, pattern, *val, flags) {
+                Some(res) if res == am_true => {
+                    println!("deleting {}", val);
+                    count += 1;
+                    false
+                } // don't keep
+                _ => true,
+            }
+        });
+        Ok(Term::uint(heap, count as u32))
     }
 
-    fn select_delete(&mut self, process: &RcProcess, tid: Term, pattern: Term) -> Result<Term> {
-        unimplemented!()
-    }
-
-    fn select_delete_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term> {
-        unimplemented!()
-    }
+    // fn select_delete_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term> {
+    //     unimplemented!()
+    // }
 
     fn select_count(&self, process: &RcProcess, tid: Term, pattern: Term) -> Result<Term> {
         unimplemented!()
     }
 
-    fn select_count_continue(&self, process: &RcProcess, continuation: Term) -> Result<Term> {
-        unimplemented!()
-    }
+    // fn select_count_continue(&self, process: &RcProcess, continuation: Term) -> Result<Term> {
+    //     unimplemented!()
+    // }
 
     fn select_replace(&mut self, process: &RcProcess, tid: Term, pattern: Term) -> Result<Term> {
         unimplemented!()
     }
 
-    fn select_replace_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term> {
-        unimplemented!()
-    }
+    // fn select_replace_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term> {
+    //     unimplemented!()
+    // }
 
     fn take(&mut self, process: &RcProcess, key: Term) -> Result<Term> {
         unimplemented!()

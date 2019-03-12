@@ -258,6 +258,8 @@ pub static GUARD_BIFS: Lazy<HashMap<(u32, usize), (bif::Fn, Flag)>> = sync_lazy!
     table
 };
 
+
+/// Check if object represents a "match" variable i.e and atom $N where N is an integer.
 pub fn is_variable(obj: Term) -> Option<usize> {
     // byte *b;
     // int n;

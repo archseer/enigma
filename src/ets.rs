@@ -1,6 +1,7 @@
 use crate::value::Term;
 use crate::vm;
 //use crate::servo_arc::Arc;
+use crate::immix::Heap;
 use crate::process::{self, RcProcess};
 use hashbrown::HashMap;
 use parking_lot::Mutex;
@@ -45,6 +46,8 @@ pub trait Table: Send + Sync {
 
     fn member(&self, key: Term) -> bool;
 
+    fn update_element(&self, process: &RcProcess, key: Term, list: Term) -> Result<Term>;
+
     // erase  (remove_entry in rust)
     fn remove(&mut self, key: Term) -> Result<Term>;
 
@@ -64,19 +67,25 @@ pub trait Table: Send + Sync {
         reverse: bool,
     ) -> Result<Term>;
 
-    fn select_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term>;
+    // fn select_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term>;
 
-    fn select_delete(&mut self, process: &RcProcess, tid: Term, pattern: Term) -> Result<Term>;
+    fn select_delete(
+        &self,
+        vm: &vm::Machine,
+        process: &RcProcess,
+        pattern: &pam::Pattern,
+        flags: pam::r#match::Flag,
+    ) -> Result<Term>;
 
-    fn select_delete_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term>;
+    // fn select_delete_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term>;
 
     fn select_count(&self, process: &RcProcess, tid: Term, pattern: Term) -> Result<Term>;
 
-    fn select_count_continue(&self, process: &RcProcess, continuation: Term) -> Result<Term>;
+    // fn select_count_continue(&self, process: &RcProcess, continuation: Term) -> Result<Term>;
 
     fn select_replace(&mut self, process: &RcProcess, tid: Term, pattern: Term) -> Result<Term>;
 
-    fn select_replace_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term>;
+    // fn select_replace_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term>;
 
     fn take(&mut self, process: &RcProcess, key: Term) -> Result<Term>;
 

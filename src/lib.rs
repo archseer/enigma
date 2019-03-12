@@ -9,6 +9,7 @@ pub mod nanbox;
 mod atom;
 mod bif;
 pub mod bitstring;
+pub mod chashmap;
 mod etf;
 pub mod ets;
 pub mod exports_table;
