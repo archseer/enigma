@@ -275,7 +275,6 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("process_dump");
     atoms.register_atom("enable_trace");
     atoms.register_atom("disable_trace");
-    atoms.register_atom("trace");
     atoms.register_atom("caller");
     atoms.register_atom("silent");
     atoms.register_atom("set_tcw");
