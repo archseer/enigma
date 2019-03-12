@@ -8,12 +8,14 @@ Enigma VM
 
 An implementation of the Erlang VM in Rust. We aim to be complete, correct and fast (in that order of importance). However my TotallySerious™ fibonacci microbenchmarks are currently on-par with OTP (but I'm missing 99% of the runtime :)
 
-We aim to be OTP 22+ compatible (sans the
-distributed bits for now) &mdash; all your code should eventually run on Enigma unchanged. Deprecated opcodes won't be supported.
+OTP 22+ compatible (sans the distributed bits for now) &mdash; all your code should eventually run on Enigma unchanged. Deprecated opcodes won't be supported.
 
 # Why?
 
-Because it's fun and I've been learning a lot. BEAM and HiPE are awesome, but they're massive (~300k SLOC). A small implementation makes it easier for new people to learn Erlang internals. We also get a platform to quickly iterate on ideas for inclusion into BEAM.
+Because it's fun and I've been learning a lot. BEAM and HiPE are awesome, but
+they're massive (~300k SLOC). A small implementation makes it easier for new
+people to learn Erlang internals. We also get a platform to quickly iterate on
+ideas for inclusion into BEAM.
 
 ##### Why Rust?
 
@@ -21,24 +23,32 @@ I read the BEAM book followed by the Rust book. Two birds with one stone?
 
 # Installation
 
-Only prerequisite to building Enigma is Rust. Use [rustup](https://rustup.rs/) (or your preferred package manager) to install latest rust (minimum version is the 2018 edition / ‎1.31, and stable is supported).
+Only prerequisite to building Enigma is Rust. Use [rustup](https://rustup.rs/) (or your preferred package manager) to install latest rust (minimum version is the 2018 edition / ‎1.33, and stable is supported).
 
 Run `cargo install` to install the dependencies, `cargo run` to build and run the VM. Expect heavy
-crashes, but a basic spawn + send multi-process model already works.
+crashes, but a lot of the functionality is already available.
+
+Currently, you will need to go into `src/bin/enigma.rs` and modify the arguments
+to point the root to your regular erlang installation. You can find the correct
+value by running:
+
+```bash
+grep ROOTDIR= $(which erl)
+```
 
 We will distribute binaries for various platforms, once we reach a certain level of usability.
 
-# Goals / ideas / experiments
+# Goals, ideas & experiments
 
 - Be able to run the Erlang bootstrap (and all OTP)
 - Be able to run Elixir
 - Write more documentation about more sparsely documented BEAM aspects (binary matching, time wheel, process monitors, etc).
-- Ideally one day, feature parity with OTP
+- Feature parity with OTP
 - Explore using immix as a GC for Erlang
-- Explore using RocksDB / Sled / embedded DB equivalent for the ETS implementation.
-- Process as a generator function (yield to suspend/on reduce)
-- Use Commentz-Walter for binary matching. ["Commentz-Walter is an algorithm that combines Aho-Corasick with Boyer-Moore. (Only implementation I know of is in GNU grep.)"](https://github.com/rust-lang/regex/issues/197))
+- BIF as a generator function (yield to suspend/on reduce)
+- Process as a future (with a tokio style executor)
 - Cross-compile to WebAssembly ([threading](https://rustwasm.github.io/2018/10/24/multithreading-rust-and-wasm.html) is coming)
+- Use Commentz-Walter for binary matching. ["Commentz-Walter is an algorithm that combines Aho-Corasick with Boyer-Moore. (Only implementation I know of is in GNU grep.)"](https://github.com/rust-lang/regex/issues/197))
 
 # Initial non-goals
 
@@ -48,7 +58,8 @@ Until we can run a large subset of OTP code, it doesn't make sense to consider t
 - Tracing / debugging support
 - BEAM compatible NIFs / FFI
 
-Note: NIF/FFI compatibility with OTP is going to be quite some work. At the moment I plan to trick the inet & file implementations by fake-loading the internal NIFs, then re-implementing those via a compatible Rust / BIF interface.
+Note: NIF/FFI compatibility with OTP is going to be quite some work. Until then,
+a rust-style NIF interface will be available.
 
 # Feature status
 
@@ -58,10 +69,10 @@ You can view a detailed breakdown on [opcode](/notes/opcodes.org) or [BIF](/note
 
 Plan:
 
-- [ ] implement all the instructions
-- [x] implement enough BIFs to get preloaded
-bootstrap to load
+- [x] implement enough instructions to run bootstrap
+- [x] implement enough BIFs to get preloaded bootstrap to load
 - [ ] implement enough to get the full system to boot (`init:start`)
+- [ ] get the REPL to run
 - [ ] get OTP tests to run
 
 Features:
@@ -101,12 +112,12 @@ Features:
   - [x] Most of decoding
   - [ ] Encoding
 - [ ] ETS
+  - [x] basic PAM implementation
 - [ ] GC!
 - [ ] Code reloading
 - [ ] Tracing/debugging support
 - [ ] beam_makeops compatible load-time opcode transformer
 - [ ] Optimize select_val with a jump table
-- [ ] Directly embed imports as some form of a pointer reference
 
 # Contributing
 
@@ -116,11 +127,4 @@ The easiest way to get started is to look at the `notes` folder and pick a BIF o
 
 Test coverage is currently lacking, and there's varying levels of documentation; I will be addressing these as soon as I solidify the core data structures.
 
-I'm also relying on a few external rust crates for various parts of implementation, I'd like to bring the dependency count down once we are able to run the OTP emulator tests.
-
-# Acknowledgements
-
-- [Yorick Peterse's Inko](https://gitlab.com/inko-lang/inko/), from which I've stolen the process scheduling code and a lot of the VM design.
-- @kvakvs for [ErlangRT](https://github.com/kvakvs/ErlangRT) which I've used for an extensive reference, along with his [BEAM Wisdoms](http://beam-wisdoms.clau.se/en/latest/) website.
-- [The BEAM Book](https://github.com/happi/theBeamBook), which spurred this interest in the first place.
-- [bumpalo](https://github.com/fitzgen/bumpalo) for the basis of bump allocation.
+We also have a #enigma channel on the [Elixir Slack](https://elixir-slackin.herokuapp.com/).

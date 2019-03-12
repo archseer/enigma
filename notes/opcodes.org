@@ -1,4 +1,4 @@
-* Opcodes [120/138]
+* Opcodes [122/138]
 - [X] Label = 1
 - [X] FuncInfo = 2
 - [X] IntCodeEnd = 3
@@ -18,9 +18,9 @@
 - [X] Init = 17
 - [X] Deallocate = 18
 - [X] Return = 19
-- [ ] Send = 20
+- [X] Send = 20
 - [X] RemoveMessage = 21
-- [ ] Timeout = 22
+- [X] Timeout = 22
 - [X] LoopRec = 23
 - [X] LoopRecEnd = 24
 - [X] Wait = 25

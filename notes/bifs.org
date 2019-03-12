@@ -1,4 +1,4 @@
-* BIFs [47/117]
+* BIFs [48/117]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
@@ -74,7 +74,7 @@
 - [X] bif erlang:monotonic_time/0
 - [ ] bif erlang:monotonic_time/1
 - [X] bif erlang:system_time/0
-- [ ] bif erlang:system_time/1
+- [X] bif erlang:system_time/1
 - [ ] bif erlang:time_offset/0
 - [ ] bif erlang:time_offset/1
 - [ ] bif erlang:timestamp/0
