@@ -343,6 +343,15 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("running");
     atoms.register_atom("runnable");
     atoms.register_atom("suspended");
+
+    atoms.register_atom("module");
+    atoms.register_atom("md5");
+    atoms.register_atom("exports");
+    atoms.register_atom("functions");
+    atoms.register_atom("nifs");
+    atoms.register_atom("attributes");
+    atoms.register_atom("compile");
+    atoms.register_atom("native_addresses");
     atoms
 };
 
@@ -351,6 +360,7 @@ pub const FALSE: u32 = 2;
 pub const UNDEFINED: u32 = 3;
 pub const VALUE: u32 = 4;
 pub const ALL: u32 = 5;
+
 pub const NORMAL: u32 = 6;
 pub const INTERNAL_ERROR: u32 = 7;
 pub const BADARG: u32 = 8;
@@ -447,6 +457,7 @@ pub const FULLSWEEP_AFTER: u32 = 86;
 pub const REGISTERED_NAME: u32 = 87;
 
 pub const ENOENT: u32 = 88;
+
 pub const BADFILE: u32 = 89;
 
 pub const MAX: u32 = 90;
@@ -455,6 +466,7 @@ pub const MEDIUM: u32 = 92;
 pub const LOW: u32 = 93;
 
 pub const NO_NODE_NO_HOST: u32 = 94;
+
 pub const PORT: u32 = 95;
 pub const TIME_OFFSET: u32 = 96;
 
@@ -572,6 +584,15 @@ pub const WAITING: u32 = 197;
 pub const RUNNING: u32 = 198;
 pub const RUNNABLE: u32 = 199;
 pub const SUSPENDED: u32 = 200;
+
+pub const MODULE: u32 = 201;
+pub const MD5: u32 = 202;
+pub const EXPORTS: u32 = 203;
+pub const FUNCTIONS: u32 = 204;
+pub const NIFS: u32 = 205;
+pub const ATTRIBUTES: u32 = 206;
+pub const COMPILE: u32 = 207;
+pub const NATIVE_ADDRESSES: u32 = 208;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

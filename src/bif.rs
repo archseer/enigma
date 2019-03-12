@@ -140,6 +140,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "make_ref", 0 => erlang::make_ref_0,
             "process_info", 2 => info::process_info_2,
             "system_info", 1 => info::system_info_1,
+            "get_module_info", 2 => load::get_module_info_2,
             "node", 0 => erlang::node_0,
             "node", 1 => erlang::node_1,
             "display", 1 => erlang::display_1,

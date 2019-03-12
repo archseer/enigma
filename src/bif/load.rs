@@ -4,7 +4,7 @@ use crate::exception::{Exception, Reason};
 use crate::loader::Loader;
 use crate::module::{self, Module};
 use crate::process::RcProcess;
-use crate::value::{self, Term, TryFrom, TryInto};
+use crate::value::{self, Term, TryFrom, TryInto, Variant};
 use crate::vm;
 
 pub fn prepare_loading_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
@@ -56,4 +56,41 @@ pub fn finish_loading_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -
             module::finish_loading_modules(vm, mods);
             Ok(atom!(OK))
         })
+}
+
+pub fn get_module_info_2(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    println!("called module_info with {} {}", args[0], args[1]);
+
+    let name = match args[0].into_variant() {
+        Variant::Atom(i) => i,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    println!("befoe lookup");
+    let registry = vm.modules.lock();
+    let module = registry.lookup(name).unwrap();
+    println!(
+        "{:?}, {:?}, {:?}",
+        args[1].into_variant(),
+        module.name,
+        name
+    );
+    let res = get_module_info(module, args[1]).unwrap();
+    println!("res: {}", res);
+    Ok(res)
+}
+
+fn get_module_info(module: &Module, what: Term) -> bif::Result {
+    match what.into_variant() {
+        Variant::Atom(atom::MODULE) => Ok(Term::atom(module.name)),
+        //Variant::Atom(atom::MD5) => md5_of_module(p, code_hdr),
+        Variant::Atom(atom::EXPORTS) => unimplemented!(),
+        Variant::Atom(atom::FUNCTIONS) => unimplemented!(),
+        Variant::Atom(atom::NIFS) => unimplemented!(),
+        Variant::Atom(atom::ATTRIBUTES) => unimplemented!(),
+        Variant::Atom(atom::COMPILE) => unimplemented!(),
+        Variant::Atom(atom::NATIVE_ADDRESSES) => unimplemented!(),
+        Variant::Atom(atom::NATIVE) => unimplemented!(),
+        _ => Err(Exception::new(Reason::EXC_BADARG)),
+    }
 }
