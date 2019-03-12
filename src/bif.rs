@@ -2,7 +2,7 @@ use crate::atom;
 use crate::bif;
 use crate::bitstring;
 use crate::ets;
-use crate::exception::{Exception, Reason};
+use crate::exception::{Exception, Reason, StackTrace};
 use crate::loader;
 use crate::module;
 use crate::process::{self, RcProcess};
@@ -762,19 +762,38 @@ fn bif_erlang_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     ))
 }
 
-fn bif_erlang_raise_3(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_raise_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+    let heap = &process.context_mut().heap;
+
     // class, reason, stacktrace
-    let class = match args[0].into_variant() {
+    let mut class = match args[0].into_variant() {
         Variant::Atom(atom::ERROR) => Reason::EXC_ERROR,
         Variant::Atom(atom::EXIT) => Reason::EXC_EXIT,
         Variant::Atom(atom::THROW) => Reason::EXC_THROWN,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
+    // trace is already provided for us, so strip the flag so it's not overwritten
+    class.remove(Reason::EXF_SAVETRACE);
 
+    // TODO: check trace syntax
+
+    let boxed = heap.alloc(value::Boxed {
+        header: value::BOXED_STACKTRACE,
+        value: StackTrace {
+            reason: class, // TODO: use original reason instead
+            trace: Vec::new(),
+            // TODO: bad
+            current: unsafe { std::mem::uninitialized() },
+            pc: None,
+            complete: true,
+        },
+    });
+
+    println!("raising with {}", args[2]);
     Err(Exception {
         reason: class,
         value: args[1],
-        trace: args[2],
+        trace: cons!(heap, args[2], Term::from(boxed)),
     })
 }
 

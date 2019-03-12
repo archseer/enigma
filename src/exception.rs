@@ -219,7 +219,7 @@ macro_rules! exception_code {
 const MAX_BACKTRACE_SIZE: u32 = 64;
 const DEFAULT_BACKTRACE_SIZE: u32 = 8;
 
-const EXIT_TAGS: [u32; 3] = [atom::EXIT, atom::ERROR, atom::THROW];
+const EXIT_TAGS: [u32; 3] = [atom::ERROR, atom::EXIT, atom::THROW];
 
 /// Mapping from error code 'index' to atoms.
 const EXIT_CODES: [u32; 20] = [
@@ -251,14 +251,14 @@ pub struct StackTrace {
     /// original exception reason is saved in the struct
     pub reason: Reason, // bitflags
     ///
-    pc: Option<InstrPtr>,
-    current: MFA,
+    pub pc: Option<InstrPtr>,
+    pub current: MFA,
     // /// number of saved pointers in trace[]
     // int depth;
     // BeamInstr *trace[1];  /* varying size - must be last in struct */
-    trace: Vec<InstrPtr>,
-    complete: bool,
-}
+    pub trace: Vec<InstrPtr>,
+    pub complete: bool,
+} // TODO: make all fields private with a constructor
 
 // TODO: to be TryFrom once rust stabilizes the trait
 impl TryFrom<Term> for StackTrace {
@@ -549,7 +549,7 @@ fn save_stacktrace(
             trace: Vec::new(),
             // TODO: bad
             current: unsafe { std::mem::uninitialized() },
-            pc: unsafe { std::mem::uninitialized() },
+            pc: None,
             complete: false,
         },
     });
@@ -632,7 +632,7 @@ fn save_stacktrace(
 
     // Package args and stack trace
     // c_p->ftrace = CONS(hp, args, make_big((Eterm *) s));
-    exc.trace = cons!(heap, args, Term::from(boxed)); // TODO: need to cast S into something
+    exc.trace = cons!(heap, args, Term::from(boxed));
 }
 
 fn erts_save_stacktrace(process: &RcProcess, s: &mut StackTrace, mut depth: u32) {
@@ -773,7 +773,6 @@ pub fn build_stacktrace(process: &RcProcess, exc: Term) -> Term {
         let mfa = erts_build_mfa_item(&fi, heap, args);
         res = cons!(heap, mfa, res);
     }
-    // TODO: probably mark stacktrace as complete?
 
     // TODO: dealloc StackTrace
     res
