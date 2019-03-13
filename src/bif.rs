@@ -253,6 +253,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
         },
         "erts_internal" => {
             "group_leader", 2 => info::group_leader_2,
+            "garbage_collect", 1 => garbage_collect_1,
         },
     ]
 };
@@ -1015,6 +1016,11 @@ pub fn bif_erlang_trunc_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
         Ok(value::Num::Bignum(v)) => Ok(Term::bigint(heap, v.clone())),
         Err(_) => Err(Exception::new(Reason::EXC_BADARG)),
     }
+}
+
+fn garbage_collect_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+    // TODO: GC unimplemented
+    Ok(atom!(TRUE))
 }
 
 #[cfg(test)]
