@@ -7,6 +7,7 @@ use crate::value::{Cons, Term, TryFrom, Tuple, Type, Variant};
 use crate::vm;
 use crate::Itertools;
 
+use super::bag::Bag;
 use super::error::{new_error, ErrorKind};
 use super::hash_table::HashTable;
 use super::*;
@@ -171,10 +172,14 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
     // #endif
 
     // had an assert here before, hence unwrap
-    let table = match table_kind!(status) {
-        Status::DB_SET | Status::DB_BAG | Status::DB_DUPLICATE_BAG => {
+    let table: RcTable = match table_kind!(status) {
+        Status::DB_SET /*| Status::DB_BAG | Status::DB_DUPLICATE_BAG */=> {
             Arc::new(HashTable::new(meta, process))
         }
+        Status::DB_BAG /*| Status::DB_BAG | Status::DB_DUPLICATE_BAG */=> {
+            Arc::new(Bag::new(meta, process))
+        }
+        Status::DB_DUPLICATE_BAG => unimplemented!(), // TODO, will be part of hashtable
         Status::DB_ORDERED_SET => unimplemented!(), // SetTable::new
         Status::DB_CA_ORDERED_SET => unimplemented!(),
         _ => return Err(Exception::new(Reason::EXC_BADARG)),

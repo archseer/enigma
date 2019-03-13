@@ -14,6 +14,7 @@ macro_rules! table_kind {
     };
 }
 
+pub mod bag;
 pub mod bif;
 pub mod hash_table;
 pub mod pam;
