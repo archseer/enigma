@@ -117,6 +117,17 @@ impl Hash for Term {
                 }
                 _ => unimplemented!("unimplemented Hash for {}", self),
             },
+            Variant::Cons(..) => {
+                // let value = unsafe { &*(ptr as *const Cons) };
+                let mut list = self;
+
+                // hash all values, including the tal.
+                while let Ok(Cons { head, tail }) = list.try_into() {
+                    head.hash(state);
+                    list = tail;
+                }
+                list.hash(state)
+            }
             variant => variant.hash(state),
         }
     }
