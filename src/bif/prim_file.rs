@@ -56,13 +56,10 @@ pub fn read_file_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
 }
 
 // TODO: maybe we should pass around as OsString which is null terminated dunno
-pub fn internal_native2name_1(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> bif::Result {
+pub fn internal_native2name_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // we already validated the name into unicode in the previous command
-    Ok(args[0])
+    bif::erlang::binary_to_list_1(vm, process, args)
+    // Ok(args[0])
 }
 
 pub fn internal_name2native_1(

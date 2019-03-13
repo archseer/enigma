@@ -705,15 +705,15 @@ impl Machine {
             let ins = &module.instructions[context.ip.ptr as usize];
             context.ip.ptr += 1;
 
-            println!(
-                "proc pid={:?} reds={:?} mod={:?} offs={:?} ins={:?} args={:?}",
-                process.pid,
-                context.reds,
-                atom::to_str(module.name).unwrap(),
-                context.ip.ptr,
-                ins.op,
-                ins.args
-            );
+            // println!(
+            //     "proc pid={:?} reds={:?} mod={:?} offs={:?} ins={:?} args={:?}",
+            //     process.pid,
+            //     context.reds,
+            //     atom::to_str(module.name).unwrap(),
+            //     context.ip.ptr,
+            //     ins.op,
+            //     ins.args
+            // );
 
             match &ins.op {
                 Opcode::FuncInfo => {
@@ -834,7 +834,7 @@ impl Machine {
                         op_jump!(context, *i);
 
                         let (mfa, _) = context.ip.lookup_func_info().unwrap();
-                        println!("pid={} action=call mfa={}", process.pid, mfa);
+                        println!("pid={} action=call_last mfa={}", process.pid, mfa);
                     } else {
                         unreachable!()
                     }
@@ -855,7 +855,7 @@ impl Machine {
                         op_jump!(context, i.to_u32());
 
                         let (mfa, _) = context.ip.lookup_func_info().unwrap();
-                        println!("pid={} action=call mfa={}", process.pid, mfa);
+                        println!("pid={} action=call_only mfa={}", process.pid, mfa);
                     } else {
                         unreachable!()
                     }

@@ -106,7 +106,9 @@ impl<'a> Loader<'a> {
         // build atoms table first
         self.load_atoms(chunks.remove("AtU8").expect("Atom AtU8 chunk not found!"));
 
-        self.load_local_fun_table(chunks.remove("LocT").expect("LocT chunk not found!")); // can probably be ignored
+        if let Some(chunk) = chunks.remove("LocT") {
+            self.load_local_fun_table(chunk); // can probably be ignored
+        }
         self.load_imports_table(chunks.remove("ImpT").expect("ImpT chunk not found!"));
         self.load_exports_table(chunks.remove("ExpT").expect("ExpT chunk not found!"));
         if let Some(chunk) = chunks.remove("StrT") {

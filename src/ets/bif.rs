@@ -209,8 +209,7 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
 
         Err(Exception::new(Reason::EXC_BADARG))
     } else {
-        let reference = vm.state.next_ref();
-        Ok(Term::reference(heap, reference))
+        Ok(Term::reference(heap, tid))
     }
 
     // BIF_P->flags |= F_USING_DB; /* So we can remove tb if p dies */
