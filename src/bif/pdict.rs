@@ -98,7 +98,7 @@ mod tests {
     fn test_bif_pdict() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
 
         let args = vec![Term::atom(1), Term::int(2)];
         let res = put_2(&vm, &process, &args);

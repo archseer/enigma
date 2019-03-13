@@ -1056,7 +1056,7 @@ mod tests {
     fn test_bif_erlang_is_atom_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
 
         let args = vec![Term::atom(3)];
         let res = bif_erlang_is_atom_1(&vm, &process, &args);
@@ -1071,7 +1071,7 @@ mod tests {
     fn test_bif_erlang_is_tuple_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let args = vec![tup2!(heap, Term::int(1), Term::int(2))];
@@ -1087,7 +1087,7 @@ mod tests {
     fn test_bif_erlang_is_list_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let args = vec![value::cons(heap, Term::int(1), Term::int(2))];
@@ -1102,7 +1102,7 @@ mod tests {
     fn test_bif_erlang_is_float_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
 
         let args = vec![Term::from(3.00)];
         let res = bif_erlang_is_float_1(&vm, &process, &args);
@@ -1117,7 +1117,7 @@ mod tests {
     fn test_bif_erlang_is_integer_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
 
         let args = vec![Term::int(3)];
         let res = bif_erlang_is_integer_1(&vm, &process, &args);
@@ -1132,7 +1132,7 @@ mod tests {
     fn test_bif_erlang_is_number_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
 
         let args = vec![Term::int(3)];
         let res = bif_erlang_is_number_1(&vm, &process, &args);
@@ -1156,7 +1156,7 @@ mod tests {
     fn test_bif_erlang_is_port_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
 
         let args = vec![Term::port(80)];
         let res = bif_erlang_is_port_1(&vm, &process, &args);
@@ -1171,7 +1171,7 @@ mod tests {
     fn test_bif_erlang_is_reference_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let args = vec![Term::reference(heap, 197)];
@@ -1187,7 +1187,7 @@ mod tests {
     fn test_bif_erlang_is_binary_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let str = bitstring::Binary::new();
@@ -1204,7 +1204,7 @@ mod tests {
     fn test_bif_erlang_is_bitstring_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let str = bitstring::Binary::new();
@@ -1221,7 +1221,7 @@ mod tests {
     fn test_bif_erlang_is_function_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let args = vec![Term::closure(
@@ -1243,7 +1243,7 @@ mod tests {
     fn test_bif_erlang_is_boolean_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
 
         let args = vec![Term::atom(atom::TRUE)];
         let res = bif_erlang_is_boolean_1(&vm, &process, &args);
@@ -1258,7 +1258,7 @@ mod tests {
     fn test_bif_erlang_is_map_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let map = map!(heap, Term::atom(1) => Term::int(1));
@@ -1275,7 +1275,7 @@ mod tests {
     fn test_bif_tuple_size_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let args = vec![tup3!(heap, Term::int(1), Term::int(2), Term::int(1))];
@@ -1288,7 +1288,7 @@ mod tests {
     fn test_bif_map_size_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let map =

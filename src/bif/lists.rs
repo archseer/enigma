@@ -142,10 +142,12 @@ fn keyfind(_func: bif::Fn, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let mut max_iter: isize = 10 * CONTEXT_REDS as isize;
 
     let key = args[0];
-    let pos_val = args[1];
     let mut list = &args[2];
 
-    let pos = pos_val.to_u32() as usize - 1; // it's always 1-indexed
+    let pos = match args[1].into_number() {
+        Ok(value::Num::Integer(i)) if !i < 1 => i as usize - 1, // it's always 1-indexed
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
 
     // OTP does 3 different loops based on key type (simple, immed, boxed), but luckily in rust we
     // just rely on Eq/PartialEq.
@@ -203,7 +205,7 @@ mod tests {
     fn test_member_2() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let elem = Term::atom(1);
@@ -221,7 +223,7 @@ mod tests {
     fn test_keyfind_3() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, None, module).unwrap();
+        let process = process::allocate(&vm.state, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let elem = Term::atom(1);
@@ -231,7 +233,7 @@ mod tests {
         assert_eq!(res, Ok(atom!(FALSE)));
 
         let elem = Term::atom(3);
-        let pos = Term::int(0);
+        let pos = Term::int(1);
         let target = tup2!(heap, Term::atom(3), Term::int(2));
         let list = from_vec(
             heap,
