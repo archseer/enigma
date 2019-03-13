@@ -231,6 +231,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "update", 3 => maps::update_3,
             "values", 1 => maps::values_1,
             "take", 2 => maps::take_2,
+            "new", 0 => maps::new_0,
         },
         "ets" => {
             "new", 2 => ets::bif::new_2,

@@ -2,9 +2,16 @@ use crate::atom;
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Term, TryFrom, TryInto};
+use crate::value::{self, Term, TryFrom, TryInto, HAMT};
 use crate::vm;
 use hamt_rs::HamtMap;
+
+// TODO: deprecated past OTP 22
+pub fn new_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
+    let heap = &process.context_mut().heap;
+    let new_map = HAMT::new();
+    Ok(Term::map(heap, new_map))
+}
 
 pub fn find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let key = &args[0];
