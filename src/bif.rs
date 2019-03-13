@@ -281,6 +281,7 @@ pub static NIFS: Lazy<NifTable> = sync_lazy! {
             "get_cwd_nif", 0 => prim_file::get_cwd_nif_0,
             "read_file_nif", 1 => prim_file::read_file_nif_1,
             "read_info_nif", 2 => prim_file::read_info_nif_2,
+            "list_dir_nif", 1 => prim_file::list_dir_nif_1,
             "internal_native2name", 1 => prim_file::internal_native2name_1,
             "internal_name2native", 1 => prim_file::internal_name2native_1,
         },

@@ -250,6 +250,36 @@ pub fn read_info_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     Ok(meta_to_tuple(heap, info))
 }
 
+pub fn list_dir_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    // arg[0] = filename
+    let heap = &process.context_mut().heap;
+
+    // TODO: needs to work with binary and list based strings
+    // TODO bitstrings or non zero offsets can fail ...
+    let cons = Cons::try_from(&args[0])?;
+    let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
+
+    println!("Trying to read dir {:?}", path);
+    let res = match std::fs::read_dir(path) {
+        Ok(entries) => Cons::from_iter(
+            entries
+                .map(|entry| {
+                    Term::binary(
+                        heap,
+                        Binary::from(entry.unwrap().path().to_str().unwrap().as_bytes()),
+                    )
+                    // bitstring!(heap, entry.unwrap().path().to_str().unwrap()
+                })
+                .collect::<Vec<Term>>()
+                .into_iter(),
+            heap,
+        ),
+        Err(err) => return Ok(error_to_tuple(heap, err)),
+    };
+
+    Ok(tup2!(heap, atom!(OK), res))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
