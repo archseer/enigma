@@ -315,11 +315,11 @@
 - [ ] bif ets:match_spec_compile/1
 - [ ] bif ets:match_spec_run_r/3
 
-** OS [0/9]
-- [ ] bif os:get_env_var/1
-- [ ] bif os:set_env_var/2
-- [ ] bif os:unset_env_var/1
-- [ ] bif os:list_env_vars/0
+** OS [4/9]
+- [X] bif os:get_env_var/1
+- [X] bif os:set_env_var/2;
+- [X] bif os:unset_env_var/1
+- [X] bif os:list_env_vars/0
 - [ ] bif os:getpid/0
 - [ ] bif os:timestamp/0
 - [ ] bif os:system_time/0

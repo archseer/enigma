@@ -18,6 +18,7 @@ mod info;
 mod lists;
 mod load;
 mod maps;
+mod os;
 mod pdict;
 mod prim_file;
 
@@ -240,6 +241,12 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "select", 2 => ets::bif::select_2,
             "select_delete", 2 => ets::bif::select_delete_2,
             "update_element", 3 => ets::bif::update_element_3,
+        },
+        "os" => {
+            "list_env_vars", 0 => os::list_env_vars_0,
+            "get_env_var", 1 => os::get_env_var_1,
+            "set_env_var", 2 => os::set_env_var_2,
+            "unset_env_var", 1 => os::unset_env_var_1,
         },
         "erts_internal" => {
             "group_leader", 2 => info::group_leader_2,
