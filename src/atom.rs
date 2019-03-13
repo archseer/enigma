@@ -352,6 +352,9 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("attributes");
     atoms.register_atom("compile");
     atoms.register_atom("native_addresses");
+
+    atoms.register_atom("hipe_architecture");
+    atoms.register_atom("new");
     atoms
 };
 
@@ -593,6 +596,9 @@ pub const NIFS: u32 = 205;
 pub const ATTRIBUTES: u32 = 206;
 pub const COMPILE: u32 = 207;
 pub const NATIVE_ADDRESSES: u32 = 208;
+
+pub const HIPE_ARCHITECTURE: u32 = 209;
+pub const NEW: u32 = 210;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

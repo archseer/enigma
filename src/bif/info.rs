@@ -159,7 +159,8 @@ pub fn system_info_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
     let heap = &process.context_mut().heap;
 
     match args[0].into_variant() {
-        Variant::Atom(atom::OS_TYPE) => Ok(tup2!(heap, atom!(OS_TYPE), Term::atom(OS_FAMILY))),
+        Variant::Atom(atom::OS_TYPE) => Ok(tup2!(heap, Term::atom(OS_FAMILY), atom!(TRUE))), // TODO: true should be :darwin
+        Variant::Atom(atom::HIPE_ARCHITECTURE) => Ok(atom!(UNDEFINED)),
         _ => unimplemented!("system_info for {}", args[0]),
     }
 }
