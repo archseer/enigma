@@ -91,7 +91,6 @@ pub fn member_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::
 // }
 
 pub fn reverse_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    println!("lists reverse called");
     // Handle legal and illegal non-lists quickly.
     if args[0].is_nil() {
         return Ok(args[1]);

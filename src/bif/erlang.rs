@@ -276,12 +276,23 @@ pub fn integer_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     }
 }
 
-pub fn display_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn list_to_integer_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    println!("integer_to_list_1 called with {}", args[0]);
+    // list to string
+    let cons = Cons::try_from(&args[0])?;
+    let string = value::cons::unicode_list_to_buf(cons, 2048)?;
+    match lexical::try_parse::<i32, _>(string) {
+        Ok(i) => Ok(Term::int(i)),
+        Err(err) => panic!("errored with {}", err), //TODO
+    }
+}
+
+pub fn display_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     println!("{}", args[0]);
     Ok(atom!(TRUE))
 }
 
-pub fn display_string_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn display_string_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let cons = Cons::try_from(&args[0])?;
     let string = value::cons::unicode_list_to_buf(cons, 2048)?;
     print!("{}", string);
