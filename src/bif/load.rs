@@ -4,8 +4,20 @@ use crate::exception::{Exception, Reason};
 use crate::loader::Loader;
 use crate::module::{self, Module};
 use crate::process::RcProcess;
-use crate::value::{self, Term, TryFrom, TryInto, Variant};
+use crate::value::{self, Cons, Term, TryFrom, TryInto, Variant};
 use crate::vm;
+
+pub fn pre_loaded_0(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    use std::path::Path;
+    let heap = &process.context_mut().heap;
+
+    let iter = vm::PRE_LOADED
+        .iter()
+        .map(|path| Path::new(path).file_stem().unwrap().to_str().unwrap())
+        .map(|name| Term::atom(atom::from_str(name)));
+
+    Ok(Cons::from_iter(iter, heap))
+}
 
 pub fn prepare_loading_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // arg[0] module name atom, arg[1] raw bytecode bytes
