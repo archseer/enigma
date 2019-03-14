@@ -605,7 +605,7 @@ macro_rules! safepoint_and_reduce {
             // $vm.state
             //     .process_pool
             //     .schedule(Job::normal($process.clone()));
-            return Ok(());
+            return Ok(process::State::Yield);
         }
     }};
 }
@@ -668,7 +668,7 @@ impl Machine {
         let mut runtime = tokio::runtime::Builder::new()
             .after_start(move || {
                 Machine::set_current(machine.clone()); // ughh double clone
-                println!("started!");
+                eprintln!("thread started!");
             })
             .build()
             .expect("failed to start new Runtime");
@@ -733,32 +733,27 @@ impl Machine {
         // run()/panic(). This might be risky if values captured are not unwind
         // safe, so take care when capturing new variables.
         //let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        if let Err(message) = self.run(process) {
-            if message.reason != Reason::TRAP {
-                // just a regular error
-                // HAXX: TODO clone() for now since handle_error consumes the msg
-                if let Some(new_pc) = exception::handle_error(&process, message.clone()) {
-                    let context = process.context_mut();
-                    context.ip = new_pc;
-                    process::State::Yield
-                // TODO: self.state
-                //     .process_pool
-                //     .schedule(Job::normal(process.clone()));
+        match self.run(process) {
+            Err(message) => {
+                if message.reason != Reason::TRAP {
+                    // just a regular error
+                    // HAXX: TODO clone() for now since handle_error consumes the msg
+                    if let Some(new_pc) = exception::handle_error(&process, message.clone()) {
+                        let context = process.context_mut();
+                        context.ip = new_pc;
+                        process::State::Yield
+                    } else {
+                        process.exit(&self.state, message);
+                        println!("pid={} action=exited", process.pid);
+                        process::State::Done
+                    }
                 } else {
-                    process.exit(&self.state, message);
-                    process::State::Done
+                    // we're trapping, ip was already set, now reschedule the process
+                    eprintln!("TRAP!");
+                    process::State::Yield
                 }
-            } else {
-                // we're trapping, ip was already set, now reschedule the process
-                eprintln!("TRAP!");
-                process::State::Yield
-                // TODO: self.state
-                //     .process_pool
-                //     .schedule(Job::normal(process.clone()));
             }
-        } else {
-            // TODO
-            process::State::Done
+            Ok(state) => state,
         }
         // }));
 
@@ -780,7 +775,10 @@ impl Machine {
     }
 
     #[allow(clippy::cyclomatic_complexity)]
-    pub fn run(&self, process: &mut Pin<&mut process::Process>) -> Result<(), Exception> {
+    pub fn run(
+        &self,
+        process: &mut Pin<&mut process::Process>,
+    ) -> Result<process::State, Exception> {
         let context = process.context_mut();
         context.reds = 2000; // self.state.config.reductions;
 
@@ -874,7 +872,7 @@ impl Machine {
                     // set wait flag
                     process.set_waiting_for_message(true);
                     // return (suspend process)
-                    return Ok(());
+                    return Ok(process::State::Wait);
                 }
                 Opcode::WaitTimeout => {
                     // @spec wait_timeout Lable Time
@@ -891,7 +889,7 @@ impl Machine {
                     process.set_waiting_for_message(true);
 
                     // return (suspend process)
-                    return Ok(());
+                    return Ok(process::State::Wait);
                 }
                 Opcode::RecvMark => {
                     process.local_data_mut().mailbox.mark();
@@ -2504,7 +2502,7 @@ impl Machine {
             self.terminate();
         }
 
-        Ok(())
+        Ok(process::State::Done)
     }
 
     pub fn elapsed_time(&self) -> time::Duration {

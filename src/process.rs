@@ -177,6 +177,9 @@ pub struct Process {
 
     /// If the process is waiting for a message.
     pub waiting_for_message: AtomicBool,
+
+    /// Waker associated with the wait
+    pub waker: Option<std::task::Waker>,
 }
 
 unsafe impl Sync for LocalData {}
@@ -214,6 +217,7 @@ impl Process {
             pid,
             local_data: UnsafeCell::new(local_data),
             waiting_for_message: AtomicBool::new(false),
+            waker: None,
         })
     }
 
@@ -280,8 +284,17 @@ impl Process {
         Ok(local_data.mailbox.receive())
     }
 
+    pub fn wake_up(&self) {
+        // TODO: will require locking
+        self.waiting_for_message.store(false, Ordering::Relaxed);
+        match &self.waker {
+            Some(waker) => waker.wake(),
+            None => (),
+        }
+    }
+
     pub fn set_waiting_for_message(&self, value: bool) {
-        self.waiting_for_message.store(value, Ordering::Relaxed);
+        self.waiting_for_message.store(value, Ordering::Relaxed)
     }
 
     pub fn is_waiting_for_message(&self) -> bool {
@@ -436,7 +449,7 @@ impl Process {
         // delete links
         for pid in local_data.links.drain() {
             // TODO: reason has to be deep cloned, make a constructor
-            println!("sending exit signal");
+            println!("pid={} sending exit signal to from={}", self.pid, pid);
             let msg = Signal::Exit {
                 reason: reason.clone(),
                 from: self.pid,
@@ -567,7 +580,13 @@ pub fn spawn(
         ret = tup2!(heap, ret, Term::reference(heap, reference))
     }
 
-    // TODO: state.process_pool.schedule(Job::normal(new_proc));
+    let new_proc = unsafe {
+        let ptr = &*new_proc as *const Process as *mut Process;
+        Pin::new_unchecked(&mut *ptr)
+    };
+    use futures::compat::Compat;
+    let future = Compat::new(new_proc);
+    tokio::spawn(future);
 
     Ok(ret)
 }
@@ -596,9 +615,7 @@ pub fn send_message(
 
         if receiver.is_waiting_for_message() {
             // wake up
-            receiver.set_waiting_for_message(false);
-
-            // TODO: state.process_pool.schedule(Job::normal(receiver));
+            receiver.wake_up();
         }
     } else {
         println!("NOTFOUND");
@@ -614,9 +631,7 @@ pub fn send_signal(state: &RcState, pid: PID, signal: Signal) -> bool {
 
         if receiver.is_waiting_for_message() {
             // wake up
-            receiver.set_waiting_for_message(false);
-
-            // TODO: state.process_pool.schedule(Job::normal(receiver));
+            receiver.wake_up();
         }
         return true;
     }
@@ -626,6 +641,7 @@ pub fn send_signal(state: &RcState, pid: PID, signal: Signal) -> bool {
 
 pub enum State {
     Done,
+    Wait,
     Yield,
 }
 
@@ -638,8 +654,13 @@ impl Future for Process {
     type Output = Result<(), ()>;
 
     fn poll(mut self: Pin<&mut Self>, waker: &Waker) -> Poll<Self::Output> {
+        self.waker = None;
         Machine::with_current(|vm| match vm.run_with_error_handling(&mut self) {
             State::Done => Poll::Ready(Ok(())),
+            State::Wait => {
+                self.waker = Some(waker.clone());
+                Poll::Pending
+            }
             State::Yield => {
                 waker.wake();
                 Poll::Pending

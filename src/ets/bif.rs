@@ -274,7 +274,7 @@ pub fn insert_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) ->
     /* Write lock table if more than one object to keep atomicity */
     // let lock_kind = if (is_list(BIF_ARG_2) && CDR(list_val(BIF_ARG_2)) != NIL { LCK_WRITE } else { LCK_WRITE_REC };
 
-    eprintln!("going in {}", args[0]);
+    // eprintln!("going in {}", args[0]);
 
     // find table
     let table = get_table(vm, args[0])?;
