@@ -15,6 +15,8 @@ fn run() -> i32 {
         "--",
         "-root",
         "/usr/local/Cellar/erlang/21.2.7/lib/erlang",
+        //"/Users/speed/src/otp/release/x86_64-apple-darwin18.0.0",
+        //"otp/bootstrap",
         "-progname",
         "enigma",
         "--",

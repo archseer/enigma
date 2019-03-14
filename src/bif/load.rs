@@ -3,11 +3,12 @@ use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::loader::Loader;
 use crate::module::{self, Module};
-use crate::process::RcProcess;
+use crate::process::Process;
 use crate::value::{self, Cons, Term, TryFrom, TryInto, Variant};
 use crate::vm;
+use std::pin::Pin;
 
-pub fn pre_loaded_0(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn pre_loaded_0(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     use std::path::Path;
     let heap = &process.context_mut().heap;
 
@@ -19,7 +20,11 @@ pub fn pre_loaded_0(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
     Ok(Cons::from_iter(iter, heap))
 }
 
-pub fn prepare_loading_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn prepare_loading_2(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
     // arg[0] module name atom, arg[1] raw bytecode bytes
     let heap = &process.context_mut().heap;
 
@@ -43,7 +48,7 @@ pub fn prepare_loading_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
 
 pub fn has_prepared_code_on_load_1(
     _vm: &vm::Machine,
-    _process: &RcProcess,
+    _process: &Pin<&mut Process>,
     args: &[Term],
 ) -> bif::Result {
     match args[0].try_into() {
@@ -55,7 +60,11 @@ pub fn has_prepared_code_on_load_1(
     }
 }
 
-pub fn finish_loading_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn finish_loading_1(
+    vm: &vm::Machine,
+    _process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
     value::Cons::try_from(&args[0])?
         .iter()
         .map(|v| {
@@ -70,7 +79,11 @@ pub fn finish_loading_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -
         })
 }
 
-pub fn get_module_info_2(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn get_module_info_2(
+    vm: &vm::Machine,
+    _process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
     println!("called module_info with {} {}", args[0], args[1]);
 
     let name = match args[0].into_variant() {

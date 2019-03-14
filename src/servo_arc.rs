@@ -401,6 +401,8 @@ impl<T: ?Sized> Drop for Arc<T> {
     }
 }
 
+impl<T: ?Sized> Unpin for Arc<T> {}
+
 impl<T: ?Sized + PartialEq> PartialEq for Arc<T> {
     fn eq(&self, other: &Arc<T>) -> bool {
         Self::ptr_eq(self, other) || *(*self) == *(*other)

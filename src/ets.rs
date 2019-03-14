@@ -2,9 +2,10 @@ use crate::value::Term;
 use crate::vm;
 //use crate::servo_arc::Arc;
 use crate::immix::Heap;
-use crate::process::{self, RcProcess};
+use crate::process::{self, Process};
 use hashbrown::HashMap;
 use parking_lot::Mutex;
+use std::pin::Pin;
 use std::sync::Arc; // servo_arc doesn't work with trait objects
 
 #[macro_export]
@@ -30,24 +31,24 @@ pub trait Table: Send + Sync {
     // first, next, last, prev could be iter? --> iter can't go backwards so we'll add a Cursor API
     // almost no code uses prev() outside of a few OTP tests so we could just start with Iter.
     // also, the db impl seems to equate the two
-    fn first(&self, process: &RcProcess) -> Result<Term>;
+    fn first(&self, process: &Pin<&mut Process>) -> Result<Term>;
 
-    fn next(&self, process: &RcProcess, key: Term) -> Result<Term>;
+    fn next(&self, process: &Pin<&mut Process>, key: Term) -> Result<Term>;
 
-    fn last(&self, process: &RcProcess) -> Result<Term>;
+    fn last(&self, process: &Pin<&mut Process>) -> Result<Term>;
 
-    fn prev(&self, process: &RcProcess, key: Term) -> Result<Term>;
+    fn prev(&self, process: &Pin<&mut Process>, key: Term) -> Result<Term>;
 
     // put
-    fn insert(&self, process: &RcProcess, value: Term, key_clash_fail: bool) -> Result<()>; /* DB_ERROR_BADKEY if key exists */
+    fn insert(&self, process: &Pin<&mut Process>, value: Term, key_clash_fail: bool) -> Result<()>; /* DB_ERROR_BADKEY if key exists */
 
-    fn get(&self, process: &RcProcess, key: Term) -> Result<Term>;
+    fn get(&self, process: &Pin<&mut Process>, key: Term) -> Result<Term>;
 
-    fn get_element(&self, process: &RcProcess, key: Term, index: usize) -> Result<Term>;
+    fn get_element(&self, process: &Pin<&mut Process>, key: Term, index: usize) -> Result<Term>;
 
     fn member(&self, key: Term) -> bool;
 
-    fn update_element(&self, process: &RcProcess, key: Term, list: Term) -> Result<Term>;
+    fn update_element(&self, process: &Pin<&mut Process>, key: Term, list: Term) -> Result<Term>;
 
     // erase  (remove_entry in rust)
     fn remove(&mut self, key: Term) -> Result<Term>;
@@ -56,42 +57,47 @@ pub trait Table: Send + Sync {
 
     fn slot(&self, slot: Term) -> Result<Term>;
 
-    // int (*db_select_chunk)(process: &RcProcess, table: &Self, Eterm tid, Eterm pattern, Sint chunk_size, int reverse, Eterm* ret);
+    // int (*db_select_chunk)(process: &Pin<&mut Process>, table: &Self, Eterm tid, Eterm pattern, Sint chunk_size, int reverse, Eterm* ret);
 
     // _continue is for when the main function traps, let's just use generators
     fn select(
         &self,
         vm: &vm::Machine,
-        process: &RcProcess,
+        process: &Pin<&mut Process>,
         pattern: &pam::Pattern,
         flags: pam::r#match::Flag,
         reverse: bool,
     ) -> Result<Term>;
 
-    // fn select_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term>;
+    // fn select_continue(&mut self, process: &Pin<&mut Process>, continuation: Term) -> Result<Term>;
 
     fn select_delete(
         &self,
         vm: &vm::Machine,
-        process: &RcProcess,
+        process: &Pin<&mut Process>,
         pattern: &pam::Pattern,
         flags: pam::r#match::Flag,
     ) -> Result<Term>;
 
-    // fn select_delete_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term>;
+    // fn select_delete_continue(&mut self, process: &Pin<&mut Process>, continuation: Term) -> Result<Term>;
 
-    fn select_count(&self, process: &RcProcess, tid: Term, pattern: Term) -> Result<Term>;
+    fn select_count(&self, process: &Pin<&mut Process>, tid: Term, pattern: Term) -> Result<Term>;
 
-    // fn select_count_continue(&self, process: &RcProcess, continuation: Term) -> Result<Term>;
+    // fn select_count_continue(&self, process: &Pin<&mut Process>, continuation: Term) -> Result<Term>;
 
-    fn select_replace(&mut self, process: &RcProcess, tid: Term, pattern: Term) -> Result<Term>;
+    fn select_replace(
+        &mut self,
+        process: &Pin<&mut Process>,
+        tid: Term,
+        pattern: Term,
+    ) -> Result<Term>;
 
-    // fn select_replace_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term>;
+    // fn select_replace_continue(&mut self, process: &Pin<&mut Process>, continuation: Term) -> Result<Term>;
 
-    fn take(&mut self, process: &RcProcess, key: Term) -> Result<Term>;
+    fn take(&mut self, process: &Pin<&mut Process>, key: Term) -> Result<Term>;
 
     /// takes reds, then returns new reds (equal to delete_all)
-    fn clear(&mut self, process: &RcProcess, reds: usize) -> Result<usize>;
+    fn clear(&mut self, process: &Pin<&mut Process>, reds: usize) -> Result<usize>;
 
     // don't think we'll need these
     // int (*db_free_empty_table)(DbTable* db);
@@ -104,7 +110,7 @@ pub trait Table: Send + Sync {
 
     // TODO: replace both with get_mut or alter
     // Lookup a dbterm for updating. Return false if not found.
-    // fn lookup_dbterm(&self, process: &RcProcess, key: Term, obj: Term) -> DbUpdateHandle;
+    // fn lookup_dbterm(&self, process: &Pin<&mut Process>, key: Term, obj: Term) -> DbUpdateHandle;
     // Must be called for each db_lookup_dbterm that returned true, even if dbterm was not
     // updated. If the handle was of a new object and cret is not DB_ERROR_NONE, the object is
     // removed from the table.

@@ -6,8 +6,8 @@ use crate::instr_ptr::InstrPtr;
 use crate::loader::LValue;
 use crate::mailbox::Mailbox;
 use crate::module::{Module, MFA};
-use crate::pool::Job;
-use crate::servo_arc::Arc;
+use crate::vm::Machine;
+// use crate::servo_arc::Arc; can't do receiver self
 use crate::signal_queue::SignalQueue;
 pub use crate::signal_queue::{ExitKind, Signal};
 use crate::value::{self, Term, TryInto};
@@ -16,13 +16,14 @@ use hashbrown::{HashMap, HashSet};
 use std::cell::UnsafeCell;
 use std::panic::RefUnwindSafe;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 pub mod registry;
 pub mod table;
 
 /// Heavily inspired by inko
 
-pub type RcProcess = Arc<Process>;
+pub type RcProcess = Pin<Arc<Process>>;
 
 pub type Ref = usize;
 
@@ -209,7 +210,7 @@ impl Process {
             dictionary: HashMap::new(),
         };
 
-        Arc::new(Process {
+        Arc::pin(Process {
             pid,
             local_data: UnsafeCell::new(local_data),
             waiting_for_message: AtomicBool::new(false),
@@ -503,7 +504,7 @@ bitflags! {
 
 pub fn spawn(
     state: &RcState,
-    parent: &RcProcess,
+    parent: &Pin<&mut Process>,
     module: *const Module,
     func: u32,
     args: Term,
@@ -566,14 +567,14 @@ pub fn spawn(
         ret = tup2!(heap, ret, Term::reference(heap, reference))
     }
 
-    state.process_pool.schedule(Job::normal(new_proc));
+    // TODO: state.process_pool.schedule(Job::normal(new_proc));
 
     Ok(ret)
 }
 
 pub fn send_message(
     state: &RcState,
-    process: &RcProcess,
+    process: &Pin<&mut Process>,
     pid: Term,
     msg: Term,
 ) -> Result<Term, Exception> {
@@ -597,7 +598,7 @@ pub fn send_message(
             // wake up
             receiver.set_waiting_for_message(false);
 
-            state.process_pool.schedule(Job::normal(receiver));
+            // TODO: state.process_pool.schedule(Job::normal(receiver));
         }
     } else {
         println!("NOTFOUND");
@@ -615,10 +616,34 @@ pub fn send_signal(state: &RcState, pid: PID, signal: Signal) -> bool {
             // wake up
             receiver.set_waiting_for_message(false);
 
-            state.process_pool.schedule(Job::normal(receiver));
+            // TODO: state.process_pool.schedule(Job::normal(receiver));
         }
         return true;
     }
     // TODO: if err, we return err ?
     false
+}
+
+pub enum State {
+    Done,
+    Yield,
+}
+
+use std::future::Future;
+// use std::marker::Unpin;
+use std::pin::Pin;
+use std::task::{Poll, Waker};
+
+impl Future for Process {
+    type Output = Result<(), ()>;
+
+    fn poll(mut self: Pin<&mut Self>, waker: &Waker) -> Poll<Self::Output> {
+        Machine::with_current(|vm| match vm.run_with_error_handling(&mut self) {
+            State::Done => Poll::Ready(Ok(())),
+            State::Yield => {
+                waker.wake();
+                Poll::Pending
+            }
+        })
+    }
 }

@@ -18,6 +18,12 @@ name = "enigma"
 test = false
 
 [dependencies]
+tokio = {version = "0.1.17", features = ["async-await-preview"]}
+# Only needs to be explicitly imported if you want to make use of
+# the machinery to convert promises back and forth between 0.1 and 0.3
+# (which is built into the provided await! macro only otherwise):
+tokio-async-await = "0.1.4"
+futures-preview = {version = "0.3.0-alpha.13", features = ["compat"]}
 nom = "4.1.1"
 num = "0.2.0"
 libflate = "0.1"
