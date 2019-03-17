@@ -19,6 +19,9 @@ use std::panic::RefUnwindSafe;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use std::pin::Pin;
+use tokio::prelude::*;
+
 pub mod registry;
 
 pub mod table;
@@ -64,7 +67,6 @@ pub struct ExecutionContext {
     pub live: usize,
     /// binary construction state
     pub bs: *mut Vec<u8>,
-    pub timeout: Option<u32>,
     ///
     pub exc: Option<Exception>,
     /// Reductions left
@@ -107,7 +109,6 @@ impl ExecutionContext {
             // register: Register::new(block.code.registers as usize),
             // binding: Binding::with_rc(block.locals(), block.receiver),
             // line: block.code.line,
-            timeout: None,
 
             // TODO: not great
             bs: unsafe { std::mem::uninitialized() },
@@ -190,6 +191,7 @@ pub struct Process {
 
 unsafe impl Sync for LocalData {}
 unsafe impl Send for LocalData {}
+unsafe impl Send for ExecutionContext {}
 unsafe impl Sync for Process {}
 impl RefUnwindSafe for Process {}
 
@@ -591,9 +593,9 @@ pub fn spawn(
         let ptr = &*new_proc as *const Process as *mut Process;
         Pin::new_unchecked(&mut *ptr)
     };
-    use futures::compat::Compat;
-    let future = Compat::new(new_proc);
-    tokio::spawn(future);
+
+    let future = crate::vm::run_with_error_handling(new_proc);
+    tokio::spawn_async(future);
 
     Ok(ret)
 }
@@ -648,65 +650,5 @@ pub fn send_signal(state: &RcState, pid: PID, signal: Signal) -> bool {
 
 pub enum State {
     Done,
-    Wait,
-    WaitTimeout(usize),
     Yield,
-}
-
-use std::future::Future;
-use tokio::await;
-use tokio::prelude::*;
-// use std::marker::Unpin;
-use std::pin::Pin;
-use std::task::{Poll, Waker};
-use std::time::{Duration, Instant};
-
-use futures::future::{self, FutureExt};
-use futures::select;
-// use futures::stream::{self, StreamExt};
-use futures_native_timers::{Delay, Interval};
-
-impl Future for Process {
-    type Output = Result<(), ()>;
-
-    fn poll(mut self: Pin<&mut Self>, waker: &Waker) -> Poll<Self::Output> {
-        self.waker = None;
-        Machine::with_current(|vm| match vm.run_with_error_handling(&mut self) {
-            State::Done => Poll::Ready(Ok(())),
-            State::Wait => {
-                self.waker = Some(waker.clone());
-                Poll::Pending
-            }
-            State::WaitTimeout(when) => {
-                self.waker = Some(waker.clone());
-                let when = Duration::from_millis(when as u64);
-
-                let (trigger, cancel) = futures::channel::oneshot::channel::<()>();
-                let process = self.get_mut();
-                let waker = waker.clone();
-                tokio::spawn_async(
-                    async move {
-                        select! {
-                            _t = cancel.fuse() => (),
-
-                            // did not work _ = tokio::timer::Delay::new(when) => {
-                            _ = Delay::new(when) => {
-                                // timeout
-                                if let Some(l) = process.context_mut().timeout.take() {
-                                    process.context_mut().ip.ptr = l;
-                                    waker.wake();
-                                }
-                            }
-                        }
-                    },
-                );
-                self.timeout = Some(trigger);
-                Poll::Pending
-            }
-            State::Yield => {
-                waker.wake();
-                Poll::Pending
-            }
-        })
-    }
 }

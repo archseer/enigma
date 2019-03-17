@@ -25,6 +25,12 @@ use std::time;
 use tokio::await;
 use tokio::prelude::*;
 
+use futures::future::{self, FutureExt};
+use futures::select;
+// use futures::stream::{self, StreamExt};
+
+use futures_native_timers::{Delay, Interval};
+
 /// A reference counted State.
 pub type RcState = Arc<State>;
 
@@ -717,24 +723,29 @@ impl Machine {
             let ptr = &*process as *const process::Process as *mut process::Process;
             Pin::new_unchecked(&mut *ptr)
         };
-        use futures::compat::Compat;
-        let future = Compat::new(process);
+        // use futures::compat::Compat;
+        // let future = Compat::new(self.run_with_error_handling(process));
+        use tokio_async_await::compat::backward;
+        let future = run_with_error_handling(process);
+        let future = backward::Compat::new(map_ok(future));
         runtime.spawn(future);
 
         // self.state.process_pool.schedule(process);
     }
+}
 
     /// Executes a single process, terminating in the event of an error.
     pub async fn run_with_error_handling(
-        &self,
-        process: &mut Pin<&mut process::Process>,
+        mut process: Pin<&mut process::Process>
     ) -> () {
+
         // We are using AssertUnwindSafe here so we can pass a &mut Worker to
         // run()/panic(). This might be risky if values captured are not unwind
         // safe, so take care when capturing new variables.
         //let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        let vm = Machine::current();
         loop {
-            match await!(self.run(process)) {
+            match await!(vm.run(&mut process)) {
                 Err(message) => {
                     if message.reason != Reason::TRAP {
                         // just a regular error
@@ -744,7 +755,7 @@ impl Machine {
                             context.ip = new_pc;
                             // yield
                         } else {
-                            process.exit(&self.state, message);
+                            process.exit(&vm.state, message);
                             println!("pid={} action=exited", process.pid);
                             break // crashed
                         }
@@ -780,11 +791,16 @@ impl Machine {
         }*/
     }
 
+    trait Captures<'a> {}
+
+    impl<'a, T> Captures<'a> for T {}
+impl Machine {
     #[allow(clippy::cyclomatic_complexity)]
-    pub async fn run(
-        &self,
-        process: &mut Pin<&mut process::Process>,
-    ) -> Result<process::State, Exception> {
+    pub fn run<'a: 'd, 'b: 'd, 'c: 'd, 'd>(
+        &'a self,
+        process: &'b mut Pin<&'c mut process::Process>,
+    ) -> impl std::future::Future<Output = Result<process::State, Exception>> + Captures<'a> + Captures<'b> + Captures<'c> + 'd {
+        async move {  // workaround for https://github.com/rust-lang/rust/issues/56238
         let context = process.context_mut();
         context.reds = 2000; // self.state.config.reductions;
 
@@ -792,7 +808,8 @@ impl Machine {
         process.process_incoming()?;
 
         loop {
-            let module = unsafe { &(*context.ip.module) };
+            let module = context.ip.get_module();
+            // let module = unsafe { &(*context.ip.module) };
             let ins = &module.instructions[context.ip.ptr as usize];
             context.ip.ptr += 1;
 
@@ -836,7 +853,6 @@ impl Machine {
                     process.local_data_mut().mailbox.remove();
                     // TODO: clear timeout
                     process.timeout.take();
-                    context.timeout.take();
                     // reset savepoint of the mailbox
                     process.local_data_mut().mailbox.reset();
                 }
@@ -844,7 +860,6 @@ impl Machine {
                     //  Reset the save point of the mailbox and clear the timeout flag.
                     process.local_data_mut().mailbox.reset();
                     process.timeout.take();
-                    context.timeout.take();
                     // TODO: clear timeout
                 }
                 Opcode::LoopRec => {
@@ -881,29 +896,44 @@ impl Machine {
 
                     // set wait flag
                     process.set_waiting_for_message(true);
-                    // return (suspend process)
-                    return Ok(process::State::Wait);
+                    let (trigger, cancel) = futures::channel::oneshot::channel::<()>();
+                    await!(cancel.fuse()); // suspend process
                 }
                 Opcode::WaitTimeout => {
                     // @spec wait_timeout Lable Time
                     // @doc  Sets up a timeout of Time milliseconds and saves the address of the
                     //       following instruction as the entry point if the timeout triggers.
                     let curr = context.ip.ptr;
-                    context.timeout = Some(curr);
-
-                    // matches Wait
-                    let label = ins.args[0].to_u32();
-                    op_jump!(context, label);
 
                     // TODO: timeout and jump back to `curr` if time expires
                     // set wait flag
-                    process.set_waiting_for_message(true);
 
                     println!("waittimeout: {:?}", ins.args[1]);
                     let ms = ins.args[1].to_u32();
+                    let when = time::Duration::from_millis(ms as u64);
 
-                    // return (suspend process)
-                    return Ok(process::State::WaitTimeout(ms));
+                    let (trigger, cancel) = futures::channel::oneshot::channel::<()>();
+                    process.timeout = Some(trigger);
+
+                    process.set_waiting_for_message(true);
+
+                    select! { // suspend process
+                        _t = cancel.fuse() => {
+                            // jump to success (start of recv loop)
+                            let label = ins.args[0].to_u32();
+                            op_jump!(context, label);
+                        },
+
+                        // did not work _ = tokio::timer::Delay::new(when) => {
+                        _ = Delay::new(when) => {
+                            // timeout
+
+                            // remove channel
+                            process.timeout.take();
+
+                            () // continue to next instruction (timeout op)
+                        }
+                    }
                 }
                 Opcode::RecvMark => {
                     process.local_data_mut().mailbox.mark();
@@ -2517,6 +2547,7 @@ impl Machine {
         }
 
         Ok(process::State::Done)
+        }
     }
 
     pub fn elapsed_time(&self) -> time::Duration {

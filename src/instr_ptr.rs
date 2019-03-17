@@ -18,6 +18,10 @@ impl InstrPtr {
         InstrPtr { module, ptr }
     }
 
+    pub fn get_module<'a, 'b>(&'a self) -> &'b Module {
+        unsafe { &(*self.module) }
+    }
+
     // typedef struct {
     //     ErtsCodeMFA* mfa;		/* Pointer to: Mod, Name, Arity */
     //     Uint needed;		/* Heap space needed for entire tuple */
