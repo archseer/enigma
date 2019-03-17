@@ -10,6 +10,7 @@ use crate::vm::Machine;
 // use crate::servo_arc::Arc; can't do receiver self
 use crate::signal_queue::SignalQueue;
 pub use crate::signal_queue::{ExitKind, Signal};
+use crate::tokio;
 use crate::value::{self, Term, TryInto};
 use crate::vm::RcState;
 use hashbrown::{HashMap, HashSet};
@@ -19,6 +20,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 pub mod registry;
+
 pub mod table;
 
 /// Heavily inspired by inko
@@ -62,6 +64,7 @@ pub struct ExecutionContext {
     pub live: usize,
     /// binary construction state
     pub bs: *mut Vec<u8>,
+    pub timeout: Option<u32>,
     ///
     pub exc: Option<Exception>,
     /// Reductions left
@@ -104,6 +107,7 @@ impl ExecutionContext {
             // register: Register::new(block.code.registers as usize),
             // binding: Binding::with_rc(block.locals(), block.receiver),
             // line: block.code.line,
+            timeout: None,
 
             // TODO: not great
             bs: unsafe { std::mem::uninitialized() },
@@ -180,6 +184,8 @@ pub struct Process {
 
     /// Waker associated with the wait
     pub waker: Option<std::task::Waker>,
+
+    pub timeout: Option<futures::channel::oneshot::Sender<()>>,
 }
 
 unsafe impl Sync for LocalData {}
@@ -218,6 +224,7 @@ impl Process {
             local_data: UnsafeCell::new(local_data),
             waiting_for_message: AtomicBool::new(false),
             waker: None,
+            timeout: None,
         })
     }
 
@@ -642,13 +649,22 @@ pub fn send_signal(state: &RcState, pid: PID, signal: Signal) -> bool {
 pub enum State {
     Done,
     Wait,
+    WaitTimeout(usize),
     Yield,
 }
 
 use std::future::Future;
+use tokio::await;
+use tokio::prelude::*;
 // use std::marker::Unpin;
 use std::pin::Pin;
 use std::task::{Poll, Waker};
+use std::time::{Duration, Instant};
+
+use futures::future::{self, FutureExt};
+use futures::select;
+// use futures::stream::{self, StreamExt};
+use futures_native_timers::{Delay, Interval};
 
 impl Future for Process {
     type Output = Result<(), ()>;
@@ -659,6 +675,32 @@ impl Future for Process {
             State::Done => Poll::Ready(Ok(())),
             State::Wait => {
                 self.waker = Some(waker.clone());
+                Poll::Pending
+            }
+            State::WaitTimeout(when) => {
+                self.waker = Some(waker.clone());
+                let when = Duration::from_millis(when as u64);
+
+                let (trigger, cancel) = futures::channel::oneshot::channel::<()>();
+                let process = self.get_mut();
+                let waker = waker.clone();
+                tokio::spawn_async(
+                    async move {
+                        select! {
+                            _t = cancel.fuse() => (),
+
+                            // did not work _ = tokio::timer::Delay::new(when) => {
+                            _ = Delay::new(when) => {
+                                // timeout
+                                if let Some(l) = process.context_mut().timeout.take() {
+                                    process.context_mut().ip.ptr = l;
+                                    waker.wake();
+                                }
+                            }
+                        }
+                    },
+                );
+                self.timeout = Some(trigger);
                 Poll::Pending
             }
             State::Yield => {

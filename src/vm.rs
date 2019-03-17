@@ -725,36 +725,42 @@ impl Machine {
     }
 
     /// Executes a single process, terminating in the event of an error.
-    pub fn run_with_error_handling(
+    pub async fn run_with_error_handling(
         &self,
         process: &mut Pin<&mut process::Process>,
-    ) -> process::State {
+    ) -> () {
         // We are using AssertUnwindSafe here so we can pass a &mut Worker to
         // run()/panic(). This might be risky if values captured are not unwind
         // safe, so take care when capturing new variables.
         //let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        match self.run(process) {
-            Err(message) => {
-                if message.reason != Reason::TRAP {
-                    // just a regular error
-                    // HAXX: TODO clone() for now since handle_error consumes the msg
-                    if let Some(new_pc) = exception::handle_error(&process, message.clone()) {
-                        let context = process.context_mut();
-                        context.ip = new_pc;
-                        process::State::Yield
+        loop {
+            match await!(self.run(process)) {
+                Err(message) => {
+                    if message.reason != Reason::TRAP {
+                        // just a regular error
+                        // HAXX: TODO clone() for now since handle_error consumes the msg
+                        if let Some(new_pc) = exception::handle_error(&process, message.clone()) {
+                            let context = process.context_mut();
+                            context.ip = new_pc;
+                            // yield
+                        } else {
+                            process.exit(&self.state, message);
+                            println!("pid={} action=exited", process.pid);
+                            break // crashed
+                        }
                     } else {
-                        process.exit(&self.state, message);
-                        println!("pid={} action=exited", process.pid);
-                        process::State::Done
+                        // we're trapping, ip was already set, now reschedule the process
+                        eprintln!("TRAP!");
+                        // yield
                     }
-                } else {
-                    // we're trapping, ip was already set, now reschedule the process
-                    eprintln!("TRAP!");
-                    process::State::Yield
                 }
+                Ok(process::State::Yield) => (), // yield
+                Ok(process::State::Done) => break, // exited OK
+                // TODO: wait is an await on a oneshot
+                // TODO: waittimeout is an select on a oneshot or a delay
             }
-            Ok(state) => state,
         }
+        ()
         // }));
 
         /*
@@ -775,7 +781,7 @@ impl Machine {
     }
 
     #[allow(clippy::cyclomatic_complexity)]
-    pub fn run(
+    pub async fn run(
         &self,
         process: &mut Pin<&mut process::Process>,
     ) -> Result<process::State, Exception> {
@@ -829,12 +835,16 @@ impl Machine {
                     // Unlink the current message from the message queue. Remove any timeout.
                     process.local_data_mut().mailbox.remove();
                     // TODO: clear timeout
+                    process.timeout.take();
+                    context.timeout.take();
                     // reset savepoint of the mailbox
                     process.local_data_mut().mailbox.reset();
                 }
                 Opcode::Timeout => {
                     //  Reset the save point of the mailbox and clear the timeout flag.
                     process.local_data_mut().mailbox.reset();
+                    process.timeout.take();
+                    context.timeout.take();
                     // TODO: clear timeout
                 }
                 Opcode::LoopRec => {
@@ -879,6 +889,7 @@ impl Machine {
                     // @doc  Sets up a timeout of Time milliseconds and saves the address of the
                     //       following instruction as the entry point if the timeout triggers.
                     let curr = context.ip.ptr;
+                    context.timeout = Some(curr);
 
                     // matches Wait
                     let label = ins.args[0].to_u32();
@@ -888,8 +899,11 @@ impl Machine {
                     // set wait flag
                     process.set_waiting_for_message(true);
 
+                    println!("waittimeout: {:?}", ins.args[1]);
+                    let ms = ins.args[1].to_u32();
+
                     // return (suspend process)
-                    return Ok(process::State::Wait);
+                    return Ok(process::State::WaitTimeout(ms));
                 }
                 Opcode::RecvMark => {
                     process.local_data_mut().mailbox.mark();

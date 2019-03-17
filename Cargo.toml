@@ -43,6 +43,7 @@ lexical = "2.1.0"
 chashmap = { git = "https://gitlab.redox-os.org/redox-os/chashmap" } #"2.2.2"
 dirs = "1.0.5"
 owning_ref = "0.4.0"
+futures-native-timers = { git = "https://github.com/tinaun/futures-native-timers" }
 
 [dev-dependencies]
 quickcheck = "0.8.0"
