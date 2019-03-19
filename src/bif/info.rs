@@ -60,7 +60,15 @@ pub fn process_info_aux(
         atom::CURRENT_FUNCTION => unimplemented!(),
         atom::CURRENT_LOCATION => unimplemented!(),
         atom::CURRENT_STACKTRACE => unimplemented!(),
-        atom::INITIAL_CALL => unimplemented!(),
+        atom::INITIAL_CALL => {
+            let call = local_data.initial_call;
+            tup3!(
+                heap,
+                Term::atom(call.0),
+                Term::atom(call.1),
+                Term::uint(heap, call.2)
+            )
+        }
         atom::STATUS => {
             // TODO: quick cheat
             atom!(RUNNING)

@@ -151,6 +151,8 @@ pub struct LocalData {
     // name (atom)
     pub name: Option<u32>,
 
+    pub initial_call: MFA,
+
     /// error handler, defaults to error_handler
     pub error_handler: u32,
 
@@ -210,6 +212,7 @@ impl Process {
             parent,
             group_leader: parent,
             name: None,
+            initial_call: MFA(0, 0, 0),
             error_handler: atom::ERROR_HANDLER,
             links: HashSet::new(),
             monitors: HashMap::new(),
@@ -297,10 +300,7 @@ impl Process {
         // TODO: will require locking
         self.waiting_for_message.store(false, Ordering::Relaxed);
         match self.context_mut().timeout.take() {
-            Some(chan) => {
-                println!("send");
-                chan.send(())
-            }
+            Some(chan) => chan.send(()),
             None => Ok(()),
         };
         () // TODO: pass through the chan.send result ret
@@ -548,10 +548,12 @@ pub fn spawn(
     // lastly, the tail
     context.x[i] = *cons;
 
+    new_proc.local_data_mut().initial_call = MFA(unsafe { (*module).name }, func, i as u32);
+
     println!(
         "Spawning... pid={} mfa={} args={}",
         new_proc.pid,
-        MFA(unsafe { (*module).name }, func, i as u32),
+        new_proc.local_data().initial_call,
         args
     );
 
