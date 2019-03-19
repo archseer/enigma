@@ -284,9 +284,9 @@ pub fn list_dir_nif_1(
                 .map(|entry| {
                     Term::binary(
                         heap,
-                        Binary::from(entry.unwrap().path().to_str().unwrap().as_bytes()),
+                        Binary::from(entry.unwrap().file_name().to_str().unwrap().as_bytes()),
                     )
-                    // bitstring!(heap, entry.unwrap().path().to_str().unwrap()
+                    // bitstring!(heap, entry.unwrap().file_name().to_str().unwrap()
                 })
                 .collect::<Vec<Term>>()
                 .into_iter(),
