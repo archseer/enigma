@@ -193,6 +193,7 @@ pub struct Process {
 unsafe impl Sync for LocalData {}
 unsafe impl Send for LocalData {}
 unsafe impl Send for ExecutionContext {}
+unsafe impl Sync for ExecutionContext {}
 unsafe impl Sync for Process {}
 impl RefUnwindSafe for Process {}
 

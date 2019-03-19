@@ -908,65 +908,68 @@ impl Machine {
                     // @spec wait_timeout Lable Time
                     // @doc  Sets up a timeout of Time milliseconds and saves the address of the
                     //       following instruction as the entry point if the timeout triggers.
-                    let curr = context.ip.ptr;
 
-                    // TODO: timeout and jump back to `curr` if time expires
-                    // set wait flag
-
-                    let ms = context.expand_arg(&ins.args[1]).to_u32();
-                    let when = time::Duration::from_millis(ms as u64);
-
+                    use futures::compat::Compat;
                     let (trigger, cancel) = futures::channel::oneshot::channel::<()>();
                     context.timeout = Some(trigger);
 
-                    // process.set_waiting_for_message(true);
+                    match context.expand_arg(&ins.args[1]).into_variant() {
+                        Variant::Atom(atom::INFINITY) => {
+                            // just a normal Opcode::Wait
+                            println!("infinity wait");
+                            let label = ins.args[0].to_u32();
+                            op_jump!(context, label);
 
-                    use futures::compat::Compat;
-                    use tokio_async_await::compat::backward;
-                    use tokio::prelude::FutureExt;
+                            println!("select! resumption");
+                            await!(Compat::new(cancel.fuse())); // suspend process
+                        },
+                        Variant::Integer(ms) => {
+                            let when = time::Duration::from_millis(ms as u64);
+                            use tokio::prelude::FutureExt;
 
-                    match await!(
-                                 Compat::new(cancel).timeout(when)
-                                 ) {
-                        Ok(()) =>  {
-                             // jump to success (start of recv loop)
-                             let label = ins.args[0].to_u32();
-                             op_jump!(context, label);
-                             println!("select! resumption");
-                        }
-                        Err(_) => {
-                             // timeout
-                             println!("select! delay timeout");
+                            match await!(Compat::new(cancel).timeout(when)) {
+                                Ok(()) =>  {
+                                    // jump to success (start of recv loop)
+                                    let label = ins.args[0].to_u32();
+                                    op_jump!(context, label);
+                                    println!("select! resumption");
+                                }
+                                Err(_) => {
+                                    // timeout
+                                    println!("select! delay timeout {} pid={} ms={} m={:?}", ms, process.pid, context.expand_arg(&ins.args[1]), ins.args[1]);
 
-                             // remove channel
-                             context.timeout.take();
+                                    // remove channel
+                                    context.timeout.take();
 
-                             () // continue to next instruction (timeout op)
-                        }
+                                    () // continue to next instruction (timeout op)
+                                }
 
+                            }
+                            // use futures::compat::Compat;
+                            // use tokio_async_await::compat::backward;
+                            // let future = backward::Compat::new(cancel).fuse();
+                            // select! { // suspend process
+                            //     _t = future => {
+                            //         // jump to success (start of recv loop)
+                            //         let label = ins.args[0].to_u32();
+                            //         op_jump!(context, label);
+                            //         println!("select! resumption");
+                            //     },
+
+                            //     // did not work _ = tokio::timer::Delay::new(when) => {
+                            //     _ = Delay::new(when) => {
+                            //         // timeout
+                            //         println!("select! delay timeout");
+
+                            //         // remove channel
+                            //         // context.timeout.take();
+
+                            //         () // continue to next instruction (timeout op)
+                            //     }
+                            // };
+                        },
+                        _ => unreachable!()
                     }
-                    // use futures::compat::Compat;
-                    // use tokio_async_await::compat::backward;
-                    // let future = backward::Compat::new(cancel).fuse();
-                    // select! { // suspend process
-                    //     _t = future => {
-                    //         // jump to success (start of recv loop)
-                    //         let label = ins.args[0].to_u32();
-                    //         op_jump!(context, label);
-                    //         println!("select! resumption");
-                    //     },
-
-                    //     // did not work _ = tokio::timer::Delay::new(when) => {
-                    //     _ = Delay::new(when) => {
-                    //         // timeout
-                    //         println!("select! delay timeout");
-
-                    //         // remove channel
-                    //         // context.timeout.take();
-
-                    //         () // continue to next instruction (timeout op)
-                    //     }
-                    // };
                     process.process_incoming()?;
                 }
                 Opcode::RecvMark => {

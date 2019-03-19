@@ -154,6 +154,8 @@ pub enum Variant {
     Cons(*const self::Cons),
     Pointer(*const Header), // tuple, map, binary, ref
 }
+unsafe impl Send for Variant {}
+// unsafe impl Sync for Variant {}
 
 impl From<f64> for Term {
     fn from(value: f64) -> Term {
