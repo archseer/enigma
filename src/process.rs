@@ -71,6 +71,9 @@ pub struct ExecutionContext {
     pub exc: Option<Exception>,
     /// Reductions left
     pub reds: usize,
+
+    /// Waker associated with the wait
+    pub timeout: Option<futures::channel::oneshot::Sender<()>>,
 }
 
 impl ExecutionContext {
@@ -113,6 +116,7 @@ impl ExecutionContext {
             // TODO: not great
             bs: unsafe { std::mem::uninitialized() },
             reds: 0,
+            timeout: None,
         }
     }
 }
@@ -182,11 +186,6 @@ pub struct Process {
 
     /// If the process is waiting for a message.
     pub waiting_for_message: AtomicBool,
-
-    /// Waker associated with the wait
-    pub waker: Option<std::task::Waker>,
-
-    pub timeout: Option<futures::channel::oneshot::Sender<()>>,
 }
 
 unsafe impl Sync for LocalData {}
@@ -225,8 +224,6 @@ impl Process {
             pid,
             local_data: UnsafeCell::new(local_data),
             waiting_for_message: AtomicBool::new(false),
-            waker: None,
-            timeout: None,
         })
     }
 
@@ -266,6 +263,7 @@ impl Process {
 
     pub fn send_signal(&self, signal: Signal) {
         self.local_data_mut().signal_queue.send_external(signal);
+        self.wake_up()
     }
 
     // TODO: remove
@@ -281,6 +279,7 @@ impl Process {
                     from,
                 });
         }
+        self.wake_up()
     }
 
     // awkward result, but it works
@@ -294,20 +293,21 @@ impl Process {
     }
 
     pub fn wake_up(&self) {
+        println!("pid={} waking up!", self.pid);
         // TODO: will require locking
         self.waiting_for_message.store(false, Ordering::Relaxed);
-        match &self.waker {
-            Some(waker) => waker.wake(),
-            None => (),
-        }
+        match self.context_mut().timeout.take() {
+            Some(chan) => {
+                println!("send");
+                chan.send(())
+            }
+            None => Ok(()),
+        };
+        () // TODO: pass through the chan.send result ret
     }
 
     pub fn set_waiting_for_message(&self, value: bool) {
         self.waiting_for_message.store(value, Ordering::Relaxed)
-    }
-
-    pub fn is_waiting_for_message(&self) -> bool {
-        self.waiting_for_message.load(Ordering::Relaxed)
     }
 
     // we're in receive(), but ran out of internal messages, process external queue
@@ -621,11 +621,6 @@ pub fn send_message(
 
     if let Some(receiver) = receiver {
         receiver.send_message(process.pid, msg);
-
-        if receiver.is_waiting_for_message() {
-            // wake up
-            receiver.wake_up();
-        }
     } else {
         println!("NOTFOUND");
     }
@@ -637,11 +632,6 @@ pub fn send_message(
 pub fn send_signal(state: &RcState, pid: PID, signal: Signal) -> bool {
     if let Some(receiver) = state.process_table.lock().get(pid) {
         receiver.send_signal(signal);
-
-        if receiver.is_waiting_for_message() {
-            // wake up
-            receiver.wake_up();
-        }
         return true;
     }
     // TODO: if err, we return err ?

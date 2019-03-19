@@ -579,6 +579,7 @@ impl Term {
         }
     }
 
+    // TODO: add unchecked variant
     pub fn get_boxed_header(self) -> Result<Header, String> {
         if let Variant::Pointer(ptr) = self.into_variant() {
             unsafe { return Ok(*ptr) }
@@ -586,6 +587,7 @@ impl Term {
         Err("Not a boxed type!".to_string())
     }
 
+    // TODO: add unchecked variant
     pub fn get_boxed_value<T>(&self) -> Result<&T, &str> {
         if let Variant::Pointer(ptr) = self.into_variant() {
             unsafe { return Ok(&(*(ptr as *const Boxed<T>)).value) }
@@ -593,6 +595,7 @@ impl Term {
         Err("Not a boxed type!")
     }
 
+    // TODO: add unchecked variant
     pub fn get_boxed_value_mut<T>(&self) -> Result<&mut T, &str> {
         if let Variant::Pointer(ptr) = self.into_variant() {
             unsafe { return Ok(&mut (*(ptr as *mut Boxed<T>)).value) }

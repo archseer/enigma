@@ -791,9 +791,10 @@ impl Machine {
         }*/
     }
 
-    trait Captures<'a> {}
+    pub trait Captures<'a> {}
 
     impl<'a, T> Captures<'a> for T {}
+
 impl Machine {
     #[allow(clippy::cyclomatic_complexity)]
     pub fn run<'a: 'd, 'b: 'd, 'c: 'd, 'd>(
@@ -851,16 +852,16 @@ impl Machine {
                 Opcode::RemoveMessage => {
                     // Unlink the current message from the message queue. Remove any timeout.
                     process.local_data_mut().mailbox.remove();
-                    // TODO: clear timeout
-                    process.timeout.take();
+                    // clear timeout
+                    context.timeout.take();
                     // reset savepoint of the mailbox
                     process.local_data_mut().mailbox.reset();
                 }
                 Opcode::Timeout => {
                     //  Reset the save point of the mailbox and clear the timeout flag.
                     process.local_data_mut().mailbox.reset();
-                    process.timeout.take();
-                    // TODO: clear timeout
+                    // clear timeout
+                    context.timeout.take();
                 }
                 Opcode::LoopRec => {
                     // label, source
@@ -895,9 +896,13 @@ impl Machine {
                     // a message while we're in the process of suspending.
 
                     // set wait flag
-                    process.set_waiting_for_message(true);
+                    // process.set_waiting_for_message(true);
+                    use futures::compat::Compat;
                     let (trigger, cancel) = futures::channel::oneshot::channel::<()>();
-                    await!(cancel.fuse()); // suspend process
+                    context.timeout = Some(trigger);
+                    await!(Compat::new(cancel.fuse())); // suspend process
+                    println!("pid={} resumption ", process.pid);
+                    process.process_incoming()?;
                 }
                 Opcode::WaitTimeout => {
                     // @spec wait_timeout Lable Time
@@ -908,32 +913,61 @@ impl Machine {
                     // TODO: timeout and jump back to `curr` if time expires
                     // set wait flag
 
-                    println!("waittimeout: {:?}", ins.args[1]);
-                    let ms = ins.args[1].to_u32();
+                    let ms = context.expand_arg(&ins.args[1]).to_u32();
                     let when = time::Duration::from_millis(ms as u64);
 
                     let (trigger, cancel) = futures::channel::oneshot::channel::<()>();
-                    process.timeout = Some(trigger);
+                    context.timeout = Some(trigger);
 
-                    process.set_waiting_for_message(true);
+                    // process.set_waiting_for_message(true);
 
-                    select! { // suspend process
-                        _t = cancel.fuse() => {
-                            // jump to success (start of recv loop)
-                            let label = ins.args[0].to_u32();
-                            op_jump!(context, label);
-                        },
+                    use futures::compat::Compat;
+                    use tokio_async_await::compat::backward;
+                    use tokio::prelude::FutureExt;
 
-                        // did not work _ = tokio::timer::Delay::new(when) => {
-                        _ = Delay::new(when) => {
-                            // timeout
-
-                            // remove channel
-                            process.timeout.take();
-
-                            () // continue to next instruction (timeout op)
+                    match await!(
+                                 Compat::new(cancel).timeout(when)
+                                 ) {
+                        Ok(()) =>  {
+                             // jump to success (start of recv loop)
+                             let label = ins.args[0].to_u32();
+                             op_jump!(context, label);
+                             println!("select! resumption");
                         }
+                        Err(_) => {
+                             // timeout
+                             println!("select! delay timeout");
+
+                             // remove channel
+                             context.timeout.take();
+
+                             () // continue to next instruction (timeout op)
+                        }
+
                     }
+                    // use futures::compat::Compat;
+                    // use tokio_async_await::compat::backward;
+                    // let future = backward::Compat::new(cancel).fuse();
+                    // select! { // suspend process
+                    //     _t = future => {
+                    //         // jump to success (start of recv loop)
+                    //         let label = ins.args[0].to_u32();
+                    //         op_jump!(context, label);
+                    //         println!("select! resumption");
+                    //     },
+
+                    //     // did not work _ = tokio::timer::Delay::new(when) => {
+                    //     _ = Delay::new(when) => {
+                    //         // timeout
+                    //         println!("select! delay timeout");
+
+                    //         // remove channel
+                    //         // context.timeout.take();
+
+                    //         () // continue to next instruction (timeout op)
+                    //     }
+                    // };
+                    process.process_incoming()?;
                 }
                 Opcode::RecvMark => {
                     process.local_data_mut().mailbox.mark();
