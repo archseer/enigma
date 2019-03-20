@@ -73,6 +73,7 @@ pub struct ExecutionContext {
     pub reds: usize,
 
     /// Waker associated with the wait
+    pub recv_channel: Option<futures::channel::oneshot::Receiver<()>>,
     pub timeout: Option<futures::channel::oneshot::Sender<()>>,
 }
 
@@ -117,6 +118,7 @@ impl ExecutionContext {
             bs: unsafe { std::mem::uninitialized() },
             reds: 0,
             timeout: None,
+            recv_channel: None,
         }
     }
 }
@@ -287,7 +289,7 @@ impl Process {
     }
 
     // awkward result, but it works
-    pub fn receive(&self) -> Result<Option<&Term>, Exception> {
+    pub fn receive(&self) -> Result<Option<Term>, Exception> {
         let local_data = self.local_data_mut();
 
         if !local_data.mailbox.has_messages() {
@@ -314,6 +316,11 @@ impl Process {
     // we're in receive(), but ran out of internal messages, process external queue
     /// An Err signals that we're now exiting.
     pub fn process_incoming(&self) -> Result<(), Exception> {
+        // we want to start tracking for new messages a lot earlier
+        let (trigger, cancel) = futures::channel::oneshot::channel::<()>();
+        self.context_mut().recv_channel = Some(cancel); // TODO: if timer already set, don't set again!!!
+        self.context_mut().timeout = Some(trigger); // TODO: if timer already set, don't set again!!!
+
         // get internal, if we ran out, start processing external
         while let Some(signal) = self.local_data_mut().signal_queue.receive() {
             match signal {

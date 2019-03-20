@@ -803,7 +803,7 @@ impl Machine {
     ) -> impl std::future::Future<Output = Result<process::State, Exception>> + Captures<'a> + Captures<'b> + Captures<'c> + 'd {
         async move {  // workaround for https://github.com/rust-lang/rust/issues/56238
         let context = process.context_mut();
-        context.reds = 2000; // self.state.config.reductions;
+        context.reds = 1000; // self.state.config.reductions;
 
         // process the incoming signal queue
         process.process_incoming()?;
@@ -868,7 +868,7 @@ impl Machine {
                     // grab message from queue, put to x0, if no message, jump to fail label
                     if let Some(msg) = process.receive()? {
                         println!("recv proc pid={:?} msg={}", process.pid, msg);
-                        context.x[0] = *msg
+                        context.x[0] = msg
                     } else {
                         let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
@@ -898,9 +898,10 @@ impl Machine {
                     // set wait flag
                     // process.set_waiting_for_message(true);
                     use futures::compat::Compat;
-                    let (trigger, cancel) = futures::channel::oneshot::channel::<()>();
-                    context.timeout = Some(trigger);
+                    // LOCK mailbox on looprec, unlock on wait/waittimeout
+                    let cancel = process.context_mut().recv_channel.take().unwrap();
                     await!(Compat::new(cancel.fuse())); // suspend process
+
                     println!("pid={} resumption ", process.pid);
                     process.process_incoming()?;
                 }
@@ -910,8 +911,7 @@ impl Machine {
                     //       following instruction as the entry point if the timeout triggers.
 
                     use futures::compat::Compat;
-                    let (trigger, cancel) = futures::channel::oneshot::channel::<()>();
-                    context.timeout = Some(trigger);
+                    let cancel = process.context_mut().recv_channel.take().unwrap();
 
                     match context.expand_arg(&ins.args[1]).into_variant() {
                         Variant::Atom(atom::INFINITY) => {
