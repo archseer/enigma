@@ -11,7 +11,6 @@ use crate::vm;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use std::pin::Pin;
-use std::sync::Arc;
 
 pub mod arith;
 mod chrono;
@@ -23,6 +22,7 @@ mod maps;
 mod os;
 mod pdict;
 mod prim_file;
+mod timer;
 
 macro_rules! trap {
     ($context:expr, $ptr:expr, $($arg:expr),*) => {{
@@ -179,6 +179,8 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "has_prepared_code_on_load", 1 => load::has_prepared_code_on_load_1,
             "finish_loading", 1 => load::finish_loading_1,
             "pre_loaded", 0 => load::pre_loaded_0,
+
+            "send_after", 3 => timer::send_after_3,
 
             // pdict
             "get", 0 => pdict::get_0,
@@ -452,7 +454,7 @@ fn bif_erlang_link_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
                         let from = Term::pid(process.pid);
                         process::send_message(
                             &vm.state,
-                            process,
+                            process.pid,
                             from,
                             tup3!(heap, atom!(EXIT), from, atom!(NOPROC)),
                         );
@@ -643,7 +645,7 @@ fn bif_erlang_send_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
     // args: dest <term (pid/atom)>, msg <term>
     let pid = args[0];
     let msg = args[1];
-    process::send_message(&vm.state, process, pid, msg)
+    process::send_message(&vm.state, process.pid, pid, msg)
 }
 
 pub fn bif_erlang_is_atom_1(

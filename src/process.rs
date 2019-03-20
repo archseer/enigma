@@ -610,12 +610,7 @@ pub fn spawn(
     Ok(ret)
 }
 
-pub fn send_message(
-    state: &RcState,
-    process: &Pin<&mut Process>,
-    pid: Term,
-    msg: Term,
-) -> Result<Term, Exception> {
+pub fn send_message(state: &RcState, sender: PID, pid: Term, msg: Term) -> Result<Term, Exception> {
     let receiver = match pid.into_variant() {
         value::Variant::Atom(name) => {
             if let Some(process) = state.process_registry.lock().whereis(name) {
@@ -630,7 +625,7 @@ pub fn send_message(
     };
 
     if let Some(receiver) = receiver {
-        receiver.send_message(process.pid, msg);
+        receiver.send_message(sender, msg);
     } else {
         println!("NOTFOUND");
     }
