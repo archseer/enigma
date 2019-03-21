@@ -920,8 +920,8 @@ impl Machine {
                             let label = ins.args[0].to_u32();
                             op_jump!(context, label);
 
-                            println!("select! resumption");
                             await!(Compat::new(cancel.fuse())); // suspend process
+                            println!("select! resumption pid={}", process.pid);
                         },
                         Variant::Integer(ms) => {
                             let when = time::Duration::from_millis(ms as u64);
@@ -932,7 +932,7 @@ impl Machine {
                                     // jump to success (start of recv loop)
                                     let label = ins.args[0].to_u32();
                                     op_jump!(context, label);
-                                    println!("select! resumption");
+                                    println!("select! resumption pid={}", process.pid);
                                 }
                                 Err(_) => {
                                     // timeout

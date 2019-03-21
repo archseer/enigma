@@ -197,7 +197,7 @@
 ** System [1/2]
 - [ ] bif erlang:system_flag/2
 - [X] bif erlang:system_info/1
-** New in R9C [23/44]
+** New in R9C [26/44]
 - [ ] bif erlang:system_monitor/0
 - [ ] bif erlang:system_monitor/1
 - [ ] bif erlang:system_monitor/2
@@ -240,9 +240,9 @@
 - [ ] ubif erlang:'/'/2			div_2
 - [X] ubif erlang:'div'/2			intdiv_2
 - [X] ubif erlang:'rem'/2
-- [ ] ubif erlang:'bor'/2
-- [ ] ubif erlang:'band'/2
-- [ ] ubif erlang:'bxor'/2
+- [X] ubif erlang:'bor'/2
+- [X] ubif erlang:'band'/2
+- [X] ubif erlang:'bxor'/2
 - [ ] ubif erlang:'bsl'/2
 - [ ] ubif erlang:'bsr'/2
 - [ ] ubif erlang:'bnot'/1

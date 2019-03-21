@@ -495,6 +495,44 @@ pub fn sneqeq_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) 
     ))
 }
 
+pub fn bor_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    println!("bor!!! {} {}", args[0], args[1]);
+    let i1 = match args[0].into_variant() {
+        Variant::Integer(i) => i,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    let i2 = match args[1].into_variant() {
+        Variant::Integer(i) => i,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    Ok(Term::int(i1 | i2))
+}
+
+pub fn band_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    println!("band!!! {} {}", args[0], args[1]);
+    let i1 = match args[0].into_variant() {
+        Variant::Integer(i) => i,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    let i2 = match args[1].into_variant() {
+        Variant::Integer(i) => i,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    Ok(Term::int(i1 & i2))
+}
+
+pub fn bxor_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    let i1 = match args[0].into_variant() {
+        Variant::Integer(i) => i,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    let i2 = match args[1].into_variant() {
+        Variant::Integer(i) => i,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    Ok(Term::int(i1 ^ i2))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
