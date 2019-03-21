@@ -258,6 +258,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
         "erts_internal" => {
             "group_leader", 2 => info::group_leader_2,
             "garbage_collect", 1 => garbage_collect_1,
+            "open_port", 2 => open_port_2,
         },
     ]
 };
@@ -1131,6 +1132,10 @@ pub fn bif_erlang_trunc_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: 
 fn garbage_collect_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
     // TODO: GC unimplemented
     Ok(atom!(TRUE))
+}
+fn open_port_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    // TODO: ports unimplemented
+    Ok(Term::port(1))
 }
 
 #[cfg(test)]
