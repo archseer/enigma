@@ -379,8 +379,8 @@ pub fn run(
                 //                    esp[-1] = t;
                 //                }
                 Opcode::Call2(bif) => {
-                    let arg0 = esp.pop().unwrap();
                     let arg1 = esp.pop().unwrap();
+                    let arg0 = esp.pop().unwrap(); // it's in reverse
                     let args = &[arg0, arg1];
                     match bif(vm, process, args) {
                         Ok(t) => {
