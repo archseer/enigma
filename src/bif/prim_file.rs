@@ -13,6 +13,13 @@ fn error_to_tuple(heap: &Heap, error: std::io::Error) -> Term {
     use std::io::ErrorKind;
     let kind = match error.kind() {
         ErrorKind::NotFound => atom!(ENOENT),
+        ErrorKind::Other => {
+            let errno = error.raw_os_error().unwrap();
+            match errno {
+                20 => atom!(ENOTDIR),
+                _ => unimplemented!("error_to_tuple for {:?}", error),
+            }
+        }
         _ => unimplemented!("error_to_tuple for {:?}", error),
     };
     tup2!(heap, atom!(ERROR), kind)

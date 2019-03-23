@@ -28,12 +28,12 @@ Only prerequisite to building Enigma is Rust. Use [rustup](https://rustup.rs/) (
 Run `cargo install` to install the dependencies, `cargo run` to build and run the VM. Expect heavy
 crashes, but a lot of the functionality is already available.
 
-Currently, you will need to go into `src/bin/enigma.rs` and modify the arguments
-to point the root to your regular erlang installation. You can find the correct
-value by running:
+To boot up OTP you will need to compile the standard library.
 
 ```bash
-grep ROOTDIR= $(which erl)
+cd otp
+make libs
+make local_setup
 ```
 
 We will distribute binaries for various platforms, once we reach a certain level of usability.

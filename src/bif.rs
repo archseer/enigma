@@ -911,7 +911,7 @@ fn bif_erlang_nif_error_1(
     _process: &Pin<&mut Process>,
     args: &[Term],
 ) -> Result {
-    println!("Tried running nif might be missing!!");
+    println!("Tried running nif, might be missing!!");
     Err(Exception::with_value(Reason::EXC_ERROR, args[0]))
 }
 
