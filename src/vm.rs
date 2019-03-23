@@ -298,7 +298,10 @@ macro_rules! op_call_ext {
                     // TODO: should use call_bif?
                     Ok(val) => {
                         set_register!($context, &LValue::X(0), val); // HAXX
-                        op_return!($context);
+                        if $return {
+                            // TODO: figure out returns
+                            op_return!($process, $context);
+                        }
                     }
                     Err(exc) => return Err(exc),
                 }
@@ -325,7 +328,7 @@ macro_rules! op_call_bif {
                 set_register!($context, &LValue::X(0), val); // HAXX
                 if $return {
                     // TODO: figure out returns
-                    op_return!($context);
+                    op_return!($process, $context);
                 }
             }
             Err(exc) => return Err(exc),
@@ -476,12 +479,12 @@ macro_rules! op_apply_fun {
 }
 
 macro_rules! op_return {
-    ($context:expr) => {{
+    ($process:expr, $context:expr) => {{
         if let Some(i) = $context.cp {
             op_jump_ptr!($context, i);
             $context.cp = None;
         } else {
-            println!("Process exited with normal, x0: {}", $context.x[0]);
+            // println!("Process pid={} exited with normal, x0: {}", $process.pid, $context.x[0]);
             break;
         }
     }};
@@ -2386,12 +2389,11 @@ impl Machine {
                     // literal arity
                     let arity = ins.args[0].to_u32();
                     let value = context.x[arity as usize];
+                    context.cp = Some(context.ip);
                     // TODO: this clone is bad but the borrow checker complains (but doesn't on GetTl/GetHd)
                     if let Ok(closure) = value::Closure::try_from(&value) {
-                        context.cp = Some(context.ip);
                         op_call_fun!(self, context, closure, arity)
                     } else if let Ok(mfa) = module::MFA::try_from(&value) {
-                        println!("callfun with export!");
                         // TODO: deduplicate this part
                         let export = { self.exports.read().lookup(&mfa) }; // drop the exports lock
 
