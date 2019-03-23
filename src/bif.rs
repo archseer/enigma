@@ -254,6 +254,9 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "get_env_var", 1 => os::get_env_var_1,
             "set_env_var", 2 => os::set_env_var_2,
             "unset_env_var", 1 => os::unset_env_var_1,
+            // TODO distinguish the two (erlang vs os) later
+            "system_time", 0 => chrono::system_time_0,
+            "system_time", 1 => chrono::system_time_1,
         },
         "erts_internal" => {
             "group_leader", 2 => info::group_leader_2,
