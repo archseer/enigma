@@ -84,24 +84,14 @@ pub fn get_module_info_2(
     _process: &Pin<&mut Process>,
     args: &[Term],
 ) -> bif::Result {
-    println!("called module_info with {} {}", args[0], args[1]);
-
     let name = match args[0].into_variant() {
         Variant::Atom(i) => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
 
-    println!("befoe lookup");
     let registry = vm.modules.lock();
     let module = registry.lookup(name).unwrap();
-    println!(
-        "{:?}, {:?}, {:?}",
-        args[1].into_variant(),
-        module.name,
-        name
-    );
     let res = get_module_info(module, args[1]).unwrap();
-    println!("res: {}", res);
     Ok(res)
 }
 

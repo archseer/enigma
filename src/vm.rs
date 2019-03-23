@@ -234,7 +234,6 @@ fn call_error_handler(
     func: u32,
 ) -> Result<(), Exception> {
     // debug!("call_error_handler mfa={}, mfa)
-    println!("function not found {}", mfa);
     let context = process.context_mut();
 
     // Search for the error_handler module.
@@ -247,6 +246,7 @@ fn call_error_handler(
             Some(Export::Fun(ptr)) => ptr,
             Some(_) => unimplemented!("call_error_handler for non-fun"),
             None => {
+                println!("function not found {}", mfa);
                 // no error handler
                 // TODO: set current to mfa
                 return Err(Exception::new(Reason::EXC_UNDEF));
@@ -674,7 +674,6 @@ impl Machine {
         let mut runtime = tokio::runtime::Builder::new()
             .after_start(move || {
                 Machine::set_current(machine.clone()); // ughh double clone
-                eprintln!("thread started!");
             })
             .build()
             .expect("failed to start new Runtime");

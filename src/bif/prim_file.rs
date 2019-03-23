@@ -51,7 +51,6 @@ pub fn read_file_nif_1(
     let cons = Cons::try_from(&args[0])?;
     let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
 
-    println!("Trying to read file {:?}", path);
     let bytes = match std::fs::read(path) {
         Ok(bytes) => bytes,
         Err(err) => return Ok(error_to_tuple(heap, err)),
@@ -169,7 +168,6 @@ fn meta_to_tuple(heap: &Heap, meta: std::fs::Metadata) -> Term {
         Term::uint(heap, meta.uid()),
         Term::uint(heap, meta.gid()),
     );
-    println!("file_info: {}", tup);
     tup
 }
 
@@ -234,8 +232,6 @@ pub fn read_info_nif_2(
 
     assert!(args.len() == 2);
 
-    println!("file stuff");
-
     let follow_links = match args[1].to_int() {
         Some(i) => i > 0,
         None => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -245,15 +241,11 @@ pub fn read_info_nif_2(
     // TODO: maybe do these casts in the native2name/name2native
     let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
 
-    println!("path stuff");
-
     let meta = if follow_links {
         std::fs::metadata(path)
     } else {
         std::fs::symlink_metadata(path)
     };
-
-    println!("meta {:?}", meta);
 
     // TODO map/and then?
     let info = match meta {
@@ -277,7 +269,6 @@ pub fn list_dir_nif_1(
     let cons = Cons::try_from(&args[0])?;
     let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
 
-    println!("Trying to read dir {:?}", path);
     let res = match std::fs::read_dir(path) {
         Ok(entries) => Cons::from_iter(
             entries

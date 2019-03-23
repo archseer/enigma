@@ -101,8 +101,8 @@ impl Table for HashTable {
             None => return Ok(atom!(FALSE)), // return BadKey
         };
 
-        println!("item! {}", *item);
-        println!("values {}", list);
+        // println!("item! {}", *item);
+        // println!("values {}", list);
         // TODO verify that items are always tuples
         let item: &mut Tuple = match item.try_into_mut() {
             Ok(t) => t,
@@ -119,22 +119,14 @@ impl Table for HashTable {
                 // and has pos as integer, >= 1 and isn't == to keypos and is in the db term tuple
                 // arity range
                 if let Ok(tup) = Tuple::try_from(&val) {
-                    println!("a");
                     if tup.len() == 2 && tup[0].is_smallint() {
-                        println!("tuplen");
                         let pos = (tup[0].to_int().unwrap() - 1) as usize; // 1 indexed
-                        println!(
-                            "pos {}, keypos {} len {}",
-                            pos,
-                            self.meta().keypos,
-                            item.len()
-                        );
                         if pos != self.meta().keypos && pos < item.len() {
                             return Ok((pos, tup[1]));
                         }
                     }
                 }
-                println!("update_element_3 failed!");
+                // println!("update_element_3 failed!");
                 Err(new_error(ErrorKind::BadItem))
             })
             .collect();
@@ -142,7 +134,7 @@ impl Table for HashTable {
         // The point of no return, no failures from here on.
         res?.iter()
             .for_each(|(pos, val)| item[*pos] = val.deep_clone(&self.heap));
-        println!("Updated items!");
+        // println!("Updated items!");
         Ok(atom!(TRUE))
     }
 

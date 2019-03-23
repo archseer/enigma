@@ -314,7 +314,6 @@ pub fn list_to_integer_1(
     process: &Pin<&mut Process>,
     args: &[Term],
 ) -> bif::Result {
-    println!("integer_to_list_1 called with {}", args[0]);
     // list to string
     let cons = Cons::try_from(&args[0])?;
     let string = value::cons::unicode_list_to_buf(cons, 2048)?;
@@ -496,7 +495,6 @@ pub fn sneqeq_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) 
 }
 
 pub fn bor_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
-    println!("bor!!! {} {}", args[0], args[1]);
     let i1 = match args[0].into_variant() {
         Variant::Integer(i) => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -509,7 +507,6 @@ pub fn bor_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> 
 }
 
 pub fn band_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
-    println!("band!!! {} {}", args[0], args[1]);
     let i1 = match args[0].into_variant() {
         Variant::Integer(i) => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
