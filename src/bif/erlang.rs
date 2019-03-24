@@ -339,6 +339,11 @@ pub fn display_string_1(
     Ok(atom!(TRUE))
 }
 
+pub fn display_nl_0(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    println!("");
+    Ok(atom!(TRUE))
+}
+
 /// erlang:'++'/2
 ///
 /// Adds a list to another (LHS ++ RHS). For historical reasons this is implemented by copying LHS
@@ -528,6 +533,38 @@ pub fn bxor_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) ->
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     Ok(Term::int(i1 ^ i2))
+}
+
+pub fn bsl_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    let i1 = match args[0].into_variant() {
+        Variant::Integer(i) => i,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    let i2 = match args[1].into_variant() {
+        Variant::Integer(i) => i,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    Ok(Term::int(i1 << i2))
+}
+
+pub fn bsr_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    let i1 = match args[0].into_variant() {
+        Variant::Integer(i) => i,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    let i2 = match args[1].into_variant() {
+        Variant::Integer(i) => i,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    Ok(Term::int(i1 >> i2))
+}
+
+pub fn bnot_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    let i1 = match args[0].into_variant() {
+        Variant::Integer(i) => i,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    Ok(Term::int(!i1))
 }
 
 #[cfg(test)]

@@ -149,6 +149,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "node", 1 => erlang::node_1,
             "display", 1 => erlang::display_1,
             "display_string", 1 => erlang::display_string_1,
+            "display_nl", 0 => erlang::display_nl_0,
 
             // logic
             "and", 2 => erlang::and_2,
@@ -168,9 +169,9 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "bor", 2 => erlang::bor_2,
             "band", 2 => erlang::band_2,
             "bxor", 2 => erlang::bxor_2,
-            // "bsl", 2 => erlang::bsl_2,
-            // "bsr", 2 => erlang::bsr_2,
-            // "bnot", 1 => erlang::bnot_1,
+            "bsl", 2 => erlang::bsl_2,
+            "bsr", 2 => erlang::bsr_2,
+            "bnot", 1 => erlang::bnot_1,
             // "-", 1 => erlang::sminus_1,
             // "+", 1 => erlang::splus_1,
 
@@ -255,6 +256,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "get_env_var", 1 => os::get_env_var_1,
             "set_env_var", 2 => os::set_env_var_2,
             "unset_env_var", 1 => os::unset_env_var_1,
+            "getpid", 0 => os::getpid_0,
             // TODO distinguish the two (erlang vs os) later
             "system_time", 0 => chrono::system_time_0,
             "system_time", 1 => chrono::system_time_1,

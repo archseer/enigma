@@ -53,6 +53,11 @@ pub fn unset_env_var_1(
     Ok(atom!(TRUE))
 }
 
+pub fn getpid_0(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    let heap = &process.context_mut().heap;
+    Ok(Term::uint(heap, std::process::id()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
