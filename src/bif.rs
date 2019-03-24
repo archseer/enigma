@@ -248,6 +248,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "select", 2 => ets::bif::select_2,
             "select_delete", 2 => ets::bif::select_delete_2,
             "update_element", 3 => ets::bif::update_element_3,
+            "match", 2 => ets::bif::match_2,
         },
         "os" => {
             "list_env_vars", 0 => os::list_env_vars_0,
@@ -262,6 +263,15 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "group_leader", 2 => info::group_leader_2,
             "garbage_collect", 1 => garbage_collect_1,
             "open_port", 2 => open_port_2,
+        },
+        "inet" => {
+            // inet_db tries to open a socket to gethostname, stub for now
+            "open", 8 => inet_open_8,
+        },
+        "net_kernel" => {
+            // monitor nodes is unimplemented for now
+            "monitor_nodes", 1 => monitor_nodes,
+            "monitor_nodes", 2 => monitor_nodes,
         },
     ]
 };
@@ -1136,9 +1146,20 @@ fn garbage_collect_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
     // TODO: GC unimplemented
     Ok(atom!(TRUE))
 }
-fn open_port_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+fn inet_open_8(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
     // TODO: ports unimplemented
-    Ok(Term::port(1))
+    Ok(tup2!(
+        &process.context_mut().heap,
+        atom!(ERROR),
+        atom!(NATIVE)
+    ))
+}
+fn monitor_nodes(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    Ok(atom!(OK))
+}
+
+fn open_port_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    panic!("open_port called with {}, {}", args[0], args[1])
 }
 
 #[cfg(test)]

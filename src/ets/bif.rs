@@ -449,6 +449,21 @@ pub fn select_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) ->
     Ok(table.select(vm, process, &pattern, flags, false)?)
 }
 
+pub fn match_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    let heap = &process.context_mut().heap;
+    let ms = cons!(
+        heap,
+        tup3!(
+            heap,
+            args[1],
+            Term::nil(),
+            cons!(heap, atom!(DOLLAR_DOLLAR), Term::nil())
+        ),
+        Term::nil()
+    );
+    select_2(vm, process, &[args[0], ms])
+}
+
 pub fn select_delete_2(
     vm: &vm::Machine,
     process: &Pin<&mut Process>,
