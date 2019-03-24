@@ -520,6 +520,13 @@ pub fn allocate(
     Ok(process)
 }
 
+pub fn cast(process: RcProcess) -> Pin<&'static mut Process> {
+    unsafe {
+        let ptr = &*process as *const Process as *mut Process;
+        std::pin::Pin::new_unchecked(&mut *ptr)
+    }
+}
+
 bitflags! {
     pub struct SpawnFlag: u8 {
         const NONE = 0;
@@ -599,10 +606,7 @@ pub fn spawn(
         ret = tup2!(heap, ret, Term::reference(heap, reference))
     }
 
-    let new_proc = unsafe {
-        let ptr = &*new_proc as *const Process as *mut Process;
-        Pin::new_unchecked(&mut *ptr)
-    };
+    let new_proc = self::cast(new_proc);
 
     let future = crate::vm::run_with_error_handling(new_proc);
     tokio::spawn_async(future);

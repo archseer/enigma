@@ -207,6 +207,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
         let elem = Term::atom(1);
@@ -225,6 +226,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
         let elem = Term::atom(1);

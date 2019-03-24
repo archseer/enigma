@@ -543,6 +543,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
 
         let number = Term::int(2);
         let default = str_to_atom!("test");
@@ -567,6 +568,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
 
         let number = Term::from(2.1);
         let default = str_to_atom!("test");
@@ -585,6 +587,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
 
         let number = Term::int(-1);
         let default = str_to_atom!("test");
@@ -602,6 +605,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
         let number = Term::int(5);
@@ -639,6 +643,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
         let number = Term::from(2.1);
@@ -669,6 +674,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
         let number = Term::int(-1);
@@ -699,6 +705,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
         let _heap = &process.context_mut().heap;
 
         let number = Term::int(5);
@@ -720,6 +727,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
         let number = Term::int(5);
@@ -750,6 +758,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
         let number = Term::int(5);
@@ -780,6 +789,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
 
         let heap = &process.context_mut().heap;
         let tuple = tup2!(&heap, Term::int(0), Term::int(1));
@@ -805,6 +815,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
 
         let bad_tuple = Term::int(0);
         let append = Term::int(2);
@@ -823,6 +834,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
 
         let heap = &process.context_mut().heap;
         let index = Term::int(2);
@@ -849,6 +861,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
 
         let heap = &process.context_mut().heap;
         let index = Term::from(1.1);
@@ -869,6 +882,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
 
         let _heap = &process.context_mut().heap;
         let index = Term::int(1);
@@ -889,6 +903,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
 
         let heap = &process.context_mut().heap;
         let index = Term::int(4);
@@ -909,6 +924,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
 
         let heap = &process.context_mut().heap;
         let tuple = tup2!(
@@ -940,6 +956,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
 
         let bad_tuple = Term::from(1);
         let args = vec![bad_tuple];

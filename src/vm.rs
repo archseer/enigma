@@ -841,7 +841,7 @@ impl Machine {
                     return Err(Exception::new(Reason::EXC_FUNCTION_CLAUSE));
                 }
                 Opcode::Return => {
-                    op_return!(context);
+                    op_return!(process, context);
                 }
                 Opcode::Send => {
                     // send x1 to x0, write result to x0

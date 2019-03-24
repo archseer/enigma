@@ -25,7 +25,7 @@ fn run() -> i32 {
             .to_str()
             .unwrap(),
         "--",
-        "-kernel shell_history enabled",
+        // "-kernel shell_history enabled",
         "-kernel start_distribution false",
     ]
     .iter()

@@ -17,11 +17,11 @@ env:
 matrix:
   include:
     # Linux
-    - env: TARGET=aarch64-unknown-linux-gnu
-    - env: TARGET=arm-unknown-linux-gnueabi
+#   - env: TARGET=aarch64-unknown-linux-gnu
+#   - env: TARGET=arm-unknown-linux-gnueabi
     # - env: TARGET=armv7-unknown-linux-gnueabihf
-    - env: TARGET=i686-unknown-linux-gnu
-    - env: TARGET=i686-unknown-linux-musl
+#   - env: TARGET=i686-unknown-linux-gnu
+#   - env: TARGET=i686-unknown-linux-musl
     # - env: TARGET=mips-unknown-linux-gnu
     # - env: TARGET=mips64-unknown-linux-gnuabi64
     # - env: TARGET=mips64el-unknown-linux-gnuabi64
@@ -30,14 +30,14 @@ matrix:
     # - env: TARGET=powerpc64-unknown-linux-gnu
     # - env: TARGET=powerpc64le-unknown-linux-gnu
     # - env: TARGET=s390x-unknown-linux-gnu DISABLE_TESTS=1
-    - env: TARGET=x86_64-unknown-linux-gnu
-    - env: TARGET=x86_64-unknown-linux-musl
+#   - env: TARGET=x86_64-unknown-linux-gnu
+#   - env: TARGET=x86_64-unknown-linux-musl
 
     # OSX
     # - env: TARGET=i686-apple-darwin
     #   os: osx
-    - env: TARGET=x86_64-apple-darwin
-      os: osx
+#   - env: TARGET=x86_64-apple-darwin
+#     os: osx
 
     # *BSD
     # - env: TARGET=i686-unknown-freebsd DISABLE_TESTS=1
@@ -58,11 +58,11 @@ matrix:
     # Testing other channels
     # Beta channel. We enable these to make sure there are no regressions in
     # Rust beta releases.
-    - env: TARGET=x86_64-unknown-linux-gnu
-      rust: beta
-    - env: TARGET=x86_64-apple-darwin
-      os: osx
-      rust: beta
+#   - env: TARGET=x86_64-unknown-linux-gnu
+#     rust: beta
+#   - env: TARGET=x86_64-apple-darwin
+#     os: osx
+#     rust: beta
     - env: TARGET=x86_64-unknown-linux-gnu
       rust: nightly
     - env: TARGET=x86_64-apple-darwin

@@ -227,6 +227,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
         let args = vec![Term::int(-1)];
         let res = abs_1(&vm, &process, &args);
         assert_eq!(res, Ok(Term::int(1)));
@@ -237,6 +238,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
         let args = vec![Term::int(1), Term::int(2)];
         let res = add_2(&vm, &process, &args);
         assert_eq!(res, Ok(Term::int(3)));
@@ -247,6 +249,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
         let args = vec![Term::int(2), Term::int(1)];
         let res = sub_2(&vm, &process, &args);
         assert_eq!(res, Ok(Term::int(1)));
@@ -257,6 +260,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
         let args = vec![Term::int(2), Term::int(4)];
         let res = mult_2(&vm, &process, &args);
         assert_eq!(res, Ok(Term::int(8)));
@@ -267,6 +271,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
         let args = vec![Term::int(8), Term::int(4)];
         let res = intdiv_2(&vm, &process, &args);
         assert_eq!(res, Ok(Term::int(2)));
@@ -277,6 +282,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
         let args = vec![Term::int(4), Term::int(3)];
         let res = mod_2(&vm, &process, &args);
         assert_eq!(res, Ok(Term::int(1)));
@@ -289,6 +295,7 @@ mod tests {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::cast(process);
         let args = vec![Term::int(1)];
         let res = math_cos_1(&vm, &process, &args);
         assert_eq!(res, Ok(Term::from(1.0_f64.cos())));
