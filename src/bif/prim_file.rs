@@ -3,21 +3,33 @@ use crate::bif;
 use crate::bitstring::Binary;
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
-use crate::process::RcProcess;
+use crate::process::Process;
 use crate::value::{self, Cons, Term, TryFrom};
 use crate::vm;
 use std::fs;
+use std::pin::Pin;
 
 fn error_to_tuple(heap: &Heap, error: std::io::Error) -> Term {
     use std::io::ErrorKind;
     let kind = match error.kind() {
         ErrorKind::NotFound => atom!(ENOENT),
+        ErrorKind::Other => {
+            let errno = error.raw_os_error().unwrap();
+            match errno {
+                20 => atom!(ENOTDIR),
+                _ => unimplemented!("error_to_tuple for {:?}", error),
+            }
+        }
         _ => unimplemented!("error_to_tuple for {:?}", error),
     };
     tup2!(heap, atom!(ERROR), kind)
 }
 
-pub fn get_cwd_nif_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
+pub fn get_cwd_nif_0(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    _args: &[Term],
+) -> bif::Result {
     let heap = &process.context_mut().heap;
 
     match std::env::current_dir() {
@@ -34,7 +46,11 @@ pub fn get_cwd_nif_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> 
 
 /// Reads an entire file into \c result, stopping after \c size bytes or EOF. It will read until
 /// EOF if size is 0.
-pub fn read_file_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn read_file_nif_1(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
     // arg[0] = filename
     let heap = &process.context_mut().heap;
 
@@ -42,7 +58,6 @@ pub fn read_file_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     let cons = Cons::try_from(&args[0])?;
     let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
 
-    println!("Trying to read file {:?}", path);
     let bytes = match std::fs::read(path) {
         Ok(bytes) => bytes,
         Err(err) => return Ok(error_to_tuple(heap, err)),
@@ -56,7 +71,11 @@ pub fn read_file_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
 }
 
 // TODO: maybe we should pass around as OsString which is null terminated dunno
-pub fn internal_native2name_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn internal_native2name_1(
+    vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
     // we already validated the name into unicode in the previous command
     bif::erlang::binary_to_list_1(vm, process, args)
     // Ok(args[0])
@@ -64,7 +83,7 @@ pub fn internal_native2name_1(vm: &vm::Machine, process: &RcProcess, args: &[Ter
 
 pub fn internal_name2native_1(
     _vm: &vm::Machine,
-    _process: &RcProcess,
+    _process: &Pin<&mut Process>,
     args: &[Term],
 ) -> bif::Result {
     // we already validated the name into unicode in the previous command
@@ -156,7 +175,6 @@ fn meta_to_tuple(heap: &Heap, meta: std::fs::Metadata) -> Term {
         Term::uint(heap, meta.uid()),
         Term::uint(heap, meta.gid()),
     );
-    println!("file_info: {}", tup);
     tup
 }
 
@@ -212,12 +230,14 @@ fn meta_to_tuple(heap: &Heap, meta: std::fs::Metadata) -> Term {
     )
 }
 
-pub fn read_info_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn read_info_nif_2(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
     let heap = &process.context_mut().heap;
 
     assert!(args.len() == 2);
-
-    println!("file stuff");
 
     let follow_links = match args[1].to_int() {
         Some(i) => i > 0,
@@ -228,15 +248,11 @@ pub fn read_info_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     // TODO: maybe do these casts in the native2name/name2native
     let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
 
-    println!("path stuff");
-
     let meta = if follow_links {
         std::fs::metadata(path)
     } else {
         std::fs::symlink_metadata(path)
     };
-
-    println!("meta {:?}", meta);
 
     // TODO map/and then?
     let info = match meta {
@@ -247,7 +263,11 @@ pub fn read_info_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     Ok(meta_to_tuple(heap, info))
 }
 
-pub fn list_dir_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn list_dir_nif_1(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
     // arg[0] = filename
     let heap = &process.context_mut().heap;
 
@@ -256,16 +276,15 @@ pub fn list_dir_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     let cons = Cons::try_from(&args[0])?;
     let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
 
-    println!("Trying to read dir {:?}", path);
     let res = match std::fs::read_dir(path) {
         Ok(entries) => Cons::from_iter(
             entries
                 .map(|entry| {
                     Term::binary(
                         heap,
-                        Binary::from(entry.unwrap().path().to_str().unwrap().as_bytes()),
+                        Binary::from(entry.unwrap().file_name().to_str().unwrap().as_bytes()),
                     )
-                    // bitstring!(heap, entry.unwrap().path().to_str().unwrap()
+                    // bitstring!(heap, entry.unwrap().file_name().to_str().unwrap()
                 })
                 .collect::<Vec<Term>>()
                 .into_iter(),

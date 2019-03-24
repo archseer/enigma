@@ -18,14 +18,14 @@ pub struct Pattern {
     pub(crate) num_bindings: usize,
 }
 
-/// Compilation flags
-///
-/// The dialect is in the 3 least significant bits and are to be interspaced by
-/// by at least 2 (decimal), thats why ((Uint) 2) isn't used. This is to be
-/// able to add Flag::DBIF_GUARD or Flag::DBIF BODY to it to use in the match_spec bif
-/// table. The rest of the word is used like ordinary flags, one bit for each
-/// flag. Note that DCOMP_TABLE and DCOMP_TRACE are mutually exclusive.
 bitflags! {
+    /// Compilation flags
+    ///
+    /// The dialect is in the 3 least significant bits and are to be interspaced by
+    /// by at least 2 (decimal), thats why ((Uint) 2) isn't used. This is to be
+    /// able to add Flag::DBIF_GUARD or Flag::DBIF BODY to it to use in the match_spec bif
+    /// table. The rest of the word is used like ordinary flags, one bit for each
+    /// flag. Note that DCOMP_TABLE and DCOMP_TRACE are mutually exclusive.
     pub struct Flag: u8 {
         /// Ets and dets. The body returns a value, and the parameter to the execution is a tuple.
         const DCOMP_TABLE = 1;
@@ -382,7 +382,6 @@ impl Compiler {
         // Compile the match expression.
         for i in 0..self.num_match { // long loop ahead
             self.current_match = i;
-            println!("current_match: {}", i);
             let mut t = self.matchexpr[self.current_match];
             self.stack_used = 0;
             let mut structure_checked = false;
@@ -401,7 +400,6 @@ impl Compiler {
                     Variant::Pointer(..) => {
                         match t.get_boxed_header().unwrap() {
                             value::BOXED_MAP => {
-                                println!("map");
                                 let map = Map::try_from(&t).unwrap();
                                 let num_iters = map.0.len();
                                 if !structure_checked {
@@ -433,7 +431,6 @@ impl Compiler {
                                 }
                             }
                             value::BOXED_TUPLE => {
-                                println!("tup");
                                 let p = Tuple::try_from(&t).unwrap();
                                 if !structure_checked { // i.e. we did not pop it
                                     self.text.push(Opcode::Tuple(p.len()));
@@ -444,7 +441,6 @@ impl Compiler {
                                 }
                             }
                             _ => {
-                                println!("simple");
                                 // goto simple_term;
                                 structure_checked = false;
                                 self.one_term(t)?;
@@ -452,7 +448,6 @@ impl Compiler {
                         }
                     }
                     Variant::Cons(..) => {
-                        println!("cons");
                         if !structure_checked {
                             self.text.push(Opcode::List());
                         }
@@ -464,7 +459,6 @@ impl Compiler {
                     }
                     _ =>  { // Nil and non proper tail end's or single terms as match expressions.
                         //simple_term:
-                        println!("simple");
                         structure_checked = false;
                         self.one_term(t)?;
                     }

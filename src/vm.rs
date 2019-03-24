@@ -9,18 +9,27 @@ use crate::loader::LValue;
 use crate::module;
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
 use crate::opcodes::Opcode;
-use crate::pool::{Job, JoinGuard as PoolJoinGuard, Pool, Worker};
 use crate::process::registry::Registry as ProcessRegistry;
 use crate::process::table::Table as ProcessTable;
 use crate::process::{self, RcProcess};
 use crate::servo_arc::Arc;
 use crate::value::{self, Cons, Term, TryFrom, TryInto, TryIntoMut, Tuple, Variant};
+use std::cell::RefCell;
 // use log::debug;
 use parking_lot::Mutex;
 use std::mem::transmute;
 use std::panic;
 use std::sync::atomic::AtomicUsize;
 use std::time;
+
+use tokio::await;
+use tokio::prelude::*;
+
+use futures::future::{self, FutureExt};
+use futures::select;
+// use futures::stream::{self, StreamExt};
+
+use futures_native_timers::{Delay, Interval};
 
 /// A reference counted State.
 pub type RcState = Arc<State>;
@@ -30,7 +39,6 @@ pub struct State {
     pub process_table: Mutex<ProcessTable<RcProcess>>,
     pub process_registry: Mutex<ProcessRegistry<RcProcess>>,
     /// TODO: Use priorities later on
-    pub process_pool: Pool<RcProcess>,
 
     /// The start time of the VM (more or less).
     pub start_time: time::Instant,
@@ -50,6 +58,8 @@ pub struct Machine {
     /// VM internal state
     pub state: RcState,
 
+    // pub exit:
+
     // env config, arguments, panic handler
 
     // atom table is accessible globally as ATOMS
@@ -60,6 +70,72 @@ pub struct Machine {
     pub modules: RcModuleRegistry,
 
     pub ets_tables: RcTableRegistry,
+}
+
+/* meh, copied from tokio async/await feature */
+use std::future::Future as StdFuture;
+use std::pin::Pin;
+use std::task::{Poll, Waker};
+fn map_ok<T: StdFuture>(future: T) -> impl StdFuture<Output = Result<(), ()>> {
+    MapOk(future)
+}
+
+struct MapOk<T>(T);
+
+impl<T> MapOk<T> {
+    fn future<'a>(self: Pin<&'a mut Self>) -> Pin<&'a mut T> {
+        unsafe { Pin::map_unchecked_mut(self, |x| &mut x.0) }
+    }
+}
+
+impl<T: StdFuture> StdFuture for MapOk<T> {
+    type Output = Result<(), ()>;
+
+    fn poll(self: Pin<&mut Self>, waker: &Waker) -> Poll<Self::Output> {
+        match self.future().poll(waker) {
+            Poll::Ready(_) => Poll::Ready(Ok(())),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+/* meh */
+
+thread_local!(
+    static CURRENT: RefCell<Option<Machine>> = RefCell::new(None);
+);
+
+impl Machine {
+    /// Get current running machine.
+    pub fn current() -> Machine {
+        CURRENT.with(|cell| match *cell.borrow() {
+            Some(ref vm) => vm.clone(),
+            None => panic!("Machine is not running"),
+        })
+    }
+
+    /// Set current running machine.
+    pub(crate) fn is_set() -> bool {
+        CURRENT.with(|cell| cell.borrow().is_some())
+    }
+
+    /// Set current running machine.
+    #[doc(hidden)]
+    pub fn set_current(vm: Machine) {
+        CURRENT.with(|s| {
+            *s.borrow_mut() = Some(vm);
+        })
+    }
+
+    /// Execute function with machine reference.
+    pub fn with_current<F, R>(f: F) -> R
+    where
+        F: FnOnce(&mut Machine) -> R,
+    {
+        CURRENT.with(|cell| match *cell.borrow_mut() {
+            Some(ref mut vm) => f(vm),
+            None => panic!("Machine is not running"),
+        })
+    }
 }
 
 macro_rules! set_register {
@@ -153,12 +229,11 @@ macro_rules! call_error_handler {
 #[inline]
 fn call_error_handler(
     vm: &Machine,
-    process: &RcProcess,
+    process: &Pin<&mut process::Process>,
     mfa: &module::MFA,
     func: u32,
 ) -> Result<(), Exception> {
     // debug!("call_error_handler mfa={}, mfa)
-    println!("function not found {}", mfa);
     let context = process.context_mut();
 
     // Search for the error_handler module.
@@ -171,6 +246,7 @@ fn call_error_handler(
             Some(Export::Fun(ptr)) => ptr,
             Some(_) => unimplemented!("call_error_handler for non-fun"),
             None => {
+                println!("function not found {}", mfa);
                 // no error handler
                 // TODO: set current to mfa
                 return Err(Exception::new(Reason::EXC_UNDEF));
@@ -222,7 +298,10 @@ macro_rules! op_call_ext {
                     // TODO: should use call_bif?
                     Ok(val) => {
                         set_register!($context, &LValue::X(0), val); // HAXX
-                        op_return!($context);
+                        if $return {
+                            // TODO: figure out returns
+                            op_return!($process, $context);
+                        }
                     }
                     Err(exc) => return Err(exc),
                 }
@@ -249,7 +328,7 @@ macro_rules! op_call_bif {
                 set_register!($context, &LValue::X(0), val); // HAXX
                 if $return {
                     // TODO: figure out returns
-                    op_return!($context);
+                    op_return!($process, $context);
                 }
             }
             Err(exc) => return Err(exc),
@@ -400,12 +479,12 @@ macro_rules! op_apply_fun {
 }
 
 macro_rules! op_return {
-    ($context:expr) => {{
+    ($process:expr, $context:expr) => {{
         if let Some(i) = $context.cp {
             op_jump_ptr!($context, i);
             $context.cp = None;
         } else {
-            println!("Process exited with normal, x0: {}", $context.x[0]);
+            // println!("Process pid={} exited with normal, x0: {}", $process.pid, $context.x[0]);
             break;
         }
     }};
@@ -532,10 +611,10 @@ macro_rules! safepoint_and_reduce {
         if $reductions > 0 {
             $reductions -= 1;
         } else {
-            $vm.state
-                .process_pool
-                .schedule(Job::normal($process.clone()));
-            return Ok(());
+            // $vm.state
+            //     .process_pool
+            //     .schedule(Job::normal($process.clone()));
+            return Ok(process::State::Yield);
         }
     }};
 }
@@ -563,13 +642,9 @@ pub const PRE_LOADED: &[&str] = &[
 
 impl Machine {
     pub fn new() -> Machine {
-        let primary_threads = 8;
-        let process_pool = Pool::new(primary_threads, Some("primary".to_string()));
-
         let state = State {
             process_table: Mutex::new(ProcessTable::new()),
             process_registry: Mutex::new(ProcessRegistry::new()),
-            process_pool,
             start_time: time::Instant::now(),
             next_ref: AtomicUsize::new(1),
         };
@@ -595,33 +670,37 @@ impl Machine {
     /// This method returns true if the VM terminated successfully, false
     /// otherwise.
     pub fn start(&self, args: Vec<String>) {
-        //self.configure_rayon();
+        // let (trigger, exit) = futures::sync::oneshot::channel();
 
-        let primary_guard = self.start_primary_threads();
-
-        self.start_main_process(args);
-
-        // Joining the pools only fails in case of a panic. In this case we
-        // don't want to re-panic as this clutters the error output.
-        if primary_guard.join().is_err() {
-            println!("Primary guard error!")
-            //self.set_exit_status(1);
-        }
-    }
-
-    fn terminate(&self) {
-        self.state.process_pool.terminate();
-    }
-
-    fn start_primary_threads(&self) -> PoolJoinGuard<()> {
+        // Create the runtime
         let machine = self.clone();
-        let pool = &self.state.process_pool;
+        let mut runtime = tokio::runtime::Builder::new()
+            .after_start(move || {
+                Machine::set_current(machine.clone()); // ughh double clone
+            })
+            .build()
+            .expect("failed to start new Runtime");
 
-        pool.run(move |worker, process| machine.run_with_error_handling(worker, &process))
+        // Spawn the server task
+        // let future = async {
+        //     println!("Hello");
+        // };
+        // use tokio_async_await::compat::backward;
+        // let future = backward::Compat::new(map_ok(future));
+        // use futures::compat::Compat;
+        // let future = Compat::new(future);
+        // runtime.spawn(future);
+
+        self.start_main_process(&mut runtime, args);
+
+        // Wait until the runtime becomes idle and shut it down.
+        runtime.shutdown_on_idle().wait().unwrap();
     }
+
+    fn terminate(&self) {}
 
     /// Starts the main process
-    pub fn start_main_process(&self, args: Vec<String>) {
+    pub fn start_main_process(&self, runtime: &mut tokio::runtime::Runtime, args: Vec<String>) {
         println!("Starting main process...");
         let registry = self.modules.lock();
         //let module = unsafe { &*module::load_module(self, path).unwrap() };
@@ -642,37 +721,56 @@ impl Machine {
         op_jump!(context, module.funs[&(fun, arity)]);
         /* TEMP */
 
-        let process = Job::normal(process);
-        self.state.process_pool.schedule(process);
+        let process = process::cast(process);
+        // use futures::compat::Compat;
+        // let future = Compat::new(self.run_with_error_handling(process));
+        use tokio_async_await::compat::backward;
+        let future = run_with_error_handling(process);
+        let future = backward::Compat::new(map_ok(future));
+        runtime.spawn(future);
+
+        // self.state.process_pool.schedule(process);
     }
+}
 
     /// Executes a single process, terminating in the event of an error.
-    pub fn run_with_error_handling(&self, _worker: &mut Worker, process: &RcProcess) {
+    pub async fn run_with_error_handling(
+        mut process: Pin<&mut process::Process>
+    ) -> () {
+
         // We are using AssertUnwindSafe here so we can pass a &mut Worker to
         // run()/panic(). This might be risky if values captured are not unwind
         // safe, so take care when capturing new variables.
         //let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        if let Err(message) = self.run(process) {
-            if message.reason != Reason::TRAP {
-                // just a regular error
-                // HAXX: TODO clone() for now since handle_error consumes the msg
-                if let Some(new_pc) = exception::handle_error(process, message.clone()) {
-                    let context = process.context_mut();
-                    context.ip = new_pc;
-                    self.state
-                        .process_pool
-                        .schedule(Job::normal(process.clone()));
-                } else {
-                    process.exit(&self.state, message);
+        let vm = Machine::current();
+        loop {
+            match await!(vm.run(&mut process)) {
+                Err(message) => {
+                    if message.reason != Reason::TRAP {
+                        // just a regular error
+                        // HAXX: TODO clone() for now since handle_error consumes the msg
+                        if let Some(new_pc) = exception::handle_error(&process, message.clone()) {
+                            let context = process.context_mut();
+                            context.ip = new_pc;
+                            // yield
+                        } else {
+                            process.exit(&vm.state, message);
+                            println!("pid={} action=exited", process.pid);
+                            break // crashed
+                        }
+                    } else {
+                        // we're trapping, ip was already set, now reschedule the process
+                        eprintln!("TRAP!");
+                        // yield
+                    }
                 }
-            } else {
-                // we're trapping, ip was already set, now reschedule the process
-                eprintln!("TRAP!");
-                self.state
-                    .process_pool
-                    .schedule(Job::normal(process.clone()));
+                Ok(process::State::Yield) => (), // yield
+                Ok(process::State::Done) => break, // exited OK
+                // TODO: wait is an await on a oneshot
+                // TODO: waittimeout is an select on a oneshot or a delay
             }
         }
+        ()
         // }));
 
         /*
@@ -692,16 +790,26 @@ impl Machine {
         }*/
     }
 
+    pub trait Captures<'a> {}
+
+    impl<'a, T> Captures<'a> for T {}
+
+impl Machine {
     #[allow(clippy::cyclomatic_complexity)]
-    pub fn run(&self, process: &RcProcess) -> Result<(), Exception> {
+    pub fn run<'a: 'd, 'b: 'd, 'c: 'd, 'd>(
+        &'a self,
+        process: &'b mut Pin<&'c mut process::Process>,
+    ) -> impl std::future::Future<Output = Result<process::State, Exception>> + Captures<'a> + Captures<'b> + Captures<'c> + 'd {
+        async move {  // workaround for https://github.com/rust-lang/rust/issues/56238
         let context = process.context_mut();
-        context.reds = 2000; // self.state.config.reductions;
+        context.reds = 1000; // self.state.config.reductions;
 
         // process the incoming signal queue
         process.process_incoming()?;
 
         loop {
-            let module = unsafe { &(*context.ip.module) };
+            let module = context.ip.get_module();
+            // let module = unsafe { &(*context.ip.module) };
             let ins = &module.instructions[context.ip.ptr as usize];
             context.ip.ptr += 1;
 
@@ -730,34 +838,36 @@ impl Machine {
                     return Err(Exception::new(Reason::EXC_FUNCTION_CLAUSE));
                 }
                 Opcode::Return => {
-                    op_return!(context);
+                    op_return!(process, context);
                 }
                 Opcode::Send => {
                     // send x1 to x0, write result to x0
                     let pid = context.x[0]; // TODO can be pid or atom name
                     let msg = context.x[1];
                     println!("sending from {} to {} msg {}", process.pid, pid, msg);
-                    let res = process::send_message(&self.state, process, pid, msg)?;
+                    let res = process::send_message(&self.state, process.pid, pid, msg)?;
                     context.x[0] = res;
                 }
                 Opcode::RemoveMessage => {
                     // Unlink the current message from the message queue. Remove any timeout.
                     process.local_data_mut().mailbox.remove();
-                    // TODO: clear timeout
+                    // clear timeout
+                    context.timeout.take();
                     // reset savepoint of the mailbox
                     process.local_data_mut().mailbox.reset();
                 }
                 Opcode::Timeout => {
                     //  Reset the save point of the mailbox and clear the timeout flag.
                     process.local_data_mut().mailbox.reset();
-                    // TODO: clear timeout
+                    // clear timeout
+                    context.timeout.take();
                 }
                 Opcode::LoopRec => {
                     // label, source
                     // grab message from queue, put to x0, if no message, jump to fail label
                     if let Some(msg) = process.receive()? {
                         println!("recv proc pid={:?} msg={}", process.pid, msg);
-                        context.x[0] = *msg
+                        context.x[0] = msg
                     } else {
                         let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
@@ -785,26 +895,81 @@ impl Machine {
                     // a message while we're in the process of suspending.
 
                     // set wait flag
-                    process.set_waiting_for_message(true);
-                    // return (suspend process)
-                    return Ok(());
+                    // process.set_waiting_for_message(true);
+                    use futures::compat::Compat;
+                    // LOCK mailbox on looprec, unlock on wait/waittimeout
+                    let cancel = process.context_mut().recv_channel.take().unwrap();
+                    await!(Compat::new(cancel.fuse())); // suspend process
+
+                    println!("pid={} resumption ", process.pid);
+                    process.process_incoming()?;
                 }
                 Opcode::WaitTimeout => {
                     // @spec wait_timeout Lable Time
                     // @doc  Sets up a timeout of Time milliseconds and saves the address of the
                     //       following instruction as the entry point if the timeout triggers.
-                    let curr = context.ip.ptr;
 
-                    // matches Wait
-                    let label = ins.args[0].to_u32();
-                    op_jump!(context, label);
+                    use futures::compat::Compat;
+                    let cancel = process.context_mut().recv_channel.take().unwrap();
 
-                    // TODO: timeout and jump back to `curr` if time expires
-                    // set wait flag
-                    process.set_waiting_for_message(true);
+                    match context.expand_arg(&ins.args[1]).into_variant() {
+                        Variant::Atom(atom::INFINITY) => {
+                            // just a normal Opcode::Wait
+                            println!("infinity wait");
+                            let label = ins.args[0].to_u32();
+                            op_jump!(context, label);
 
-                    // return (suspend process)
-                    return Ok(());
+                            await!(Compat::new(cancel.fuse())); // suspend process
+                            println!("select! resumption pid={}", process.pid);
+                        },
+                        Variant::Integer(ms) => {
+                            let when = time::Duration::from_millis(ms as u64);
+                            use tokio::prelude::FutureExt;
+
+                            match await!(Compat::new(cancel).timeout(when)) {
+                                Ok(()) =>  {
+                                    // jump to success (start of recv loop)
+                                    let label = ins.args[0].to_u32();
+                                    op_jump!(context, label);
+                                    println!("select! resumption pid={}", process.pid);
+                                }
+                                Err(_) => {
+                                    // timeout
+                                    println!("select! delay timeout {} pid={} ms={} m={:?}", ms, process.pid, context.expand_arg(&ins.args[1]), ins.args[1]);
+
+                                    // remove channel
+                                    context.timeout.take();
+
+                                    () // continue to next instruction (timeout op)
+                                }
+
+                            }
+                            // use futures::compat::Compat;
+                            // use tokio_async_await::compat::backward;
+                            // let future = backward::Compat::new(cancel).fuse();
+                            // select! { // suspend process
+                            //     _t = future => {
+                            //         // jump to success (start of recv loop)
+                            //         let label = ins.args[0].to_u32();
+                            //         op_jump!(context, label);
+                            //         println!("select! resumption");
+                            //     },
+
+                            //     // did not work _ = tokio::timer::Delay::new(when) => {
+                            //     _ = Delay::new(when) => {
+                            //         // timeout
+                            //         println!("select! delay timeout");
+
+                            //         // remove channel
+                            //         // context.timeout.take();
+
+                            //         () // continue to next instruction (timeout op)
+                            //     }
+                            // };
+                        },
+                        _ => unreachable!()
+                    }
+                    process.process_incoming()?;
                 }
                 Opcode::RecvMark => {
                     process.local_data_mut().mailbox.mark();
@@ -867,7 +1032,7 @@ impl Machine {
                         // save pointer onto CP
                         context.cp = Some(context.ip);
 
-                        op_call_ext!(self, context, process, arity, dest, false); // don't return on call_ext
+                        op_call_ext!(self, context, &process, arity, dest, false); // don't return on call_ext
                     } else {
                         unreachable!()
                     }
@@ -876,7 +1041,7 @@ impl Machine {
                 Opcode::CallExtOnly => {
                     //literal arity, literal destination (module.imports index)
                     if let [LValue::Literal(arity), LValue::Literal(dest)] = &ins.args[..] {
-                        op_call_ext!(self, context, process, arity, dest, true);
+                        op_call_ext!(self, context, &process, arity, dest, true);
                     } else {
                         unreachable!()
                     }
@@ -889,7 +1054,7 @@ impl Machine {
                     {
                         op_deallocate!(context, *nwords);
 
-                        op_call_ext!(self, context, process, arity, dest, true);
+                        op_call_ext!(self, context, &process, arity, dest, true);
                     } else {
                         unreachable!()
                     }
@@ -900,7 +1065,7 @@ impl Machine {
                     if let [LValue::Literal(dest), reg] = &ins.args[..] {
                         // TODO: precompute these lookups
                         let mfa = &module.imports[*dest as usize];
-                        let val = bif::apply(self, process, mfa, &[]).unwrap(); // bif0 can't fail
+                        let val = bif::apply(self, &process, mfa, &[]).unwrap(); // bif0 can't fail
                         set_register!(context, reg, val);
                     } else {
                         unreachable!()
@@ -912,7 +1077,7 @@ impl Machine {
                         let args = &[context.expand_arg(arg1)];
                         // TODO: precompute these lookups
                         let mfa = &module.imports[*dest as usize];
-                        match bif::apply(self, process, mfa, args) {
+                        match bif::apply(self, &process, mfa, args) {
                             Ok(val) => set_register!(context, reg, val),
                             Err(exc) => cond_fail!(context, fail, exc),
                         }
@@ -926,7 +1091,7 @@ impl Machine {
                         let args = &[context.expand_arg(arg1), context.expand_arg(arg2)];
                         // TODO: precompute these lookups
                         let mfa = &module.imports[*dest as usize];
-                        match bif::apply(self, process, mfa, args) {
+                        match bif::apply(self, &process, mfa, args) {
                             Ok(val) => set_register!(context, reg, val),
                             Err(exc) => cond_fail!(context, fail, exc),
                         }
@@ -1368,7 +1533,7 @@ impl Machine {
                         } else {
                             if context.x[1] == Term::atom(atom::ERROR) {
                                 context.x[2] =
-                                    exception::add_stacktrace(process, context.x[2], context.x[3]);
+                                    exception::add_stacktrace(&process, context.x[2], context.x[3]);
                             }
                             // only x(2) is included in the rootset here
                             // if (E - HTOP < 3) { check for heap space, otherwise garbage collect
@@ -1405,7 +1570,7 @@ impl Machine {
                     if let [LValue::Literal(arity)] = &ins.args[..] {
                         context.cp = Some(context.ip);
 
-                        op_fixed_apply!(self, context, process, *arity, false)
+                        op_fixed_apply!(self, context, &process, *arity, false)
                     // call this fixed_apply, used for ops (apply, apply_last).
                     // apply is the func that's equivalent to erlang:apply/3 (and instrs)
                     } else {
@@ -1418,7 +1583,7 @@ impl Machine {
                     if let [LValue::Literal(arity), LValue::Literal(nwords)] = &ins.args[..] {
                         op_deallocate!(context, *nwords);
 
-                        op_fixed_apply!(self, context, process, *arity, true)
+                        op_fixed_apply!(self, context, &process, *arity, true)
                     } else {
                         unreachable!()
                     }
@@ -1430,7 +1595,7 @@ impl Machine {
                         // TODO: GcBif needs to handle GC as necessary
                         let args = &[context.expand_arg(&ins.args[3])];
                         let mfa = &module.imports[*i as usize];
-                        match bif::apply(self, process, mfa, args) {
+                        match bif::apply(self, &process, mfa, args) {
                             Ok(val) => set_register!(context, &ins.args[4], val),
                             Err(exc) => cond_fail!(context, ins.args[0], exc),
                         }
@@ -1965,7 +2130,7 @@ impl Machine {
                 }
                 Opcode::BsInitWritable => {
                     debug_assert_eq!(ins.args.len(), 0);
-                    context.x[0] = bitstring::init_writable(process, context.x[0]);
+                    context.x[0] = bitstring::init_writable(&process, context.x[0]);
                 }
                 // BsGet and BsSkip should be implemented over an Iterator inside a match context (.skip/take)
                 // maybe we can even use nom for this
@@ -1981,7 +2146,7 @@ impl Machine {
                     let unit = ins.args[2].to_u32() as usize;
                     let src = context.expand_arg(&ins.args[4]);
 
-                    let res = bitstring::append(process, src, size, extra_words, unit);
+                    let res = bitstring::append(&process, src, size, extra_words, unit);
 
                     if let Some(res) = res {
                         set_register!(context, &ins.args[5], res)
@@ -1999,7 +2164,7 @@ impl Machine {
                     let unit = ins.args[2].to_u32() as usize;
                     let src = context.expand_arg(&ins.args[3]);
 
-                    let res = bitstring::private_append(process, src, size, unit);
+                    let res = bitstring::private_append(&process, src, size, unit);
 
                     if let Some(res) = res {
                         set_register!(context, &ins.args[5], res)
@@ -2156,7 +2321,7 @@ impl Machine {
                             context.expand_arg(&ins.args[4]),
                         ];
                         let mfa = &module.imports[*i as usize];
-                        let val = bif::apply(self, process, mfa, &args[..]).unwrap(); // TODO: handle fail
+                        let val = bif::apply(self, &process, mfa, &args[..]).unwrap(); // TODO: handle fail
 
                         // TODO: consume fail label if not 0, else return error
 
@@ -2175,7 +2340,7 @@ impl Machine {
                             context.expand_arg(&ins.args[5]),
                         ];
                         let mfa = &module.imports[*i as usize];
-                        let val = bif::apply(self, process, mfa, &args[..]).unwrap(); // TODO: handle fail
+                        let val = bif::apply(self, &process, mfa, &args[..]).unwrap(); // TODO: handle fail
 
                         // TODO: consume fail label if not 0, else return error
 
@@ -2221,23 +2386,22 @@ impl Machine {
                     // literal arity
                     let arity = ins.args[0].to_u32();
                     let value = context.x[arity as usize];
+                    context.cp = Some(context.ip);
                     // TODO: this clone is bad but the borrow checker complains (but doesn't on GetTl/GetHd)
                     if let Ok(closure) = value::Closure::try_from(&value) {
-                        context.cp = Some(context.ip);
                         op_call_fun!(self, context, closure, arity)
                     } else if let Ok(mfa) = module::MFA::try_from(&value) {
-                        println!("callfun with export!");
                         // TODO: deduplicate this part
                         let export = { self.exports.read().lookup(&mfa) }; // drop the exports lock
 
                         match export {
                             Some(Export::Fun(ptr)) => op_jump_ptr!(context, ptr),
                             Some(Export::Bif(bif)) => {
-                                op_call_bif!(self, context, process, bif, mfa.2 as usize, true) // TODO is return true ok
+                                op_call_bif!(self, context, &process, bif, mfa.2 as usize, true) // TODO is return true ok
                             }
                             None => {
                                 println!("apply setup_error_handler");
-                                call_error_handler!(self, process, &mfa);
+                                call_error_handler!(self, &process, &mfa);
                                 // apply_setup_error_handler
                             }
                         }
@@ -2370,7 +2534,7 @@ impl Machine {
                     }
                 }
                 Opcode::BuildStacktrace => {
-                    context.x[0] = exception::build_stacktrace(process, context.x[0]);
+                    context.x[0] = exception::build_stacktrace(&process, context.x[0]);
                 }
                 Opcode::RawRaise => {
                     let class = &context.x[0];
@@ -2417,7 +2581,8 @@ impl Machine {
             self.terminate();
         }
 
-        Ok(())
+        Ok(process::State::Done)
+        }
     }
 
     pub fn elapsed_time(&self) -> time::Duration {

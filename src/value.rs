@@ -154,6 +154,8 @@ pub enum Variant {
     Cons(*const self::Cons),
     Pointer(*const Header), // tuple, map, binary, ref
 }
+unsafe impl Send for Variant {}
+// unsafe impl Sync for Variant {}
 
 impl From<f64> for Term {
     fn from(value: f64) -> Term {
@@ -579,6 +581,7 @@ impl Term {
         }
     }
 
+    // TODO: add unchecked variant
     pub fn get_boxed_header(self) -> Result<Header, String> {
         if let Variant::Pointer(ptr) = self.into_variant() {
             unsafe { return Ok(*ptr) }
@@ -586,6 +589,7 @@ impl Term {
         Err("Not a boxed type!".to_string())
     }
 
+    // TODO: add unchecked variant
     pub fn get_boxed_value<T>(&self) -> Result<&T, &str> {
         if let Variant::Pointer(ptr) = self.into_variant() {
             unsafe { return Ok(&(*(ptr as *const Boxed<T>)).value) }
@@ -593,6 +597,7 @@ impl Term {
         Err("Not a boxed type!")
     }
 
+    // TODO: add unchecked variant
     pub fn get_boxed_value_mut<T>(&self) -> Result<&mut T, &str> {
         if let Variant::Pointer(ptr) = self.into_variant() {
             unsafe { return Ok(&mut (*(ptr as *mut Boxed<T>)).value) }
@@ -1014,33 +1019,51 @@ impl std::fmt::Display for Term {
 impl std::fmt::Display for Variant {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Variant::Nil(..) => write!(f, "NIL"),
+            Variant::Nil(..) => write!(f, "[]"),
             Variant::Integer(i) => write!(f, "{}", i),
             Variant::Float(self::Float(i)) => write!(f, "{}", i),
             Variant::Atom(i) => write!(f, ":{}", atom::to_str(*i).unwrap()),
             Variant::Port(i) => write!(f, "#Port<{}>", i),
             Variant::Pid(i) => write!(f, "#Pid<{}>", i),
             Variant::Cons(c) => unsafe {
-                write!(f, "[")?;
-                let mut cons = *c;
-                loop {
-                    write!(f, "{}", (*cons).head)?;
-                    match (*cons).tail.into_variant() {
-                        // Proper list ends here, do not show the tail
-                        Variant::Nil(..) => break,
-                        // List continues, print a comma and follow the tail
-                        Variant::Cons(c) => {
-                            write!(f, ", ")?;
-                            cons = c;
-                        }
-                        // Improper list, show tail
-                        val => {
-                            write!(f, "| {}", val)?;
-                            break;
+                let cons = &**c;
+                let is_printable = cons.iter().all(|v| match v.into_variant() {
+                    Variant::Integer(i) if i > 0 && i <= 255 => {
+                        let i = i as u8;
+                        // isn't a control char, or is space
+                        !(i < b' ' || i >= 127)
+                            || (i == b' ' || i == b'\n' || i == b'\t' || i == b'\r')
+                    }
+                    _ => false,
+                });
+
+                if is_printable {
+                    write!(f, "\"")?;
+                    let string = cons::unicode_list_to_buf(cons, 8096).unwrap();
+                    write!(f, "{}", string)?;
+                    write!(f, "\"")
+                } else {
+                    write!(f, "[")?;
+                    let mut cons = *c;
+                    loop {
+                        write!(f, "{}", (*cons).head)?;
+                        match (*cons).tail.into_variant() {
+                            // Proper list ends here, do not show the tail
+                            Variant::Nil(..) => break,
+                            // List continues, print a comma and follow the tail
+                            Variant::Cons(c) => {
+                                write!(f, ", ")?;
+                                cons = c;
+                            }
+                            // Improper list, show tail
+                            val => {
+                                write!(f, "| {}", val)?;
+                                break;
+                            }
                         }
                     }
+                    write!(f, "]")
                 }
-                write!(f, "]")
             },
             Variant::Pointer(ptr) => unsafe {
                 match **ptr {

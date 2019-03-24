@@ -6,23 +6,29 @@ use crate::instr_ptr::InstrPtr;
 use crate::loader::LValue;
 use crate::mailbox::Mailbox;
 use crate::module::{Module, MFA};
-use crate::pool::Job;
-use crate::servo_arc::Arc;
+use crate::vm::Machine;
+// use crate::servo_arc::Arc; can't do receiver self
 use crate::signal_queue::SignalQueue;
 pub use crate::signal_queue::{ExitKind, Signal};
+use crate::tokio;
 use crate::value::{self, Term, TryInto};
 use crate::vm::RcState;
 use hashbrown::{HashMap, HashSet};
 use std::cell::UnsafeCell;
 use std::panic::RefUnwindSafe;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
+use std::pin::Pin;
+use tokio::prelude::*;
 
 pub mod registry;
+
 pub mod table;
 
 /// Heavily inspired by inko
 
-pub type RcProcess = Arc<Process>;
+pub type RcProcess = Pin<Arc<Process>>;
 
 pub type Ref = usize;
 
@@ -65,6 +71,10 @@ pub struct ExecutionContext {
     pub exc: Option<Exception>,
     /// Reductions left
     pub reds: usize,
+
+    /// Waker associated with the wait
+    pub recv_channel: Option<futures::channel::oneshot::Receiver<()>>,
+    pub timeout: Option<futures::channel::oneshot::Sender<()>>,
 }
 
 impl ExecutionContext {
@@ -107,6 +117,8 @@ impl ExecutionContext {
             // TODO: not great
             bs: unsafe { std::mem::uninitialized() },
             reds: 0,
+            timeout: None,
+            recv_channel: None,
         }
     }
 }
@@ -140,6 +152,8 @@ pub struct LocalData {
 
     // name (atom)
     pub name: Option<u32>,
+
+    pub initial_call: MFA,
 
     /// error handler, defaults to error_handler
     pub error_handler: u32,
@@ -180,6 +194,8 @@ pub struct Process {
 
 unsafe impl Sync for LocalData {}
 unsafe impl Send for LocalData {}
+unsafe impl Send for ExecutionContext {}
+unsafe impl Sync for ExecutionContext {}
 unsafe impl Sync for Process {}
 impl RefUnwindSafe for Process {}
 
@@ -199,6 +215,7 @@ impl Process {
             parent,
             group_leader: parent,
             name: None,
+            initial_call: MFA(0, 0, 0),
             error_handler: atom::ERROR_HANDLER,
             links: HashSet::new(),
             monitors: HashMap::new(),
@@ -209,7 +226,7 @@ impl Process {
             dictionary: HashMap::new(),
         };
 
-        Arc::new(Process {
+        Arc::pin(Process {
             pid,
             local_data: UnsafeCell::new(local_data),
             waiting_for_message: AtomicBool::new(false),
@@ -252,6 +269,7 @@ impl Process {
 
     pub fn send_signal(&self, signal: Signal) {
         self.local_data_mut().signal_queue.send_external(signal);
+        self.wake_up()
     }
 
     // TODO: remove
@@ -267,10 +285,11 @@ impl Process {
                     from,
                 });
         }
+        self.wake_up()
     }
 
     // awkward result, but it works
-    pub fn receive(&self) -> Result<Option<&Term>, Exception> {
+    pub fn receive(&self) -> Result<Option<Term>, Exception> {
         let local_data = self.local_data_mut();
 
         if !local_data.mailbox.has_messages() {
@@ -279,17 +298,29 @@ impl Process {
         Ok(local_data.mailbox.receive())
     }
 
-    pub fn set_waiting_for_message(&self, value: bool) {
-        self.waiting_for_message.store(value, Ordering::Relaxed);
+    pub fn wake_up(&self) {
+        println!("pid={} waking up!", self.pid);
+        // TODO: will require locking
+        self.waiting_for_message.store(false, Ordering::Relaxed);
+        match self.context_mut().timeout.take() {
+            Some(chan) => chan.send(()),
+            None => Ok(()),
+        };
+        () // TODO: pass through the chan.send result ret
     }
 
-    pub fn is_waiting_for_message(&self) -> bool {
-        self.waiting_for_message.load(Ordering::Relaxed)
+    pub fn set_waiting_for_message(&self, value: bool) {
+        self.waiting_for_message.store(value, Ordering::Relaxed)
     }
 
     // we're in receive(), but ran out of internal messages, process external queue
     /// An Err signals that we're now exiting.
     pub fn process_incoming(&self) -> Result<(), Exception> {
+        // we want to start tracking for new messages a lot earlier
+        let (trigger, cancel) = futures::channel::oneshot::channel::<()>();
+        self.context_mut().recv_channel = Some(cancel); // TODO: if timer already set, don't set again!!!
+        self.context_mut().timeout = Some(trigger); // TODO: if timer already set, don't set again!!!
+
         // get internal, if we ran out, start processing external
         while let Some(signal) = self.local_data_mut().signal_queue.receive() {
             match signal {
@@ -435,7 +466,7 @@ impl Process {
         // delete links
         for pid in local_data.links.drain() {
             // TODO: reason has to be deep cloned, make a constructor
-            println!("sending exit signal");
+            println!("pid={} sending exit signal to from={}", self.pid, pid);
             let msg = Signal::Exit {
                 reason: reason.clone(),
                 from: self.pid,
@@ -489,6 +520,13 @@ pub fn allocate(
     Ok(process)
 }
 
+pub fn cast(process: RcProcess) -> Pin<&'static mut Process> {
+    unsafe {
+        let ptr = &*process as *const Process as *mut Process;
+        std::pin::Pin::new_unchecked(&mut *ptr)
+    }
+}
+
 bitflags! {
     pub struct SpawnFlag: u8 {
         const NONE = 0;
@@ -503,7 +541,7 @@ bitflags! {
 
 pub fn spawn(
     state: &RcState,
-    parent: &RcProcess,
+    parent: &Pin<&mut Process>,
     module: *const Module,
     func: u32,
     args: Term,
@@ -525,10 +563,12 @@ pub fn spawn(
     // lastly, the tail
     context.x[i] = *cons;
 
+    new_proc.local_data_mut().initial_call = MFA(unsafe { (*module).name }, func, i as u32);
+
     println!(
         "Spawning... pid={} mfa={} args={}",
         new_proc.pid,
-        MFA(unsafe { (*module).name }, func, i as u32),
+        new_proc.local_data().initial_call,
         args
     );
 
@@ -566,17 +606,15 @@ pub fn spawn(
         ret = tup2!(heap, ret, Term::reference(heap, reference))
     }
 
-    state.process_pool.schedule(Job::normal(new_proc));
+    let new_proc = self::cast(new_proc);
+
+    let future = crate::vm::run_with_error_handling(new_proc);
+    tokio::spawn_async(future);
 
     Ok(ret)
 }
 
-pub fn send_message(
-    state: &RcState,
-    process: &RcProcess,
-    pid: Term,
-    msg: Term,
-) -> Result<Term, Exception> {
+pub fn send_message(state: &RcState, sender: PID, pid: Term, msg: Term) -> Result<Term, Exception> {
     let receiver = match pid.into_variant() {
         value::Variant::Atom(name) => {
             if let Some(process) = state.process_registry.lock().whereis(name) {
@@ -591,14 +629,7 @@ pub fn send_message(
     };
 
     if let Some(receiver) = receiver {
-        receiver.send_message(process.pid, msg);
-
-        if receiver.is_waiting_for_message() {
-            // wake up
-            receiver.set_waiting_for_message(false);
-
-            state.process_pool.schedule(Job::normal(receiver));
-        }
+        receiver.send_message(sender, msg);
     } else {
         println!("NOTFOUND");
     }
@@ -610,15 +641,13 @@ pub fn send_message(
 pub fn send_signal(state: &RcState, pid: PID, signal: Signal) -> bool {
     if let Some(receiver) = state.process_table.lock().get(pid) {
         receiver.send_signal(signal);
-
-        if receiver.is_waiting_for_message() {
-            // wake up
-            receiver.set_waiting_for_message(false);
-
-            state.process_pool.schedule(Job::normal(receiver));
-        }
         return true;
     }
     // TODO: if err, we return err ?
     false
+}
+
+pub enum State {
+    Done,
+    Yield,
 }

@@ -11,10 +11,11 @@ fn run() -> i32 {
 
     // erlexec defaults:
     let args: Vec<String> = vec![
-        "/usr/local/Cellar/erlang/21.2.7/lib/erlang/erts-10.2.3/bin/enigma.smp",
+        "/usr/local/Cellar/erlang/21.3.2/lib/erlang/erts-10.2.3/bin/enigma.smp",
         "--",
         "-root",
-        "/usr/local/Cellar/erlang/21.2.7/lib/erlang",
+        //"/usr/local/Cellar/erlang/21.3.2/lib/erlang",
+        "otp",
         "-progname",
         "enigma",
         "--",
@@ -24,7 +25,8 @@ fn run() -> i32 {
             .to_str()
             .unwrap(),
         "--",
-        "-kernel shell_history enabled",
+        // "-kernel shell_history enabled",
+        "-kernel start_distribution false",
     ]
     .iter()
     .map(|s| s.to_string())

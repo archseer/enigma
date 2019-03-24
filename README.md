@@ -23,30 +23,48 @@ I read the BEAM book followed by the Rust book. Two birds with one stone?
 
 # Installation
 
-Only prerequisite to building Enigma is Rust. Use [rustup](https://rustup.rs/) (or your preferred package manager) to install latest rust (minimum version is the 2018 edition / ‎1.33, and stable is supported).
+Only prerequisite to building Enigma is Rust. Use [rustup](https://rustup.rs/)
+to install the latest nightly rust. At this time we don't support stable / beta
+anymore, because we're relying on async/await, which is scheduled to run in
+stable some time in 2019.
 
-Run `cargo install` to install the dependencies, `cargo run` to build and run the VM. Expect heavy
-crashes, but a lot of the functionality is already available.
-
-Currently, you will need to go into `src/bin/enigma.rs` and modify the arguments
-to point the root to your regular erlang installation. You can find the correct
-value by running:
+To boot up OTP you will also need to compile the standard library first. At the
+moment, that relies on the regular BEAM build system:
 
 ```bash
-grep ROOTDIR= $(which erl)
+git submodule update --init --depth 1
+cd otp
+./otp_build autoconf
+./otp_build configure
+make libs
+make local_setup
 ```
+
+We hope to simplify this step in the future (once enigma can run the compiler).
+
+Run `cargo install` to install the dependencies, `cargo run` to build and run
+the VM. Expect crashes, but a lot of the functionality is already available.
 
 We will distribute binaries for various platforms, once we reach a certain level of usability.
 
 # Goals, ideas & experiments
 
+Process scheduling is implemented on top of rust futures:
+- A process is simply a long running future, scheduled on top of
+    tokio-threadpool work-stealing queue
+- A timer is a delay/timeout future relying on tokio-timer time-wheel
+- Ports are futures we can await on
+- File I/O is AsyncRead/AsyncWrite awaitable
+- NIF/BIFs are futures that yield at certain points to play nice with reductions
+    (allows a much simpler yielding implementation)
+
+Future possibilities:
 - Be able to run the Erlang bootstrap (and all OTP)
 - Be able to run Elixir
 - Write more documentation about more sparsely documented BEAM aspects (binary matching, time wheel, process monitors, etc).
 - Feature parity with OTP
 - Explore using immix as a GC for Erlang
 - BIF as a generator function (yield to suspend/on reduce)
-- Process as a future (with a tokio style executor)
 - Cross-compile to WebAssembly ([threading](https://rustwasm.github.io/2018/10/24/multithreading-rust-and-wasm.html) is coming)
 - Use Commentz-Walter for binary matching. ["Commentz-Walter is an algorithm that combines Aho-Corasick with Boyer-Moore. (Only implementation I know of is in GNU grep.)"](https://github.com/rust-lang/regex/issues/197))
 
@@ -86,7 +104,7 @@ Features:
 - [x] Links
 - [x] Monitors
 - [x] Signal queue
-- [ ] error_handler system hooks (export stubs)
+- [x] error_handler system hooks (export stubs)
 - [ ] Deep term comparison (lists, tuples, maps)
 - [ ] Timers
 - [x] Maps
@@ -106,6 +124,10 @@ Features:
     - [x] basic read_file
 - [ ] [NIF](http://erlang.org/doc/man/erl_nif.html)
 - [ ] Ports
+    - [ ] spawn_drv
+    - [ ] fd_drv
+    - [ ] vanilla_driver ?
+    - [ ] forker_driver
     - [ ] inet_drv
     - [ ] ram_file_drv
 - [ ] External Term representation

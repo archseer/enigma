@@ -1,9 +1,10 @@
 use crate::immix::Heap;
-use crate::process::RcProcess;
+use crate::process::Process;
 use crate::servo_arc::Arc;
 use crate::value::{self, Term, TryFrom};
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
+use std::pin::Pin;
 // use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 // use std::cell::UnsafeCell;
 
@@ -1008,7 +1009,7 @@ macro_rules! copy_binary {
 //
 
 pub fn append(
-    process: &RcProcess,
+    process: &Pin<&mut Process>,
     binary: Term,
     build_size: Term,
     _extra_words: usize,
@@ -1167,7 +1168,7 @@ pub fn append(
 }
 
 pub fn private_append(
-    process: &RcProcess,
+    process: &Pin<&mut Process>,
     binary: Term,
     build_size: Term,
     unit: usize,
@@ -1212,7 +1213,7 @@ pub fn private_append(
 }
 
 // TODO: transform into SubBinary::new() + is_writable
-pub fn init_writable(process: &RcProcess, size: Term) -> Term {
+pub fn init_writable(process: &Pin<&mut Process>, size: Term) -> Term {
     let size = match size.into_variant() {
         value::Variant::Integer(i) if i >= 0 => i as usize,
         _ => 1024,

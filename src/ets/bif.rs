@@ -1,11 +1,12 @@
 use crate::atom;
 use crate::bif;
 use crate::exception::{Exception, Reason};
-use crate::process::RcProcess;
+use crate::process::Process;
 use crate::value;
 use crate::value::{Cons, Term, TryFrom, Tuple, Type, Variant};
 use crate::vm;
 use crate::Itertools;
+use std::pin::Pin;
 
 use super::bag::Bag;
 use super::error::{new_error, ErrorKind};
@@ -13,7 +14,7 @@ use super::hash_table::HashTable;
 use super::*;
 use super::{pam, Status};
 
-pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn new_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     if !args[0].is_atom() {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
@@ -187,6 +188,7 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
 
     {
         // TODO: need clone since insert_named might run, not ideal
+        println!("inserting table as {}", tid);
         vm.ets_tables.lock().insert(tid, table.clone());
     }
     // process.save_sched_table(tabletb);
@@ -225,7 +227,7 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
     // 		 BIF_P->u.initial[0], BIF_P->u.initial[1], BIF_P->u.initial[2]);
     // #endif
 }
-pub fn whereis_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn whereis_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     // atom
     let name = match args[0].into_variant() {
         Variant::Atom(name) => name,
@@ -268,11 +270,11 @@ fn get_table(vm: &vm::Machine, term: Term) -> std::result::Result<RcTable, Excep
     .ok_or_else(|| Exception::new(Reason::EXC_BADARG))
 }
 
-pub fn insert_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn insert_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     /* Write lock table if more than one object to keep atomicity */
     // let lock_kind = if (is_list(BIF_ARG_2) && CDR(list_val(BIF_ARG_2)) != NIL { LCK_WRITE } else { LCK_WRITE_REC };
 
-    eprintln!("going in {}", args[0]);
+    eprintln!("inserting into {} val {}", args[0], args[1]);
 
     // find table
     let table = get_table(vm, args[0])?;
@@ -313,7 +315,7 @@ pub fn insert_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
     }
 }
 
-pub fn insert_new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn insert_new_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     /* Write lock table if more than one object to keep atomicity */
     // let lock_kind = if (is_list(BIF_ARG_2) && CDR(list_val(BIF_ARG_2)) != NIL { LCK_WRITE } else { LCK_WRITE_REC };
 
@@ -363,14 +365,21 @@ pub fn insert_new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif
     }
 }
 
-pub fn lookup_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn lookup_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     let table = get_table(vm, args[0])?;
 
+    println!("looking up {}", args[1]);
     // for some reason just returning won't work
-    Ok(table.get(process, args[1])?)
+    let res = table.get(process, args[1])?;
+    println!("got {}", res);
+    Ok(res)
 }
 
-pub fn lookup_element_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn lookup_element_3(
+    vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
     let table = get_table(vm, args[0])?;
 
     let index = match args[2].into_number() {
@@ -383,7 +392,7 @@ pub fn lookup_element_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
 }
 
 /// Deletes an entire table.
-pub fn delete_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn delete_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     let table = get_table(vm, args[0])?;
 
     // TODO: set access bits to none to disable access
@@ -401,7 +410,11 @@ pub fn delete_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
     Ok(atom!(TRUE))
 }
 
-pub fn update_element_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn update_element_3(
+    vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
     let heap = &process.context_mut().heap;
     // DB_BIF_GET_TABLE(tb, DB_WRITE, LCK_WRITE_REC, BIF_ets_update_element_3);
     let table = get_table(vm, args[0])?;
@@ -425,7 +438,7 @@ pub fn update_element_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     Ok(table.update_element(process, args[1], list)?)
 }
 
-pub fn select_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn select_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     let table = get_table(vm, args[0])?;
     println!("pam=select {}", args[1]);
     let pattern = analyze_pattern(&table, args[1]).unwrap();
@@ -436,7 +449,26 @@ pub fn select_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
     Ok(table.select(vm, process, &pattern, flags, false)?)
 }
 
-pub fn select_delete_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn match_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    let heap = &process.context_mut().heap;
+    let ms = cons!(
+        heap,
+        tup3!(
+            heap,
+            args[1],
+            Term::nil(),
+            cons!(heap, atom!(DOLLAR_DOLLAR), Term::nil())
+        ),
+        Term::nil()
+    );
+    select_2(vm, process, &[args[0], ms])
+}
+
+pub fn select_delete_2(
+    vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
     let table = get_table(vm, args[0])?;
     println!("pam=select_delete {}", args[1]);
     let pattern = analyze_pattern(&table, args[1]).unwrap();

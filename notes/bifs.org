@@ -1,4 +1,4 @@
-* BIFs [48/117]
+* BIFs [51/117]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
@@ -16,7 +16,7 @@
 - [ ] bif erlang:delete_module/1
 - [X] bif erlang:display/1
 - [X] bif erlang:display_string/1
-- [ ] bif erlang:display_nl/0
+- [X] bif erlang:display_nl/0
 - [X] ubif erlang:element/2
 - [X] bif erlang:erase/0
 - [X] bif erlang:erase/1
@@ -48,7 +48,7 @@
 - [X] bif erlang:list_to_atom/1
 - [X] bif erlang:list_to_binary/1
 - [ ] bif erlang:list_to_float/1
-- [ ] bif erlang:list_to_integer/1
+- [X] bif erlang:list_to_integer/1
 - [ ] bif erlang:list_to_pid/1
 - [ ] bif erlang:list_to_port/1
 - [ ] bif erlang:list_to_ref/1
@@ -81,7 +81,7 @@
 - [ ] bif erts_internal:open_port/2
 - [ ] bif erlang:pid_to_list/1
 - [ ] bif erlang:ports/0
-- [ ] bif erlang:pre_loaded/0
+- [X] bif erlang:pre_loaded/0
 - [ ] bif erlang:process_flag/2
 - [ ] bif erts_internal:process_flag/3
 - [ ] bif erlang:process_info/1
@@ -181,10 +181,10 @@
 - [X] bif math:sqrt/1
 - [X] bif math:atan2/2
 - [X] bif math:pow/2
-** Timers [0/8]
+** Timers [1/8]
 - [ ] bif erlang:start_timer/3
 - [ ] bif erlang:start_timer/4
-- [ ] bif erlang:send_after/3
+- [X] bif erlang:send_after/3
 - [ ] bif erlang:send_after/4
 - [ ] bif erlang:cancel_timer/1
 - [ ] bif erlang:cancel_timer/2
@@ -197,7 +197,7 @@
 ** System [1/2]
 - [ ] bif erlang:system_flag/2
 - [X] bif erlang:system_info/1
-** New in R9C [23/44]
+** New in R9C [29/44]
 - [ ] bif erlang:system_monitor/0
 - [ ] bif erlang:system_monitor/1
 - [ ] bif erlang:system_monitor/2
@@ -240,12 +240,12 @@
 - [ ] ubif erlang:'/'/2			div_2
 - [X] ubif erlang:'div'/2			intdiv_2
 - [X] ubif erlang:'rem'/2
-- [ ] ubif erlang:'bor'/2
-- [ ] ubif erlang:'band'/2
-- [ ] ubif erlang:'bxor'/2
-- [ ] ubif erlang:'bsl'/2
-- [ ] ubif erlang:'bsr'/2
-- [ ] ubif erlang:'bnot'/1
+- [X] ubif erlang:'bor'/2
+- [X] ubif erlang:'band'/2
+- [X] ubif erlang:'bxor'/2
+- [X] ubif erlang:'bsl'/2
+- [X] ubif erlang:'bsr'/2
+- [X] ubif erlang:'bnot'/1
 - [ ] ubif erlang:'-'/1			sminus_1
 - [ ] ubif erlang:'+'/1			splus_1
 
@@ -276,7 +276,7 @@
 
 - [ ] bif erlang:match_spec_test/3
 
-** ETS [5/37]
+** ETS [8/37]
 - [ ] bif ets:internal_request_all/0
 - [X] bif ets:new/2
 - [X] bif ets:delete/1
@@ -290,7 +290,7 @@
 - [ ] bif ets:info/2
 - [ ] bif ets:last/1
 - [ ] bif ets:match/1
-- [ ] bif ets:match/2
+- [X] bif ets:match/2
 - [ ] bif ets:match/3
 - [ ] bif ets:match_object/1
 - [ ] bif ets:match_object/2
@@ -299,13 +299,13 @@
 - [ ] bif ets:next/2
 - [ ] bif ets:prev/2
 - [X] bif ets:insert/2
-- [ ] bif ets:insert_new/2
+- [X] bif ets:insert_new/2
 - [ ] bif ets:rename/2
 - [ ] bif ets:safe_fixtable/2
 - [ ] bif ets:slot/2
 - [ ] bif ets:update_counter/3
 - [ ] bif ets:select/1
-- [ ] bif ets:select/2
+- [X] bif ets:select/2
 - [ ] bif ets:select/3
 - [ ] bif ets:select_count/2
 - [ ] bif ets:select_reverse/1
@@ -315,15 +315,15 @@
 - [ ] bif ets:match_spec_compile/1
 - [ ] bif ets:match_spec_run_r/3
 
-** OS [4/9]
+** OS [7/9]
 - [X] bif os:get_env_var/1
 - [X] bif os:set_env_var/2;
 - [X] bif os:unset_env_var/1
 - [X] bif os:list_env_vars/0
-- [ ] bif os:getpid/0
+- [X] bif os:getpid/0
 - [ ] bif os:timestamp/0
-- [ ] bif os:system_time/0
-- [ ] bif os:system_time/1
+- [X] bif os:system_time/0
+- [X] bif os:system_time/1
 - [ ] bif os:perf_counter/0
 
 ** Bifs in the erl_ddll module (the module actually does not exist) [0/7]
@@ -378,9 +378,9 @@
 - [ ] bif erlang:hibernate/3
 - [ ] bif error_logger:warning_map/0
 
-** New Bifs in R10B. [1/9]
+** New Bifs in R10B. [2/9]
 - [ ] bif erlang:get_module_info/1
-- [ ] bif erlang:get_module_info/2
+- [X] bif erlang:get_module_info/2
 - [X] ubif erlang:is_boolean/1
 - [ ] bif string:list_to_integer/1
 - [ ] bif string:list_to_float/1
@@ -397,8 +397,8 @@
 - [ ] bif erlang:list_to_bitstring/1
 - [ ] bif erlang:bitstring_to_list/1
 
-** New Bifs in R12B-2 [0/1]
-- [ ] bif ets:update_element/3
+** New Bifs in R12B-2 [1/1]
+- [X] bif ets:update_element/3
 
 ** New Bifs in R12B-4 [0/1]
 - [ ] bif erlang:decode_packet/3
@@ -540,7 +540,7 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 ** New in 20.1 [0/1]
 - [ ] bif erlang:iolist_to_iovec/1
 
-** New in 21.0 [1/11]
+** New in 21.0 [2/11]
 - [ ] bif erts_internal:get_dflags/0
 - [ ] bif erts_internal:new_connection/1
 - [ ] bif erts_internal:abort_connection/2
@@ -551,7 +551,7 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 - [ ] ubif erlang:map_get/2
 - [ ] ubif erlang:is_map_key/2
 - [ ] bif ets:internal_delete_all/2
-- [ ] bif ets:internal_select_delete/2
+- [X] bif ets:internal_select_delete/2
 
 ** New in 21.2 [0/3]
 - [ ] Persistent terms [0/6]
@@ -576,3 +576,11 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
       - [ ] bif erts_internal:counters_add/3
       - [ ] bif erts_internal:counters_put/3
       - [ ] bif erts_internal:counters_info/1
+
+** New in 21.2.3 [0/1]
+      - [ ] bif erts_internal:spawn_system_process/3
+
+** New in 21.3 [0/3]
+      - [ ] bif erlang:integer_to_list/2
+      - [ ] bif erlang:integer_to_binary/2
+      - [ ] bif persistent_term:get/2

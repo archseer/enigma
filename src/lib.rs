@@ -1,3 +1,12 @@
+// The nightly features that are commonly needed with async / await
+#![feature(await_macro, async_await, futures_api)]
+#![feature(arbitrary_self_types)]
+
+// This pulls in the `tokio-async-await` crate. While Rust 2018 doesn't require
+// `extern crate`, we need to pull in the macros.
+#[macro_use]
+extern crate tokio;
+
 #[macro_use]
 mod macros;
 #[macro_use]
@@ -6,11 +15,11 @@ pub mod exception;
 pub mod vm;
 #[macro_use]
 pub mod nanbox;
-mod atom;
+pub mod atom;
 mod bif;
 pub mod bitstring;
 pub mod chashmap;
-mod etf;
+pub mod etf;
 pub mod ets;
 pub mod exports_table;
 mod immix;
@@ -21,11 +30,9 @@ pub mod module;
 pub mod module_registry;
 mod numeric;
 pub mod opcodes;
-mod pool;
 pub mod process;
-mod queue;
 pub mod servo_arc;
-mod signal_queue;
+pub mod signal_queue;
 pub mod value;
 
 #[macro_use]

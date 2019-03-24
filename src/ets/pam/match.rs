@@ -45,8 +45,8 @@ macro_rules! fail {
 #[allow(dead_code)]
 pub fn run(
     vm: &vm::Machine,
-    process: &RcProcess,
-    // pself: &RcProcess,
+    process: &Pin<&mut Process>,
+    // pself: &Pin<&mut Process>,
     pat: &pam::Pattern,
     term: Term,     /*Eterm *termp, arity: usize*/
     in_flags: Flag, /*, Uint32 *return_flags*/
@@ -379,8 +379,8 @@ pub fn run(
                 //                    esp[-1] = t;
                 //                }
                 Opcode::Call2(bif) => {
-                    let arg0 = esp.pop().unwrap();
                     let arg1 = esp.pop().unwrap();
+                    let arg0 = esp.pop().unwrap(); // it's in reverse
                     let args = &[arg0, arg1];
                     match bif(vm, process, args) {
                         Ok(t) => {
