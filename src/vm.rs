@@ -721,10 +721,7 @@ impl Machine {
         op_jump!(context, module.funs[&(fun, arity)]);
         /* TEMP */
 
-        let process = unsafe {
-            let ptr = &*process as *const process::Process as *mut process::Process;
-            Pin::new_unchecked(&mut *ptr)
-        };
+        let process = process::cast(process);
         // use futures::compat::Compat;
         // let future = Compat::new(self.run_with_error_handling(process));
         use tokio_async_await::compat::backward;
