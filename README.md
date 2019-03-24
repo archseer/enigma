@@ -10,7 +10,7 @@ An implementation of the Erlang VM in Rust. We aim to be complete, correct and f
 
 OTP 22+ compatible (sans the distributed bits for now) &mdash; all your code should eventually run on Enigma unchanged. Deprecated opcodes won't be supported.
 
-# Why?
+## Why?
 
 Because it's fun and I've been learning a lot. BEAM and HiPE are awesome, but
 they're massive (~300k SLOC). A small implementation makes it easier for new
@@ -21,7 +21,7 @@ ideas for inclusion into BEAM.
 
 I read the BEAM book followed by the Rust book. Two birds with one stone?
 
-# Installation
+## Installation
 
 Only prerequisite to building Enigma is Rust. Use [rustup](https://rustup.rs/)
 to install the latest nightly rust. At this time we don't support stable / beta
@@ -49,7 +49,7 @@ Expect crashes, but a lot of the functionality is already available.
 
 We will distribute binaries for various platforms, once we reach a certain level of usability.
 
-# Goals, ideas & experiments
+## Goals, ideas & experiments
 
 Process scheduling is implemented on top of rust futures:
 - A process is simply a long running future, scheduled on top of
@@ -70,7 +70,7 @@ Future possibilities:
 - Cross-compile to WebAssembly ([threading](https://rustwasm.github.io/2018/10/24/multithreading-rust-and-wasm.html) is coming)
 - Use Commentz-Walter for binary matching. ["Commentz-Walter is an algorithm that combines Aho-Corasick with Boyer-Moore. (Only implementation I know of is in GNU grep.)"](https://github.com/rust-lang/regex/issues/197))
 
-# Initial non-goals
+## Initial non-goals
 
 Until we can run a large subset of OTP code, it doesn't make sense to consider these.
 
@@ -81,7 +81,7 @@ Until we can run a large subset of OTP code, it doesn't make sense to consider t
 Note: NIF/FFI compatibility with OTP is going to be quite some work. Until then,
 a rust-style NIF interface will be available.
 
-# Feature status
+## Feature status
 
 This section is a quick overview of what's supported, and what's the next general features that will be worked on.
 
@@ -143,7 +143,7 @@ Features:
 - [ ] beam_makeops compatible load-time opcode transformer
 - [ ] Optimize select_val with a jump table
 
-# Contributing
+## Contributing
 
 Contributors are very welcome!
 
