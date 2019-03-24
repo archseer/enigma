@@ -42,8 +42,10 @@ make local_setup
 
 We hope to simplify this step in the future (once enigma can run the compiler).
 
-Run `cargo install` to install the dependencies, `cargo run` to build and run
-the VM. Expect crashes, but a lot of the functionality is already available.
+Run `cargo run` to install dependencies, build and run the VM. By default, it
+will try to boot up the erl shell ([and fail, but it currently boots up the entire kernel layer, up to the user shell](https://asciinema.org/a/yVKI5dAdDXGq11azUSjbQV42y)).
+
+Expect crashes, but a lot of the functionality is already available.
 
 We will distribute binaries for various platforms, once we reach a certain level of usability.
 
