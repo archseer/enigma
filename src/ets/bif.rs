@@ -188,7 +188,7 @@ pub fn new_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bi
 
     {
         // TODO: need clone since insert_named might run, not ideal
-        println!("inserting table as {}", tid);
+        // println!("inserting table as {}", tid);
         vm.ets_tables.lock().insert(tid, table.clone());
     }
     // process.save_sched_table(tabletb);
@@ -274,7 +274,7 @@ pub fn insert_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) ->
     /* Write lock table if more than one object to keep atomicity */
     // let lock_kind = if (is_list(BIF_ARG_2) && CDR(list_val(BIF_ARG_2)) != NIL { LCK_WRITE } else { LCK_WRITE_REC };
 
-    eprintln!("inserting into {} val {}", args[0], args[1]);
+    // eprintln!("inserting into {} val {}", args[0], args[1]);
 
     // find table
     let table = get_table(vm, args[0])?;
@@ -368,10 +368,10 @@ pub fn insert_new_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]
 pub fn lookup_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     let table = get_table(vm, args[0])?;
 
-    println!("looking up {}", args[1]);
+    // println!("looking up {}", args[1]);
     // for some reason just returning won't work
     let res = table.get(process, args[1])?;
-    println!("got {}", res);
+    // println!("got {}", res);
     Ok(res)
 }
 
@@ -418,7 +418,7 @@ pub fn update_element_3(
     let heap = &process.context_mut().heap;
     // DB_BIF_GET_TABLE(tb, DB_WRITE, LCK_WRITE_REC, BIF_ets_update_element_3);
     let table = get_table(vm, args[0])?;
-    println!("pam=update_element {}", args[1]);
+    // println!("pam=update_element {}", args[1]);
 
     if table
         .meta()
@@ -440,7 +440,7 @@ pub fn update_element_3(
 
 pub fn select_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     let table = get_table(vm, args[0])?;
-    println!("pam=select {}", args[1]);
+    // println!("pam=select {}", args[1]);
     let pattern = analyze_pattern(&table, args[1]).unwrap();
 
     let flags = pam::r#match::Flag::COPY_RESULT | pam::r#match::Flag::CONTIGUOUS_TUPLE;
@@ -470,7 +470,7 @@ pub fn select_delete_2(
     args: &[Term],
 ) -> bif::Result {
     let table = get_table(vm, args[0])?;
-    println!("pam=select_delete {}", args[1]);
+    // println!("pam=select_delete {}", args[1]);
     let pattern = analyze_pattern(&table, args[1]).unwrap();
 
     let flags = pam::r#match::Flag::COPY_RESULT | pam::r#match::Flag::CONTIGUOUS_TUPLE;
@@ -506,7 +506,7 @@ fn analyze_pattern(
     // Eterm key = NIL;
     // HashValue hval = NIL;
 
-    println!("compiling PAM {}", pattern);
+    // println!("compiling PAM {}", pattern);
 
     let pattern = Cons::try_from(&pattern)?;
 
@@ -626,7 +626,7 @@ fn analyze_pattern(
     //    return Err(new_error(ErrorKind::BadParameter));
     //}
     //if buff != sbuff { erts_free(ERTS_ALC_T_DB_TMP, buff); }
-    mp.program.iter().for_each(|op| eprintln!("{}", op));
+    // DEBUG: mp.program.iter().for_each(|op| eprintln!("{}", op));
 
     Ok(mp)
 }

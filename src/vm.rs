@@ -11,6 +11,7 @@ use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
 use crate::opcodes::Opcode;
 use crate::process::registry::Registry as ProcessRegistry;
 use crate::process::table::Table as ProcessTable;
+use crate::port::{Table as PortTable, RcTable as RcPortTable};
 use crate::process::{self, RcProcess};
 use crate::servo_arc::Arc;
 use crate::value::{self, Cons, Term, TryFrom, TryInto, TryIntoMut, Tuple, Variant};
@@ -38,6 +39,8 @@ pub struct State {
     /// Table containing all processes.
     pub process_table: Mutex<ProcessTable<RcProcess>>,
     pub process_registry: Mutex<ProcessRegistry<RcProcess>>,
+
+    pub port_table: RcPortTable,
     /// TODO: Use priorities later on
 
     /// The start time of the VM (more or less).
@@ -272,7 +275,7 @@ macro_rules! op_call_ext {
     ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr, $return: expr) => {{
         let mfa = unsafe { &(*$context.ip.module).imports[*$dest as usize] };
 
-        println!("pid={} action=call_ext mfa={}", $process.pid, mfa);
+        // println!("pid={} action=call_ext mfa={}", $process.pid, mfa);
 
         let export = { $vm.exports.read().lookup(mfa) }; // drop the exports lock
 
@@ -416,7 +419,7 @@ macro_rules! op_apply {
 
         let mfa = module::MFA(module.to_u32(), func.to_u32(), arity as u32);
 
-        println!("pid={} applying/3... {}", $process.pid, mfa);
+        // println!("pid={} applying/3... {}", $process.pid, mfa);
 
         let export = { $vm.exports.read().lookup(&mfa) }; // drop the exports lock
 
@@ -428,7 +431,7 @@ macro_rules! op_apply {
                 op_call_bif!($vm, $context, $process, bif, arity, $return)
             }
             None => {
-                println!("apply setup_error_handler pid={}", $process.pid);
+                // println!("apply setup_error_handler pid={}", $process.pid);
                 call_error_handler!($vm, $process, &mfa);
                 // apply_setup_error_handler
             }
@@ -550,7 +553,7 @@ macro_rules! op_fixed_apply {
                 op_call_bif!($vm, $context, $process, bif, arity, $return)
             }
             None => {
-                println!("fixed_apply setup_error_handler pid={}", $process.pid);
+                // println!("fixed_apply setup_error_handler pid={}", $process.pid);
                 call_error_handler!($vm, $process, &mfa);
                 // apply_setup_error_handler
             }
@@ -645,6 +648,7 @@ impl Machine {
         let state = State {
             process_table: Mutex::new(ProcessTable::new()),
             process_registry: Mutex::new(ProcessRegistry::new()),
+            port_table: PortTable::new(),
             start_time: time::Instant::now(),
             next_ref: AtomicUsize::new(1),
         };
@@ -844,7 +848,7 @@ impl Machine {
                     // send x1 to x0, write result to x0
                     let pid = context.x[0]; // TODO can be pid or atom name
                     let msg = context.x[1];
-                    println!("sending from {} to {} msg {}", process.pid, pid, msg);
+                    // println!("sending from {} to {} msg {}", process.pid, pid, msg);
                     let res = process::send_message(&self.state, process.pid, pid, msg)?;
                     context.x[0] = res;
                 }
@@ -866,7 +870,7 @@ impl Machine {
                     // label, source
                     // grab message from queue, put to x0, if no message, jump to fail label
                     if let Some(msg) = process.receive()? {
-                        println!("recv proc pid={:?} msg={}", process.pid, msg);
+                        // println!("recv proc pid={:?} msg={}", process.pid, msg);
                         context.x[0] = msg
                     } else {
                         let fail = ins.args[0].to_u32();
@@ -901,7 +905,7 @@ impl Machine {
                     let cancel = process.context_mut().recv_channel.take().unwrap();
                     await!(Compat::new(cancel.fuse())); // suspend process
 
-                    println!("pid={} resumption ", process.pid);
+                    // println!("pid={} resumption ", process.pid);
                     process.process_incoming()?;
                 }
                 Opcode::WaitTimeout => {
@@ -915,12 +919,12 @@ impl Machine {
                     match context.expand_arg(&ins.args[1]).into_variant() {
                         Variant::Atom(atom::INFINITY) => {
                             // just a normal Opcode::Wait
-                            println!("infinity wait");
+                            // println!("infinity wait");
                             let label = ins.args[0].to_u32();
                             op_jump!(context, label);
 
                             await!(Compat::new(cancel.fuse())); // suspend process
-                            println!("select! resumption pid={}", process.pid);
+                            // println!("select! resumption pid={}", process.pid);
                         },
                         Variant::Integer(ms) => {
                             let when = time::Duration::from_millis(ms as u64);
@@ -931,11 +935,11 @@ impl Machine {
                                     // jump to success (start of recv loop)
                                     let label = ins.args[0].to_u32();
                                     op_jump!(context, label);
-                                    println!("select! resumption pid={}", process.pid);
+                                    // println!("select! resumption pid={}", process.pid);
                                 }
                                 Err(_) => {
                                     // timeout
-                                    println!("select! delay timeout {} pid={} ms={} m={:?}", ms, process.pid, context.expand_arg(&ins.args[1]), ins.args[1]);
+                                    // println!("select! delay timeout {} pid={} ms={} m={:?}", ms, process.pid, context.expand_arg(&ins.args[1]), ins.args[1]);
 
                                     // remove channel
                                     context.timeout.take();
@@ -983,6 +987,9 @@ impl Machine {
                     if let [LValue::Literal(_a), LValue::Label(i)] = &ins.args[..] {
                         context.cp = Some(context.ip);
                         op_jump!(context, *i);
+
+                        // let (mfa, _) = context.ip.lookup_func_info().unwrap();
+                        // println!("pid={} action=call mfa={}", process.pid, mfa);
                     } else {
                         unreachable!()
                     }
@@ -998,8 +1005,8 @@ impl Machine {
 
                         op_jump!(context, *i);
 
-                        let (mfa, _) = context.ip.lookup_func_info().unwrap();
-                        println!("pid={} action=call_last mfa={}", process.pid, mfa);
+                        // let (mfa, _) = context.ip.lookup_func_info().unwrap();
+                        // println!("pid={} action=call_last mfa={}", process.pid, mfa);
                     } else {
                         unreachable!()
                     }
@@ -1019,8 +1026,8 @@ impl Machine {
                     if let [LValue::Literal(_a), i] = &ins.args[..] {
                         op_jump!(context, i.to_u32());
 
-                        let (mfa, _) = context.ip.lookup_func_info().unwrap();
-                        println!("pid={} action=call_only mfa={}", process.pid, mfa);
+                        // let (mfa, _) = context.ip.lookup_func_info().unwrap();
+                        // println!("pid={} action=call_only mfa={}", process.pid, mfa);
                     } else {
                         unreachable!()
                     }
@@ -2400,7 +2407,7 @@ impl Machine {
                                 op_call_bif!(self, context, &process, bif, mfa.2 as usize, true) // TODO is return true ok
                             }
                             None => {
-                                println!("apply setup_error_handler");
+                                // println!("apply setup_error_handler");
                                 call_error_handler!(self, &process, &mfa);
                                 // apply_setup_error_handler
                             }

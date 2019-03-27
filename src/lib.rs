@@ -30,6 +30,7 @@ pub mod module;
 pub mod module_registry;
 mod numeric;
 pub mod opcodes;
+pub mod port;
 pub mod process;
 pub mod servo_arc;
 pub mod signal_queue;

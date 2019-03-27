@@ -5,6 +5,7 @@ use crate::ets;
 use crate::exception::{Exception, Reason, StackTrace};
 use crate::loader;
 use crate::module;
+use crate::port;
 use crate::process::{self, Process};
 use crate::value::{self, Cons, Term, TryFrom, TryInto, Tuple, Variant};
 use crate::vm;
@@ -320,7 +321,7 @@ pub fn apply(
     mfa: &module::MFA,
     args: &[Term],
 ) -> Result {
-    println!("bif_apply {}", mfa);
+    // println!("bif_apply {}", mfa);
     match BIFS.get(mfa) {
         Some(fun) => fun(vm, process, args),
         None => unimplemented!("BIF {} not implemented", mfa),
@@ -1160,8 +1161,10 @@ fn monitor_nodes(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) 
     Ok(atom!(OK))
 }
 
-fn open_port_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
-    panic!("open_port called with {}, {}", args[0], args[1])
+fn open_port_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    println!("open_port called with {}, {}", args[0], args[1]);
+    let pid = port::spawn(&vm.state, process.pid, args[0], args[1])?;
+    Ok(Term::port(pid))
 }
 
 #[cfg(test)]

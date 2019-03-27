@@ -29,7 +29,7 @@ bitflags! {
 
 macro_rules! fail {
     () => {{
-        dbg!("Failed at");
+        // dbg!("Failed at");
         break;
     }};
 }
@@ -156,7 +156,7 @@ pub fn run(
             // }
             // save_op = *pc;
             // #endif
-            println!("pam instr={}", pat.program[pc]);
+            // println!("pam instr={}", pat.program[pc]);
             match pat.program[pc] {
                 Opcode::TryMeElse(fail) => {
                     assert!(fail_label.is_none());

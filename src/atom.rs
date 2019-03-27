@@ -358,6 +358,9 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("infinity");
 
     atoms.register_atom("enotdir");
+
+    atoms.register_atom("spawn");
+    atoms.register_atom("tty_sl -c -e");
     atoms
 };
 
@@ -605,6 +608,8 @@ pub const NEW: u32 = 210;
 pub const INFINITY: u32 = 211;
 
 pub const ENOTDIR: u32 = 212;
+pub const SPAWN: u32 = 213;
+pub const TTY_SL: u32 = 214;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

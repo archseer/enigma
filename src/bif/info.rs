@@ -170,6 +170,7 @@ pub fn system_info_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
     match args[0].into_variant() {
         Variant::Atom(atom::OS_TYPE) => Ok(tup2!(heap, Term::atom(OS_FAMILY), atom!(TRUE))), // TODO: true should be :darwin
         Variant::Atom(atom::HIPE_ARCHITECTURE) => Ok(atom!(UNDEFINED)),
+        // TODO: Variant::Atom(atom::SYSTEM_VERSION) => Ok(atom!()),
         _ => unimplemented!("system_info for {}", args[0]),
     }
 }

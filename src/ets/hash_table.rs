@@ -61,11 +61,11 @@ impl Table for HashTable {
     fn get(&self, process: &Pin<&mut Process>, key: Term) -> Result<Term> {
         let heap = &process.context_mut().heap;
 
-        println!("debug: ----");
-        self.hashmap.clone().into_iter().for_each(|(key, value)| {
-            println!("key {} value {}", key, value);
-        });
-        println!("debug: end----");
+        // println!("debug: ----");
+        // self.hashmap.clone().into_iter().for_each(|(key, value)| {
+        //     println!("key {} value {}", key, value);
+        // });
+        // println!("debug: end----");
         Ok(self
             .hashmap
             .get(&key)
@@ -174,13 +174,13 @@ impl Table for HashTable {
             .clone() // TODO: eww, temporary until I implement my own buckets
             .into_iter()
             .fold(Term::nil(), |acc, (_key, val)| {
-                println!("running select for {}", val);
+                // println!("running select for {}", val);
                 match pam::r#match::run(vm, process, pattern, val, flags) {
                     Some(val) => cons!(heap, val, acc),
                     None => acc,
                 }
             });
-        println!("PAM res: {}", res);
+        // println!("PAM res: {}", res);
         Ok(res)
     }
 
@@ -199,10 +199,10 @@ impl Table for HashTable {
         let mut count = 0;
         let am_true = atom!(TRUE);
         self.hashmap.retain(|_key, val| {
-            println!("running retain for {}", val);
+            // println!("running retain for {}", val);
             match pam::r#match::run(vm, process, pattern, *val, flags) {
                 Some(res) if res == am_true => {
-                    println!("deleting {}", val);
+                    // println!("deleting {}", val);
                     count += 1;
                     false
                 } // don't keep
