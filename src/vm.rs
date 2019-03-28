@@ -33,9 +33,9 @@ use futures::select;
 use futures_native_timers::{Delay, Interval};
 
 /// A reference counted State.
-pub type RcState = Arc<State>;
+pub type RcMachine = Arc<Machine>;
 
-pub struct State {
+pub struct Machine {
     /// Table containing all processes.
     pub process_table: Mutex<ProcessTable<RcProcess>>,
     pub process_registry: Mutex<ProcessRegistry<RcProcess>>,
@@ -47,19 +47,6 @@ pub struct State {
     pub start_time: time::Instant,
 
     pub next_ref: AtomicUsize,
-}
-
-impl State {
-    pub fn next_ref(&self) -> process::Ref {
-        self.next_ref
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-    }
-}
-
-#[derive(Clone)]
-pub struct Machine {
-    /// VM internal state
-    pub state: RcState,
 
     // pub exit:
 
@@ -74,6 +61,14 @@ pub struct Machine {
 
     pub ets_tables: RcTableRegistry,
 }
+
+impl Machine {
+    pub fn next_ref(&self) -> process::Ref {
+        self.next_ref
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
 
 /* meh, copied from tokio async/await feature */
 use std::future::Future as StdFuture;
@@ -104,12 +99,12 @@ impl<T: StdFuture> StdFuture for MapOk<T> {
 /* meh */
 
 thread_local!(
-    static CURRENT: RefCell<Option<Machine>> = RefCell::new(None);
+    static CURRENT: RefCell<Option<Arc<Machine>>> = RefCell::new(None);
 );
 
 impl Machine {
     /// Get current running machine.
-    pub fn current() -> Machine {
+    pub fn current() -> Arc<Machine> {
         CURRENT.with(|cell| match *cell.borrow() {
             Some(ref vm) => vm.clone(),
             None => panic!("Machine is not running"),
@@ -123,7 +118,7 @@ impl Machine {
 
     /// Set current running machine.
     #[doc(hidden)]
-    pub fn set_current(vm: Machine) {
+    pub fn set_current(vm: Arc<Machine>) {
         CURRENT.with(|s| {
             *s.borrow_mut() = Some(vm);
         })
@@ -132,10 +127,10 @@ impl Machine {
     /// Execute function with machine reference.
     pub fn with_current<F, R>(f: F) -> R
     where
-        F: FnOnce(&mut Machine) -> R,
+        F: FnOnce(&Machine) -> R,
     {
         CURRENT.with(|cell| match *cell.borrow_mut() {
-            Some(ref mut vm) => f(vm),
+            Some(ref vm) => f(vm),
             None => panic!("Machine is not running"),
         })
     }
@@ -614,7 +609,7 @@ macro_rules! safepoint_and_reduce {
         if $reductions > 0 {
             $reductions -= 1;
         } else {
-            // $vm.state
+            // $vm
             //     .process_pool
             //     .schedule(Job::normal($process.clone()));
             return Ok(process::State::Yield);
@@ -644,21 +639,18 @@ pub const PRE_LOADED: &[&str] = &[
 ];
 
 impl Machine {
-    pub fn new() -> Machine {
-        let state = State {
+    pub fn new() -> Arc<Machine> {
+        Arc::new(Machine {
             process_table: Mutex::new(ProcessTable::new()),
             process_registry: Mutex::new(ProcessRegistry::new()),
             port_table: PortTable::new(),
             start_time: time::Instant::now(),
-            next_ref: AtomicUsize::new(1),
-        };
 
-        Machine {
-            state: Arc::new(state),
+            next_ref: AtomicUsize::new(1),
             exports: ExportsTable::with_rc(),
             modules: ModuleRegistry::with_rc(),
             ets_tables: TableRegistry::with_rc(),
-        }
+        })
     }
 
     pub fn preload_modules(&self) {
@@ -673,7 +665,7 @@ impl Machine {
     ///
     /// This method returns true if the VM terminated successfully, false
     /// otherwise.
-    pub fn start(&self, args: Vec<String>) {
+    pub fn start(self: &Arc<Self>, args: Vec<String>) {
         // let (trigger, exit) = futures::sync::oneshot::channel();
 
         // Create the runtime
@@ -709,7 +701,7 @@ impl Machine {
         let registry = self.modules.lock();
         //let module = unsafe { &*module::load_module(self, path).unwrap() };
         let module = registry.lookup(atom::from_str("erl_init")).unwrap();
-        let process = process::allocate(&self.state, 0 /* itself */, module).unwrap();
+        let process = process::allocate(&self, 0 /* itself */, module).unwrap();
 
         /* TEMP */
         let context = process.context_mut();
@@ -733,7 +725,7 @@ impl Machine {
         let future = backward::Compat::new(map_ok(future));
         runtime.spawn(future);
 
-        // self.state.process_pool.schedule(process);
+        // self.process_pool.schedule(process);
     }
 }
 
@@ -758,7 +750,7 @@ impl Machine {
                             context.ip = new_pc;
                             // yield
                         } else {
-                            process.exit(&vm.state, message);
+                            process.exit(&vm, message);
                             println!("pid={} action=exited", process.pid);
                             break // crashed
                         }
@@ -806,7 +798,7 @@ impl Machine {
     ) -> impl std::future::Future<Output = Result<process::State, Exception>> + Captures<'a> + Captures<'b> + Captures<'c> + 'd {
         async move {  // workaround for https://github.com/rust-lang/rust/issues/56238
         let context = process.context_mut();
-        context.reds = 1000; // self.state.config.reductions;
+        context.reds = 1000; // self.config.reductions;
 
         // process the incoming signal queue
         process.process_incoming()?;
@@ -849,7 +841,7 @@ impl Machine {
                     let pid = context.x[0]; // TODO can be pid or atom name
                     let msg = context.x[1];
                     // println!("sending from {} to {} msg {}", process.pid, pid, msg);
-                    let res = process::send_message(&self.state, process.pid, pid, msg)?;
+                    let res = process::send_message(&self, process.pid, pid, msg)?;
                     context.x[0] = res;
                 }
                 Opcode::RemoveMessage => {
@@ -2593,12 +2585,6 @@ impl Machine {
     }
 
     pub fn elapsed_time(&self) -> time::Duration {
-        self.state.start_time.elapsed()
-    }
-}
-
-impl Default for Machine {
-    fn default() -> Self {
-        Self::new()
+        self.start_time.elapsed()
     }
 }

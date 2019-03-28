@@ -1,13 +1,12 @@
 use crate::bif;
 use crate::instr_ptr::InstrPtr;
 use crate::module::MFA;
-use crate::servo_arc::Arc;
 use hashbrown::HashMap;
 use parking_lot::RwLock;
 use std::fmt;
 
 /// Reference counted ExportsTable.
-pub type RcExportsTable = Arc<RwLock<ExportsTable>>; // TODO: I don't like this lock at all
+pub type RcExportsTable = RwLock<ExportsTable>; // TODO: I don't like this lock at all
 
 #[derive(Copy, Clone)]
 pub enum Export {
@@ -38,7 +37,7 @@ impl ExportsTable {
             exports.insert(*key, Export::Bif(*val));
         }
 
-        Arc::new(RwLock::new(ExportsTable { exports }))
+        RwLock::new(ExportsTable { exports })
     }
 
     pub fn register(&mut self, mfa: MFA, ptr: InstrPtr) {

@@ -139,7 +139,7 @@ pub fn process_info_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
 
     // TODO optimize for if process.pid == pid
     let proc = {
-        let table = vm.state.process_table.lock();
+        let table = vm.process_table.lock();
         table.get(pid)
     };
 
@@ -196,7 +196,7 @@ pub fn group_leader_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
 
     // TODO optimize for if process.pid == pid
     let proc = {
-        let table = vm.state.process_table.lock();
+        let table = vm.process_table.lock();
         table.get(pid)
     };
 

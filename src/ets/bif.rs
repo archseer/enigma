@@ -150,7 +150,7 @@ pub fn new_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bi
     }
 
     // make_btid(tb);
-    let tid = vm.state.next_ref();
+    let tid = vm.next_ref();
 
     // meth: methods
     let meta = Metadata {

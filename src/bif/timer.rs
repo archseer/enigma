@@ -28,14 +28,14 @@ pub fn send_after_3(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]
     let when = Instant::now() + Duration::from_millis(delay as u64);
     let fut = Delay::new(when)
         .and_then(move |_| {
-            vm::Machine::with_current(|vm| process::send_message(&vm.state, from, dest, msg));
+            vm::Machine::with_current(|vm| process::send_message(vm, from, dest, msg));
             Ok(())
         })
         .map_err(|e| panic!("delay errored; err={:?}", e));
     tokio::spawn(fut);
 
     let heap = &process.context_mut().heap;
-    let reference = vm.state.next_ref();
+    let reference = vm.next_ref();
     let ref_term = Term::reference(heap, reference);
     Ok(ref_term)
 }

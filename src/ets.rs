@@ -160,7 +160,7 @@ pub struct Metadata {
 }
 
 // TODO: we want to avoid mutex for concurrent writes tho, maybe dyn Table + Sync
-pub type RcTableRegistry = Arc<Mutex<TableRegistry>>;
+pub type RcTableRegistry = Mutex<TableRegistry>;
 
 pub type RcTable = Arc<dyn Table>;
 
@@ -171,10 +171,10 @@ pub struct TableRegistry {
 
 impl TableRegistry {
     pub fn with_rc() -> RcTableRegistry {
-        Arc::new(Mutex::new(Self {
+        Mutex::new(Self {
             tables: HashMap::new(),
             named_tables: HashMap::new(),
-        }))
+        })
     }
 
     pub fn get(&self, reference: process::Ref) -> Option<RcTable> {

@@ -1,10 +1,9 @@
 use crate::loader::Loader;
 use crate::module::Module;
-use crate::servo_arc::Arc;
 use hashbrown::HashMap;
 use parking_lot::Mutex;
 
-pub type RcModuleRegistry = Arc<Mutex<ModuleRegistry>>;
+pub type RcModuleRegistry = Mutex<ModuleRegistry>;
 
 pub struct ModuleRegistry {
     modules: HashMap<u32, Box<Module>>,
@@ -12,9 +11,9 @@ pub struct ModuleRegistry {
 
 impl ModuleRegistry {
     pub fn with_rc() -> RcModuleRegistry {
-        Arc::new(Mutex::new(ModuleRegistry {
+        Mutex::new(ModuleRegistry {
             modules: HashMap::new(),
-        }))
+        })
     }
 
     /// Parses a full file path pointing to a module.

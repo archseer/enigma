@@ -2,7 +2,7 @@ use crate::value::{Term, Variant, Tuple, TryFrom};
 use crate::process::PID;
 use crate::exception::Exception;
 use crate::atom;
-use crate::vm::RcState;
+use crate::vm::Machine;
 
 use crate::servo_arc::Arc;
 use hashbrown::HashMap;
@@ -16,7 +16,7 @@ use crate::tokio::prelude::SinkExt;
 
 use futures::channel::mpsc;
 use futures::select;
-use futures::future::FutureExt;
+use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{StreamExt, FusedStream};
 use futures::sink::SinkExt as FuturesSinkExt;
 use futures::compat::Compat;
@@ -31,7 +31,7 @@ pub struct Port {
     id: ID,
     parent: PID,
     // chan: mpsc::UnboundedSender<Signal>,
-    chan: Compat<mpsc::UnboundedSender<Signal>>,
+    pub chan: mpsc::UnboundedSender<Signal>,
 }
 
 impl Port {
@@ -39,22 +39,22 @@ impl Port {
         Port {
             id,
             parent,
-            chan: chan.compat()
+            chan
         }
     }
 
     // TODO: probably better to return the future here and await outside
-    async fn send(&mut self, msg: String) -> Result<(), mpsc::SendError> {
-        await!(self.chan.send_async(Signal::Command(msg)))
-    }
+    // pub async fn send_message(&mut self, msg: Vec<u8>) { // Result<(), mpsc::SendError> {
+    //     await!(self.chan.send_async(Signal::Command(msg)));
+    // }
 
-    async fn control(&mut self, sig: usize) -> Result<(), mpsc::SendError> {
-        await!(self.chan.send_async(Signal::Control(sig)))
-    }
+    // pub async fn control(&mut self, sig: usize) -> Result<(), mpsc::SendError> {
+    //     await!(self.chan.send_async(Signal::Control(sig)))
+    // }
 }
 
 pub enum Signal {
-    Command(String), // TODO: probably binary or String/&str
+    Command(Vec<u8>), // TODO: zero-copy passing via slice would be better
     Control(usize), // usize => a set of constant predefined values
     Close
 }
@@ -100,7 +100,7 @@ impl Table {
 }
 
 pub fn spawn(
-    state: &RcState,
+    vm: &Machine,
     parent: PID,
     args: Term,
     opts: Term
@@ -117,7 +117,7 @@ pub fn spawn(
                     let fut = tty(parent, input);
                     tokio::spawn_async(fut);
 
-                    let pid = state.port_table.write().insert(parent, port);
+                    let pid = vm.port_table.write().insert(parent, port);
                     Ok(pid)
                 }
                 _ => unimplemented!()

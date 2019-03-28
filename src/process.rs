@@ -6,13 +6,12 @@ use crate::instr_ptr::InstrPtr;
 use crate::loader::LValue;
 use crate::mailbox::Mailbox;
 use crate::module::{Module, MFA};
-use crate::vm::Machine;
 // use crate::servo_arc::Arc; can't do receiver self
 use crate::signal_queue::SignalQueue;
 pub use crate::signal_queue::{ExitKind, Signal};
 use crate::tokio;
 use crate::value::{self, Term, TryInto};
-use crate::vm::RcState;
+use crate::vm::Machine;
 use hashbrown::{HashMap, HashSet};
 use std::cell::UnsafeCell;
 use std::panic::RefUnwindSafe;
@@ -454,7 +453,7 @@ impl Process {
     }
 
     // equivalent of erts_continue_exit_process
-    pub fn exit(&self, state: &RcState, reason: Exception) {
+    pub fn exit(&self, vm: &Machine, reason: Exception) {
         let local_data = self.local_data_mut();
 
         // set state to exiting
@@ -472,7 +471,7 @@ impl Process {
                 from: self.pid,
                 kind: ExitKind::ExitLinked,
             };
-            self::send_signal(state, pid, msg);
+            self::send_signal(vm, pid, msg);
             // erts_proc_sig_send_link_exit(c_p, c_p->common.id, lnk, reason, SEQ_TRACE_TOKEN(c_p));
         }
 
@@ -484,7 +483,7 @@ impl Process {
                 from: self.pid,
                 reference,
             };
-            self::send_signal(state, pid, msg);
+            self::send_signal(vm, pid, msg);
         }
 
         for (pid, reference) in local_data.lt_monitors.drain(..) {
@@ -495,24 +494,20 @@ impl Process {
                 from: self.pid,
                 reference,
             };
-            self::send_signal(state, pid, msg);
+            self::send_signal(vm, pid, msg);
         }
     }
 }
 
-pub fn allocate(
-    state: &RcState,
-    parent: PID,
-    module: *const Module,
-) -> Result<RcProcess, Exception> {
-    let mut process_table = state.process_table.lock();
+pub fn allocate(vm: &Machine, parent: PID, module: *const Module) -> Result<RcProcess, Exception> {
+    let mut process_table = vm.process_table.lock();
 
     let pid = process_table
         .reserve()
         .ok_or_else(|| Exception::new(Reason::EXC_SYSTEM_LIMIT))?;
 
     let process = Process::from_block(
-        pid, parent, module, /*, state.global_allocator.clone(), &state.config*/
+        pid, parent, module, /*, vm.global_allocator.clone(), &vm.config*/
     );
 
     process_table.map(pid, process.clone());
@@ -540,14 +535,14 @@ bitflags! {
 }
 
 pub fn spawn(
-    state: &RcState,
+    vm: &Machine,
     parent: &Pin<&mut Process>,
     module: *const Module,
     func: u32,
     args: Term,
     flags: SpawnFlag,
 ) -> Result<Term, Exception> {
-    let new_proc = allocate(state, parent.pid, module)?;
+    let new_proc = allocate(vm, parent.pid, module)?;
     let context = new_proc.context_mut();
     let mut ret = Term::pid(new_proc.pid);
 
@@ -590,7 +585,7 @@ pub fn spawn(
     }
 
     if flags.contains(SpawnFlag::MONITOR) {
-        let reference = state.next_ref();
+        let reference = vm.next_ref();
 
         parent
             .local_data_mut()
@@ -614,17 +609,17 @@ pub fn spawn(
     Ok(ret)
 }
 
-pub fn send_message(state: &RcState, sender: PID, pid: Term, msg: Term) -> Result<Term, Exception> {
+pub fn send_message(vm: &Machine, sender: PID, pid: Term, msg: Term) -> Result<Term, Exception> {
     let receiver = match pid.into_variant() {
         value::Variant::Atom(name) => {
-            if let Some(process) = state.process_registry.lock().whereis(name) {
+            if let Some(process) = vm.process_registry.lock().whereis(name) {
                 Some(process.clone())
             } else {
                 println!("registered name {} not found!", pid);
                 return Err(Exception::new(Reason::EXC_BADARG));
             }
         }
-        value::Variant::Pid(pid) => state.process_table.lock().get(pid),
+        value::Variant::Pid(pid) => vm.process_table.lock().get(pid),
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
 
@@ -638,8 +633,8 @@ pub fn send_message(state: &RcState, sender: PID, pid: Term, msg: Term) -> Resul
     Ok(msg)
 }
 
-pub fn send_signal(state: &RcState, pid: PID, signal: Signal) -> bool {
-    if let Some(receiver) = state.process_table.lock().get(pid) {
+pub fn send_signal(vm: &Machine, pid: PID, signal: Signal) -> bool {
+    if let Some(receiver) = vm.process_table.lock().get(pid) {
         receiver.send_signal(signal);
         return true;
     }

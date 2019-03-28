@@ -351,7 +351,7 @@ fn bif_erlang_spawn_3(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
     let module = registry.lookup(module).unwrap();
     // TODO: avoid the clone here since we copy later
     process::spawn(
-        &vm.state,
+        vm,
         process,
         module,
         func,
@@ -382,7 +382,7 @@ fn bif_erlang_spawn_link_3(vm: &vm::Machine, process: &Pin<&mut Process>, args: 
     let module = registry.lookup(module).unwrap();
     // TODO: avoid the clone here since we copy later
     process::spawn(
-        &vm.state,
+        vm,
         process,
         module,
         func,
@@ -443,7 +443,7 @@ fn bif_erlang_spawn_opt_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &
     let registry = vm.modules.lock();
     let module = registry.lookup(module).unwrap();
     // TODO: avoid the clone here since we copy later
-    process::spawn(&vm.state, process, module, func, arglist, flag)
+    process::spawn(vm, process, module, func, arglist, flag)
 }
 
 fn bif_erlang_link_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
@@ -457,7 +457,7 @@ fn bif_erlang_link_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
 
             {
                 // scope the process_table lock
-                if !vm.state.process_table.lock().contains_key(pid) {
+                if !vm.process_table.lock().contains_key(pid) {
                     // if pid doesn't exist fail with noproc
                     if process
                         .local_data()
@@ -470,7 +470,7 @@ fn bif_erlang_link_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
                         let heap = &process.context_mut().heap;
                         let from = Term::pid(process.pid);
                         process::send_message(
-                            &vm.state,
+                            vm,
                             process.pid,
                             from,
                             tup3!(heap, atom!(EXIT), from, atom!(NOPROC)),
@@ -484,7 +484,7 @@ fn bif_erlang_link_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
             process.local_data_mut().links.insert(pid);
 
             // send LINK signal to the other process return true
-            process::send_signal(&vm.state, pid, process::Signal::Link { from: process.pid });
+            process::send_signal(vm, pid, process::Signal::Link { from: process.pid });
             // TODO do we need to check the return value here? ^^
             Ok(atom!(TRUE))
         }
@@ -503,7 +503,7 @@ fn bif_erlang_unlink_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Te
 
             // send LINK signal to the other process return true
             process::send_signal(
-                &vm.state,
+                vm,
                 pid,
                 process::Signal::Unlink { from: process.pid },
             );
@@ -517,7 +517,7 @@ fn bif_erlang_unlink_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Te
 fn bif_erlang_monitor_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
     // arg[0] = pid/port
     let heap = &process.context_mut().heap;
-    let reference = vm.state.next_ref();
+    let reference = vm.next_ref();
     let ref_term = Term::reference(heap, reference);
     // TODO: this will still alloc on badarg ^
 
@@ -531,7 +531,7 @@ fn bif_erlang_monitor_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[T
                     pid
                 }
                 Variant::Atom(name) => {
-                    if let Some(process) = vm.state.process_registry.lock().whereis(name) {
+                    if let Some(process) = vm.process_registry.lock().whereis(name) {
                         process.pid
                     } else {
                         println!("registered name {} not found!", args[1]);
@@ -549,7 +549,7 @@ fn bif_erlang_monitor_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[T
 
             // send MONITOR signal to the other process return true
             let sent = process::send_signal(
-                &vm.state,
+                vm,
                 pid,
                 process::Signal::Monitor {
                     from: process.pid,
@@ -559,7 +559,7 @@ fn bif_erlang_monitor_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[T
 
             if !sent {
                 process::send_signal(
-                    &vm.state,
+                    vm,
                     process.pid,
                     process::Signal::MonitorDown {
                         from: process.pid,
@@ -590,7 +590,7 @@ fn demonitor(
         if let Some(pid) = process.local_data_mut().monitors.remove(&reference) {
             // send DEMONITOR signal to the other process return true
             process::send_signal(
-                &vm.state,
+                vm,
                 pid,
                 process::Signal::Demonitor {
                     from: process.pid,
@@ -662,7 +662,28 @@ fn bif_erlang_send_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
     // args: dest <term (pid/atom)>, msg <term>
     let pid = args[0];
     let msg = args[1];
-    process::send_message(&vm.state, process.pid, pid, msg)
+
+    match pid.into_variant() {
+        Variant::Port(id) => {
+            let res = vm.port_table.read().lookup(id).map(|port| port.chan.clone());
+            if let Some(mut chan) = res {
+                // TODO: error unhandled
+                use futures::sink::SinkExt as FuturesSinkExt;
+                let bytes = msg.to_bytes().unwrap().to_owned();
+                // let fut = chan
+                //     .send(port::Signal::Command(bytes))
+                //     .map_err(|_| ())
+                //     .boxed()
+                //     .compat();
+                tokio::spawn_async(async move { await!(chan.send(port::Signal::Command(bytes))); });
+            } else {
+                // TODO: handle errors properly
+                println!("NOTFOUND");
+            }
+            Ok(msg)
+        }
+        _ => process::send_message(vm, process.pid, pid, msg),
+    }
 }
 
 pub fn bif_erlang_is_atom_1(
@@ -846,7 +867,7 @@ fn bif_erlang_exit_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
     match args[0].into_variant() {
         Variant::Pid(pid) => {
             process::send_signal(
-                &vm.state,
+                vm,
                 pid,
                 // TODO: deep copy reason
                 process::Signal::Exit {
@@ -914,7 +935,7 @@ fn bif_erlang_raise_3(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Te
 fn bif_erlang_whereis_1(vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> Result {
     /* (Atom, Pid|Port)   */
     if let Variant::Atom(name) = args[0].into_variant() {
-        if let Some(process) = vm.state.process_registry.lock().whereis(name) {
+        if let Some(process) = vm.process_registry.lock().whereis(name) {
             return Ok(Term::pid(process.pid));
         }
         return Ok(atom!(UNDEFINED));
@@ -1062,8 +1083,8 @@ fn bif_erlang_register_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[
     /* (Atom, Pid|Port)   */
     if let Variant::Atom(name) = args[0].into_variant() {
         // need to lookup first to get a Pin<Arc<>>
-        let arc = vm.state.process_table.lock().get(process.pid).unwrap();
-        vm.state.process_registry.lock().register(name, arc);
+        let arc = vm.process_table.lock().get(process.pid).unwrap();
+        vm.process_registry.lock().register(name, arc);
 
         process.local_data_mut().name = Some(name);
         return Ok(atom!(TRUE));
@@ -1079,7 +1100,7 @@ fn bif_erlang_unregister_1(
 ) -> Result {
     /* (Atom, Pid|Port)   */
     if let Variant::Atom(name) = args[0].into_variant() {
-        let res = vm.state.process_registry.lock().unregister(name);
+        let res = vm.process_registry.lock().unregister(name);
 
         return Ok(Term::boolean(res.is_some()));
     }
@@ -1163,7 +1184,7 @@ fn monitor_nodes(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) 
 
 fn open_port_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
     println!("open_port called with {}, {}", args[0], args[1]);
-    let pid = port::spawn(&vm.state, process.pid, args[0], args[1])?;
+    let pid = port::spawn(vm, process.pid, args[0], args[1])?;
     Ok(Term::port(pid))
 }
 
@@ -1199,7 +1220,7 @@ mod tests {
     fn test_bif_erlang_is_atom_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::allocate(vm, 0, module).unwrap();
         let process = process::cast(process);
 
         let args = vec![Term::atom(3)];
@@ -1215,7 +1236,7 @@ mod tests {
     fn test_bif_erlang_is_tuple_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::allocate(vm, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
@@ -1232,7 +1253,7 @@ mod tests {
     fn test_bif_erlang_is_list_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::allocate(vm, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
@@ -1248,7 +1269,7 @@ mod tests {
     fn test_bif_erlang_is_float_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::allocate(vm, 0, module).unwrap();
         let process = process::cast(process);
 
         let args = vec![Term::from(3.00)];
@@ -1264,7 +1285,7 @@ mod tests {
     fn test_bif_erlang_is_integer_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::allocate(vm, 0, module).unwrap();
         let process = process::cast(process);
 
         let args = vec![Term::int(3)];
@@ -1280,7 +1301,7 @@ mod tests {
     fn test_bif_erlang_is_number_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::allocate(vm, 0, module).unwrap();
         let process = process::cast(process);
 
         let args = vec![Term::int(3)];
@@ -1305,7 +1326,7 @@ mod tests {
     fn test_bif_erlang_is_port_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::allocate(vm, 0, module).unwrap();
         let process = process::cast(process);
 
         let args = vec![Term::port(80)];
@@ -1321,7 +1342,7 @@ mod tests {
     fn test_bif_erlang_is_reference_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::allocate(vm, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
@@ -1338,7 +1359,7 @@ mod tests {
     fn test_bif_erlang_is_binary_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::allocate(vm, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
@@ -1356,7 +1377,7 @@ mod tests {
     fn test_bif_erlang_is_bitstring_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::allocate(vm, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
@@ -1374,7 +1395,7 @@ mod tests {
     fn test_bif_erlang_is_function_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::allocate(vm, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
@@ -1397,7 +1418,7 @@ mod tests {
     fn test_bif_erlang_is_boolean_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::allocate(vm, 0, module).unwrap();
         let process = process::cast(process);
 
         let args = vec![Term::atom(atom::TRUE)];
@@ -1413,7 +1434,7 @@ mod tests {
     fn test_bif_erlang_is_map_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::allocate(vm, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
@@ -1431,7 +1452,7 @@ mod tests {
     fn test_bif_tuple_size_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::allocate(vm, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
@@ -1445,7 +1466,7 @@ mod tests {
     fn test_bif_map_size_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm.state, 0, module).unwrap();
+        let process = process::allocate(vm, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
