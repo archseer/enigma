@@ -170,7 +170,7 @@ pub fn system_info_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
     match args[0].into_variant() {
         Variant::Atom(atom::OS_TYPE) => Ok(tup2!(heap, Term::atom(OS_FAMILY), atom!(TRUE))), // TODO: true should be :darwin
         Variant::Atom(atom::HIPE_ARCHITECTURE) => Ok(atom!(UNDEFINED)),
-        // TODO: Variant::Atom(atom::SYSTEM_VERSION) => Ok(atom!()),
+        Variant::Atom(atom::SYSTEM_VERSION) => Ok(bitstring!(heap, "Erlang/OTP 21 [erts-10.3.1] [source] [64-bit] [smp:8:8] [ds:8:8:10] [async-threads:1] [enigma]\n")),
         _ => unimplemented!("system_info for {}", args[0]),
     }
 }

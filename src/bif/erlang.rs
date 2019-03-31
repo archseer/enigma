@@ -253,6 +253,60 @@ pub fn list_to_binary_1(
 // TODO iolist_to_binary is the same, input can be a binary (is_binary() true), and we just return
 // it (badarg on bitstring)
 
+pub fn unicode_characters_to_binary_2(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    let mut bytes: Vec<u8> = Vec::new();
+    let heap = &process.context_mut().heap;
+
+    match args[1].into_variant() {
+        Variant::Atom(atom::UNICODE) | Variant::Atom(atom::UTF8) | Variant::Atom(atom::LATIN1) => {
+            ()
+        }
+        _ => unimplemented!(), // only unicode atm
+    }
+
+    // if nil return an empty string
+    if args[0].is_nil() {
+        return Ok(Term::binary(heap, bitstring::Binary::new()));
+    }
+
+    let mut stack = Vec::new();
+    let cons = Cons::try_from(&args[0])?;
+    stack.push(cons.iter());
+
+    // TODO fastpath for if [binary]
+    while let Some(iter) = stack.last_mut() {
+        if let Some(elem) = iter.next() {
+            match elem.into_variant() {
+                Variant::Integer(i @ 0...255) => {
+                    // append int to bytes
+                    bytes.push(i as u8);
+                }
+                Variant::Cons(ptr) => {
+                    // push cons onto stack
+                    let cons = unsafe { &*ptr };
+                    stack.push(cons.iter())
+                }
+                Variant::Pointer(..) => match elem.to_bytes() {
+                    Some(data) => bytes.extend_from_slice(data),
+                    None => return Err(Exception::new(Reason::EXC_BADARG)),
+                },
+                _ => return Err(Exception::new(Reason::EXC_BADARG)),
+            }
+        } else {
+            stack.pop();
+        }
+    }
+
+    // TODO: up to here, equivalent to list_to_binary_1
+    String::from_utf8(bytes)
+        .map(|string| Term::binary(heap, bitstring::Binary::from(string.into_bytes())))
+        .map_err(|_| Exception::new(Reason::EXC_BADARG))
+}
+
 pub fn binary_to_term_1(
     _vm: &vm::Machine,
     process: &Pin<&mut Process>,

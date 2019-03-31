@@ -1,4 +1,5 @@
 use crate::atom;
+use crate::port;
 use crate::bif;
 use crate::bitstring;
 use crate::ets::{RcTableRegistry, TableRegistry};
@@ -841,7 +842,40 @@ impl Machine {
                     let pid = context.x[0]; // TODO can be pid or atom name
                     let msg = context.x[1];
                     // println!("sending from {} to {} msg {}", process.pid, pid, msg);
-                    let res = process::send_message(&self, process.pid, pid, msg)?;
+                    let res = match pid.into_variant() {
+                        Variant::Port(id) => {
+                            let res = self.port_table.read().lookup(id).map(|port| port.chan.clone());
+                            if let Some(mut chan) = res {
+                                // TODO: error unhandled
+                                use futures::sink::SinkExt as FuturesSinkExt;
+                                match Tuple::try_from(&msg) {
+                                    Ok(tup) => {
+                                        match tup[0].into_variant() {
+                                            Variant::Atom(atom::COMMAND) => {
+                                                // TODO: validate tuple len 2
+                                                let bytes = tup[1].to_bytes().unwrap().to_owned();
+                                                // let fut = chan
+                                                //     .send(port::Signal::Command(bytes))
+                                                //     .map_err(|_| ())
+                                                //     .boxed()
+                                                //     .compat();
+                                                // TODO: can probably do without await!, if we make sure we don't need 'static
+                                                println!("sending! {:?}", bytes);
+                                                tokio::spawn_async(async move { await!(chan.send(port::Signal::Command(bytes))); });
+                                            }
+                                            _ => unimplemented!("msg to port {}", msg),
+                                        }
+                                    }
+                                    _ => unimplemented!()
+                                }
+                            } else {
+                                // TODO: handle errors properly
+                                println!("NOTFOUND");
+                            }
+                            Ok(msg)
+                        }
+                        _ => process::send_message(self, process.pid, pid, msg),
+                    }?;
                     context.x[0] = res;
                 }
                 Opcode::RemoveMessage => {

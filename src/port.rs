@@ -1,14 +1,11 @@
 use crate::value::{Term, Variant, Tuple, TryFrom};
-use crate::process::PID;
+use crate::process::{PID, Ref};
 use crate::exception::Exception;
 use crate::atom;
 use crate::vm::Machine;
 
-use crate::servo_arc::Arc;
 use hashbrown::HashMap;
 use parking_lot::{RwLock, Mutex, MutexGuard};
-
-use std::future::Future;
 
 use tokio::await;
 use tokio::prelude::*;
@@ -29,16 +26,16 @@ pub const MAX_ID: ID = std::u32::MAX;
 
 pub struct Port {
     id: ID,
-    parent: PID,
+    owner: PID,
     // chan: mpsc::UnboundedSender<Signal>,
     pub chan: mpsc::UnboundedSender<Signal>,
 }
 
 impl Port {
-    fn new(id: ID, parent: PID, chan: mpsc::UnboundedSender<Signal>) -> Self {
+    fn new(id: ID, owner: PID, chan: mpsc::UnboundedSender<Signal>) -> Self {
         Port {
             id,
-            parent,
+            owner,
             chan
         }
     }
@@ -55,7 +52,13 @@ impl Port {
 
 pub enum Signal {
     Command(Vec<u8>), // TODO: zero-copy passing via slice would be better
-    Control(usize), // usize => a set of constant predefined values
+    Connect(PID), // new_owner
+    Control {
+        from: PID,
+        reference: Ref,
+        opcode: usize,
+        data: Vec<u8>
+    }, // usize => a set of constant predefined values
     Close
 }
 
@@ -73,9 +76,9 @@ impl Table {
         RwLock::new(Table { next_pid: 0, ports: HashMap::new() })
     }
 
-    pub fn insert(&mut self, parent: PID, chan: mpsc::UnboundedSender<Signal>) -> ID {
+    pub fn insert(&mut self, owner: PID, chan: mpsc::UnboundedSender<Signal>) -> ID {
         let pid = self.next_pid();
-        let port = Mutex::new(Port::new(pid, parent, chan));
+        let port = Mutex::new(Port::new(pid, owner, chan));
         self.ports.insert(pid, port);
         pid
     }
@@ -101,38 +104,82 @@ impl Table {
 
 pub fn spawn(
     vm: &Machine,
-    parent: PID,
+    owner: PID,
     args: Term,
     opts: Term
 ) -> Result<ID, Exception> {
     let tup = Tuple::try_from(&args)?;
 
+    // TODO: opts 
+    let (port, input) = mpsc::unbounded::<Signal>();
+
     match tup[0].into_variant() {
         Variant::Atom(atom::SPAWN) => {
             match tup[1].into_variant() {
-                Variant::Atom(atom::TTY_SL) => {
-                    // TODO: opts 
-                    let (port, input) = mpsc::unbounded::<Signal>();
-                    // TODO: put the port (sender) in a ports table
-                    let fut = tty(parent, input);
-                    tokio::spawn_async(fut);
-
-                    let pid = vm.port_table.write().insert(parent, port);
-                    Ok(pid)
-                }
+                Variant::Atom(atom::TTY_SL) => tokio::spawn_async(tty(owner, input)),
+                _ => unimplemented!(),
+            }
+        }
+        Variant::Atom(atom::FD) => {
+            match (tup[1].into_variant(), tup[2].into_variant()) {
+                (Variant::Integer(2), Variant::Integer(2)) => tokio::spawn_async(stderr(owner, input)),
                 _ => unimplemented!()
             }
         }
         _ => unimplemented!()
+    };
+
+    // put the port (sender) in a ports table
+    let pid = vm.port_table.write().insert(owner, port);
+    Ok(pid)
+}
+
+/// Schedules a port operation and returns a ref. When we're done, need to reply to sender with
+/// {ref, data}.
+pub fn control(
+    vm: &Machine,
+    from: PID,
+    port: ID,
+    opcode: usize,
+    msg: Term,
+    ) -> Result<Ref, Exception> {
+    unimplemented!();
+    let res = vm.port_table.read().lookup(port).map(|port| port.chan.clone());
+    if let Some(mut chan) = res {
+        let reference = vm.next_ref();
+
+        // TODO: error unhandled
+        use futures::sink::SinkExt as FuturesSinkExt;
+        let bytes = msg.to_bytes().unwrap().to_owned();
+        // let fut = chan
+        //     .send(port::Signal::Command(bytes))
+        //     .map_err(|_| ())
+        //     .boxed()
+        //     .compat();
+        //     TODO: can probably do without await!, if we make sure we don't need 'static
+        tokio::spawn_async(async move {
+            await!(chan.send(Signal::Control {
+                from,
+                reference,
+                opcode,
+                data: bytes,
+            }));
+        });
+
+        Ok(reference)
+    } else {
+        // TODO: handle errors properly
+        println!("NOTFOUND");
+        Ok(1)
     }
 }
 
 // TODO: needs type async fn
-type Driver = fn(parent: PID, input: mpsc::UnboundedReceiver<Signal>); 
+type Driver = fn(owner: PID, input: mpsc::UnboundedReceiver<Signal>); 
 
 /// Port driver implementations.
 
-async fn tty(parent: PID, mut input: mpsc::UnboundedReceiver<Signal>) {
+async fn tty(owner: PID, mut input: mpsc::UnboundedReceiver<Signal>) {
     let mut buf = [0;1];
     let mut stdin = tokio::io::stdin();
     let mut input = input.fuse();
@@ -144,39 +191,50 @@ async fn tty(parent: PID, mut input: mpsc::UnboundedReceiver<Signal>) {
         select! {
             msg = input.next() => {
                 // process command
-                // match msg {
-                    // input says {command, write}, so write
+                match msg {
+                    // * Port ! {Owner, {command, Data}}
+                    Some(Signal::Command(bytes)) => {
+                        println!("Received command {:?}", bytes);
+                    }
+                    // * Port ! {Owner, {connect, NewOwner}}
+                    Some(Signal::Connect(_new_owner)) => {
+                        unimplemented!()
+                    },
+                    // * Port ! {Owner, close}
+                    Some(Signal::Close) => {
+                        break;
+                        // TODO: any cleanup etc?
+                    },
+
                     // port_control stuff (op_get_winsize)
-                    // if :close, break loop
-                // }
-            }
+                    Some(Signal::Control{..}) => {
+                    }
+  
+                    // TODO, drop Signal::Close, just close sender
+                    None => break,
+                }
+            },
             _ = stdin.read_async(&mut buf).fuse() => {
                 println!("read byte! {:?}", buf);
                 // send {port, {:data, <bytes>}} back
-            }
+            },
         }
     }
     ()
 }
 
-// async fn stderr(parent: PID, mut input: mpsc::UnboundedReceiver<Signal>) {
-//     let mut buf = [0;1];
-//     let mut stderr = tokio::io::stderr();
+async fn stderr(owner: PID, mut input: mpsc::UnboundedReceiver<Signal>) {
+    let mut stderr = tokio::io::stderr();
+    let mut input = input.fuse();
 
-//     loop {
-//         select! {
-//             msg = input.next().fuse() => {
-//                 // process command
-//                 // match msg {
-//                     // input says {command, write}, so write
-//                     // port_control stuff (op_get_winsize)
-//                     // if :close, break loop
-//                 // }
-//             }
-//             _ = stderr.read_async(&mut buf).fuse() => {
-//                 // send {port, {:data, <bytes>}} back
-//             }
-//         }
-//     }
-//     ()
-// }
+    loop {
+        let msg = await!(input.next());
+        // process command
+        // match msg {
+        // input says {command, write}, so write
+        // port_control stuff (op_get_winsize)
+        // if :close, break loop
+        // }
+    }
+    ()
+}

@@ -266,6 +266,10 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "group_leader", 2 => info::group_leader_2,
             "garbage_collect", 1 => garbage_collect_1,
             "open_port", 2 => open_port_2,
+            "port_control", 3 => port_control_3,
+        },
+        "unicode" => {
+            "characters_to_binary", 2 => erlang::unicode_characters_to_binary_2,
         },
         "inet" => {
             // inet_db tries to open a socket to gethostname, stub for now
@@ -669,13 +673,25 @@ fn bif_erlang_send_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
             if let Some(mut chan) = res {
                 // TODO: error unhandled
                 use futures::sink::SinkExt as FuturesSinkExt;
-                let bytes = msg.to_bytes().unwrap().to_owned();
-                // let fut = chan
-                //     .send(port::Signal::Command(bytes))
-                //     .map_err(|_| ())
-                //     .boxed()
-                //     .compat();
-                tokio::spawn_async(async move { await!(chan.send(port::Signal::Command(bytes))); });
+                match Tuple::try_from(&msg) {
+                    Ok(tup) => {
+                        match tup[0].into_variant() {
+                            Variant::Atom(atom::COMMAND) => {
+                                // TODO: validate tuple len 2
+                                let bytes = tup[1].to_bytes().unwrap().to_owned();
+                                // let fut = chan
+                                //     .send(port::Signal::Command(bytes))
+                                //     .map_err(|_| ())
+                                //     .boxed()
+                                //     .compat();
+                                // TODO: can probably do without await!, if we make sure we don't need 'static
+                                tokio::spawn_async(async move { await!(chan.send(port::Signal::Command(bytes))); });
+                            }
+                            _ => unimplemented!()
+                        }
+                    }
+                    _ => unimplemented!()
+                }
             } else {
                 // TODO: handle errors properly
                 println!("NOTFOUND");
@@ -855,8 +871,8 @@ fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[T
     Err(Exception::with_value(Reason::EXC_THROWN, args[0]))
 }
 
-fn bif_erlang_exit_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> Result {
-    println!("exiting a proc with {}", args[0]);
+fn bif_erlang_exit_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    println!("exiting proc pid={} with {}", process.pid, args[0]);
     Err(Exception::with_value(Reason::EXC_EXIT, args[0]))
 }
 
@@ -945,10 +961,11 @@ fn bif_erlang_whereis_1(vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[
 
 fn bif_erlang_nif_error_1(
     _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
+    process: &Pin<&mut Process>,
     args: &[Term],
 ) -> Result {
-    println!("Tried running nif, might be missing!!");
+    let (mfa, _) = process.context_mut().ip.lookup_func_info().unwrap();
+    println!("Tried running nif {}, on pid={} might be missing!!", mfa, process.pid);
     Err(Exception::with_value(Reason::EXC_ERROR, args[0]))
 }
 
@@ -1186,6 +1203,20 @@ fn open_port_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> 
     println!("open_port called with {}, {}", args[0], args[1]);
     let pid = port::spawn(vm, process.pid, args[0], args[1])?;
     Ok(Term::port(pid))
+}
+
+fn port_control_3(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    println!("port_control called with {}, {}, {}", args[0], args[1], args[2]);
+    let port = match args[0].into_variant() {
+        Variant::Port(id) => id,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    let opcode = match args[1].into_variant() {
+        Variant::Integer(op) if op > 0 => op as usize,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    let reference = port::control(vm, process.pid, port, opcode, args[2])?;
+    Ok(Term::reference(&process.context_mut().heap, reference))
 }
 
 #[cfg(test)]
