@@ -851,6 +851,7 @@ impl Machine {
                                 match Tuple::try_from(&msg) {
                                     Ok(tup) => {
                                         match tup[0].into_variant() {
+                                            // TODO: some commands are [id | binary]
                                             Variant::Atom(atom::COMMAND) => {
                                                 // TODO: validate tuple len 2
                                                 let bytes = tup[1].to_bytes().unwrap().to_owned();

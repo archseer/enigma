@@ -207,51 +207,107 @@ pub fn list_to_existing_atom_1(
     unimplemented!()
 }
 
+pub fn list_to_iodata(list: Term) -> Result<Vec<u8>, Exception> {
+    let mut bytes: Vec<u8> = Vec::new();
+
+    // if nil return an empty string
+    if list.is_nil() {
+        return Ok(Vec::new());
+    }
+
+    let mut stack = Vec::new();
+    stack.push(list);
+
+    let mut cons: &Cons;
+
+    while let Some(mut elem) = stack.pop() {
+        match elem.into_variant() {
+            Variant::Cons(mut ptr) => {
+                loop {
+                    // tail loop
+                    loop {
+                        // head loop
+                        cons = unsafe { &*ptr };
+                        elem = cons.head;
+
+                        match elem.into_variant() {
+                            Variant::Integer(i @ 0...255) => {
+                                // append int to bytes
+                                bytes.push(i as u8);
+                            }
+                            Variant::Pointer(..) => match elem.to_bytes() {
+                                Some(data) => bytes.extend_from_slice(data),
+                                None => return Err(Exception::new(Reason::EXC_BADARG)),
+                            },
+                            Variant::Cons(p) => {
+                                ptr = p;
+                                stack.push(cons.tail);
+                                continue; // head loop
+                            }
+                            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                        }
+                        break;
+                    }
+
+                    elem = cons.tail;
+
+                    match elem.into_variant() {
+                        Variant::Integer(i @ 0...255) => {
+                            // append int to bytes
+                            bytes.push(i as u8);
+                        }
+                        Variant::Pointer(..) => match elem.to_bytes() {
+                            Some(data) => bytes.extend_from_slice(data),
+                            None => return Err(Exception::new(Reason::EXC_BADARG)),
+                        },
+                        Variant::Nil(..) => {}
+                        Variant::Cons(p) => {
+                            ptr = p;
+                            continue; // tail loop
+                        }
+                        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                    }
+                    break;
+                }
+            }
+            Variant::Pointer(..) => match elem.to_bytes() {
+                Some(data) => bytes.extend_from_slice(data),
+                None => return Err(Exception::new(Reason::EXC_BADARG)),
+            },
+            Variant::Nil(..) => {}
+            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        }
+    }
+
+    Ok(bytes)
+}
+
 pub fn list_to_binary_1(
     _vm: &vm::Machine,
     process: &Pin<&mut Process>,
     args: &[Term],
 ) -> bif::Result {
-    let mut bytes: Vec<u8> = Vec::new();
+    let bytes = list_to_iodata(args[0])?;
+
     let heap = &process.context_mut().heap;
-
-    // if nil return an empty string
-    if args[0].is_nil() {
-        return Ok(Term::binary(heap, bitstring::Binary::new()));
-    }
-
-    let mut stack = Vec::new();
-    let cons = Cons::try_from(&args[0])?;
-    stack.push(cons.iter());
-
-    // TODO fastpath for if [binary]
-    while let Some(iter) = stack.last_mut() {
-        if let Some(elem) = iter.next() {
-            match elem.into_variant() {
-                Variant::Integer(i @ 0...255) => {
-                    // append int to bytes
-                    bytes.push(i as u8);
-                }
-                Variant::Cons(ptr) => {
-                    // push cons onto stack
-                    let cons = unsafe { &*ptr };
-                    stack.push(cons.iter())
-                }
-                Variant::Pointer(..) => match elem.to_bytes() {
-                    Some(data) => bytes.extend_from_slice(data),
-                    None => return Err(Exception::new(Reason::EXC_BADARG)),
-                },
-                _ => return Err(Exception::new(Reason::EXC_BADARG)),
-            }
-        } else {
-            stack.pop();
-        }
-    }
-
     Ok(Term::binary(heap, bitstring::Binary::from(bytes)))
 }
 // TODO iolist_to_binary is the same, input can be a binary (is_binary() true), and we just return
 // it (badarg on bitstring)
+pub fn iolist_to_binary_1(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    if args[0].is_binary() {
+        return Ok(args[0]);
+    }
+
+    let bytes = list_to_iodata(args[0])?;
+
+    let heap = &process.context_mut().heap;
+    Ok(Term::binary(heap, bitstring::Binary::from(bytes)))
+}
 
 pub fn unicode_characters_to_binary_2(
     _vm: &vm::Machine,
@@ -1062,5 +1118,31 @@ mod tests {
         } else {
             panic!();
         }
+    }
+
+    #[test]
+    fn test_list_to_iodata() {
+        let vm = vm::Machine::new();
+        let module: *const module::Module = std::ptr::null();
+        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::cast(process);
+        let heap = &process.context_mut().heap;
+
+        let binary = crate::bitstring::Binary::from(vec![0xAB, 0xCD, 0xEF]);
+        let binary = Term::binary(heap, binary);
+
+        let list = cons!(
+            heap,
+            cons!(
+                heap,
+                cons!(heap, Term::int(1), cons!(heap, Term::int(2), Term::nil())),
+                cons!(heap, Term::int(3), Term::nil())
+            ),
+            binary
+        );
+        // [[1, 2], 3 | <<0xAB, 0xCD, 0xEF>>]
+
+        let res = list_to_iodata(list);
+        assert_eq!(Ok(vec![1, 2, 3, 0xAB, 0xCD, 0xEF]), res)
     }
 }
