@@ -839,7 +839,7 @@ impl Machine {
                 }
                 Opcode::Send => {
                     // send x1 to x0, write result to x0
-                    let pid = context.x[0]; // TODO can be pid or atom name
+                    let pid = context.x[0];
                     let msg = context.x[1];
                     // println!("sending from {} to {} msg {}", process.pid, pid, msg);
                     let res = match pid.into_variant() {

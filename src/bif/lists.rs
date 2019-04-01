@@ -206,7 +206,7 @@ mod tests {
     fn test_member_2() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
@@ -225,7 +225,7 @@ mod tests {
     fn test_keyfind_3() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
