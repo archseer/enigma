@@ -266,6 +266,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
         "erts_internal" => {
             "group_leader", 2 => info::group_leader_2,
             "garbage_collect", 1 => garbage_collect_1,
+            "scheduler_wall_time", 1 => scheduler_wall_time_1,
             "open_port", 2 => open_port_2,
             "port_control", 3 => port_control_3,
         },
@@ -674,21 +675,28 @@ fn bif_erlang_send_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
             if let Some(mut chan) = res {
                 // TODO: error unhandled
                 use futures::sink::SinkExt as FuturesSinkExt;
-                match Tuple::try_from(&msg) {
-                    Ok(tup) => {
-                        match tup[0].into_variant() {
+                use futures::future::{FutureExt, TryFutureExt};
+                let tup = Tuple::try_from(&msg)?;
+                if !tup.len() == 2 || !tup[0].is_pid() {
+                    return Err(Exception::new(Reason::EXC_BADARG));
+                }
+
+                match Tuple::try_from(&tup[1]) {
+                    Ok(cmd) => {
+                        match cmd[0].into_variant() {
+                            // TODO: some commands are [id | binary]
                             Variant::Atom(atom::COMMAND) => {
                                 // TODO: validate tuple len 2
-                                let bytes = tup[1].to_bytes().unwrap().to_owned();
+                                let bytes = self::erlang::list_to_iodata(cmd[1]).unwrap();
                                 // let fut = chan
                                 //     .send(port::Signal::Command(bytes))
                                 //     .map_err(|_| ())
                                 //     .boxed()
                                 //     .compat();
                                 // TODO: can probably do without await!, if we make sure we don't need 'static
-                                tokio::spawn_async(async move { await!(chan.send(port::Signal::Command(bytes))); });
+                                tokio::spawn_async(async move { await!(chan.send(port::Signal::Command(bytes)).compat()); });
                             }
-                            _ => unimplemented!()
+                            _ => unimplemented!("msg to port {}", msg),
                         }
                     }
                     _ => unimplemented!()
@@ -1187,6 +1195,10 @@ pub fn bif_erlang_trunc_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: 
 fn garbage_collect_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
     // TODO: GC unimplemented
     Ok(atom!(TRUE))
+}
+fn scheduler_wall_time_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    // TODO: stats unimplemented
+    Ok(atom!(FALSE))
 }
 fn inet_open_8(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
     // TODO: ports unimplemented

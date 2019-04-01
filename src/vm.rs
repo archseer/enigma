@@ -848,21 +848,26 @@ impl Machine {
                             if let Some(mut chan) = res {
                                 // TODO: error unhandled
                                 use futures::sink::SinkExt as FuturesSinkExt;
-                                match Tuple::try_from(&msg) {
-                                    Ok(tup) => {
-                                        match tup[0].into_variant() {
+                                use futures::future::{FutureExt, TryFutureExt};
+                                let tup = Tuple::try_from(&msg)?;
+                                if !tup.len() == 2 || !tup[0].is_pid() {
+                                    return Err(Exception::new(Reason::EXC_BADARG));
+                                }
+
+                                match Tuple::try_from(&tup[1]) {
+                                    Ok(cmd) => {
+                                        match cmd[0].into_variant() {
                                             // TODO: some commands are [id | binary]
                                             Variant::Atom(atom::COMMAND) => {
                                                 // TODO: validate tuple len 2
-                                                let bytes = tup[1].to_bytes().unwrap().to_owned();
+                                                let bytes = bif::erlang::list_to_iodata(cmd[1]).unwrap();
                                                 // let fut = chan
                                                 //     .send(port::Signal::Command(bytes))
                                                 //     .map_err(|_| ())
                                                 //     .boxed()
                                                 //     .compat();
                                                 // TODO: can probably do without await!, if we make sure we don't need 'static
-                                                println!("sending! {:?}", bytes);
-                                                tokio::spawn_async(async move { await!(chan.send(port::Signal::Command(bytes))); });
+                                                tokio::spawn_async(async move { await!(chan.send(port::Signal::Command(bytes)).compat()); });
                                             }
                                             _ => unimplemented!("msg to port {}", msg),
                                         }
@@ -941,6 +946,15 @@ impl Machine {
                     //       following instruction as the entry point if the timeout triggers.
 
                     use futures::compat::Compat;
+                    use futures::future::{FutureExt, TryFutureExt};
+
+                    if process.context_mut().timeout.is_none() {
+                        // if this is outside of loop_rec, this will be blank
+                        let (trigger, cancel) = futures::channel::oneshot::channel::<()>();
+                        process.context_mut().recv_channel = Some(cancel);
+                        process.context_mut().timeout = Some(trigger);
+                    }
+
                     let cancel = process.context_mut().recv_channel.take().unwrap();
 
                     match context.expand_arg(&ins.args[1]).into_variant() {
@@ -957,14 +971,14 @@ impl Machine {
                             let when = time::Duration::from_millis(ms as u64);
                             use tokio::prelude::FutureExt;
 
-                            match await!(Compat::new(cancel).timeout(when)) {
+                            match await!(cancel.compat().timeout(when)) {
                                 Ok(()) =>  {
                                     // jump to success (start of recv loop)
                                     let label = ins.args[0].to_u32();
                                     op_jump!(context, label);
                                     // println!("select! resumption pid={}", process.pid);
                                 }
-                                Err(_) => {
+                                Err(err) => {
                                     // timeout
                                     // println!("select! delay timeout {} pid={} ms={} m={:?}", ms, process.pid, context.expand_arg(&ins.args[1]), ins.args[1]);
 

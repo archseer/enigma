@@ -298,7 +298,6 @@ impl Process {
     }
 
     pub fn wake_up(&self) {
-        // println!("pid={} waking up!", self.pid);
         // TODO: will require locking
         self.waiting_for_message.store(false, Ordering::Relaxed);
         match self.context_mut().timeout.take() {
