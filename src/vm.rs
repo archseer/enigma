@@ -25,6 +25,7 @@ use std::sync::atomic::AtomicUsize;
 use std::time;
 
 use tokio::await;
+use tokio_threadpool::ThreadPool;
 use tokio::prelude::*;
 
 use futures::future::{self, FutureExt};
@@ -50,6 +51,7 @@ pub struct Machine {
     pub next_ref: AtomicUsize,
 
     // pub exit:
+    pub process_pool: ThreadPool,
 
     // env config, arguments, panic handler
 
@@ -75,7 +77,7 @@ impl Machine {
 use std::future::Future as StdFuture;
 use std::pin::Pin;
 use std::task::{Poll, Waker};
-fn map_ok<T: StdFuture>(future: T) -> impl StdFuture<Output = Result<(), ()>> {
+pub fn map_ok<T: StdFuture>(future: T) -> impl StdFuture<Output = Result<(), ()>> {
     MapOk(future)
 }
 
@@ -646,7 +648,7 @@ impl Machine {
             process_registry: Mutex::new(ProcessRegistry::new()),
             port_table: PortTable::new(),
             start_time: time::Instant::now(),
-
+            process_pool: unsafe { std::mem::uninitialized() }, // I'm sorry, but we need a ref to vm in threadpool
             next_ref: AtomicUsize::new(1),
             exports: ExportsTable::with_rc(),
             modules: ModuleRegistry::with_rc(),
@@ -678,6 +680,12 @@ impl Machine {
             .build()
             .expect("failed to start new Runtime");
 
+        let machine = self.clone();
+        let process_pool = tokio_threadpool::Builder::new().after_start(move || {
+            Machine::set_current(machine.clone());
+        }).build();
+        unsafe { std::ptr::write(&self.process_pool as *const ThreadPool as *mut ThreadPool, process_pool); }
+
         // Spawn the server task
         // let future = async {
         //     println!("Hello");
@@ -690,8 +698,10 @@ impl Machine {
 
         self.start_main_process(&mut runtime, args);
 
+        // TODO: self.process_pool.shutdown_on_idle(); ??
+
         // Wait until the runtime becomes idle and shut it down.
-        runtime.shutdown_on_idle().wait().unwrap();
+        runtime.shutdown_on_idle().wait().unwrap(); // TODO: block_on
     }
 
     fn terminate(&self) {}
@@ -843,43 +853,7 @@ impl Machine {
                     let msg = context.x[1];
                     // println!("sending from {} to {} msg {}", process.pid, pid, msg);
                     let res = match pid.into_variant() {
-                        Variant::Port(id) => {
-                            let res = self.port_table.read().lookup(id).map(|port| port.chan.clone());
-                            if let Some(mut chan) = res {
-                                // TODO: error unhandled
-                                use futures::sink::SinkExt as FuturesSinkExt;
-                                use futures::future::{FutureExt, TryFutureExt};
-                                let tup = Tuple::try_from(&msg)?;
-                                if !tup.len() == 2 || !tup[0].is_pid() {
-                                    return Err(Exception::new(Reason::EXC_BADARG));
-                                }
-
-                                match Tuple::try_from(&tup[1]) {
-                                    Ok(cmd) => {
-                                        match cmd[0].into_variant() {
-                                            // TODO: some commands are [id | binary]
-                                            Variant::Atom(atom::COMMAND) => {
-                                                // TODO: validate tuple len 2
-                                                let bytes = bif::erlang::list_to_iodata(cmd[1]).unwrap();
-                                                // let fut = chan
-                                                //     .send(port::Signal::Command(bytes))
-                                                //     .map_err(|_| ())
-                                                //     .boxed()
-                                                //     .compat();
-                                                // TODO: can probably do without await!, if we make sure we don't need 'static
-                                                tokio::spawn_async(async move { await!(chan.send(port::Signal::Command(bytes)).compat()); });
-                                            }
-                                            _ => unimplemented!("msg to port {}", msg),
-                                        }
-                                    }
-                                    _ => unimplemented!()
-                                }
-                            } else {
-                                // TODO: handle errors properly
-                                println!("NOTFOUND");
-                            }
-                            Ok(msg)
-                        }
+                        Variant::Port(id) => port::send_message(self, process.pid, id, msg),
                         _ => process::send_message(self, process.pid, pid, msg),
                     }?;
                     context.x[0] = res;

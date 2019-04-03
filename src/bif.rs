@@ -356,14 +356,7 @@ fn bif_erlang_spawn_3(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
     let registry = vm.modules.lock();
     let module = registry.lookup(module).unwrap();
     // TODO: avoid the clone here since we copy later
-    process::spawn(
-        vm,
-        process,
-        module,
-        func,
-        arglist,
-        process::SpawnFlag::NONE,
-    )
+    process::spawn(vm, process, module, func, arglist, process::SpawnFlag::NONE)
 }
 
 fn bif_erlang_spawn_link_3(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
@@ -387,14 +380,7 @@ fn bif_erlang_spawn_link_3(vm: &vm::Machine, process: &Pin<&mut Process>, args: 
     let registry = vm.modules.lock();
     let module = registry.lookup(module).unwrap();
     // TODO: avoid the clone here since we copy later
-    process::spawn(
-        vm,
-        process,
-        module,
-        func,
-        arglist,
-        process::SpawnFlag::LINK,
-    )
+    process::spawn(vm, process, module, func, arglist, process::SpawnFlag::LINK)
 }
 
 fn bif_erlang_spawn_opt_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
@@ -508,11 +494,7 @@ fn bif_erlang_unlink_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Te
             process.local_data_mut().links.remove(&pid);
 
             // send LINK signal to the other process return true
-            process::send_signal(
-                vm,
-                pid,
-                process::Signal::Unlink { from: process.pid },
-            );
+            process::send_signal(vm, pid, process::Signal::Unlink { from: process.pid });
             Ok(atom!(TRUE))
         }
         // TODO: port
@@ -670,43 +652,7 @@ fn bif_erlang_send_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
     let msg = args[1];
 
     match pid.into_variant() {
-        Variant::Port(id) => {
-            let res = vm.port_table.read().lookup(id).map(|port| port.chan.clone());
-            if let Some(mut chan) = res {
-                // TODO: error unhandled
-                use futures::sink::SinkExt as FuturesSinkExt;
-                use futures::future::{FutureExt, TryFutureExt};
-                let tup = Tuple::try_from(&msg)?;
-                if !tup.len() == 2 || !tup[0].is_pid() {
-                    return Err(Exception::new(Reason::EXC_BADARG));
-                }
-
-                match Tuple::try_from(&tup[1]) {
-                    Ok(cmd) => {
-                        match cmd[0].into_variant() {
-                            // TODO: some commands are [id | binary]
-                            Variant::Atom(atom::COMMAND) => {
-                                // TODO: validate tuple len 2
-                                let bytes = self::erlang::list_to_iodata(cmd[1]).unwrap();
-                                // let fut = chan
-                                //     .send(port::Signal::Command(bytes))
-                                //     .map_err(|_| ())
-                                //     .boxed()
-                                //     .compat();
-                                // TODO: can probably do without await!, if we make sure we don't need 'static
-                                tokio::spawn_async(async move { await!(chan.send(port::Signal::Command(bytes)).compat()); });
-                            }
-                            _ => unimplemented!("msg to port {}", msg),
-                        }
-                    }
-                    _ => unimplemented!()
-                }
-            } else {
-                // TODO: handle errors properly
-                println!("NOTFOUND");
-            }
-            Ok(msg)
-        }
+        Variant::Port(id) => port::send_message(vm, process.pid, id, msg),
         _ => process::send_message(vm, process.pid, pid, msg),
     }
 }
@@ -968,13 +914,12 @@ fn bif_erlang_whereis_1(vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
-fn bif_erlang_nif_error_1(
-    _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
-) -> Result {
+fn bif_erlang_nif_error_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
     let (mfa, _) = process.context_mut().ip.lookup_func_info().unwrap();
-    println!("Tried running nif {}, on pid={} might be missing!!", mfa, process.pid);
+    println!(
+        "Tried running nif {}, on pid={} might be missing!!",
+        mfa, process.pid
+    );
     Err(Exception::with_value(Reason::EXC_ERROR, args[0]))
 }
 
@@ -1219,7 +1164,10 @@ fn open_port_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> 
 }
 
 fn port_control_3(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
-    println!("port_control called with {}, {}, {}", args[0], args[1], args[2]);
+    println!(
+        "port_control called with {}, {}, {}",
+        args[0], args[1], args[2]
+    );
     let port = match args[0].into_variant() {
         Variant::Port(id) => id,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),

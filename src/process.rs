@@ -602,8 +602,10 @@ pub fn spawn(
 
     let new_proc = self::cast(new_proc);
 
+    use tokio_async_await::compat::backward;
     let future = crate::vm::run_with_error_handling(new_proc);
-    tokio::spawn_async(future);
+    let future = backward::Compat::new(crate::vm::map_ok(future));
+    vm.process_pool.spawn(future);
 
     Ok(ret)
 }

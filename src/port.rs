@@ -1,6 +1,6 @@
 use crate::value::{Term, Variant, Tuple, TryFrom};
 use crate::process::{PID, Ref};
-use crate::exception::Exception;
+use crate::exception::{Exception, Reason};
 use crate::atom;
 use crate::vm::Machine;
 
@@ -134,6 +134,49 @@ pub fn spawn(
     Ok(pid)
 }
 
+pub fn send_message(
+    vm: &Machine,
+    from: PID,
+    port: ID,
+    msg: Term
+    ) -> Result<Term, Exception> {
+    let res = vm.port_table.read().lookup(port).map(|port| port.chan.clone());
+    if let Some(mut chan) = res {
+        // TODO: error unhandled
+        use futures::sink::SinkExt as FuturesSinkExt;
+        use futures::future::{FutureExt, TryFutureExt};
+        let tup = Tuple::try_from(&msg)?;
+        if !tup.len() == 2 || !tup[0].is_pid() {
+            return Err(Exception::new(Reason::EXC_BADARG));
+        }
+        let mut chan = chan.compat();
+        match Tuple::try_from(&tup[1]) {
+            Ok(cmd) => {
+                match cmd[0].into_variant() {
+                    // TODO: some commands are [id | binary]
+                    Variant::Atom(atom::COMMAND) => {
+                        // TODO: validate tuple len 2
+                        let bytes = crate::bif::erlang::list_to_iodata(cmd[1]).unwrap();
+                        // let fut = chan
+                        //     .send(port::Signal::Command(bytes))
+                        //     .map_err(|_| ())
+                        //     .boxed()
+                        //     .compat();
+                        // TODO: can probably do without await!, if we make sure we don't need 'static
+                        tokio::spawn_async(async move { await!(chan.send(Signal::Command(bytes))); });
+                    }
+                    _ => unimplemented!("msg to port {}", msg),
+                }
+            }
+            _ => unimplemented!()
+        }
+    } else {
+        // TODO: handle errors properly
+        println!("NOTFOUND");
+    }
+    Ok(msg)
+}
+
 /// Schedules a port operation and returns a ref. When we're done, need to reply to sender with
 /// {ref, data}.
 pub fn control(
@@ -180,21 +223,23 @@ type Driver = fn(owner: PID, input: mpsc::UnboundedReceiver<Signal>);
 /// Port driver implementations.
 
 async fn tty(owner: PID, mut input: mpsc::UnboundedReceiver<Signal>) {
-    let mut buf = [0;1];
+    let mut buf = [0;1024];
     let mut stdin = tokio::io::stdin();
     let mut input = input.fuse();
+
+    let mut out = std::io::stdout();
 
     // need to disable echo and canon
 
     loop {
-        println!("Looping!");
         select! {
             msg = input.next() => {
                 // process command
                 match msg {
                     // * Port ! {Owner, {command, Data}}
                     Some(Signal::Command(bytes)) => {
-                        println!("Received command {:?}", bytes);
+                        out.write_all(&bytes).unwrap();
+                        out.flush().unwrap();
                     }
                     // * Port ! {Owner, {connect, NewOwner}}
                     Some(Signal::Connect(_new_owner)) => {
@@ -214,10 +259,14 @@ async fn tty(owner: PID, mut input: mpsc::UnboundedReceiver<Signal>) {
                     None => break,
                 }
             },
-            _ = stdin.read_async(&mut buf).fuse() => {
-                println!("read byte! {:?}", buf);
-                // send {port, {:data, <bytes>}} back
-            },
+            // // TODO: use a larger buffer and check ret val for how many bytes we've read
+            // res = stdin.read_async(&mut buf).fuse() => {
+            //     match res {
+            //         Ok(bytes) => println!("read byte! num {}, {:?}", bytes, &buf[..bytes]),
+            //         Err(err) => panic!(err)
+            //     }
+            //     // send {port, {:data, <bytes>}} back
+            // },
         }
     }
     ()
