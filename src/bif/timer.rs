@@ -1,4 +1,3 @@
-use crate::atom;
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::{self, Process};
@@ -32,7 +31,7 @@ pub fn send_after_3(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]
             Ok(())
         })
         .map_err(|e| panic!("delay errored; err={:?}", e));
-    tokio::spawn(fut);
+    vm.runtime.executor().spawn(fut);
 
     let heap = &process.context_mut().heap;
     let reference = vm.next_ref();

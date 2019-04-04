@@ -183,8 +183,8 @@ pub fn list_to_atom_1(
 /// conditionally convert a list of ascii integers to an atom
 pub fn list_to_existing_atom_1(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
+    _process: &Pin<&mut Process>,
+    _args: &[Term],
 ) -> bif::Result {
     // byte *buf = (byte *) erts_alloc(ERTS_ALC_T_TMP, MAX_ATOM_SZ_LIMIT);
     // Sint written;
@@ -684,7 +684,7 @@ pub fn bnot_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::atom;
+    
     use crate::module;
     use crate::process;
     use crate::value::Cons;

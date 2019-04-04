@@ -786,7 +786,7 @@ pub fn build_stacktrace(process: &Pin<&mut Process>, exc: Term) -> Term {
 fn erts_build_mfa_item(fi: &(MFA, Option<FuncInfo>), heap: &Heap, args: Term) -> Term {
     let mut loc = Term::nil();
 
-    if let Some((file, line)) = fi.1 {
+    if let Some((_file, line)) = fi.1 {
         // let file_term = if file == 0 {
         //     Atom* ap = atom_tab(atom_val(fi.mfa.module));
         //     file_term = buf_to_intlist(&hp, ".erl", 4, NIL);

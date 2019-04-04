@@ -1,7 +1,7 @@
 use crate::value::Term;
 use crate::vm;
 //use crate::servo_arc::Arc;
-use crate::immix::Heap;
+
 use crate::process::{self, Process};
 use hashbrown::HashMap;
 use parking_lot::Mutex;

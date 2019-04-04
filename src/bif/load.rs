@@ -8,7 +8,7 @@ use crate::value::{self, Cons, Term, TryFrom, TryInto, Variant};
 use crate::vm;
 use std::pin::Pin;
 
-pub fn pre_loaded_0(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn pre_loaded_0(_vm: &vm::Machine, process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
     use std::path::Path;
     let heap = &process.context_mut().heap;
 

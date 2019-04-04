@@ -106,7 +106,7 @@ pub fn run(
     // #else
     // #define fail!() goto fail
     // #endif
-    let FAIL_TERM = atom!(EXIT); // The term to set as return when bif fails and do_catch != 0
+    let _FAIL_TERM = atom!(EXIT); // The term to set as return when bif fails and do_catch != 0
     let mut pc = 0;
 
     //*return_flags = 0U;

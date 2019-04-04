@@ -1,11 +1,11 @@
 use libenigma::vm;
 
-use getopts::{Options, ParsingStyle};
+
 use std::env;
 use std::process;
 
 fn run() -> i32 {
-    let args: Vec<String> = env::args().collect();
+    let _args: Vec<String> = env::args().collect();
 
     let vm = vm::Machine::new();
 

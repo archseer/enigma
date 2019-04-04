@@ -91,7 +91,7 @@ pub fn erase_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::immix::Heap;
+    
     use crate::module;
     use crate::process;
 
@@ -120,7 +120,7 @@ mod tests {
 
         // TODO: add a assert helper for lists
         let args = vec![];
-        let res = get_0(&vm, &process, &args);
+        let _res = get_0(&vm, &process, &args);
         // assert_eq!(res, Ok(Term::int(1)));
     }
 }

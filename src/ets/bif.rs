@@ -5,7 +5,7 @@ use crate::process::Process;
 use crate::value;
 use crate::value::{Cons, Term, TryFrom, Tuple, Type, Variant};
 use crate::vm;
-use crate::Itertools;
+
 use std::pin::Pin;
 
 use super::bag::Bag;
@@ -392,7 +392,7 @@ pub fn lookup_element_3(
 }
 
 /// Deletes an entire table.
-pub fn delete_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn delete_1(vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     let table = get_table(vm, args[0])?;
 
     // TODO: set access bits to none to disable access
@@ -497,7 +497,7 @@ struct MpInfo {
 /// For the select functions, analyzes the pattern and determines which
 /// slots should be searched. Also compiles the match program
 fn analyze_pattern(
-    table: &RcTable,
+    _table: &RcTable,
     pattern: Term, /* extra_validator: Fn optional callback */
 ) -> Result<pam::Pattern> {
     // Eterm *ptpl;
@@ -520,7 +520,7 @@ fn analyze_pattern(
 
     // let lists = Vec::with_capacity(num_heads);
 
-    let mut mpi = MpInfo {
+    let _mpi = MpInfo {
         // lists,
         // lists: mpi.dlists,
         // num_lists: 0,
@@ -543,8 +543,8 @@ fn analyze_pattern(
             return Err(new_error(ErrorKind::BadParameter));
         }
 
-        let tpl = ptpl[0];
-        let body = ptpl[2];
+        let _tpl = ptpl[0];
+        let _body = ptpl[2];
         matches.push(ptpl[0]);
         guards.push(ptpl[1]);
         bodies.push(ptpl[2]);

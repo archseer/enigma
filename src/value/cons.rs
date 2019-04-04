@@ -138,7 +138,7 @@ impl Cons {
 /// @return 0 ok,
 ///        -1 type error,
 ///        -2 list too long, only \c len characters written
-pub fn unicode_list_to_buf(list: &Cons, max_len: usize) -> Result<String, exception::Exception> {
+pub fn unicode_list_to_buf(list: &Cons, _max_len: usize) -> Result<String, exception::Exception> {
     // TODO: handle max_len
     list.iter()
         .map(|v| {
@@ -183,7 +183,7 @@ mod tests {
 
     #[test]
     fn test_unicode_list_to_buf() {
-        let heap = Heap::new();
+        let _heap = Heap::new();
 
         // '関数に渡すことで'
         // [38306, 25968, 12395, 28193, 12377, 12371, 12392, 12391]

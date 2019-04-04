@@ -47,7 +47,7 @@ impl InstrPtr {
             if self.ptr < *vec[mid as usize].1 {
                 high = mid;
             } else if self.ptr < *vec[(mid + 1) as usize].1 {
-                let ((f, a), fun_offset) = vec[mid as usize];
+                let ((f, a), _fun_offset) = vec[mid as usize];
                 let mfa = MFA(module.name, *f, *a);
                 let func_info = self.lookup_loc();
                 return Some((mfa, func_info));

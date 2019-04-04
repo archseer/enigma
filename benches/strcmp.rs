@@ -6,7 +6,7 @@ use test::Bencher;
 use libenigma::bitstring;
 use libenigma::bitstring::{Binary, SubBinary};
 use libenigma::servo_arc::Arc;
-use std::mem::replace;
+
 
 #[bench]
 fn bitstring_cmpbits(b: &mut Bencher) {

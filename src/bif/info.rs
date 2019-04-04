@@ -13,7 +13,7 @@ pub fn process_info_aux(
     item: Term,
     always_wrap: bool,
 ) -> bif::Result {
-    use crate::process::{self, Flag};
+    use crate::process::{Flag};
     let heap = &process.context_mut().heap;
 
     // TODO: bump process regs
@@ -183,7 +183,7 @@ pub fn group_leader_0(
     Ok(Term::pid(process.local_data().group_leader))
 }
 
-pub fn group_leader_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn group_leader_2(vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     if !args[0].is_pid() {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
@@ -192,7 +192,7 @@ pub fn group_leader_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
     if !args[1].is_pid() {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
-    let target = args[1].to_u32();
+    let _target = args[1].to_u32();
 
     // TODO optimize for if process.pid == pid
     let proc = {

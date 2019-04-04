@@ -321,7 +321,7 @@ mod tests {
             )
         );
         let args = vec![list];
-        let res = from_list_1(&vm, &process, &args);
+        let _res = from_list_1(&vm, &process, &args);
     }
 
     #[test]
@@ -330,7 +330,7 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, module).unwrap();
         let process = process::cast(process);
-        let heap = &process.context_mut().heap;
+        let _heap = &process.context_mut().heap;
 
         let bad_list = Term::int(1);
         let args = vec![bad_list];

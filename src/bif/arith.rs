@@ -3,7 +3,7 @@ use crate::exception::{Exception, Reason};
 use crate::numeric::division::{FlooredDiv, OverflowingFlooredDiv};
 use crate::numeric::modulo::{Modulo, OverflowingModulo};
 use crate::process::Process;
-use crate::value::{self, Term, TryInto};
+use crate::value::{self, Term};
 use crate::vm;
 use num::bigint::BigInt;
 use std::pin::Pin;
@@ -201,6 +201,7 @@ mod tests {
     use crate::immix::Heap;
     use crate::module;
     use crate::process;
+    use crate::value::TryInto;
 
     /// Converts an erlang list to a value vector.
     fn to_vec(value: Term) -> Vec<Term> {

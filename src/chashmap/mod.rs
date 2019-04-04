@@ -429,7 +429,7 @@ impl<K: PartialEq + Hash, V> Table<K, V> {
             // We'll only transfer the bucket if it is a KV pair.
             if let Bucket::Contains(key, val) = i.into_inner() {
                 // Find a bucket where the KV pair can be inserted.
-                let mut bucket = self.scan_mut_no_lock(&key, |x| match *x {
+                let bucket = self.scan_mut_no_lock(&key, |x| match *x {
                     // Halt on an empty bucket.
                     Bucket::Empty => true,
                     // We'll assume that the rest of the buckets either contains other KV pairs (in

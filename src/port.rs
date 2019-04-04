@@ -7,16 +7,19 @@ use crate::vm::Machine;
 use hashbrown::HashMap;
 use parking_lot::{RwLock, Mutex, MutexGuard};
 
-use tokio::await;
 use tokio::prelude::*;
-use crate::tokio::prelude::SinkExt;
+
 
 use futures::channel::mpsc;
 use futures::select;
-use futures::future::{FutureExt, TryFutureExt};
-use futures::stream::{StreamExt, FusedStream};
-use futures::sink::SinkExt as FuturesSinkExt;
-use futures::compat::Compat;
+use futures::{
+  compat::*,
+  future::{FutureExt, TryFutureExt},
+  io::AsyncWriteExt,
+  stream::StreamExt,
+  sink::SinkExt,
+};
+use futures::io::AsyncReadExt;
 
 /// The type of a PID.
 pub type ID = u32;
@@ -106,7 +109,7 @@ pub fn spawn(
     vm: &Machine,
     owner: PID,
     args: Term,
-    opts: Term
+    _opts: Term
 ) -> Result<ID, Exception> {
     let tup = Tuple::try_from(&args)?;
 
@@ -116,13 +119,13 @@ pub fn spawn(
     match tup[0].into_variant() {
         Variant::Atom(atom::SPAWN) => {
             match tup[1].into_variant() {
-                Variant::Atom(atom::TTY_SL) => tokio::spawn_async(tty(owner, input)),
+                Variant::Atom(atom::TTY_SL) => vm.runtime.executor().spawn(tty(owner, input).unit_error().boxed().compat()),
                 _ => unimplemented!(),
             }
         }
         Variant::Atom(atom::FD) => {
             match (tup[1].into_variant(), tup[2].into_variant()) {
-                (Variant::Integer(2), Variant::Integer(2)) => tokio::spawn_async(stderr(owner, input)),
+                (Variant::Integer(2), Variant::Integer(2)) => vm.runtime.executor().spawn(stderr(owner, input).unit_error().boxed().compat()),
                 _ => unimplemented!()
             }
         }
@@ -136,20 +139,17 @@ pub fn spawn(
 
 pub fn send_message(
     vm: &Machine,
-    from: PID,
+    _from: PID,
     port: ID,
     msg: Term
     ) -> Result<Term, Exception> {
     let res = vm.port_table.read().lookup(port).map(|port| port.chan.clone());
     if let Some(mut chan) = res {
         // TODO: error unhandled
-        use futures::sink::SinkExt as FuturesSinkExt;
-        use futures::future::{FutureExt, TryFutureExt};
         let tup = Tuple::try_from(&msg)?;
         if !tup.len() == 2 || !tup[0].is_pid() {
             return Err(Exception::new(Reason::EXC_BADARG));
         }
-        let mut chan = chan.compat();
         match Tuple::try_from(&tup[1]) {
             Ok(cmd) => {
                 match cmd[0].into_variant() {
@@ -163,7 +163,8 @@ pub fn send_message(
                         //     .boxed()
                         //     .compat();
                         // TODO: can probably do without await!, if we make sure we don't need 'static
-                        tokio::spawn_async(async move { await!(chan.send(Signal::Command(bytes))); });
+                        let future = async move { await!(chan.send(Signal::Command(bytes))); };
+                        vm.runtime.executor().spawn(future.unit_error().boxed().compat());
                     }
                     _ => unimplemented!("msg to port {}", msg),
                 }
@@ -186,7 +187,7 @@ pub fn control(
     opcode: usize,
     msg: Term,
     ) -> Result<Ref, Exception> {
-    unimplemented!();
+    // unimplemented!();
     let res = vm.port_table.read().lookup(port).map(|port| port.chan.clone());
     if let Some(mut chan) = res {
         let reference = vm.next_ref();
@@ -200,14 +201,15 @@ pub fn control(
         //     .boxed()
         //     .compat();
         //     TODO: can probably do without await!, if we make sure we don't need 'static
-        tokio::spawn_async(async move {
+        let future = async move {
             await!(chan.send(Signal::Control {
                 from,
                 reference,
                 opcode,
                 data: bytes,
             }));
-        });
+        };
+        vm.runtime.executor().spawn(future.unit_error().boxed().compat());
 
         Ok(reference)
     } else {
@@ -222,9 +224,9 @@ type Driver = fn(owner: PID, input: mpsc::UnboundedReceiver<Signal>);
 
 /// Port driver implementations.
 
-async fn tty(owner: PID, mut input: mpsc::UnboundedReceiver<Signal>) {
-    let mut buf = [0;1024];
-    let mut stdin = tokio::io::stdin();
+async fn tty(_owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
+    let mut buf: [u8;1024] = [0;1024];
+    let mut stdin = tokio::io::stdin().compat();
     let mut input = input.fuse();
 
     let mut out = std::io::stdout();
@@ -259,25 +261,25 @@ async fn tty(owner: PID, mut input: mpsc::UnboundedReceiver<Signal>) {
                     None => break,
                 }
             },
-            // // TODO: use a larger buffer and check ret val for how many bytes we've read
-            // res = stdin.read_async(&mut buf).fuse() => {
-            //     match res {
-            //         Ok(bytes) => println!("read byte! num {}, {:?}", bytes, &buf[..bytes]),
-            //         Err(err) => panic!(err)
-            //     }
-            //     // send {port, {:data, <bytes>}} back
-            // },
+            // TODO: use a larger buffer and check ret val for how many bytes we've read
+            res = stdin.read(&mut buf).fuse() => {
+                match res {
+                    Ok(bytes) => println!("read byte! num {}, {:?}", bytes, &buf[..bytes]),
+                    Err(err) => panic!(err)
+                }
+                // send {port, {:data, <bytes>}} back
+            },
         }
     }
     ()
 }
 
-async fn stderr(owner: PID, mut input: mpsc::UnboundedReceiver<Signal>) {
-    let mut stderr = tokio::io::stderr();
+async fn stderr(_owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
+    let _stderr = tokio::io::stderr();
     let mut input = input.fuse();
 
     loop {
-        let msg = await!(input.next());
+        let _msg = await!(input.next());
         // process command
         // match msg {
         // input says {command, write}, so write

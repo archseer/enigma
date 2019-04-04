@@ -1137,15 +1137,15 @@ pub fn bif_erlang_trunc_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: 
     }
 }
 
-fn garbage_collect_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+fn garbage_collect_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> Result {
     // TODO: GC unimplemented
     Ok(atom!(TRUE))
 }
-fn scheduler_wall_time_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+fn scheduler_wall_time_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> Result {
     // TODO: stats unimplemented
     Ok(atom!(FALSE))
 }
-fn inet_open_8(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+fn inet_open_8(_vm: &vm::Machine, process: &Pin<&mut Process>, _args: &[Term]) -> Result {
     // TODO: ports unimplemented
     Ok(tup2!(
         &process.context_mut().heap,
@@ -1153,7 +1153,7 @@ fn inet_open_8(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) ->
         atom!(NATIVE)
     ))
 }
-fn monitor_nodes(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+fn monitor_nodes(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> Result {
     Ok(atom!(OK))
 }
 

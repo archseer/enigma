@@ -99,7 +99,7 @@ impl StdError for Error {
 }
 
 impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, _f: &mut fmt::Formatter) -> fmt::Result {
         match *self.0 {
             // ErrorKind::Utf8 {
             //     pos: Some(ref pos),

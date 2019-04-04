@@ -393,7 +393,7 @@ impl Compiler {
                 current_try_label = None;
             }
 
-            let clause_start = self.text.len(); // the "special" test needs it
+            let _clause_start = self.text.len(); // the "special" test needs it
             // TODO, are all these -1 ?
             loop {
                 match t.into_variant() {
@@ -745,8 +745,8 @@ impl Compiler {
     //}
 
     fn array(&mut self, terms: &[Term]) -> DMCRet {
-        let mut all_constant = true;
-        let textpos = self.text.len();
+        let all_constant = true;
+        let _textpos = self.text.len();
         // Uint i;
 
         // We remember where we started to layout code,
@@ -823,7 +823,7 @@ impl Compiler {
         Ok(false)
     }
 
-    fn whole_expression(&mut self, t: Term) -> DMCRet {
+    fn whole_expression(&mut self, _t: Term) -> DMCRet {
         if self.cflags.contains(Flag::DCOMP_TRACE) {
             // Hmmm, convert array to list...
             if self.special {
@@ -942,7 +942,7 @@ impl Compiler {
             return Err(new_error(ErrorKind::Argument { form: "andalso", value: t, reason: "without arguments" }));
         }
         let mut lbl = 0;
-        let mut iter = &mut p.iter();
+        let iter = &mut p.iter();
         let len = iter.len();
         iter.next(); // drop the operator
 

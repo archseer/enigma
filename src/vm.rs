@@ -24,15 +24,17 @@ use std::panic;
 use std::sync::atomic::AtomicUsize;
 use std::time;
 
-use tokio::await;
 use tokio_threadpool::ThreadPool;
 use tokio::prelude::*;
+use futures::{
+  compat::*,
+  future::{FutureExt, TryFutureExt},
+  io::AsyncWriteExt,
+  stream::StreamExt,
+  sink::SinkExt,
+};
+use futures::prelude::*;
 
-use futures::future::{self, FutureExt};
-use futures::select;
-// use futures::stream::{self, StreamExt};
-
-use futures_native_timers::{Delay, Interval};
 
 /// A reference counted State.
 pub type RcMachine = Arc<Machine>;
@@ -52,6 +54,9 @@ pub struct Machine {
 
     // pub exit:
     pub process_pool: ThreadPool,
+    pub runtime: tokio::runtime::Runtime,
+
+    pub exit: futures::channel::oneshot::Sender::<()>,
 
     // env config, arguments, panic handler
 
@@ -649,6 +654,8 @@ impl Machine {
             port_table: PortTable::new(),
             start_time: time::Instant::now(),
             process_pool: unsafe { std::mem::uninitialized() }, // I'm sorry, but we need a ref to vm in threadpool
+            runtime: unsafe { std::mem::uninitialized() }, // I'm sorry, but we need a ref to vm in threadpool
+            exit: unsafe { std::mem::uninitialized() },
             next_ref: AtomicUsize::new(1),
             exports: ExportsTable::with_rc(),
             modules: ModuleRegistry::with_rc(),
@@ -684,24 +691,23 @@ impl Machine {
         let process_pool = tokio_threadpool::Builder::new().after_start(move || {
             Machine::set_current(machine.clone());
         }).build();
+
         unsafe { std::ptr::write(&self.process_pool as *const ThreadPool as *mut ThreadPool, process_pool); }
+        unsafe { std::ptr::write(&self.runtime as *const tokio::runtime::Runtime as *mut tokio::runtime::Runtime, runtime); }
+        let vm = unsafe { &mut *(&**self as *const Machine as *mut Machine) };
 
-        // Spawn the server task
-        // let future = async {
-        //     println!("Hello");
-        // };
-        // use tokio_async_await::compat::backward;
-        // let future = backward::Compat::new(map_ok(future));
-        // use futures::compat::Compat;
-        // let future = Compat::new(future);
-        // runtime.spawn(future);
+        let (tx, rx) = futures::channel::oneshot::channel::<()>();
 
-        self.start_main_process(&mut runtime, args);
+        unsafe { std::ptr::write(&self.exit as *const futures::channel::oneshot::Sender::<()> as *mut futures::channel::oneshot::Sender::<()>, tx); }
 
-        // TODO: self.process_pool.shutdown_on_idle(); ??
+        self.start_main_process(&mut vm.runtime, args);
 
         // Wait until the runtime becomes idle and shut it down.
-        runtime.shutdown_on_idle().wait().unwrap(); // TODO: block_on
+        println!("asd");
+        let res = vm.runtime.block_on(rx.into_future().boxed().compat()).unwrap();
+        println!("res = {:?}",res);
+        // self.process_pool.shutdown_on_idle().wait().unwrap();
+        // runtime.shutdown_now().wait(); // TODO: block_on
     }
 
     fn terminate(&self) {}
@@ -729,12 +735,8 @@ impl Machine {
         /* TEMP */
 
         let process = process::cast(process);
-        // use futures::compat::Compat;
-        // let future = Compat::new(self.run_with_error_handling(process));
-        use tokio_async_await::compat::backward;
         let future = run_with_error_handling(process);
-        let future = backward::Compat::new(map_ok(future));
-        runtime.spawn(future);
+        self.process_pool.spawn(future.unit_error().boxed().compat());
 
         // self.process_pool.schedule(process);
     }
@@ -906,10 +908,10 @@ impl Machine {
 
                     // set wait flag
                     // process.set_waiting_for_message(true);
-                    use futures::compat::Compat;
+
                     // LOCK mailbox on looprec, unlock on wait/waittimeout
                     let cancel = process.context_mut().recv_channel.take().unwrap();
-                    await!(Compat::new(cancel.fuse())); // suspend process
+                    await!(cancel); // suspend process
 
                     // println!("pid={} resumption ", process.pid);
                     process.process_incoming()?;
@@ -918,9 +920,6 @@ impl Machine {
                     // @spec wait_timeout Lable Time
                     // @doc  Sets up a timeout of Time milliseconds and saves the address of the
                     //       following instruction as the entry point if the timeout triggers.
-
-                    use futures::compat::Compat;
-                    use futures::future::{FutureExt, TryFutureExt};
 
                     if process.context_mut().timeout.is_none() {
                         // if this is outside of loop_rec, this will be blank
@@ -938,21 +937,21 @@ impl Machine {
                             let label = ins.args[0].to_u32();
                             op_jump!(context, label);
 
-                            await!(Compat::new(cancel.fuse())); // suspend process
+                            await!(cancel); // suspend process
                             // println!("select! resumption pid={}", process.pid);
                         },
                         Variant::Integer(ms) => {
                             let when = time::Duration::from_millis(ms as u64);
                             use tokio::prelude::FutureExt;
 
-                            match await!(cancel.compat().timeout(when)) {
+                            match await!(cancel.into_future().boxed().compat().timeout(when).compat()) {
                                 Ok(()) =>  {
                                     // jump to success (start of recv loop)
                                     let label = ins.args[0].to_u32();
                                     op_jump!(context, label);
                                     // println!("select! resumption pid={}", process.pid);
                                 }
-                                Err(err) => {
+                                Err(_err) => {
                                     // timeout
                                     // println!("select! delay timeout {} pid={} ms={} m={:?}", ms, process.pid, context.expand_arg(&ins.args[1]), ins.args[1]);
 
@@ -963,9 +962,6 @@ impl Machine {
                                 }
 
                             }
-                            // use futures::compat::Compat;
-                            // use tokio_async_await::compat::backward;
-                            // let future = backward::Compat::new(cancel).fuse();
                             // select! { // suspend process
                             //     _t = future => {
                             //         // jump to success (start of recv loop)
@@ -1686,7 +1682,7 @@ impl Machine {
                     unimplemented!("bs_put_integer")
                 }
                 Opcode::BsPutBinary => {
-                    if let [fail, size, LValue::Literal(unit), _flags, src] = &ins.args[..] {
+                    if let [_fail, size, LValue::Literal(unit), _flags, src] = &ins.args[..] {
                         // TODO: fail label
                         if *unit != 8 {
                             unimplemented!("bs_put_binary unit != 8");
@@ -1710,7 +1706,7 @@ impl Machine {
                 Opcode::BsPutFloat => {
                     // gen_put_float(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
                     // Size can be atom all
-                    if let [fail, size, LValue::Literal(unit), _flags, src] = &ins.args[..] {
+                    if let [_fail, size, LValue::Literal(unit), _flags, src] = &ins.args[..] {
                         // TODO: fail label
                         if *unit != 8 {
                             unimplemented!("bs_put_float unit != 8");
@@ -1769,7 +1765,7 @@ impl Machine {
 
                     // Reserve a slot for the start position.
                     let slots = ins.args[3].to_u32() + 1;
-                    let live = ins.args[2].to_u32();
+                    let _live = ins.args[2].to_u32();
 
                     match header {
                         value::BOXED_MATCHSTATE => {
@@ -1829,7 +1825,7 @@ impl Machine {
                     let header = cxt.get_boxed_header().unwrap();
 
                     // Reserve a slot for the start position.
-                    let live = ins.args[2].to_u32();
+                    let _live = ins.args[2].to_u32();
 
                     match header {
                         value::BOXED_MATCHSTATE => {
@@ -2456,7 +2452,7 @@ impl Machine {
                 Opcode::PutMapAssoc => {
                     debug_assert_eq!(ins.args.len(), 5);
                     // F Map Dst Live Rest=* (atom with module name??)
-                    if let [LValue::Label(fail), map, dest, live, LValue::ExtendedList(list)] =
+                    if let [LValue::Label(_fail), map, dest, _live, LValue::ExtendedList(list)] =
                         &ins.args[..]
                     {
                         let mut map = match context.expand_arg(map).try_into() {
@@ -2524,7 +2520,7 @@ impl Machine {
                     // key tuple (and other optimizations)
                     debug_assert_eq!(ins.args.len(), 5);
                     // F Map Dst Live Rest=* (atom with module name??)
-                    if let [LValue::Label(fail), map, dest, live, LValue::ExtendedList(list)] =
+                    if let [LValue::Label(_fail), map, dest, _live, LValue::ExtendedList(list)] =
                         &ins.args[..]
                     {
                         let mut map = match context.expand_arg(map).try_into() {

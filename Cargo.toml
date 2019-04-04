@@ -18,12 +18,12 @@ name = "enigma"
 test = false
 
 [dependencies]
-tokio = {version = "0.1.17", features = ["async-await-preview"]}
+tokio = "0.1.17"
 # Only needs to be explicitly imported if you want to make use of
 # the machinery to convert promises back and forth between 0.1 and 0.3
 # (which is built into the provided await! macro only otherwise):
-tokio-async-await = "0.1.4"
-futures-preview = {version = "0.3.0-alpha.13", features = ["compat"]}
+# futures-preview = {version = "0.3.0-alpha.13", features = ["compat", "io-compat"]}
+futures-preview = {git = "https://github.com/rust-lang-nursery/futures-rs", features = ["compat", "io-compat"]}
 futures01 = { package = "futures", version = "0.1" }
 nom = "4.1.1"
 num = "0.2.0"
@@ -46,6 +46,7 @@ dirs = "1.0.5"
 owning_ref = "0.4.0"
 futures-native-timers = { git = "https://github.com/tinaun/futures-native-timers" }
 tokio-threadpool = "0.1.13"
+tokio-executor = "0.1.7"
 
 [dev-dependencies]
 quickcheck = "0.8.0"

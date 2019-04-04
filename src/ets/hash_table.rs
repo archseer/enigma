@@ -14,7 +14,7 @@ unsafe impl Sync for HashTable {}
 unsafe impl Send for HashTable {}
 
 impl HashTable {
-    pub fn new(meta: Metadata, process: &Pin<&mut Process>) -> Self {
+    pub fn new(meta: Metadata, _process: &Pin<&mut Process>) -> Self {
         Self {
             meta,
             hashmap: CHashMap::new(),
@@ -33,24 +33,24 @@ impl Table for HashTable {
         &self.meta
     }
 
-    fn first(&self, process: &Pin<&mut Process>) -> Result<Term> {
+    fn first(&self, _process: &Pin<&mut Process>) -> Result<Term> {
         unimplemented!()
     }
 
-    fn next(&self, process: &Pin<&mut Process>, key: Term) -> Result<Term> {
+    fn next(&self, _process: &Pin<&mut Process>, _key: Term) -> Result<Term> {
         unimplemented!()
     }
 
-    fn last(&self, process: &Pin<&mut Process>) -> Result<Term> {
+    fn last(&self, _process: &Pin<&mut Process>) -> Result<Term> {
         unimplemented!()
     }
 
-    fn prev(&self, process: &Pin<&mut Process>, key: Term) -> Result<Term> {
+    fn prev(&self, _process: &Pin<&mut Process>, _key: Term) -> Result<Term> {
         unimplemented!()
     }
 
     // put
-    fn insert(&self, process: &Pin<&mut Process>, value: Term, key_clash_fail: bool) -> Result<()> {
+    fn insert(&self, _process: &Pin<&mut Process>, value: Term, _key_clash_fail: bool) -> Result<()> {
         // TODO deep copy that value
         let value = value.deep_clone(&self.heap);
         let key = get_key(self.meta().keypos, value);
@@ -95,7 +95,7 @@ impl Table for HashTable {
         self.hashmap.contains_key(&key)
     }
 
-    fn update_element(&self, process: &Pin<&mut Process>, key: Term, list: Term) -> Result<Term> {
+    fn update_element(&self, _process: &Pin<&mut Process>, key: Term, list: Term) -> Result<Term> {
         let item = match self.hashmap.get_mut(&key) {
             Some(item) => item,
             None => return Ok(atom!(FALSE)), // return BadKey
@@ -139,15 +139,15 @@ impl Table for HashTable {
     }
 
     // erase  (remove_entry in rust)
-    fn remove(&mut self, key: Term) -> Result<Term> {
+    fn remove(&mut self, _key: Term) -> Result<Term> {
         unimplemented!()
     }
 
-    fn remove_object(&mut self, object: Term) -> Result<Term> {
+    fn remove_object(&mut self, _object: Term) -> Result<Term> {
         unimplemented!()
     }
 
-    fn slot(&self, slot: Term) -> Result<Term> {
+    fn slot(&self, _slot: Term) -> Result<Term> {
         unimplemented!()
     }
 
@@ -166,7 +166,7 @@ impl Table for HashTable {
         process: &Pin<&mut Process>,
         pattern: &pam::Pattern,
         flags: pam::r#match::Flag,
-        reverse: bool,
+        _reverse: bool,
     ) -> Result<Term> {
         let heap = &process.context_mut().heap;
         let res = self
@@ -216,7 +216,7 @@ impl Table for HashTable {
     //     unimplemented!()
     // }
 
-    fn select_count(&self, process: &Pin<&mut Process>, tid: Term, pattern: Term) -> Result<Term> {
+    fn select_count(&self, _process: &Pin<&mut Process>, _tid: Term, _pattern: Term) -> Result<Term> {
         unimplemented!()
     }
 
@@ -226,9 +226,9 @@ impl Table for HashTable {
 
     fn select_replace(
         &mut self,
-        process: &Pin<&mut Process>,
-        tid: Term,
-        pattern: Term,
+        _process: &Pin<&mut Process>,
+        _tid: Term,
+        _pattern: Term,
     ) -> Result<Term> {
         unimplemented!()
     }
@@ -237,12 +237,12 @@ impl Table for HashTable {
     //     unimplemented!()
     // }
 
-    fn take(&mut self, process: &Pin<&mut Process>, key: Term) -> Result<Term> {
+    fn take(&mut self, _process: &Pin<&mut Process>, _key: Term) -> Result<Term> {
         unimplemented!()
     }
 
     /// takes reds, then returns new reds (equal to delete_all)
-    fn clear(&mut self, process: &Pin<&mut Process>, reds: usize) -> Result<usize> {
+    fn clear(&mut self, _process: &Pin<&mut Process>, _reds: usize) -> Result<usize> {
         unimplemented!()
     }
 }

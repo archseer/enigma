@@ -313,7 +313,7 @@ macro_rules! binary_size {
     };
 }
 
-pub fn start_match_2(heap: &Heap, binary: Term, max: u32) -> Option<Term> {
+pub fn start_match_2(heap: &Heap, binary: Term, _max: u32) -> Option<Term> {
     assert!(binary.is_binary());
 
     // TODO: BEAM allocates size on all binary types right after the header so we can grab it
@@ -748,7 +748,7 @@ impl MatchBuffer {
         Some(Term::from(f))
     }
 
-    pub fn get_binary(&mut self, heap: &Heap, num_bits: usize, flags: Flag) -> Option<Term> {
+    pub fn get_binary(&mut self, heap: &Heap, num_bits: usize, _flags: Flag) -> Option<Term> {
         // CHECK_MATCH_BUFFER(mb);
 
         // Reduce the use of none by using Result.
@@ -767,7 +767,7 @@ impl MatchBuffer {
         Some(binary)
     }
 
-    pub fn get_binary_all(&mut self, heap: &Heap, flags: Flag) -> Option<Term> {
+    pub fn get_binary_all(&mut self, heap: &Heap, _flags: Flag) -> Option<Term> {
         // CHECK_MATCH_BUFFER(mb);
 
         let size = self.remaining();
@@ -1171,7 +1171,7 @@ pub fn private_append(
     process: &Pin<&mut Process>,
     binary: Term,
     build_size: Term,
-    unit: usize,
+    _unit: usize,
 ) -> Option<Term> {
     // Check and untag the requested build size.
     // if size < 0 || not smallint

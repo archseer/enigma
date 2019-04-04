@@ -169,7 +169,7 @@ impl<'a> Loader<'a> {
     fn load_attributes(&mut self, chunk: Chunk) {
         // Contains two parts: a proplist of module attributes, encoded as External Term Format,
         // and a compiler info (options and version) encoded similarly.
-        let (_rest, val) = etf::decode(chunk, &self.literal_heap).unwrap();
+        let (_rest, _val) = etf::decode(chunk, &self.literal_heap).unwrap();
     }
 
     fn load_local_fun_table(&mut self, chunk: Chunk) {
@@ -488,7 +488,7 @@ fn decode_lines<'a>(rest: &'a [u8]) -> IResult<&'a [u8], (Vec<FuncInfo>, Vec<&st
     do_parse!(
         rest,
         _flags: be_u32 >> // reserved for future use
-        num_line_instrs: be_u32 >>
+        _num_line_instrs: be_u32 >>
         num_line_items: be_u32 >>
         num_fnames: be_u32 >>
         line_items: call!(decode_line_items, num_line_items) >>
@@ -681,7 +681,7 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], LValue> {
     } else {
         // Bit 4 is 1 means that bits 5-6-7 contain amount of bytes+2 to store
         // the value
-        let mut n_bytes = (b >> 5) + 2;
+        let n_bytes = (b >> 5) + 2;
         if n_bytes == 9 {
             println!("more than 9!");
             //     // bytes=9 means upper 5 bits were set to 1, special case 0b11111xxx

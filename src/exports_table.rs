@@ -62,7 +62,7 @@ mod tests {
 
     #[test]
     fn test_with_rc() {
-        let table = ExportsTable::with_rc();
+        let _table = ExportsTable::with_rc();
     }
 
     #[test]
