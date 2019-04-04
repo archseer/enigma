@@ -24,7 +24,6 @@ use std::panic;
 use std::sync::atomic::AtomicUsize;
 use std::time;
 
-use tokio_threadpool::ThreadPool;
 use tokio::prelude::*;
 use futures::{
   compat::*,
@@ -53,7 +52,7 @@ pub struct Machine {
     pub next_ref: AtomicUsize,
 
     // pub exit:
-    pub process_pool: ThreadPool,
+    pub process_pool: tokio::runtime::Runtime,
     pub runtime: tokio::runtime::Runtime,
 
     pub exit: futures::channel::oneshot::Sender::<()>,
@@ -688,12 +687,15 @@ impl Machine {
             .expect("failed to start new Runtime");
 
         let machine = self.clone();
-        let process_pool = tokio_threadpool::Builder::new().after_start(move || {
-            Machine::set_current(machine.clone());
-        }).build();
+        let mut process_pool = tokio::runtime::Builder::new()
+            .after_start(move || {
+                Machine::set_current(machine.clone());
+            })
+            .build()
+            .expect("failed to start new Runtime");
 
-        unsafe { std::ptr::write(&self.process_pool as *const ThreadPool as *mut ThreadPool, process_pool); }
         unsafe { std::ptr::write(&self.runtime as *const tokio::runtime::Runtime as *mut tokio::runtime::Runtime, runtime); }
+        unsafe { std::ptr::write(&self.process_pool as *const tokio::runtime::Runtime as *mut tokio::runtime::Runtime, process_pool); }
         let vm = unsafe { &mut *(&**self as *const Machine as *mut Machine) };
 
         let (tx, rx) = futures::channel::oneshot::channel::<()>();
@@ -703,9 +705,7 @@ impl Machine {
         self.start_main_process(&mut vm.runtime, args);
 
         // Wait until the runtime becomes idle and shut it down.
-        println!("asd");
-        let res = vm.runtime.block_on(rx.into_future().boxed().compat()).unwrap();
-        println!("res = {:?}",res);
+        vm.runtime.block_on(rx.into_future().boxed().compat()).unwrap();
         // self.process_pool.shutdown_on_idle().wait().unwrap();
         // runtime.shutdown_now().wait(); // TODO: block_on
     }
@@ -736,7 +736,7 @@ impl Machine {
 
         let process = process::cast(process);
         let future = run_with_error_handling(process);
-        self.process_pool.spawn(future.unit_error().boxed().compat());
+        self.process_pool.executor().spawn(future.unit_error().boxed().compat());
 
         // self.process_pool.schedule(process);
     }

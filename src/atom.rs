@@ -369,6 +369,7 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("latin1");
 
     atoms.register_atom("command");
+    atoms.register_atom("data");
     atoms
 };
 
@@ -626,6 +627,7 @@ pub const UTF8: u32 = 218;
 pub const LATIN1: u32 = 219;
 
 pub const COMMAND: u32 = 220;
+pub const DATA: u32 = 221;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

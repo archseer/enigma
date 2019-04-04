@@ -1,7 +1,9 @@
 use parking_lot::Mutex;
 use std::collections::VecDeque;
 
+use crate::bitstring;
 use crate::exception::Exception;
+use crate::port;
 use crate::process::{Ref, PID};
 use crate::value::Term;
 
@@ -22,6 +24,10 @@ pub enum Signal {
     Message {
         from: PID,
         value: Term,
+    },
+    PortMessage {
+        from: port::ID,
+        value: bitstring::RcBinary,
     },
     Link {
         from: PID,

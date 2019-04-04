@@ -684,7 +684,7 @@ pub fn bnot_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     use crate::module;
     use crate::process;
     use crate::value::Cons;

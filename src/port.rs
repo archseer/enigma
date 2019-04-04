@@ -3,6 +3,7 @@ use crate::process::{PID, Ref};
 use crate::exception::{Exception, Reason};
 use crate::atom;
 use crate::vm::Machine;
+use crate::servo_arc::Arc;
 
 use hashbrown::HashMap;
 use parking_lot::{RwLock, Mutex, MutexGuard};
@@ -115,25 +116,25 @@ pub fn spawn(
 
     // TODO: opts 
     let (port, input) = mpsc::unbounded::<Signal>();
+    // put the port (sender) in a ports table
+    let pid = vm.port_table.write().insert(owner, port);
 
     match tup[0].into_variant() {
         Variant::Atom(atom::SPAWN) => {
             match tup[1].into_variant() {
-                Variant::Atom(atom::TTY_SL) => vm.runtime.executor().spawn(tty(owner, input).unit_error().boxed().compat()),
+                Variant::Atom(atom::TTY_SL) => vm.runtime.executor().spawn(tty(pid, owner, input).unit_error().boxed().compat()),
                 _ => unimplemented!(),
             }
         }
         Variant::Atom(atom::FD) => {
             match (tup[1].into_variant(), tup[2].into_variant()) {
-                (Variant::Integer(2), Variant::Integer(2)) => vm.runtime.executor().spawn(stderr(owner, input).unit_error().boxed().compat()),
+                (Variant::Integer(2), Variant::Integer(2)) => vm.runtime.executor().spawn(stderr(pid, owner, input).unit_error().boxed().compat()),
                 _ => unimplemented!()
             }
         }
         _ => unimplemented!()
     };
 
-    // put the port (sender) in a ports table
-    let pid = vm.port_table.write().insert(owner, port);
     Ok(pid)
 }
 
@@ -224,12 +225,17 @@ type Driver = fn(owner: PID, input: mpsc::UnboundedReceiver<Signal>);
 
 /// Port driver implementations.
 
-async fn tty(_owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
+async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
     let mut buf: [u8;1024] = [0;1024];
-    let mut stdin = tokio::io::stdin().compat();
+    // let mut stdin = tokio::io::stdin().compat();
+    let mut stdin = tokio_stdin_stdout::stdin(0).compat();
     let mut input = input.fuse();
 
     let mut out = std::io::stdout();
+
+    // for raw mode
+    use termion::raw::IntoRawMode;
+    let mut stdout = std::io::stdout().into_raw_mode().unwrap();
 
     // need to disable echo and canon
 
@@ -255,6 +261,7 @@ async fn tty(_owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
 
                     // port_control stuff (op_get_winsize)
                     Some(Signal::Control{..}) => {
+                        unimplemented!("unimplemented control");
                     }
   
                     // TODO, drop Signal::Close, just close sender
@@ -264,7 +271,15 @@ async fn tty(_owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
             // TODO: use a larger buffer and check ret val for how many bytes we've read
             res = stdin.read(&mut buf).fuse() => {
                 match res {
-                    Ok(bytes) => println!("read byte! num {}, {:?}", bytes, &buf[..bytes]),
+                    Ok(bytes) => {
+                        let vm = Machine::current();
+                        // need to return a tuple, but want to avoid heap alloc here..
+                        let bin = Arc::new(crate::bitstring::Binary::from(&buf[..bytes]));
+                        crate::process::send_signal(&vm, owner, crate::process::Signal::PortMessage {
+                            from: id,
+                            value: bin
+                        });
+                    },
                     Err(err) => panic!(err)
                 }
                 // send {port, {:data, <bytes>}} back
@@ -274,18 +289,36 @@ async fn tty(_owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
     ()
 }
 
-async fn stderr(_owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
-    let _stderr = tokio::io::stderr();
+async fn stderr(id: ID, _owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
+    let mut stderr = tokio::io::stderr();
     let mut input = input.fuse();
 
     loop {
-        let _msg = await!(input.next());
-        // process command
-        // match msg {
-        // input says {command, write}, so write
+        match await!(input.next()) {
+            // * Port ! {Owner, {command, Data}}
+            Some(Signal::Command(bytes)) => {
+                stderr.write_all(&bytes).unwrap();
+                stderr.flush().unwrap();
+            }
+            // * Port ! {Owner, {connect, NewOwner}}
+            Some(Signal::Connect(_new_owner)) => {
+                unimplemented!()
+            },
+            // * Port ! {Owner, close}
+            Some(Signal::Close) => {
+                break;
+                // TODO: any cleanup etc?
+            },
+
+            // port_control stuff (op_get_winsize)
+            Some(Signal::Control{..}) => {
+                unimplemented!("unimplemented control");
+            }
+
+            // TODO, drop Signal::Close, just close sender
+            None => break,
+        }
         // port_control stuff (op_get_winsize)
-        // if :close, break loop
-        // }
     }
     ()
 }

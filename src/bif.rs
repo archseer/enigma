@@ -1141,7 +1141,11 @@ fn garbage_collect_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[T
     // TODO: GC unimplemented
     Ok(atom!(TRUE))
 }
-fn scheduler_wall_time_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> Result {
+fn scheduler_wall_time_1(
+    _vm: &vm::Machine,
+    _process: &Pin<&mut Process>,
+    _args: &[Term],
+) -> Result {
     // TODO: stats unimplemented
     Ok(atom!(FALSE))
 }

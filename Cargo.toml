@@ -24,7 +24,7 @@ tokio = "0.1.17"
 # (which is built into the provided await! macro only otherwise):
 # futures-preview = {version = "0.3.0-alpha.13", features = ["compat", "io-compat"]}
 futures-preview = {git = "https://github.com/rust-lang-nursery/futures-rs", features = ["compat", "io-compat"]}
-futures01 = { package = "futures", version = "0.1" }
+# futures01 = { package = "futures", version = "0.1" }
 nom = "4.1.1"
 num = "0.2.0"
 libflate = "0.1"
@@ -47,6 +47,8 @@ owning_ref = "0.4.0"
 futures-native-timers = { git = "https://github.com/tinaun/futures-native-timers" }
 tokio-threadpool = "0.1.13"
 tokio-executor = "0.1.7"
+termion = "1.5.1"
+tokio-stdin-stdout = "0.1.5"
 
 [dev-dependencies]
 quickcheck = "0.8.0"

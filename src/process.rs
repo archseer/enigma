@@ -327,6 +327,16 @@ impl Process {
                 Signal::Message { value, .. } => {
                     self.local_data_mut().mailbox.send(value);
                 }
+                Signal::PortMessage { from, value, .. } => {
+                    // we only get the binary, so construct message on heap
+                    let heap = &self.context_mut().heap;
+                    let binary = Term::from(heap.alloc(value::Boxed {
+                        header: value::BOXED_BINARY,
+                        value: value,
+                    }));
+                    let msg = tup2!(heap, Term::port(from), tup2!(heap, atom!(DATA), binary));
+                    self.local_data_mut().mailbox.send(msg);
+                }
                 Signal::Exit { .. } => {
                     self.handle_exit_signal(signal)?;
                 }
@@ -605,7 +615,9 @@ pub fn spawn(
     let new_proc = self::cast(new_proc);
 
     let future = crate::vm::run_with_error_handling(new_proc);
-    vm.process_pool.spawn(future.unit_error().boxed().compat());
+    vm.process_pool
+        .executor()
+        .spawn(future.unit_error().boxed().compat());
 
     Ok(ret)
 }
