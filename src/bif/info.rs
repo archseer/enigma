@@ -13,7 +13,7 @@ pub fn process_info_aux(
     item: Term,
     always_wrap: bool,
 ) -> bif::Result {
-    use crate::process::{Flag};
+    use crate::process::Flag;
     let heap = &process.context_mut().heap;
 
     // TODO: bump process regs
