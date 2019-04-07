@@ -1097,7 +1097,10 @@ impl std::fmt::Display for Variant {
                         write!(f, "}}")
                     }
                     BOXED_BIGINT => write!(f, "#BigInt<>"),
-                    BOXED_CLOSURE => write!(f, "#Fun<>"),
+                    BOXED_CLOSURE => {
+                        let ptr = &*(*ptr as *const Boxed<Closure>);
+                        write!(f, "#Fun<{}>", ptr.value.mfa)
+                    }
                     BOXED_CP => {
                         let ptr = &*(*ptr as *const Boxed<Option<InstrPtr>>);
                         write!(f, "CP<{:?}>", ptr.value)

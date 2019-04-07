@@ -308,7 +308,10 @@ pub fn handle_error(
     process: &Pin<&mut Process>,
     mut exc: Exception, /*, bif_mfa: &MFA*/
 ) -> Option<InstrPtr> {
-    println!("handling error... proc pid={}", process.pid);
+    println!(
+        "handling error... proc pid={} exc={}",
+        process.pid, exc.value
+    );
     let heap = &process.context_mut().heap;
     let args = Term::atom(atom::TRUE);
 

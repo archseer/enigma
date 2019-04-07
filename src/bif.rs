@@ -107,6 +107,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "tuple_size", 1 => bif_erlang_tuple_size_1,
             "byte_size", 1 => bif_erlang_byte_size_1,
             "map_size", 1 => bif_erlang_map_size_1,
+            //"iolist_size", 1 => erlang::iolist_size_1,
             "length", 1 => bif_erlang_length_1,
             "error", 1 => bif_erlang_error_1,
             "error", 2 => bif_erlang_error_2,
@@ -269,13 +270,24 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "scheduler_wall_time", 1 => scheduler_wall_time_1,
             "open_port", 2 => open_port_2,
             "port_control", 3 => port_control_3,
+            "spawn_system_process", 3 => bif_erlang_spawn_3, // TODO: aliased to normal spawn for now
         },
         "unicode" => {
             "characters_to_binary", 2 => erlang::unicode_characters_to_binary_2,
+            "characters_to_list", 2 => erlang::unicode_characters_to_list_2,
+        },
+        "io" => {
+            "printable_range", 0 => io_printable_range_0,
         },
         "inet" => {
             // inet_db tries to open a socket to gethostname, stub for now
             "open", 8 => inet_open_8,
+        },
+        "socket" => {
+            "on_load", 0 => socket_on_load_0,
+        },
+        "net" => {
+            "on_load", 0 => socket_on_load_0,
         },
         "net_kernel" => {
             // monitor nodes is unimplemented for now
@@ -1137,6 +1149,10 @@ pub fn bif_erlang_trunc_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: 
     }
 }
 
+fn io_printable_range_0(_vm: &vm::Machine, process: &Pin<&mut Process>, _args: &[Term]) -> Result {
+    Ok(atom!(LATIN1))
+}
+
 fn garbage_collect_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> Result {
     // TODO: GC unimplemented
     Ok(atom!(TRUE))
@@ -1156,6 +1172,10 @@ fn inet_open_8(_vm: &vm::Machine, process: &Pin<&mut Process>, _args: &[Term]) -
         atom!(ERROR),
         atom!(NATIVE)
     ))
+}
+fn socket_on_load_0(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> Result {
+    // stub for now
+    Ok(atom!(OK))
 }
 fn monitor_nodes(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> Result {
     Ok(atom!(OK))

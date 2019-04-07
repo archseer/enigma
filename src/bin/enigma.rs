@@ -1,6 +1,5 @@
 use libenigma::vm;
 
-
 use std::env;
 use std::process;
 
@@ -25,8 +24,13 @@ fn run() -> i32 {
             .to_str()
             .unwrap(),
         "--",
+        "-init_debug",
+        "-kernel",
+        "start_distribution",
+        "false",
+        "-kernel",
+        "logger_level debug",
         // "-kernel shell_history enabled",
-        "-kernel start_distribution false",
     ]
     .iter()
     .map(|s| s.to_string())

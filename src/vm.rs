@@ -625,24 +625,24 @@ macro_rules! safepoint_and_reduce {
 }
 
 pub const PRE_LOADED: &[&str] = &[
-    "examples/preloaded/ebin/erts_code_purger.beam",
-    "examples/preloaded/ebin/erl_init.beam",
-    "examples/preloaded/ebin/init.beam",
-    "examples/preloaded/ebin/prim_buffer.beam",
-    "examples/preloaded/ebin/prim_eval.beam",
-    "examples/preloaded/ebin/prim_inet.beam",
-    "examples/preloaded/ebin/prim_file.beam",
-    "examples/preloaded/ebin/zlib.beam",
-    "examples/preloaded/ebin/prim_zip.beam",
-    "examples/preloaded/ebin/erl_prim_loader.beam",
-    "examples/preloaded/ebin/erlang.beam",
-    "examples/preloaded/ebin/erts_internal.beam",
-    "examples/preloaded/ebin/erl_tracer.beam",
-    "examples/preloaded/ebin/erts_literal_area_collector.beam",
-    "examples/preloaded/ebin/erts_dirty_process_signal_handler.beam",
-    "examples/preloaded/ebin/atomics.beam",
-    "examples/preloaded/ebin/counters.beam",
-    "examples/preloaded/ebin/persistent_term.beam",
+    "otp/erts/preloaded/ebin/erts_code_purger.beam",
+    "otp/erts/preloaded/ebin/erl_init.beam",
+    "otp/erts/preloaded/ebin/init.beam",
+    "otp/erts/preloaded/ebin/prim_buffer.beam",
+    "otp/erts/preloaded/ebin/prim_eval.beam",
+    "otp/erts/preloaded/ebin/prim_inet.beam",
+    "otp/erts/preloaded/ebin/prim_file.beam",
+    "otp/erts/preloaded/ebin/zlib.beam",
+    "otp/erts/preloaded/ebin/prim_zip.beam",
+    "otp/erts/preloaded/ebin/erl_prim_loader.beam",
+    "otp/erts/preloaded/ebin/erlang.beam",
+    "otp/erts/preloaded/ebin/erts_internal.beam",
+    "otp/erts/preloaded/ebin/erl_tracer.beam",
+    "otp/erts/preloaded/ebin/erts_literal_area_collector.beam",
+    "otp/erts/preloaded/ebin/erts_dirty_process_signal_handler.beam",
+    "otp/erts/preloaded/ebin/atomics.beam",
+    "otp/erts/preloaded/ebin/counters.beam",
+    "otp/erts/preloaded/ebin/persistent_term.beam",
 ];
 
 impl Machine {
@@ -1023,19 +1023,12 @@ impl Machine {
                     }
                     safepoint_and_reduce!(self, process, context.reds);
                 }
-                // proc pid=38 reds=1974 mod="erl_parse" offs=2986 ins=CallOnly args=[Literal(7), Integer(2838)]
-
-                // proc pid=38 reds=1961 mod="erl_parse" offs=5604 ins=CallOnly args=[Literal(7), Integer(2620)]
-                // pid=38 action=call mfa=erl_parse:yeccpars2/7
-                // proc pid=38 reds=1960 mod="erl_parse" offs=2621 ins=CallOnly args=[Literal(7), Label(4019)]
-                // pid=38 action=call mfa=erl_parse:yeccpars2_139/7
                 Opcode::CallOnly => {
                     //literal arity, label jmp
                     // store arity as live
                     //
-                    // TODO: has a second arg as Integer???
-                    if let [LValue::Literal(_a), i] = &ins.args[..] {
-                        op_jump!(context, i.to_u32());
+                    if let [LValue::Literal(_a), LValue::Label(l)] = &ins.args[..] {
+                        op_jump!(context, *l);
 
                         // let (mfa, _) = context.ip.lookup_func_info().unwrap();
                         // println!("pid={} action=call_only mfa={}", process.pid, mfa);
@@ -2028,8 +2021,9 @@ impl Machine {
                     {
                         let slot = match ins.args[1] {
                             LValue::Integer(i) => i as usize,
+                            LValue::Literal(i) => i as usize, // TODO: unsure if correct
                             LValue::Atom(atom::START) => 0,
-                            _ => unreachable!(),
+                            _ => unreachable!("{:?}", ins.args[1]),
                         };
                         ms.saved_offsets[slot] = ms.mb.offset;
                     } else {
@@ -2045,6 +2039,7 @@ impl Machine {
                     {
                         let slot = match ins.args[1] {
                             LValue::Integer(i) => i as usize,
+                            LValue::Literal(i) => i as usize,
                             LValue::Atom(atom::START) => 0,
                             _ => unreachable!(),
                         };

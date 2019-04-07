@@ -215,6 +215,10 @@ pub fn list_to_iodata(list: Term) -> Result<Vec<u8>, Exception> {
         return Ok(Vec::new());
     }
 
+    if list.is_binary() {
+        return Ok(list.to_bytes().unwrap().to_owned());
+    }
+
     let mut stack = Vec::new();
     stack.push(list);
 
@@ -361,6 +365,27 @@ pub fn unicode_characters_to_binary_2(
     String::from_utf8(bytes)
         .map(|string| Term::binary(heap, bitstring::Binary::from(string.into_bytes())))
         .map_err(|_| Exception::new(Reason::EXC_BADARG))
+}
+
+pub fn unicode_characters_to_list_2(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    let heap = &process.context_mut().heap;
+
+    match args[1].into_variant() {
+        Variant::Atom(atom::UNICODE) | Variant::Atom(atom::UTF8) | Variant::Atom(atom::LATIN1) => {
+            ()
+        }
+        _ => unimplemented!(), // only unicode atm
+    }
+
+    let bytes = list_to_iodata(args[0])?;
+
+    Ok(bytes.into_iter().fold(Term::nil(), |acc, val| {
+        cons!(heap, Term::int(i32::from(val)), acc)
+    }))
 }
 
 pub fn binary_to_term_1(

@@ -274,6 +274,7 @@ impl<'a> Loader<'a> {
     fn postprocess_raw_code(&mut self) {
         // scan over the Code chunk bits, but we'll need to know bit length of each instruction.
         let (_, code) = scan_instructions(self.code).unwrap();
+
         let mut code_iter = code.into_iter();
 
         while let Some(mut instruction) = code_iter.next() {
@@ -719,7 +720,8 @@ fn compact_term(i: &[u8]) -> IResult<&[u8], LValue> {
     let (rest, b) = be_u8(i)?;
     let tag = b & 0b111;
 
-    if b & 0b0001_1001 == 0b001_1001 {
+    // TODO: need to parse over few bytes, but not bigint too as smallint
+    if b & 0b1111_1001 == 0b1111_1001 {
         // bigint scenario TODO: triple check
         let (rest, val) = read_int(b, rest)?;
         return Ok((rest, val));
