@@ -1066,7 +1066,12 @@ fn bif_erlang_register_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[
     /* (Atom, Pid|Port)   */
     if let Variant::Atom(name) = args[0].into_variant() {
         // need to lookup first to get a Pin<Arc<>>
-        let arc = vm.process_table.lock().get(process.pid).unwrap();
+        let pid = match args[1].into_variant() {
+            Variant::Pid(pid) => pid,
+            Variant::Port(..) => unimplemented!(),
+            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        };
+        let arc = vm.process_table.lock().get(pid).unwrap();
         vm.process_registry.lock().register(name, arc);
 
         process.local_data_mut().name = Some(name);
