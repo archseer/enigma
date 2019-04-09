@@ -59,7 +59,7 @@ pub fn process_info_aux(
         }
         atom::CURRENT_FUNCTION => unimplemented!(),
         atom::CURRENT_LOCATION => unimplemented!(),
-        atom::CURRENT_STACKTRACE => unimplemented!(),
+        atom::CURRENT_STACKTRACE => unimplemented!(), // TODO
         atom::INITIAL_CALL => {
             let call = local_data.initial_call;
             tup3!(
@@ -171,6 +171,7 @@ pub fn system_info_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
         Variant::Atom(atom::OS_TYPE) => Ok(tup2!(heap, Term::atom(OS_FAMILY), atom!(TRUE))), // TODO: true should be :darwin
         Variant::Atom(atom::HIPE_ARCHITECTURE) => Ok(atom!(UNDEFINED)),
         Variant::Atom(atom::SYSTEM_VERSION) => Ok(bitstring!(heap, "Erlang/OTP 21 [erts-10.3.1] [source] [64-bit] [smp:8:8] [ds:8:8:10] [async-threads:1] [enigma]\n")),
+        // thread 'tokio-runtime-worker-7' panicked at 'not yet implemented: system_info for :start_time', src/bif/info.rs:174:14
         _ => unimplemented!("system_info for {}", args[0]),
     }
 }

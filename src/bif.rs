@@ -1053,6 +1053,10 @@ pub fn bif_erlang_process_flag_2(
             local_data.state = flag;
             Ok(old_value)
         }
+        Variant::Atom(atom::MESSAGE_QUEUE_DATA) => {
+            // TODO: unimplemented
+            Ok(atom!(ON_HEAP))
+        }
         Variant::Atom(i) => unimplemented!(
             "erlang:process_flag/2 not implemented for {:?}",
             atom::to_str(i)
