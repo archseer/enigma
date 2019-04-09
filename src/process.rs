@@ -382,7 +382,7 @@ impl Process {
             let reference = Term::reference(heap, reference as usize);
             let reason = reason.value;
 
-            let msg = tup!(heap, atom!(DOWN), reference, atom!(PROCESS), from, reason);
+            let msg = tup!(heap, atom!(DOWN_U), reference, atom!(PROCESS), from, reason);
             self.local_data_mut().mailbox.send(msg);
         // bump reds by 8?
         } else {
@@ -412,7 +412,7 @@ impl Process {
                 // (push to internal msg queue as message)
                 let msg = tup3!(
                     &self.context_mut().heap,
-                    atom!(EXIT),
+                    atom!(EXIT_U),
                     Term::pid(from),
                     reason
                 );

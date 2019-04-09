@@ -370,6 +370,12 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
 
     atoms.register_atom("command");
     atoms.register_atom("data");
+
+
+    atoms.register_atom("DOWN");
+    atoms.register_atom("UP");
+    atoms.register_atom("EXIT");
+
     atoms
 };
 
@@ -628,6 +634,10 @@ pub const LATIN1: u32 = 219;
 
 pub const COMMAND: u32 = 220;
 pub const DATA: u32 = 221;
+
+pub const DOWN_U: u32 = 222;
+pub const UP_U: u32 = 223;
+pub const EXIT_U: u32 = 224;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

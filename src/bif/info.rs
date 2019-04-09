@@ -183,7 +183,11 @@ pub fn group_leader_0(
     Ok(Term::pid(process.local_data().group_leader))
 }
 
-pub fn group_leader_2(vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn group_leader_2(
+    vm: &vm::Machine,
+    _process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
     if !args[0].is_pid() {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
