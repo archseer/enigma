@@ -206,11 +206,10 @@ dependencies = [
  "chashmap 2.2.2 (git+https://gitlab.redox-os.org/redox-os/chashmap)",
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "dirs 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-native-timers 0.1.0 (git+https://github.com/tinaun/futures-native-timers)",
- "futures-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
+ "futures-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
  "getopts 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "hamt-rs 0.3.0 (git+https://github.com/archseer/hamt-rs/?branch=remove-reqs)",
- "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hashbrown 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lexical 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libflate 0.1.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -291,31 +290,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "futures-channel-preview"
 version = "0.3.0-alpha.13"
-source = "git+https://github.com/rust-lang-nursery/futures-rs#dfb7210650e3ea82192c2f88acc8569b6180426d"
+source = "git+https://github.com/taiki-e/futures-rs/?branch=futures_api#c2249c75f4f51e5ed0226f39512fd7b853761c0f"
 dependencies = [
- "futures-core-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
-]
-
-[[package]]
-name = "futures-channel-preview"
-version = "0.3.0-alpha.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "futures-core-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-core-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
 ]
 
 [[package]]
 name = "futures-core-preview"
 version = "0.3.0-alpha.13"
-source = "git+https://github.com/rust-lang-nursery/futures-rs#dfb7210650e3ea82192c2f88acc8569b6180426d"
-dependencies = [
- "either 1.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "futures-core-preview"
-version = "0.3.0-alpha.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/taiki-e/futures-rs/?branch=futures_api#c2249c75f4f51e5ed0226f39512fd7b853761c0f"
 dependencies = [
  "either 1.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -323,24 +306,11 @@ dependencies = [
 [[package]]
 name = "futures-executor-preview"
 version = "0.3.0-alpha.13"
-source = "git+https://github.com/rust-lang-nursery/futures-rs#dfb7210650e3ea82192c2f88acc8569b6180426d"
+source = "git+https://github.com/taiki-e/futures-rs/?branch=futures_api#c2249c75f4f51e5ed0226f39512fd7b853761c0f"
 dependencies = [
- "futures-channel-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
- "futures-core-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
- "futures-util-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
- "num_cpus 1.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "pin-utils 0.1.0-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "futures-executor-preview"
-version = "0.3.0-alpha.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "futures-channel-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-core-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-util-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-channel-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
+ "futures-core-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
+ "futures-util-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
  "num_cpus 1.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pin-utils 0.1.0-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -348,73 +318,29 @@ dependencies = [
 [[package]]
 name = "futures-io-preview"
 version = "0.3.0-alpha.13"
-source = "git+https://github.com/rust-lang-nursery/futures-rs#dfb7210650e3ea82192c2f88acc8569b6180426d"
+source = "git+https://github.com/taiki-e/futures-rs/?branch=futures_api#c2249c75f4f51e5ed0226f39512fd7b853761c0f"
 dependencies = [
- "futures-core-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
+ "futures-core-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
  "iovec 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "futures-io-preview"
-version = "0.3.0-alpha.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "futures-core-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "iovec 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "futures-native-timers"
-version = "0.1.0"
-source = "git+https://github.com/tinaun/futures-native-timers#4f37b8114f661af4a6dbfb2330ffa8295c118b22"
-dependencies = [
- "futures-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
- "pin-utils 0.1.0-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "winapi 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "futures-preview"
 version = "0.3.0-alpha.13"
-source = "git+https://github.com/rust-lang-nursery/futures-rs#dfb7210650e3ea82192c2f88acc8569b6180426d"
+source = "git+https://github.com/taiki-e/futures-rs/?branch=futures_api#c2249c75f4f51e5ed0226f39512fd7b853761c0f"
 dependencies = [
- "futures-channel-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
- "futures-core-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
- "futures-executor-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
- "futures-io-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
- "futures-sink-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
- "futures-util-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
-]
-
-[[package]]
-name = "futures-preview"
-version = "0.3.0-alpha.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "futures-channel-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-core-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-executor-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-io-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-sink-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-util-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-channel-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
+ "futures-core-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
+ "futures-executor-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
+ "futures-io-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
+ "futures-sink-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
+ "futures-util-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
 ]
 
 [[package]]
 name = "futures-select-macro-preview"
 version = "0.3.0-alpha.13"
-source = "git+https://github.com/rust-lang-nursery/futures-rs#dfb7210650e3ea82192c2f88acc8569b6180426d"
-dependencies = [
- "proc-macro-hack 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "proc-macro2 0.4.27 (registry+https://github.com/rust-lang/crates.io-index)",
- "quote 0.6.11 (registry+https://github.com/rust-lang/crates.io-index)",
- "syn 0.15.30 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "futures-select-macro-preview"
-version = "0.3.0-alpha.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/taiki-e/futures-rs/?branch=futures_api#c2249c75f4f51e5ed0226f39512fd7b853761c0f"
 dependencies = [
  "proc-macro-hack 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "proc-macro2 0.4.27 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -425,35 +351,25 @@ dependencies = [
 [[package]]
 name = "futures-sink-preview"
 version = "0.3.0-alpha.13"
-source = "git+https://github.com/rust-lang-nursery/futures-rs#dfb7210650e3ea82192c2f88acc8569b6180426d"
+source = "git+https://github.com/taiki-e/futures-rs/?branch=futures_api#c2249c75f4f51e5ed0226f39512fd7b853761c0f"
 dependencies = [
  "either 1.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-channel-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
- "futures-core-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
-]
-
-[[package]]
-name = "futures-sink-preview"
-version = "0.3.0-alpha.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "either 1.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-channel-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-core-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-channel-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
+ "futures-core-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
 ]
 
 [[package]]
 name = "futures-util-preview"
 version = "0.3.0-alpha.13"
-source = "git+https://github.com/rust-lang-nursery/futures-rs#dfb7210650e3ea82192c2f88acc8569b6180426d"
+source = "git+https://github.com/taiki-e/futures-rs/?branch=futures_api#c2249c75f4f51e5ed0226f39512fd7b853761c0f"
 dependencies = [
  "either 1.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-channel-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
- "futures-core-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
- "futures-io-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
- "futures-select-macro-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
- "futures-sink-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)",
+ "futures-channel-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
+ "futures-core-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
+ "futures-io-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
+ "futures-select-macro-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
+ "futures-sink-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)",
  "pin-utils 0.1.0-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "proc-macro-hack 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "proc-macro-nested 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -461,25 +377,6 @@ dependencies = [
  "rand_core 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "slab 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-io 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "futures-util-preview"
-version = "0.3.0-alpha.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "either 1.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-channel-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-core-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-io-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-select-macro-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-sink-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "pin-utils 0.1.0-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "proc-macro-hack 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "proc-macro-nested 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand_core 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "slab 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -500,12 +397,8 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.1.8"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "byteorder 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "scopeguard 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "iovec"
@@ -1397,26 +1290,17 @@ dependencies = [
 "checksum fuchsia-zircon 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "2e9763c69ebaae630ba35f74888db465e49e259ba1bc0eda7d06f4a067615d82"
 "checksum fuchsia-zircon-sys 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "3dcaa9ae7725d12cdb85b3ad99a434db70b468c09ded17e012d86b5c1010f7a7"
 "checksum futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)" = "62941eff9507c8177d448bd83a44d9b9760856e184081d8cd79ba9f03dd24981"
-"checksum futures-channel-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)" = "<none>"
-"checksum futures-channel-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)" = "d55b12e2746710757f794670bc4e0461097e8873a6d21a48b3f4bf2f5b44053b"
-"checksum futures-core-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)" = "<none>"
-"checksum futures-core-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)" = "0788448b9b2fc2ca1956f735ac7073745486d6729b44dd083e274f710d1268b0"
-"checksum futures-executor-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)" = "<none>"
-"checksum futures-executor-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)" = "cc7d1e0b45afb1c29fa15e90f55608387e7a9f3a9fa49de290262a9dc81a0501"
-"checksum futures-io-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)" = "<none>"
-"checksum futures-io-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)" = "4d9afda895bfc92d256fd66d3c438c8e2a46753b8474658d204df3c2434035a6"
-"checksum futures-native-timers 0.1.0 (git+https://github.com/tinaun/futures-native-timers)" = "<none>"
-"checksum futures-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)" = "<none>"
-"checksum futures-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)" = "7faf4ac82e295643b1562a524004ef41b62e8f2de42d5506f037eaad68abe111"
-"checksum futures-select-macro-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)" = "<none>"
-"checksum futures-select-macro-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)" = "3bd59b75bb2c86cda47c00d71bf520683a6831751648458540db330e25627c91"
-"checksum futures-sink-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)" = "<none>"
-"checksum futures-sink-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)" = "8a9be0748d742f1f5f61a9b65e2de0e815de9c05343cea1ceae74062df3f55fe"
-"checksum futures-util-preview 0.3.0-alpha.13 (git+https://github.com/rust-lang-nursery/futures-rs)" = "<none>"
-"checksum futures-util-preview 0.3.0-alpha.13 (registry+https://github.com/rust-lang/crates.io-index)" = "88b0edcc082d39a3379a96eb670c9b6b28689cd753cc351fb2c0a4739e4a1f97"
+"checksum futures-channel-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)" = "<none>"
+"checksum futures-core-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)" = "<none>"
+"checksum futures-executor-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)" = "<none>"
+"checksum futures-io-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)" = "<none>"
+"checksum futures-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)" = "<none>"
+"checksum futures-select-macro-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)" = "<none>"
+"checksum futures-sink-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)" = "<none>"
+"checksum futures-util-preview 0.3.0-alpha.13 (git+https://github.com/taiki-e/futures-rs/?branch=futures_api)" = "<none>"
 "checksum getopts 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)" = "0a7292d30132fb5424b354f5dc02512a86e4c516fe544bb7a25e7f266951b797"
 "checksum hamt-rs 0.3.0 (git+https://github.com/archseer/hamt-rs/?branch=remove-reqs)" = "<none>"
-"checksum hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)" = "3bae29b6653b3412c2e71e9d486db9f9df5d701941d86683005efb9f2d28e3da"
+"checksum hashbrown 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "58623735fa622916205f9e0a52a031b25b0e251ddaef47f7cb288444c4410beb"
 "checksum iovec 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "dbe6e417e7d0975db6512b90796e8ce223145ac4e33c377e4a42882a0e88bb08"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 "checksum lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bc5729f27f159ddd61f4df6228e827e86643d4d3e7c32183cb30a1c08f604a14"

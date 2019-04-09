@@ -24,6 +24,7 @@ use std::panic;
 use std::sync::atomic::AtomicUsize;
 use std::time;
 
+use std::pin::Pin;
 use tokio::prelude::*;
 use futures::{
   compat::*,
@@ -75,35 +76,6 @@ impl Machine {
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     }
 }
-
-
-/* meh, copied from tokio async/await feature */
-use std::future::Future as StdFuture;
-use std::pin::Pin;
-use std::task::{Poll, Waker};
-pub fn map_ok<T: StdFuture>(future: T) -> impl StdFuture<Output = Result<(), ()>> {
-    MapOk(future)
-}
-
-struct MapOk<T>(T);
-
-impl<T> MapOk<T> {
-    fn future<'a>(self: Pin<&'a mut Self>) -> Pin<&'a mut T> {
-        unsafe { Pin::map_unchecked_mut(self, |x| &mut x.0) }
-    }
-}
-
-impl<T: StdFuture> StdFuture for MapOk<T> {
-    type Output = Result<(), ()>;
-
-    fn poll(self: Pin<&mut Self>, waker: &Waker) -> Poll<Self::Output> {
-        match self.future().poll(waker) {
-            Poll::Ready(_) => Poll::Ready(Ok(())),
-            Poll::Pending => Poll::Pending,
-        }
-    }
-}
-/* meh */
 
 thread_local!(
     static CURRENT: RefCell<Option<Arc<Machine>>> = RefCell::new(None);
@@ -745,7 +717,7 @@ impl Machine {
     /// Executes a single process, terminating in the event of an error.
     pub async fn run_with_error_handling(
         mut process: Pin<&mut process::Process>
-    ) -> () {
+    ) {
 
         // We are using AssertUnwindSafe here so we can pass a &mut Worker to
         // run()/panic(). This might be risky if values captured are not unwind
