@@ -25,15 +25,15 @@ use std::sync::atomic::AtomicUsize;
 use std::time;
 
 use std::pin::Pin;
-use tokio::prelude::*;
+// use tokio::prelude::*;
 use futures::{
   compat::*,
   future::{FutureExt, TryFutureExt},
-  io::AsyncWriteExt,
-  stream::StreamExt,
-  sink::SinkExt,
+  // io::AsyncWriteExt,
+  // stream::StreamExt,
+  // sink::SinkExt,
 };
-use futures::prelude::*;
+// use futures::prelude::*;
 
 
 /// A reference counted State.
@@ -51,6 +51,9 @@ pub struct Machine {
     pub start_time: time::Instant,
 
     pub next_ref: AtomicUsize,
+
+    /// PID pointing to the process handling system-wide logging.
+    pub system_logger: AtomicUsize,
 
     // pub exit:
     pub process_pool: tokio::runtime::Runtime,
@@ -628,6 +631,7 @@ impl Machine {
             runtime: unsafe { std::mem::uninitialized() }, // I'm sorry, but we need a ref to vm in threadpool
             exit: unsafe { std::mem::uninitialized() },
             next_ref: AtomicUsize::new(1),
+            system_logger: AtomicUsize::new(0),
             exports: ExportsTable::with_rc(),
             modules: ModuleRegistry::with_rc(),
             ets_tables: TableRegistry::with_rc(),

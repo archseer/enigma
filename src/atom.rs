@@ -379,6 +379,8 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("on_heap");
     atoms.register_atom("off_heap");
 
+    atoms.register_atom("system_logger");
+
     atoms
 };
 
@@ -644,6 +646,8 @@ pub const EXIT_U: u32 = 224;
 
 pub const ON_HEAP: u32 = 225;
 pub const OFF_HEAP: u32 = 226;
+
+pub const SYSTEM_LOGGER: u32 = 227;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)
