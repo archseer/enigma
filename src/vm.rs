@@ -14,6 +14,7 @@ use crate::process::registry::Registry as ProcessRegistry;
 use crate::process::table::Table as ProcessTable;
 use crate::port::{Table as PortTable, RcTable as RcPortTable};
 use crate::process::{self, RcProcess};
+use crate::persistent_term::{Table as PersistentTermTable};
 use crate::servo_arc::Arc;
 use crate::value::{self, Cons, Term, TryFrom, TryInto, TryIntoMut, Tuple, Variant};
 use std::cell::RefCell;
@@ -71,6 +72,8 @@ pub struct Machine {
     pub modules: RcModuleRegistry,
 
     pub ets_tables: RcTableRegistry,
+
+    pub persistent_terms: PersistentTermTable,
 }
 
 impl Machine {
@@ -635,6 +638,7 @@ impl Machine {
             exports: ExportsTable::with_rc(),
             modules: ModuleRegistry::with_rc(),
             ets_tables: TableRegistry::with_rc(),
+            persistent_terms: PersistentTermTable::new(),
         })
     }
 

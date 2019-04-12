@@ -5,6 +5,7 @@ use crate::ets;
 use crate::exception::{Exception, Reason, StackTrace};
 use crate::loader;
 use crate::module;
+use crate::persistent_term;
 use crate::port;
 use crate::process::{self, Process};
 use crate::value::{self, Cons, Term, TryFrom, TryInto, Tuple, Variant};
@@ -294,6 +295,12 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             // monitor nodes is unimplemented for now
             "monitor_nodes", 1 => monitor_nodes,
             "monitor_nodes", 2 => monitor_nodes,
+        },
+        "persistent_term" => {
+            // monitor nodes is unimplemented for now
+            "get", 1 => persistent_term::bif::get_1,
+            "get", 2 => persistent_term::bif::get_2,
+            "put", 2 => persistent_term::bif::put_2,
         },
     ]
 };

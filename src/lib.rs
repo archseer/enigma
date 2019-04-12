@@ -31,6 +31,7 @@ pub mod module;
 pub mod module_registry;
 mod numeric;
 pub mod opcodes;
+pub mod persistent_term;
 pub mod port;
 pub mod process;
 pub mod servo_arc;
