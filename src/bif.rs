@@ -256,6 +256,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "select_delete", 2 => ets::bif::select_delete_2,
             "update_element", 3 => ets::bif::update_element_3,
             "match", 2 => ets::bif::match_2,
+            "member", 2 => ets::bif::member_2,
         },
         "os" => {
             "list_env_vars", 0 => os::list_env_vars_0,
