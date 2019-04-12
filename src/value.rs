@@ -864,7 +864,11 @@ impl Term {
                         let export = &(*(ptr as *const Boxed<module::MFA>)).value;
                         Term::export(heap, *export)
                     }
-                    _ => unimplemented!("deep_clone for {}", self),
+                    BOXED_REF => {
+                        let reference = &(*(ptr as *const Boxed<process::Ref>)).value;
+                        Term::reference(heap, *reference)
+                    }
+                    _ => unimplemented!("deep_clone for {}", self), // TODO: deep clone for Ref<>
                 }
             },
         }
