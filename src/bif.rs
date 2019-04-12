@@ -102,6 +102,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "is_function", 1 => bif_erlang_is_function_1,
             "is_boolean", 1 => bif_erlang_is_boolean_1,
             "is_map", 1 => bif_erlang_is_map_1,
+            "is_map_key", 2 => bif_erlang_is_map_key_2,
             "hd", 1 => bif_erlang_hd_1,
             "tl", 1 => bif_erlang_tl_1,
             "trunc", 1 => bif_erlang_trunc_1,
@@ -789,6 +790,19 @@ pub fn bif_erlang_is_map_1(
     args: &[Term],
 ) -> Result {
     Ok(Term::boolean(args[0].is_map()))
+}
+
+pub fn bif_erlang_is_map_key_2(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> Result {
+    let key = &args[0];
+    let map = &args[1];
+    if let Ok(value::Map(map)) = map.try_into() {
+        return Ok(Term::boolean(map.find(key).is_some()));
+    }
+    Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
 fn bif_erlang_tuple_size_1(

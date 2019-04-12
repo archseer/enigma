@@ -108,12 +108,18 @@ impl Hash for Term {
                 BOXED_BINARY => {
                     let value = &self.get_boxed_value::<bitstring::RcBinary>().unwrap();
 
+                    BOXED_BINARY.hash(state);
                     value.data.hash(state)
                 }
                 BOXED_TUPLE => {
                     let value = unsafe { &*(p as *const Tuple) };
 
+                    BOXED_TUPLE.hash(state);
                     value.as_slice().hash(state)
+                }
+                BOXED_REF => {
+                    let value = &self.get_boxed_value::<process::Ref>().unwrap();
+                    BOXED_REF.hash(state);
                 }
                 _ => unimplemented!("unimplemented Hash for {}", self),
             },
