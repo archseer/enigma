@@ -11,6 +11,7 @@ use std::pin::Pin;
 use super::bag::Bag;
 use super::error::{new_error, ErrorKind};
 use super::hash_table::HashTable;
+use super::ordered_set::OrderedSet;
 use super::*;
 use super::{pam, Status};
 
@@ -181,7 +182,9 @@ pub fn new_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bi
             Arc::new(Bag::new(meta, process))
         }
         Status::DB_DUPLICATE_BAG => unimplemented!(), // TODO, will be part of hashtable
-        Status::DB_ORDERED_SET => unimplemented!(), // SetTable::new
+        Status::DB_ORDERED_SET => {
+            Arc::new(OrderedSet::new(meta, process))
+        },
         Status::DB_CA_ORDERED_SET => unimplemented!(),
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };

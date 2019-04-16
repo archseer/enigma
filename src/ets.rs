@@ -5,6 +5,7 @@ use crate::vm;
 use crate::process::{self, Process};
 use hashbrown::HashMap;
 use parking_lot::Mutex;
+use std::collections::BTreeMap;
 use std::pin::Pin;
 use std::sync::Arc; // servo_arc doesn't work with trait objects
 
@@ -18,6 +19,7 @@ macro_rules! table_kind {
 pub mod bag;
 pub mod bif;
 pub mod hash_table;
+pub mod ordered_set;
 pub mod pam;
 
 pub mod error;
