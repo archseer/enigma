@@ -868,6 +868,10 @@ impl Term {
                         let reference = &(*(ptr as *const Boxed<process::Ref>)).value;
                         Term::reference(heap, *reference)
                     }
+                    BOXED_BIGINT => {
+                        let bigint = &(*(ptr as *const Boxed<BigInt>)).value;
+                        Term::bigint(heap, bigint.clone())
+                    }
                     _ => unimplemented!("deep_clone for {}", self), // TODO: deep clone for Ref<>
                 }
             },
@@ -1009,12 +1013,33 @@ impl Ord for Variant {
                         // TODO: handle other boxed types
                         // ref, bigint, cp, catch, stacktrace, binary, subbinary
                         // TODO: binary and subbinary need to be compared
-                        _ => unimplemented!(),
+                        BOXED_BIGINT => {
+                            // TODO: bigint with int compare?
+                            let i1 = &(*(*p1 as *const Boxed<BigInt>)).value;
+                            let i2 = &(*(*p2 as *const Boxed<BigInt>)).value;
+                            i1.cmp(i2)
+                        }
+                        _ => unimplemented!("cmp for {}", header),
                     }
                 } else {
                     unimplemented!()
                 }
             },
+            (Variant::Integer(i1), Variant::Pointer(p2)) => unsafe {
+                if **p2 != BOXED_BIGINT {
+                    unreachable!()
+                }
+                let i2 = &(*(*p2 as *const Boxed<BigInt>)).value;
+                BigInt::from(*i1).cmp(i2)
+            },
+            (Variant::Pointer(p1), Variant::Integer(i2)) => unsafe {
+                if **p1 != BOXED_BIGINT {
+                    unreachable!()
+                }
+                let i1 = &(*(*p1 as *const Boxed<BigInt>)).value;
+                i1.cmp(&BigInt::from(*i2))
+            },
+            // int and bigint
             _ => unimplemented!("cmp for {:?} and {:?}", self, other),
         }
     }
@@ -1106,7 +1131,12 @@ impl std::fmt::Display for Variant {
                         }
                         write!(f, "}}")
                     }
-                    BOXED_BIGINT => write!(f, "#BigInt<>"),
+                    BOXED_BIGINT => {
+                        write!(f, "#BigInt<")?;
+                        let ptr = &*(*ptr as *const Boxed<BigInt>);
+                        ptr.value.fmt(f)?;
+                        write!(f, ">")
+                    }
                     BOXED_CLOSURE => {
                         let ptr = &*(*ptr as *const Boxed<Closure>);
                         write!(f, "#Fun<{}>", ptr.value.mfa)
