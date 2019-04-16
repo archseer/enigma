@@ -82,17 +82,14 @@ impl Table for HashTable {
     fn get_element(&self, process: &Pin<&mut Process>, key: Term, index: usize) -> Result<Term> {
         let heap = &process.context_mut().heap;
 
-        Ok(self
-            .hashmap
-            .get(&key)
-            // TODO: deep clone
-            .map(|v| {
-                let tup = Tuple::try_from(&*v).unwrap();
+        match self.hashmap.get(&key) {
+            Some(value) => {
+                let tup = Tuple::try_from(&*value).unwrap();
                 assert!(tup.len() > index);
-                tup[index]
-            })
-            .map(|v| cons!(heap, v.deep_clone(heap), Term::nil()))
-            .unwrap_or_else(|| Term::nil()))
+                Ok(tup[index].deep_clone(heap))
+            }
+            None => Ok(Term::nil()),
+        }
     }
 
     // contains_key ? why is result a Term, not bool
