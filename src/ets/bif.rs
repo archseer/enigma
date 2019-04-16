@@ -491,6 +491,20 @@ pub fn member_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) ->
     Ok(Term::boolean(table.member(args[1])))
 }
 
+pub fn first_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    let table = get_table(vm, args[0])?;
+
+    eprintln!("first_1: {} {}", args[0], table.first(process)?);
+    Ok(table.first(process)?)
+}
+
+pub fn last_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    let table = get_table(vm, args[0])?;
+
+    eprintln!("last_1: {} {}", args[0], table.last(process)?);
+    Ok(table.last(process)?)
+}
+
 struct MpInfo {
     /// The match_spec is not "impossible"
     something_can_match: bool,

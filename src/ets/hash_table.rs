@@ -50,7 +50,12 @@ impl Table for HashTable {
     }
 
     // put
-    fn insert(&self, _process: &Pin<&mut Process>, value: Term, _key_clash_fail: bool) -> Result<()> {
+    fn insert(
+        &self,
+        _process: &Pin<&mut Process>,
+        value: Term,
+        _key_clash_fail: bool,
+    ) -> Result<()> {
         // TODO deep copy that value
         let value = value.deep_clone(&self.heap);
         let key = get_key(self.meta().keypos, value);
@@ -216,7 +221,12 @@ impl Table for HashTable {
     //     unimplemented!()
     // }
 
-    fn select_count(&self, _process: &Pin<&mut Process>, _tid: Term, _pattern: Term) -> Result<Term> {
+    fn select_count(
+        &self,
+        _process: &Pin<&mut Process>,
+        _tid: Term,
+        _pattern: Term,
+    ) -> Result<Term> {
         unimplemented!()
     }
 
