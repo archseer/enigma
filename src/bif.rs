@@ -125,6 +125,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "apply", 3 => bif_erlang_apply_3,
             "register", 2 => bif_erlang_register_2,
             "unregister", 1 => bif_erlang_unregister_1,
+            "is_process_alive", 1 => bif_erlang_is_process_alive_1,
             "function_exported", 3 => bif_erlang_function_exported_3,
             "module_loaded", 1 => bif_erlang_module_loaded_1,
             "process_flag", 2 => bif_erlang_process_flag_2,
@@ -485,6 +486,7 @@ fn bif_erlang_link_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
                         // if trapping exits, fail with exit signal that has reason noproc instead
                         let heap = &process.context_mut().heap;
                         let from = Term::pid(process.pid);
+
                         process::send_message(
                             vm,
                             process.pid,
@@ -1120,6 +1122,20 @@ fn bif_erlang_unregister_1(
         let res = vm.process_registry.lock().unregister(name);
 
         return Ok(Term::boolean(res.is_some()));
+    }
+    Err(Exception::new(Reason::EXC_BADARG))
+}
+
+fn bif_erlang_is_process_alive_1(
+    vm: &vm::Machine,
+    _process: &Pin<&mut Process>,
+    args: &[Term],
+) -> Result {
+    /* (Atom, Pid|Port)   */
+    if let Variant::Pid(pid) = args[0].into_variant() {
+        let res = vm.process_table.lock().contains_key(pid);
+
+        return Ok(Term::boolean(res));
     }
     Err(Exception::new(Reason::EXC_BADARG))
 }
