@@ -962,7 +962,8 @@ impl Machine {
                             //     }
                             // };
                         },
-                        _ => unreachable!()
+                        // TODO: bigint
+                        _ => unreachable!("{}", context.expand_arg(&ins.args[1]))
                     }
                     process.process_incoming()?;
                 }
@@ -2223,7 +2224,9 @@ impl Machine {
                         if res.is_none() {
                             fail!(context, ins.args[0]);
                         }
-                    };
+                    } else {
+                        unreachable!()
+                    }
                 }
                 Opcode::BsSkipUtf16 => {
                     debug_assert_eq!(ins.args.len(), 4);
@@ -2242,7 +2245,9 @@ impl Machine {
                         if res.is_none() {
                             fail!(context, ins.args[0]);
                         }
-                    };
+                    } else {
+                        unreachable!()
+                    }
                 }
                 Opcode::Fclearerror => {
                     debug_assert_eq!(ins.args.len(), 0);
@@ -2441,6 +2446,8 @@ impl Machine {
                             map = map.plus(context.expand_arg(key), context.expand_arg(value))
                         }
                         set_register!(context, dest, Term::map(&context.heap, map))
+                    } else {
+                        unreachable!()
                     }
                 }
                 Opcode::HasMapFields => {
@@ -2455,8 +2462,8 @@ impl Machine {
 
                         // N is a list of the type [key => dest_reg], if any of these fields don't
                         // exist, jump to fail label.
-                        let mut iter = list.chunks_exact(2);
-                        while let Some([key, _dest]) = iter.next() {
+                        let mut iter = list.iter();
+                        while let Some(key) = iter.next() {
                             if map.find(&context.expand_arg(key)).is_some() {
                                 // ok
                             } else {
@@ -2464,6 +2471,8 @@ impl Machine {
                                 break;
                             }
                         }
+                    } else {
+                        unreachable!()
                     }
                 }
                 Opcode::GetMapElements => {
