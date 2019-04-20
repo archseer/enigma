@@ -103,7 +103,10 @@ pub fn process_info_aux(
             // TODO: temporary
             Term::int(512)
         }
-        atom::MEMORY => unimplemented!(),
+        atom::MEMORY => {
+            // TODO: temporary
+            Term::int(1024)
+        }
         atom::GARBAGE_COLLECTION => unimplemented!(),
         atom::GARBAGE_COLLECTION_INFO => unimplemented!(),
         atom::GROUP_LEADER => unimplemented!(),
