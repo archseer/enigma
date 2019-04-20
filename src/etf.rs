@@ -251,10 +251,9 @@ pub fn decode_bignum<'a>(rest: &'a [u8], size: u32, heap: &Heap) -> IResult<&'a 
     let (rest, digits) = take!(rest, size)?;
     let big = BigInt::from_bytes_le(sign, digits);
 
-    // Assert that the number fits into small TODO: double check again
-    if big.bits() < WORD_BITS - 4 {
-        let b_signed = big.to_isize().unwrap();
-        return Ok((rest, Term::int(b_signed as i32)));
+    // Assert that the number fits into small
+    if let Some(b_signed) = big.to_i32() {
+        return Ok((rest, Term::int(b_signed)));
     }
 
     Ok((rest, Term::bigint(heap, big)))

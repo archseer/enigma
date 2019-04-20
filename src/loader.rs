@@ -44,7 +44,7 @@ pub struct Loader<'a> {
 pub enum LValue {
     // TODO: these dupe LTerm values
     Atom(u32),
-    Integer(i64),
+    Integer(i32),
     Character(u8),
     Nil,
     Binary(Arc<bitstring::Binary>),
@@ -654,7 +654,7 @@ named!(
 
 // basically read_int, but returns an integer and never bignum to use elsewhere in loader.
 // TODO: deduplicate.
-fn read_smallint(b: u8, rest: &[u8]) -> IResult<&[u8], i64> {
+fn read_smallint(b: u8, rest: &[u8]) -> IResult<&[u8], i32> {
     let (rest, val) = read_int(b, rest)?;
 
     if let LValue::Integer(i) = val {
@@ -667,7 +667,7 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], LValue> {
     // it's not extended
     if 0 == (b & 0b1000) {
         // Bit 3 is 0 marks that 4 following bits contain the value
-        return Ok((rest, LValue::Integer(i64::from(b >> 4))));
+        return Ok((rest, LValue::Integer(i32::from(b >> 4))));
     }
 
     // Bit 3 is 1, but...
@@ -677,7 +677,7 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], LValue> {
         let (rest, r) = be_u8(rest)?;
         Ok((
             rest,
-            LValue::Integer((((b as usize) & 0b1110_0000) << 3 | (r as usize)) as i64),
+            LValue::Integer((((b as usize) & 0b1110_0000) << 3 | (r as usize)) as i32),
         )) // upcasting to i64 from usize not safe
     } else {
         // Bit 4 is 1 means that bits 5-6-7 contain amount of bytes+2 to store
@@ -707,7 +707,7 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], LValue> {
 
         let r = BigInt::from_bytes_be(sign, long_bytes);
 
-        if let Some(i) = r.to_i64() {
+        if let Some(i) = r.to_i32() {
             // fits in a regular int
             return Ok((rest, LValue::Integer(i)));
         }
@@ -729,18 +729,22 @@ fn compact_term(i: &[u8]) -> IResult<&[u8], LValue> {
 
     if tag < 0b111 {
         //println!("b is {:?}, tag is {:?}", b, tag);
-        let (rest, val) = read_smallint(b, rest)?;
+        let (rest, val) = read_int(b, rest)?;
 
-        return match tag {
-            0 => Ok((rest, LValue::Literal(val as u32))),
-            1 => Ok((rest, LValue::Integer(val))), // TODO: this cast is unsafe
-            2 => Ok((rest, LValue::Atom(val as u32))),
-            3 => Ok((rest, LValue::X(val as u32))),
-            4 => Ok((rest, LValue::Y(val as u32))),
-            5 => Ok((rest, LValue::Label(val as u32))),
-            6 => Ok((rest, LValue::Character(val as u8))),
-            _ => unreachable!(),
-        };
+        if let LValue::Integer(val) = val {
+            return match tag {
+                0 => Ok((rest, LValue::Literal(val as u32))),
+                1 => Ok((rest, LValue::Integer(val))), // TODO: this cast is unsafe
+                2 => Ok((rest, LValue::Atom(val as u32))),
+                3 => Ok((rest, LValue::X(val as u32))),
+                4 => Ok((rest, LValue::Y(val as u32))),
+                5 => Ok((rest, LValue::Label(val as u32))),
+                6 => Ok((rest, LValue::Character(val as u8))),
+                _ => unreachable!(),
+            };
+        } else {
+            return Ok((rest, val)); // bigint
+        }
     }
 
     parse_extended_term(b, rest)

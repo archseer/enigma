@@ -633,7 +633,7 @@ impl Term {
     // TODO: might be atoms only??
     pub fn into_lvalue(self) -> Option<loader::LValue> {
         match self.into_variant() {
-            Variant::Integer(i) => Some(loader::LValue::Integer(i64::from(i))),
+            Variant::Integer(i) => Some(loader::LValue::Integer(i)),
             Variant::Atom(i) => Some(loader::LValue::Atom(i)),
             Variant::Nil(..) => Some(loader::LValue::Nil),
             // TODO Variant::Float(self::Float(i)) => Num::Float(i),

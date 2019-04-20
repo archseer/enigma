@@ -2320,11 +2320,11 @@ impl Machine {
                             context.expand_arg(&ins.args[4]),
                         ];
                         let mfa = &module.imports[*i as usize];
-                        let val = bif::apply(self, &process, mfa, &args[..]).unwrap(); // TODO: handle fail
 
-                        // TODO: consume fail label if not 0, else return error
-
-                        set_register!(context, &ins.args[5], val)
+                        match bif::apply(self, &process, mfa, args) {
+                            Ok(val) => set_register!(context, &ins.args[5], val),
+                            Err(exc) => cond_fail!(context, ins.args[0], exc),
+                        }
                     } else {
                         unreachable!()
                     }
@@ -2339,11 +2339,11 @@ impl Machine {
                             context.expand_arg(&ins.args[5]),
                         ];
                         let mfa = &module.imports[*i as usize];
-                        let val = bif::apply(self, &process, mfa, &args[..]).unwrap(); // TODO: handle fail
 
-                        // TODO: consume fail label if not 0, else return error
-
-                        set_register!(context, &ins.args[6], val)
+                        match bif::apply(self, &process, mfa, args) {
+                            Ok(val) => set_register!(context, &ins.args[6], val),
+                            Err(exc) => cond_fail!(context, ins.args[0], exc),
+                        }
                     } else {
                         unreachable!()
                     }
