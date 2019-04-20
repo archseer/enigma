@@ -419,6 +419,18 @@ pub fn atom_to_list_1(
     }
 }
 
+pub fn pid_to_list_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    match args[0].into_variant() {
+        Variant::Pid(i) => {
+            let string = format!("<0.0.{}>", i); // TODO: proper format
+            let heap = &process.context_mut().heap;
+
+            Ok(bitstring!(heap, string))
+        }
+        _ => Err(Exception::new(Reason::EXC_BADARG)),
+    }
+}
+
 pub fn integer_to_list_1(
     _vm: &vm::Machine,
     process: &Pin<&mut Process>,
