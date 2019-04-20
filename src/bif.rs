@@ -678,6 +678,8 @@ fn bif_erlang_send_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
     let pid = args[0];
     let msg = args[1];
 
+    // println!("sending from {} to {} msg {}", process.pid, pid, msg);
+
     match pid.into_variant() {
         Variant::Port(id) => port::send_message(vm, process.pid, id, msg),
         _ => process::send_message(vm, process.pid, pid, msg),
@@ -895,7 +897,7 @@ fn bif_erlang_exit_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
 }
 
 fn bif_erlang_error_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> Result {
-    println!("raising val {}", args[0]);
+    // println!("raising val {}", args[0]);
     Err(Exception::with_value(Reason::EXC_ERROR, args[0]))
 }
 
@@ -935,7 +937,7 @@ fn bif_erlang_raise_3(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Te
         },
     });
 
-    println!("raising with {}", args[2]);
+    // println!("raising with {}", args[2]);
     Err(Exception {
         reason: class,
         value: args[1],
@@ -956,8 +958,8 @@ fn bif_erlang_whereis_1(vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[
 
 fn bif_erlang_nif_error_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
     let (mfa, _) = process.context_mut().ip.lookup_func_info().unwrap();
-    println!(
-        "Tried running nif {}, on pid={} might be missing!!",
+    print!(
+        "Tried running nif {}, on pid={} might be missing!!\r\n",
         mfa, process.pid
     );
     Err(Exception::with_value(Reason::EXC_ERROR, args[0]))

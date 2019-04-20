@@ -321,6 +321,7 @@ pub fn insert_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) ->
 pub fn insert_new_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     /* Write lock table if more than one object to keep atomicity */
     // let lock_kind = if (is_list(BIF_ARG_2) && CDR(list_val(BIF_ARG_2)) != NIL { LCK_WRITE } else { LCK_WRITE_REC };
+    // println!("ets:insert_new/2, {}, {}", args[0], args[1]);
 
     // find table
     let table = get_table(vm, args[0])?;
@@ -371,10 +372,10 @@ pub fn insert_new_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]
 pub fn lookup_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     let table = get_table(vm, args[0])?;
 
-    // println!("looking up {}", args[1]);
+    // println!("ets:lookup/2: {}", args[1]);
     // for some reason just returning won't work
     let res = table.get(process, args[1])?;
-    // println!("got {}", res);
+    // println!("ets:lookup got {}", res);
     Ok(res)
 }
 
@@ -485,26 +486,26 @@ pub fn select_delete_2(
 pub fn member_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     let table = get_table(vm, args[0])?;
 
-    eprintln!(
-        "member_2: {} {} {}",
-        args[0],
-        args[1],
-        table.member(args[1])
-    );
+    // eprintln!(
+    //     "member_2: {} {} {}",
+    //     args[0],
+    //     args[1],
+    //     table.member(args[1])
+    // );
     Ok(Term::boolean(table.member(args[1])))
 }
 
 pub fn first_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     let table = get_table(vm, args[0])?;
 
-    eprintln!("first_1: {} {}", args[0], table.first(process)?);
+    // eprintln!("first_1: {} {}", args[0], table.first(process)?);
     Ok(table.first(process)?)
 }
 
 pub fn last_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     let table = get_table(vm, args[0])?;
 
-    eprintln!("last_1: {} {}", args[0], table.last(process)?);
+    // eprintln!("last_1: {} {}", args[0], table.last(process)?);
     Ok(table.last(process)?)
 }
 

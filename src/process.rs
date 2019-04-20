@@ -467,6 +467,8 @@ impl Process {
     pub fn exit(&self, vm: &Machine, reason: Exception) {
         let local_data = self.local_data_mut();
 
+        print!("pid={} exiting reason={}\r\n", self.pid, reason.value);
+
         // set state to exiting
 
         // TODO: cancel timers
@@ -571,12 +573,12 @@ pub fn spawn(
 
     new_proc.local_data_mut().initial_call = MFA(unsafe { (*module).name }, func, i as u32);
 
-    println!(
-        "Spawning... pid={} mfa={} args={}",
-        new_proc.pid,
-        new_proc.local_data().initial_call,
-        args
-    );
+    // print!(
+    //     "Spawning... pid={} mfa={} args={}\r\n",
+    //     new_proc.pid,
+    //     new_proc.local_data().initial_call,
+    //     args
+    // );
 
     // TODO: func to ip offset
     let func = unsafe {
@@ -623,6 +625,7 @@ pub fn spawn(
 }
 
 pub fn send_message(vm: &Machine, sender: PID, pid: Term, msg: Term) -> Result<Term, Exception> {
+    // println!("sending from={} to={}, msg={}", sender, pid, msg);
     let receiver = match pid.into_variant() {
         value::Variant::Atom(name) => {
             if let Some(process) = vm.process_registry.lock().whereis(name) {

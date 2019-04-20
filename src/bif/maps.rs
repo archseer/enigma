@@ -33,6 +33,7 @@ pub fn find_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> 
 
 pub fn get_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     let map = &args[1];
+    // println!("maps:get/2: {} and {}", args[0], args[1]);
     if let Ok(value::Map(map)) = map.try_into() {
         let target = &args[0];
         match map.find(target) {

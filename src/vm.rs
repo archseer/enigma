@@ -931,9 +931,10 @@ impl Machine {
                                     op_jump!(context, label);
                                     // println!("select! resumption pid={}", process.pid);
                                 }
-                                Err(_err) => {
+                                Err(err) => {
                                     // timeout
                                     // println!("select! delay timeout {} pid={} ms={} m={:?}", ms, process.pid, context.expand_arg(&ins.args[1]), ins.args[1]);
+                                    // println!("select! delay timeout {} pid={} ms={} err={:?}", ms, process.pid, context.expand_arg(&ins.args[1]), err);
 
                                     // remove channel
                                     context.timeout.take();

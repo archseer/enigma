@@ -471,7 +471,7 @@ pub fn list_to_integer_1(
 }
 
 pub fn display_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
-    println!("{}", args[0]);
+    print!("{}\r\n", args[0]);
     Ok(atom!(TRUE))
 }
 
@@ -491,7 +491,7 @@ pub fn display_nl_0(
     _process: &Pin<&mut Process>,
     _args: &[Term],
 ) -> bif::Result {
-    println!("");
+    print!("\r\n");
     Ok(atom!(TRUE))
 }
 
