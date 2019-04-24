@@ -26,7 +26,9 @@ futures-preview = {version = "0.3.0-alpha.14", features = ["compat", "io-compat"
 
 # futures01 = { package = "futures", version = "0.1" }
 nom = "4.1.1"
-num = "0.2.0"
+num-bigint = "0.2.2"
+num-traits = "0.2.4"
+num-integer = "0.1.39"
 libflate = "0.1"
 once_cell = "0.1.6"
 parking_lot = "0.7.0"
@@ -41,18 +43,19 @@ hashbrown = "0.2.0"
 nodrop = "0.1.13"
 statrs = "0.10.0"
 lexical = "2.1.0"
-chashmap = { git = "https://gitlab.redox-os.org/redox-os/chashmap" } #"2.2.2"
 dirs = "1.0.5"
-owning_ref = "0.4.0"
+owning_ref = "0.4.0" # chashmap dependency
 # futures-native-timers = { git = "https://github.com/tinaun/futures-native-timers" }
 tokio-threadpool = "0.1.13"
 tokio-executor = "0.1.7"
 termion = "1.5.1"
 tokio-stdin-stdout = "0.1.5"
+regex = "1.1.6"
+im = "12.3.4"
 
 [dev-dependencies]
 quickcheck = "0.8.0"
 
 [profile.release]
-lto = true
+# lto = true
 # debug = true
