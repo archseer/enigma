@@ -22,7 +22,7 @@ macro_rules! integer_overflow_op {
         $op:ident,
         $overflow:ident
     ) => {{
-        use num::traits::cast::ToPrimitive;
+        use num_traits::cast::ToPrimitive;
         // TODO: figure out if we can reduce amount of cloning here.
         match [$args[0].into_number(), $args[1].into_number()] {
             [Ok(value::Num::Integer(rec)), Ok(value::Num::Integer(arg))] => {

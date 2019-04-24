@@ -9,8 +9,8 @@ use crate::value::Term;
 use hashbrown::HashMap;
 use libflate::zlib;
 use nom::*;
-use num::bigint::{BigInt, Sign};
-use num::ToPrimitive;
+use num_bigint::{BigInt, Sign};
+use num_traits::ToPrimitive;
 use std::io::{Cursor, Read};
 
 // (filename_index, loc)

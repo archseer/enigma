@@ -5,10 +5,10 @@ use crate::numeric::modulo::{Modulo, OverflowingModulo};
 use crate::process::Process;
 use crate::value::{self, Term};
 use crate::vm;
-use num::bigint::BigInt;
+use num_bigint::BigInt;
 use std::pin::Pin;
-// use num::bigint::ToBigInt;
-use num::traits::Signed;
+// use num_bigint::ToBigInt;
+use num_traits::Signed;
 use statrs;
 use std::ops::{Add, Mul, Sub};
 

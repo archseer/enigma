@@ -1,7 +1,7 @@
 //! Floored integer divisions.
 
-use num::bigint::BigInt;
-use num::integer::Integer;
+use num_bigint::BigInt;
+use num_integer::Integer;
 
 pub trait FlooredDiv<RHS = Self> {
     type Output;
@@ -19,7 +19,7 @@ impl FlooredDiv for i32 {
     type Output = i32;
 
     fn floored_division(self, rhs: Self) -> Self::Output {
-        num::integer::div_floor(self, rhs)
+        num_integer::div_floor(self, rhs)
     }
 }
 
@@ -39,7 +39,7 @@ impl FlooredDiv for i64 {
     type Output = i64;
 
     fn floored_division(self, rhs: Self) -> Self::Output {
-        num::integer::div_floor(self, rhs)
+        num_integer::div_floor(self, rhs)
     }
 }
 

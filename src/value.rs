@@ -12,7 +12,7 @@ use crate::nanbox::TypedNanBox;
 use crate::process;
 use crate::servo_arc::Arc;
 use allocator_api::Layout;
-use num::bigint::BigInt;
+use num_bigint::BigInt;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 

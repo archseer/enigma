@@ -5,8 +5,8 @@ use crate::process::Process;
 use crate::value::{self, Term, TryFrom, Tuple, Variant};
 use crate::vm;
 use chrono::prelude::*;
-use num::bigint::ToBigInt;
-use num::traits::ToPrimitive;
+use num_bigint::ToBigInt;
+use num_traits::ToPrimitive;
 use std::pin::Pin;
 use std::time::SystemTime;
 

@@ -279,6 +279,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "open_port", 2 => open_port_2,
             "port_control", 3 => port_control_3,
             "spawn_system_process", 3 => bif_erlang_spawn_3, // TODO: aliased to normal spawn for now
+            "map_next", 3 => erts_internal_map_next_3,
         },
         "unicode" => {
             "characters_to_binary", 2 => erlang::unicode_characters_to_binary_2,
@@ -1257,11 +1258,42 @@ fn port_control_3(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) 
     Ok(Term::reference(&process.context_mut().heap, reference))
 }
 
+fn erts_internal_map_next_3(
+    vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> Result {
+    let heap = &process.context_mut().heap;
+    // this is totally hacky but we can't just splat an iter into a number like BEAM does.
+    // so what we do is we store the current pos, and then we simply take enough values to
+    // reach that point. the whole point of maps:next was to be performant, but we've achieved the
+    // inverse! ¯\_(ツ)_/¯
+    // .iter().nth(n-1) or skip(n).take()?
+    //
+    // this might get easier with https://github.com/rust-lang/rust/issues/56167 raw_entry api
+    if args[0] != Term::int(0) {
+        unimplemented!();
+    }
+    if args[2] != atom!(ITERATOR) {
+        unimplemented!();
+    }
+
+    // {k, v, i} where i is also {k, v, i} or none
+
+    let map = value::Map::try_from(&args[1])?;
+
+    let res = map
+        .0
+        .iter()
+        .fold(atom!(NONE), |acc, (key, val)| tup3!(heap, *key, *val, acc));
+    Ok(res)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::immix::Heap;
-    use num::bigint::ToBigInt;
+    use num_bigint::ToBigInt;
 
     /// Converts an erlang list to a value vector.
     fn to_vec(value: Term) -> Vec<Term> {

@@ -4,8 +4,8 @@ use crate::immix::Heap;
 use crate::module;
 use crate::value::{self, Term, HAMT};
 use nom::*;
-use num::bigint::{BigInt, Sign};
-use num::traits::ToPrimitive;
+use num_bigint::{BigInt, Sign};
+use num_traits::ToPrimitive;
 
 /// External Term Format parser
 

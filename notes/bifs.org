@@ -1,4 +1,4 @@
-* BIFs [51/117]
+* BIFs [52/117]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
@@ -79,7 +79,7 @@
 - [ ] bif erlang:time_offset/1
 - [ ] bif erlang:timestamp/0
 - [ ] bif erts_internal:open_port/2
-- [ ] bif erlang:pid_to_list/1
+- [X] bif erlang:pid_to_list/1
 - [ ] bif erlang:ports/0
 - [X] bif erlang:pre_loaded/0
 - [ ] bif erlang:process_flag/2
@@ -276,26 +276,26 @@
 
 - [ ] bif erlang:match_spec_test/3
 
-** ETS [8/37]
+** ETS [11/37]
 - [ ] bif ets:internal_request_all/0
 - [X] bif ets:new/2
 - [X] bif ets:delete/1
 - [ ] bif ets:delete/2
 - [ ] bif ets:delete_object/2
-- [ ] bif ets:first/1
+- [X] bif ets:first/1
 - [ ] bif ets:is_compiled_ms/1
 - [X] bif ets:lookup/2
 - [X] bif ets:lookup_element/3
 - [ ] bif ets:info/1
 - [ ] bif ets:info/2
-- [ ] bif ets:last/1
+- [X] bif ets:last/1
 - [ ] bif ets:match/1
 - [X] bif ets:match/2
 - [ ] bif ets:match/3
 - [ ] bif ets:match_object/1
 - [ ] bif ets:match_object/2
 - [ ] bif ets:match_object/3
-- [ ] bif ets:member/2
+- [X] bif ets:member/2
 - [ ] bif ets:next/2
 - [ ] bif ets:prev/2
 - [X] bif ets:insert/2
@@ -403,9 +403,9 @@
 ** New Bifs in R12B-4 [0/1]
 - [ ] bif erlang:decode_packet/3
 
-** New Bifs in R12B-5 [0/3]
+** New Bifs in R12B-5 [1/3]
 - [ ] bif unicode:characters_to_binary/2
-- [ ] bif unicode:characters_to_list/2
+- [X] bif unicode:characters_to_list/2
 - [ ] bif unicode:bin_is_7bit/1
 
 ** New Bifs in R13A. [0/4]
@@ -540,7 +540,7 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 ** New in 20.1 [0/1]
 - [ ] bif erlang:iolist_to_iovec/1
 
-** New in 21.0 [2/11]
+** New in 21.0 [3/11]
 - [ ] bif erts_internal:get_dflags/0
 - [ ] bif erts_internal:new_connection/1
 - [ ] bif erts_internal:abort_connection/2
@@ -549,14 +549,14 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 - [ ] bif erts_internal:gather_alloc_histograms/1
 - [ ] bif erts_internal:gather_carrier_info/1
 - [ ] ubif erlang:map_get/2
-- [ ] ubif erlang:is_map_key/2
+- [X] ubif erlang:is_map_key/2
 - [ ] bif ets:internal_delete_all/2
 - [X] bif ets:internal_select_delete/2
 
 ** New in 21.2 [0/3]
-- [ ] Persistent terms [0/6]
-      - [ ] bif persistent_term:put/2
-      - [ ] bif persistent_term:get/1
+- [-] Persistent terms [2/6]
+      - [X] bif persistent_term:put/2
+      - [X] bif persistent_term:get/1
       - [ ] bif persistent_term:get/0
       - [ ] bif persistent_term:erase/1
       - [ ] bif persistent_term:info/0
