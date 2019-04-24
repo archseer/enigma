@@ -388,6 +388,85 @@ pub fn unicode_characters_to_list_2(
     }))
 }
 
+pub fn iolist_size_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    // basically list_to_iodata but it counts
+    let list = args[0];
+    let heap = &process.context_mut().heap;
+
+    // if nil return an empty string
+    if list.is_nil() {
+        return Ok(Term::int(0));
+    }
+
+    // FIXME: to_bytes is potentially inefficient ATM since it can copy (we need to use Cow)
+
+    if list.is_binary() {
+        return Ok(Term::uint64(heap, list.to_bytes().unwrap().len() as u64));
+    }
+
+    let mut count: usize = 0;
+
+    let mut stack = Vec::new();
+    stack.push(list);
+
+    let mut cons: &Cons;
+
+    while let Some(mut elem) = stack.pop() {
+        match elem.into_variant() {
+            Variant::Cons(mut ptr) => {
+                loop {
+                    // tail loop
+                    loop {
+                        // head loop
+                        cons = unsafe { &*ptr };
+                        elem = cons.head;
+
+                        match elem.into_variant() {
+                            Variant::Integer(i @ 0...255) => count += 1,
+                            Variant::Pointer(..) => match elem.to_bytes() {
+                                Some(data) => count += data.len(),
+                                None => return Err(Exception::new(Reason::EXC_BADARG)),
+                            },
+                            Variant::Cons(p) => {
+                                ptr = p;
+                                stack.push(cons.tail);
+                                continue; // head loop
+                            }
+                            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                        }
+                        break;
+                    }
+
+                    elem = cons.tail;
+
+                    match elem.into_variant() {
+                        Variant::Integer(i @ 0...255) => count += 1,
+                        Variant::Pointer(..) => match elem.to_bytes() {
+                            Some(data) => count += data.len(),
+                            None => return Err(Exception::new(Reason::EXC_BADARG)),
+                        },
+                        Variant::Nil(..) => {}
+                        Variant::Cons(p) => {
+                            ptr = p;
+                            continue; // tail loop
+                        }
+                        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                    }
+                    break;
+                }
+            }
+            Variant::Pointer(..) => match elem.to_bytes() {
+                Some(data) => count += data.len(),
+                None => return Err(Exception::new(Reason::EXC_BADARG)),
+            },
+            Variant::Nil(..) => {}
+            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        }
+    }
+
+    Ok(Term::uint64(heap, count as u64))
+}
+
 pub fn binary_to_term_1(
     _vm: &vm::Machine,
     process: &Pin<&mut Process>,
