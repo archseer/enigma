@@ -535,6 +535,17 @@ pub fn integer_to_list_1(
     }
 }
 
+pub fn fun_to_list_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    if args[0].get_type() != value::Type::Closure {
+        return Err(Exception::new(Reason::EXC_BADARG));
+    }
+
+    let string = format!("{}", args[0]);
+    let heap = &process.context_mut().heap;
+
+    Ok(bitstring!(heap, string))
+}
+
 pub fn list_to_integer_1(
     _vm: &vm::Machine,
     _process: &Pin<&mut Process>,
