@@ -1656,8 +1656,31 @@ impl Machine {
                 }
                 Opcode::BsPutInteger => {
                     // gen_put_integer(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
+                    // [Label(0), Integer(8), Literal(1), Literal(0), Y(0)]'
                     // Size can be atom all
-                    unimplemented!("bs_put_integer")
+                    if let [_fail, LValue::Integer(size), LValue::Literal(unit), _flags, src] = &ins.args[..] {
+                        // TODO: fail label
+                        let size = *size as u32 * *unit;
+
+                        if size != 8 {
+                            unimplemented!("bs_put_integer size * unit != 8");
+                            //fail!(context, fail);
+                        }
+                        println!("src is {}", context.expand_arg(src));
+
+                        if let Variant::Integer(value) = context.expand_arg(src).into_variant() {
+                            match size {
+                                8 => unsafe {
+                                    (*context.bs).push(value as u8);
+                                },
+                                _ => unimplemented!("bs_put_binary size {:?}", size),
+                            }
+                        } else {
+                            panic!("Bad argument to {:?}", ins.op)
+                        }
+                    } else {
+                        unreachable!()
+                    }
                 }
                 Opcode::BsPutBinary => {
                     if let [_fail, size, LValue::Literal(unit), _flags, src] = &ins.args[..] {
