@@ -318,9 +318,13 @@ impl Process {
     /// An Err signals that we're now exiting.
     pub fn process_incoming(&self) -> Result<(), Exception> {
         // we want to start tracking for new messages a lot earlier
-        let (trigger, cancel) = futures::channel::oneshot::channel::<()>();
-        self.context_mut().recv_channel = Some(cancel); // TODO: if timer already set, don't set again!!!
-        self.context_mut().timeout = Some(trigger); // TODO: if timer already set, don't set again!!!
+        let context = self.context_mut();
+
+        if context.timeout.is_none() {
+            let (trigger, cancel) = futures::channel::oneshot::channel::<()>();
+            context.recv_channel = Some(cancel); // TODO: if timer already set, don't set again!!!
+            context.timeout = Some(trigger); // TODO: if timer already set, don't set again!!!
+        }
 
         // get internal, if we ran out, start processing external
         while let Some(signal) = self.local_data_mut().signal_queue.receive() {
