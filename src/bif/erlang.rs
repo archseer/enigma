@@ -207,6 +207,7 @@ pub fn list_to_existing_atom_1(
     unimplemented!()
 }
 
+// TODO: use Cow
 pub fn list_to_iodata(list: Term) -> Result<Vec<u8>, Exception> {
     let mut bytes: Vec<u8> = Vec::new();
 

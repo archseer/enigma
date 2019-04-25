@@ -146,7 +146,7 @@ impl TryFrom<Term> for RcBinary {
 }
 
 /// Binaries are bitstrings by default, byte aligned ones are binaries.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SubBinary {
     // TODO: wrap into value
     /// Binary size in bytes

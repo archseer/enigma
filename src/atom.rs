@@ -384,6 +384,8 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("$end_of_table");
     atoms.register_atom("iterator");
 
+    atoms.register_atom("match");
+    atoms.register_atom("nomatch");
     atoms
 };
 
@@ -654,6 +656,9 @@ pub const SYSTEM_LOGGER: u32 = 227;
 
 pub const DOLLAR_END_OF_TABLE: u32 = 228;
 pub const ITERATOR: u32 = 229;
+
+pub const MATCH: u32 = 230;
+pub const NOMATCH: u32 = 231;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

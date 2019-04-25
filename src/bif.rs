@@ -8,6 +8,7 @@ use crate::module;
 use crate::persistent_term;
 use crate::port;
 use crate::process::{self, Process};
+use crate::regex;
 use crate::value::{self, Cons, Term, TryFrom, TryInto, Tuple, Variant};
 use crate::vm;
 use hashbrown::HashMap;
@@ -303,6 +304,9 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             // monitor nodes is unimplemented for now
             "monitor_nodes", 1 => monitor_nodes,
             "monitor_nodes", 2 => monitor_nodes,
+        },
+        "re" => {
+            "run", 3 => regex::bif::run_3,
         },
         "persistent_term" => {
             // monitor nodes is unimplemented for now

@@ -1964,10 +1964,10 @@ impl Machine {
                     {
                         let flags = bitstring::Flag::from_bits(flags as u8).unwrap();
                         let heap = &context.heap;
-                        let res = match ins.args[3] {
-                            LValue::Integer(size) => ms.mb.get_binary(heap, size as usize, flags),
-                            LValue::Atom(atom::ALL) => ms.mb.get_binary_all(heap, flags),
-                            _ => unreachable!(),
+                        let res = match context.expand_arg(&ins.args[3]).into_variant() {
+                            Variant::Integer(size) => ms.mb.get_binary(heap, size as usize, flags),
+                            Variant::Atom(atom::ALL) => ms.mb.get_binary_all(heap, flags),
+                            arg => unreachable!("get_binary2 for {:?}", arg),
                         };
 
                         if let Some(res) = res {
