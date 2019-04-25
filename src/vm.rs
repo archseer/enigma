@@ -1641,7 +1641,10 @@ impl Machine {
                         // TODO: use a current_string ptr to be able to write to the Arc wrapped str
                         // alternatively, loop through the instrs until we hit a non bs_ instr.
                         // that way, no unsafe ptrs!
-                        let size = s1.to_u32();
+                        let size = match s1 {
+                            LValue::Literal(i) => *i as u32,
+                            _ => context.expand_arg(s1).to_int().unwrap()
+                        };
                         let mut binary = bitstring::Binary::with_capacity(size as usize);
                         binary.is_writable = false;
                         context.bs = binary.get_mut();
