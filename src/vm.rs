@@ -1796,7 +1796,7 @@ impl Machine {
                                 set_register!(context, &ins.args[4], cxt);
                             }
                         }
-                        value::BOXED_BINARY => {
+                        value::BOXED_BINARY | value::BOXED_SUBBINARY => {
                             // Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
                             // $GC_TEST_PRESERVE(wordsneeded, live, context);
 
@@ -1837,7 +1837,7 @@ impl Machine {
                                 set_register!(context, &ins.args[3], cxt);
                             }
                         }
-                        value::BOXED_BINARY => {
+                        value::BOXED_BINARY | value::BOXED_SUBBINARY => {
                             // Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
                             // $GC_TEST_PRESERVE(wordsneeded, live, context);
 
@@ -2099,7 +2099,6 @@ impl Machine {
                     } else {
                         unreachable!()
                     }
-                    unimplemented!("bs_test_unit") // TODO
                 }
                 Opcode::BsMatchString => {
                     debug_assert_eq!(ins.args.len(), 4);
