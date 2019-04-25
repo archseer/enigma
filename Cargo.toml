@@ -22,7 +22,8 @@ tokio = "0.1.17"
 # Only needs to be explicitly imported if you want to make use of
 # the machinery to convert promises back and forth between 0.1 and 0.3
 # (which is built into the provided await! macro only otherwise):
-futures-preview = {version = "0.3.0-alpha.14", features = ["compat", "io-compat"]}
+# futures-preview = {version = "0.3.0-alpha.14", features = ["compat", "io-compat"]}
+futures-preview = {git = "https://github.com/rust-lang-nursery/futures-rs/", features = ["compat", "io-compat"]}
 
 # futures01 = { package = "futures", version = "0.1" }
 nom = "4.1.1"
@@ -32,14 +33,14 @@ num-integer = "0.1.39"
 libflate = "0.1"
 once_cell = "0.1.6"
 parking_lot = "0.7.0"
-allocator_api = "0.5.0"
+allocator_api = "0.6.0"
 time = "0.1.40"
 chrono = "0.4.6"
 bitflags = "1.0.4"
 getopts = "0.2.18"
 hamt-rs = { git = "https://github.com/archseer/hamt-rs/", branch = "remove-reqs" }
 log = "0.4"
-hashbrown = "0.2.0"
+hashbrown = "0.3.0"
 nodrop = "0.1.13"
 statrs = "0.10.0"
 lexical = "2.1.0"

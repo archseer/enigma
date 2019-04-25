@@ -1,5 +1,5 @@
 // The nightly features that are commonly needed with async / await
-#![feature(await_macro, async_await, futures_api)]
+#![feature(await_macro, async_await, alloc_layout_extra)]
 #![feature(arbitrary_self_types)]
 #![recursion_limit = "256"] // yeowch
 
