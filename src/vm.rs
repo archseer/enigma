@@ -1647,9 +1647,10 @@ impl Machine {
                         };
                         let mut binary = bitstring::Binary::with_capacity(size as usize);
                         binary.is_writable = false;
-                        context.bs = binary.get_mut();
+                        let term = Term::binary(&context.heap, binary);
                         // TODO ^ ensure this pointer stays valid after heap alloc
-                        set_register!(context, dest, Term::binary(&context.heap, binary));
+                        context.bs = &**term.get_boxed_value::<bitstring::RcBinary>().unwrap() as *const bitstring::Binary as *mut bitstring::Binary;
+                        set_register!(context, dest, term);
                     } else {
                         unreachable!()
                     }
@@ -1668,15 +1669,8 @@ impl Machine {
                         }
                         println!("src is {}", context.expand_arg(src));
 
-                        if let Variant::Integer(value) = context.expand_arg(src).into_variant() {
-                            match size {
-                                8 => unsafe {
-                                    (*context.bs).push(value as u8);
-                                },
-                                _ => unimplemented!("bs_put_binary size {:?}", size),
-                            }
-                        } else {
-                            panic!("Bad argument to {:?}", ins.op)
+                        unsafe {
+                            (*context.bs).put_integer(size as usize, context.expand_arg(src));
                         }
                     } else {
                         unreachable!()
@@ -1693,7 +1687,7 @@ impl Machine {
                         if let Ok(value) = bitstring::RcBinary::try_from(&context.expand_arg(src)) {
                             match size {
                                 LValue::Atom(atom::ALL) => unsafe {
-                                    (*context.bs).extend_from_slice(&value.data);
+                                    (*context.bs).put_binary(&value);
                                 },
                                 _ => unimplemented!("bs_put_binary size {:?}", size),
                             }
@@ -1719,8 +1713,7 @@ impl Machine {
                         {
                             match size {
                                 LValue::Atom(atom::ALL) => unsafe {
-                                    let bytes: [u8; 8] = transmute(f);
-                                    (*context.bs).extend_from_slice(&bytes);
+                                    (*context.bs).put_float(f);
                                 },
                                 _ => unimplemented!("bs_put_float size {:?}", size),
                             }
@@ -1735,7 +1728,7 @@ impl Machine {
                     // BsPutString uses the StrT strings table! needs to be patched in loader
                     if let LValue::Binary(str) = &ins.args[0] {
                         unsafe {
-                            (*context.bs).extend_from_slice(&str.data);
+                            (*context.bs).put_binary(&str);
                         }
                     } else {
                         unreachable!()
@@ -1962,10 +1955,12 @@ impl Machine {
                         .expand_arg(&ins.args[1])
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
+                        // proc pid=37 reds=907 mod="re" offs=870 ins=BsGetBinary2 args=[Label(916), X(5), Literal(9), X(2), Literal(8), Literal(0), X(2)]
                         let flags = bitstring::Flag::from_bits(flags as u8).unwrap();
                         let heap = &context.heap;
+                        let unit = ins.args[4].to_u32() as usize;
                         let res = match context.expand_arg(&ins.args[3]).into_variant() {
-                            Variant::Integer(size) => ms.mb.get_binary(heap, size as usize, flags),
+                            Variant::Integer(size) => ms.mb.get_binary(heap, size as usize * unit, flags),
                             Variant::Atom(atom::ALL) => ms.mb.get_binary_all(heap, flags),
                             arg => unreachable!("get_binary2 for {:?}", arg),
                         };
@@ -1981,17 +1976,23 @@ impl Machine {
                     debug_assert_eq!(ins.args.len(), 5);
                     // fail, ms, size, unit, flags
 
-                    if let Ok(ms) =
-                        bitstring::MatchState::try_from(&context.expand_arg(&ins.args[1]))
+                    if let Ok(ms) = context
+                        .expand_arg(&ins.args[1])
+                        .get_boxed_value_mut::<bitstring::MatchState>()
                     {
-                        let mb = &ms.mb;
+                        let mb = &mut ms.mb;
 
-                        let size = ins.args[2].to_u32();
+                        let size = match &ins.args[2] {
+                            LValue::Literal(i) => *i as u32,
+                            arg => context.expand_arg(arg).to_int().unwrap()
+                        };
                         let unit = ins.args[3].to_u32();
 
                         let new_offset = mb.offset + (size * unit) as usize;
 
                         if new_offset <= mb.size {
+                            mb.offset = new_offset;
+                        } else {
                             fail!(context, ins.args[0]);
                         }
                     } else {

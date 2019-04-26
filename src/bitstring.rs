@@ -78,6 +78,30 @@ impl Binary {
         // :( we want to avoid locks so this method is for specifically when we know we're the only writer.
         unsafe { &mut *(&self.data as *const Vec<u8> as *mut Vec<u8>) }
     }
+
+    pub fn put_integer(&mut self, size: usize, int: Term) {
+        if let value::Variant::Integer(value) = int.into_variant() {
+            match size {
+                8 => unsafe {
+                    self.data.push(value as u8);
+                },
+                _ => unimplemented!("bs_put_binary size {:?}", size),
+            }
+        } else {
+            panic!("Bad argument to put_integer")
+        }
+    }
+
+    pub fn put_binary(&mut self, binary: &RcBinary) {
+        self.data.extend_from_slice(&binary.data);
+    }
+
+    pub fn put_float(&mut self, float: f64) {
+        unsafe {
+            let bytes: [u8; 8] = std::mem::transmute(float);
+            self.data.extend_from_slice(&bytes);
+        }
+    }
 }
 
 impl From<Vec<u8>> for Binary {
@@ -309,12 +333,23 @@ macro_rules! native_endian {
 
 macro_rules! binary_size {
     ($str:expr) => {
-        $str.get_boxed_value::<RcBinary>().unwrap().data.len()
+        match $str.get_boxed_header() {
+            Ok(value::BOXED_BINARY) => $str.get_boxed_value::<RcBinary>().unwrap().data.len(),
+            Ok(value::BOXED_SUBBINARY) => {
+                // TODO use ok_or to cast to some, then use ?
+                $str.get_boxed_value::<SubBinary>()
+                    .unwrap()
+                    .original
+                    .data
+                    .len()
+            }
+            _ => unreachable!(),
+        }
     };
 }
 
 pub fn start_match_2(heap: &Heap, binary: Term, _max: u32) -> Option<Term> {
-    assert!(binary.is_binary());
+    assert!(binary.is_bitstring());
 
     // TODO: BEAM allocates size on all binary types right after the header so we can grab it
     // without needing the binary subtype.
@@ -356,7 +391,7 @@ pub fn start_match_2(heap: &Heap, binary: Term, _max: u32) -> Option<Term> {
 }
 
 pub fn start_match_3(heap: &Heap, binary: Term) -> Option<Term> {
-    assert!(binary.is_binary());
+    assert!(binary.is_bitstring());
 
     // TODO: BEAM allocates size on all binary types right after the header so we can grab it
     // without needing the binary subtype.
@@ -1080,7 +1115,7 @@ pub fn append(
         if data.capacity() < size {
             data.reserve(2 * size); // why 2*?
         }
-        process.context_mut().bs = data;
+        process.context_mut().bs = &**pb as *const Binary as *mut Binary;
 
         // Allocate heap space and build a new sub binary.
 
@@ -1148,7 +1183,7 @@ pub fn append(
         let new_binary = heap.alloc(Arc::new(Binary::with_capacity(size))).clone();
         // ACTIVE_WRITER
 
-        process.context_mut().bs = new_binary.get_mut();
+        process.context_mut().bs = &*new_binary as *const Binary as *mut Binary;
 
         // Now copy the data into the binary.
         copy_binary!(
@@ -1205,7 +1240,7 @@ pub fn private_append(
     if data.capacity() < size {
         data.reserve(2 * size); // why 2*?
     }
-    process.context_mut().bs = data;
+    process.context_mut().bs = &**pb as *const Binary as *mut Binary;
 
     sb.size = size_in_bits_after_build >> 3;
     sb.bitsize = size_in_bits_after_build & 7;

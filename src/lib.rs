@@ -34,6 +34,7 @@ pub mod opcodes;
 pub mod persistent_term;
 pub mod port;
 pub mod process;
+pub mod regex;
 pub mod servo_arc;
 pub mod signal_queue;
 pub mod value;

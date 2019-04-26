@@ -1,5 +1,6 @@
 pub use self::table::PID;
 use crate::atom;
+use crate::bitstring;
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
 use crate::instr_ptr::InstrPtr;
@@ -67,7 +68,7 @@ pub struct ExecutionContext {
     pub current: MFA,
     pub live: usize,
     /// binary construction state
-    pub bs: *mut Vec<u8>,
+    pub bs: *mut bitstring::Binary,
     ///
     pub exc: Option<Exception>,
     /// Reductions left
