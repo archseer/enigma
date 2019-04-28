@@ -17,6 +17,7 @@ use std::pin::Pin;
 
 pub mod arith;
 mod chrono;
+mod dtrace;
 pub mod erlang;
 mod info;
 mod lists;
@@ -201,6 +202,16 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "put", 2 => pdict::put_2,
             "erase", 0 => pdict::erase_0,
             "erase", 1 => pdict::erase_1,
+
+
+            // dtrace
+            "dt_put_tag", 1 => dtrace::dt_put_tag_1,
+            "dt_get_tag", 0 => dtrace::dt_get_tag_0,
+            "dt_get_tag_data", 0 => dtrace::dt_get_tag_data_0,
+            "dt_spread_tag", 1 => dtrace::dt_spread_tag_1,
+            "dt_restore_tag", 1 => dtrace::dt_restore_tag_1,
+            "dt_prepend_vm_tag_data", 1 => dtrace::dt_prepend_vm_tag_data_1,
+            "dt_append_vm_tag_data", 1 => dtrace::dt_append_vm_tag_data_1,
         },
         "math" => {
             "cos", 1 => arith::math_cos_1,
