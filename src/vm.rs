@@ -754,7 +754,10 @@ impl Machine {
                     }
                 }
                 Ok(process::State::Yield) => (), // yield
-                Ok(process::State::Done) => break, // exited OK
+                Ok(process::State::Done) => {
+                    process.exit(&vm, Exception::with_value(Reason::EXC_EXIT, atom!(NORMAL)));
+                    break
+                }, // exited OK
                 // TODO: wait is an await on a oneshot
                 // TODO: waittimeout is an select on a oneshot or a delay
             }
