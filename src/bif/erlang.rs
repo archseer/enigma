@@ -561,6 +561,42 @@ pub fn list_to_integer_1(
     }
 }
 
+pub fn list_to_tuple_1(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    // list to tuple
+    let heap = &process.context_mut().heap;
+
+    let mut tmp = args[0];
+    let mut arity = 0;
+
+    while let Ok(value::Cons { tail, .. }) = tmp.try_into() {
+        arity += 1;
+        tmp = *tail
+    }
+
+    if !tmp.is_nil() {
+        // Must be well-formed list
+        return Err(Exception::new(Reason::EXC_BADARG));
+    }
+
+    // allocate tuple, traverse the list and assign to tup
+    let tuple = value::tuple(heap, arity);
+    let mut i = 0;
+    let mut tmp = args[0];
+
+    while let Ok(value::Cons { head, tail }) = tmp.try_into() {
+        unsafe {
+            std::ptr::write(&mut tuple[i], *head);
+        }
+        i += 1;
+        tmp = *tail
+    }
+    Ok(Term::from(tuple))
+}
+
 pub fn display_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     print!("{}\r\n", args[0]);
     Ok(atom!(TRUE))

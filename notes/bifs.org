@@ -1,4 +1,4 @@
-* BIFs [52/117]
+* BIFs [53/117]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
@@ -52,7 +52,7 @@
 - [ ] bif erlang:list_to_pid/1
 - [ ] bif erlang:list_to_port/1
 - [ ] bif erlang:list_to_ref/1
-- [ ] bif erlang:list_to_tuple/1
+- [X] bif erlang:list_to_tuple/1
 - [ ] bif erlang:loaded/0
 - [X] bif erlang:localtime/0
 - [ ] bif erlang:localtime_to_universaltime/2
