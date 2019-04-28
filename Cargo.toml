@@ -22,8 +22,8 @@ tokio = "0.1.17"
 # Only needs to be explicitly imported if you want to make use of
 # the machinery to convert promises back and forth between 0.1 and 0.3
 # (which is built into the provided await! macro only otherwise):
-# futures-preview = {version = "0.3.0-alpha.14", features = ["compat", "io-compat"]}
-futures-preview = {git = "https://github.com/rust-lang-nursery/futures-rs/", features = ["compat", "io-compat"]}
+# futures-preview = {version = "0.3.0-alpha.14", features = ["compat", "io-compat", "async-await"]}
+futures-preview = {git = "https://github.com/rust-lang-nursery/futures-rs/", features = ["compat", "io-compat", "async-await", "nightly"]}
 
 # futures01 = { package = "futures", version = "0.1" }
 nom = "4.1.1"

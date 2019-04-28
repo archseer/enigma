@@ -48,7 +48,7 @@ dependencies = [
  "autocfg 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "backtrace-sys 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "cfg-if 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-demangle 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -59,7 +59,7 @@ version = "0.1.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cc 1.0.35 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -175,7 +175,7 @@ name = "dirs"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_users 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -188,7 +188,7 @@ dependencies = [
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "dirs 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
  "getopts 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "hamt-rs 0.3.0 (git+https://github.com/archseer/hamt-rs/?branch=remove-reqs)",
  "hashbrown 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -240,7 +240,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "proc-macro2 0.4.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "syn 0.15.32 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 0.15.33 (registry+https://github.com/rust-lang/crates.io-index)",
  "synstructure 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -275,82 +275,83 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "futures-channel-preview"
-version = "0.3.0-alpha.14"
-source = "git+https://github.com/rust-lang-nursery/futures-rs/#bbbfbb7812ede7720183407bbe4cfbd98b5f5c1f"
+version = "0.3.0-alpha.15"
+source = "git+https://github.com/rust-lang-nursery/futures-rs/#3872328c419e9fdd8d074c23e738fa2eef5d1b4a"
 dependencies = [
- "futures-core-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-core-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
 ]
 
 [[package]]
 name = "futures-core-preview"
-version = "0.3.0-alpha.14"
-source = "git+https://github.com/rust-lang-nursery/futures-rs/#bbbfbb7812ede7720183407bbe4cfbd98b5f5c1f"
+version = "0.3.0-alpha.15"
+source = "git+https://github.com/rust-lang-nursery/futures-rs/#3872328c419e9fdd8d074c23e738fa2eef5d1b4a"
 
 [[package]]
 name = "futures-executor-preview"
-version = "0.3.0-alpha.14"
-source = "git+https://github.com/rust-lang-nursery/futures-rs/#bbbfbb7812ede7720183407bbe4cfbd98b5f5c1f"
+version = "0.3.0-alpha.15"
+source = "git+https://github.com/rust-lang-nursery/futures-rs/#3872328c419e9fdd8d074c23e738fa2eef5d1b4a"
 dependencies = [
- "futures-channel-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
- "futures-core-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
- "futures-util-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-channel-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-core-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-util-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
  "num_cpus 1.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pin-utils 0.1.0-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "futures-io-preview"
-version = "0.3.0-alpha.14"
-source = "git+https://github.com/rust-lang-nursery/futures-rs/#bbbfbb7812ede7720183407bbe4cfbd98b5f5c1f"
+version = "0.3.0-alpha.15"
+source = "git+https://github.com/rust-lang-nursery/futures-rs/#3872328c419e9fdd8d074c23e738fa2eef5d1b4a"
 dependencies = [
- "futures-core-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-core-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
  "iovec 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "futures-preview"
-version = "0.3.0-alpha.14"
-source = "git+https://github.com/rust-lang-nursery/futures-rs/#bbbfbb7812ede7720183407bbe4cfbd98b5f5c1f"
+version = "0.3.0-alpha.15"
+source = "git+https://github.com/rust-lang-nursery/futures-rs/#3872328c419e9fdd8d074c23e738fa2eef5d1b4a"
 dependencies = [
- "futures-channel-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
- "futures-core-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
- "futures-executor-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
- "futures-io-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
- "futures-sink-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
- "futures-util-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-channel-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-core-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-executor-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-io-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-sink-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-util-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
 ]
 
 [[package]]
 name = "futures-select-macro-preview"
-version = "0.3.0-alpha.14"
-source = "git+https://github.com/rust-lang-nursery/futures-rs/#bbbfbb7812ede7720183407bbe4cfbd98b5f5c1f"
+version = "0.3.0-alpha.15"
+source = "git+https://github.com/rust-lang-nursery/futures-rs/#3872328c419e9fdd8d074c23e738fa2eef5d1b4a"
 dependencies = [
  "proc-macro-hack 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "proc-macro2 0.4.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "syn 0.15.32 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 0.15.33 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "futures-sink-preview"
-version = "0.3.0-alpha.14"
-source = "git+https://github.com/rust-lang-nursery/futures-rs/#bbbfbb7812ede7720183407bbe4cfbd98b5f5c1f"
+version = "0.3.0-alpha.15"
+source = "git+https://github.com/rust-lang-nursery/futures-rs/#3872328c419e9fdd8d074c23e738fa2eef5d1b4a"
 dependencies = [
- "futures-channel-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
- "futures-core-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-channel-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-core-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
 ]
 
 [[package]]
 name = "futures-util-preview"
-version = "0.3.0-alpha.14"
-source = "git+https://github.com/rust-lang-nursery/futures-rs/#bbbfbb7812ede7720183407bbe4cfbd98b5f5c1f"
+version = "0.3.0-alpha.15"
+source = "git+https://github.com/rust-lang-nursery/futures-rs/#3872328c419e9fdd8d074c23e738fa2eef5d1b4a"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-channel-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
- "futures-core-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
- "futures-io-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
- "futures-select-macro-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
- "futures-sink-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-channel-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-core-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-io-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-select-macro-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "futures-sink-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)",
+ "memchr 2.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pin-utils 0.1.0-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "proc-macro-hack 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "proc-macro-nested 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -373,7 +374,7 @@ name = "hamt-rs"
 version = "0.3.0"
 source = "git+https://github.com/archseer/hamt-rs/?branch=remove-reqs#1f717cd3dcfc01660bf5ca5fca35550e3eb8637b"
 dependencies = [
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -396,7 +397,7 @@ name = "iovec"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -441,7 +442,7 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.51"
+version = "0.2.53"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -491,7 +492,7 @@ dependencies = [
  "iovec 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazycell 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "miow 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "net2 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -505,7 +506,7 @@ version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "iovec 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.6.16 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -526,7 +527,7 @@ version = "0.2.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cfg-if 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -571,7 +572,7 @@ name = "num_cpus"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -609,7 +610,7 @@ name = "parking_lot_core"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "smallvec 0.6.9 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -628,7 +629,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "proc-macro2 0.4.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "syn 0.15.32 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 0.15.33 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -670,7 +671,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cloudabi 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "fuchsia-cprng 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand_core 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -681,7 +682,7 @@ version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "autocfg 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand_chacha 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand_core 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand_hc 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -736,7 +737,7 @@ name = "rand_jitter"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand_core 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -748,7 +749,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cloudabi 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "fuchsia-cprng 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand_core 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rdrand 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -910,7 +911,7 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "0.15.32"
+version = "0.15.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "proc-macro2 0.4.28 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -925,7 +926,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "proc-macro2 0.4.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "syn 0.15.32 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 0.15.33 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicode-xid 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -934,7 +935,7 @@ name = "termion"
 version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
  "numtoa 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_syscall 0.1.54 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_termios 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -953,7 +954,7 @@ name = "time"
 version = "0.1.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_syscall 0.1.54 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1136,7 +1137,7 @@ dependencies = [
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "iovec 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.6.16 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio-uds 0.6.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1258,14 +1259,14 @@ dependencies = [
 "checksum fuchsia-zircon 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "2e9763c69ebaae630ba35f74888db465e49e259ba1bc0eda7d06f4a067615d82"
 "checksum fuchsia-zircon-sys 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "3dcaa9ae7725d12cdb85b3ad99a434db70b468c09ded17e012d86b5c1010f7a7"
 "checksum futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)" = "62941eff9507c8177d448bd83a44d9b9760856e184081d8cd79ba9f03dd24981"
-"checksum futures-channel-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)" = "<none>"
-"checksum futures-core-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)" = "<none>"
-"checksum futures-executor-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)" = "<none>"
-"checksum futures-io-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)" = "<none>"
-"checksum futures-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)" = "<none>"
-"checksum futures-select-macro-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)" = "<none>"
-"checksum futures-sink-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)" = "<none>"
-"checksum futures-util-preview 0.3.0-alpha.14 (git+https://github.com/rust-lang-nursery/futures-rs/)" = "<none>"
+"checksum futures-channel-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)" = "<none>"
+"checksum futures-core-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)" = "<none>"
+"checksum futures-executor-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)" = "<none>"
+"checksum futures-io-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)" = "<none>"
+"checksum futures-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)" = "<none>"
+"checksum futures-select-macro-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)" = "<none>"
+"checksum futures-sink-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)" = "<none>"
+"checksum futures-util-preview 0.3.0-alpha.15 (git+https://github.com/rust-lang-nursery/futures-rs/)" = "<none>"
 "checksum getopts 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)" = "0a7292d30132fb5424b354f5dc02512a86e4c516fe544bb7a25e7f266951b797"
 "checksum hamt-rs 0.3.0 (git+https://github.com/archseer/hamt-rs/?branch=remove-reqs)" = "<none>"
 "checksum hashbrown 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "570178d5e4952010d138b0f1d581271ff3a02406d990f887d1e87e3d6e43b0ac"
@@ -1276,7 +1277,7 @@ dependencies = [
 "checksum lazycell 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b294d6fa9ee409a054354afc4352b0b9ef7ca222c69b8812cbea9e7d2bf3783f"
 "checksum lexical 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c106ed999697325a540c43d66a8d5175668cd96d7eb0bdba03a3bd98256cd698"
 "checksum lexical-core 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3e82e023e062f1d25f807ad182008fba1b46538e999f908a08cc0c29e084462e"
-"checksum libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)" = "bedcc7a809076656486ffe045abeeac163da1b558e963a31e29fbfbeba916917"
+"checksum libc 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)" = "ec350a9417dfd244dc9a6c4a71e13895a4db6b92f0b106f07ebbc3f3bc580cee"
 "checksum libflate 0.1.22 (registry+https://github.com/rust-lang/crates.io-index)" = "c52384aeb22d0ce82a10d8ddf35f7fb4717d1b23eac5b94cd38d2050fb53766a"
 "checksum lock_api 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "62ebf1391f6acad60e5c8b43706dde4582df75c06698ab44511d15016bc2442c"
 "checksum log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "c84ec4b527950aa83a329754b01dbe3f58361d1c5efacd1f6d68c494d08a17c6"
@@ -1334,7 +1335,7 @@ dependencies = [
 "checksum stackvector 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "c049c77bf85fbc036484c97b008276d539d9ebff9dfbde37b632ebcd5b8746b6"
 "checksum static_assertions 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "c19be23126415861cb3a23e501d34a708f7f9b2183c5252d690941c2e69199d5"
 "checksum statrs 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "10102ac8d55e35db2b3fafc26f81ba8647da2e15879ab686a67e6d19af2685e8"
-"checksum syn 0.15.32 (registry+https://github.com/rust-lang/crates.io-index)" = "846620ec526c1599c070eff393bfeeeb88a93afa2513fc3b49f1fea84cf7b0ed"
+"checksum syn 0.15.33 (registry+https://github.com/rust-lang/crates.io-index)" = "ec52cd796e5f01d0067225a5392e70084acc4c0013fa71d55166d38a8b307836"
 "checksum synstructure 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)" = "73687139bf99285483c96ac0add482c3776528beac1d97d444f6e91f203a2015"
 "checksum termion 1.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "dde0593aeb8d47accea5392b39350015b5eccb12c0d98044d856983d89548dea"
 "checksum thread_local 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)" = "c6b53e329000edc2b34dbe8545fd20e55a333362d0a321909685a19bd28c3f1b"
