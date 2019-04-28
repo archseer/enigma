@@ -197,15 +197,15 @@
 ** System [1/2]
 - [ ] bif erlang:system_flag/2
 - [X] bif erlang:system_info/1
-** New in R9C [29/44]
+** New in R9C [31/44]
 - [ ] bif erlang:system_monitor/0
 - [ ] bif erlang:system_monitor/1
 - [ ] bif erlang:system_monitor/2
 - [ ] bif erlang:system_profile/2
 - [ ] bif erlang:system_profile/0
-- [ ] bif erlang:ref_to_list/1
+- [X] bif erlang:ref_to_list/1
 - [ ] bif erlang:port_to_list/1
-- [ ] bif erlang:fun_to_list/1
+- [X] bif erlang:fun_to_list/1
 
 - [X] bif erlang:monitor/2
 - [X] bif erlang:demonitor/1
