@@ -327,6 +327,9 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "get", 2 => persistent_term::bif::get_2,
             "put", 2 => persistent_term::bif::put_2,
         },
+        "file" => {
+            "native_name_encoding", 0 => prim_file::native_name_encoding_0,
+        },
     ]
 };
 

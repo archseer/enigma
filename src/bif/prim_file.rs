@@ -90,6 +90,15 @@ pub fn internal_name2native_1(
     Ok(args[0])
 }
 
+pub fn native_name_encoding_0(
+    _vm: &vm::Machine,
+    _process: &Pin<&mut Process>,
+    _args: &[Term],
+) -> bif::Result {
+    // TODO:
+    Ok(atom!(UTF8))
+}
+
 #[cfg(unix)]
 fn filetype_to_atom(file_type: fs::FileType) -> Term {
     use std::os::unix::fs::FileTypeExt;
