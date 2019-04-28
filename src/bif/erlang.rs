@@ -384,7 +384,7 @@ pub fn unicode_characters_to_list_2(
 
     let bytes = list_to_iodata(args[0])?;
 
-    Ok(bytes.into_iter().fold(Term::nil(), |acc, val| {
+    Ok(bytes.into_iter().rev().fold(Term::nil(), |acc, val| {
         cons!(heap, Term::int(i32::from(val)), acc)
     }))
 }

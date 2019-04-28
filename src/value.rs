@@ -791,8 +791,8 @@ impl Term {
                     panic!("to_str can't work with non-zero bit_offset");
                 }
 
-                let offset = value.offset >> 3; // byte_offset!
-                Some(&value.original.data[offset..offset + value.size])
+                let offset = value.offset; // byte_offset!
+                Some(&value.original.data[offset..value.size + 1])
             }
             _ => None,
         }
@@ -814,8 +814,8 @@ impl Term {
                     panic!("to_str can't work with non-zero bit_offset");
                 }
 
-                let offset = value.offset >> 3; // byte_offset!
-                std::str::from_utf8(&value.original.data[offset..offset + value.size]).ok()
+                let offset = value.offset;
+                std::str::from_utf8(&value.original.data[offset..value.size + 1]).ok()
             }
             _ => None,
         }
@@ -1124,8 +1124,15 @@ impl std::fmt::Display for Variant {
                         }
                         write!(f, "}}")
                     }
-                    BOXED_REF => write!(f, "#Ref<>"),
-                    BOXED_BINARY => write!(f, "#Binary<>"),
+                    BOXED_REF => {
+                        let reference = &(*(*ptr as *const Boxed<process::Ref>)).value;
+                        write!(f, "#Ref<0.0.0.{}>", reference)
+                    }
+                    BOXED_BINARY => {
+                        // let binary = &(*(*ptr as *const Boxed<bitstring::RcBinary>)).value;
+                        // write!(f, "#Binary<{:.40?}>", binary.data) // up to 40 chars
+                        write!(f, "#Binary<>")
+                    }
                     BOXED_SUBBINARY => write!(f, "#SubBinary<>"),
                     BOXED_MATCHSTATE => write!(f, "#MatchState<>"),
                     BOXED_MAP => {

@@ -806,10 +806,12 @@ impl MatchBuffer {
         // CHECK_MATCH_BUFFER(mb);
 
         let size = self.remaining();
-        Some(Term::subbinary(
+        let binary = Term::subbinary(
             heap,
             SubBinary::new(self.original.clone(), size, self.offset, false),
-        ))
+        );
+        self.offset = size;
+        Some(binary)
     }
 
     /// Copy up to 4 bytes into the supplied buffer.
@@ -1618,5 +1620,21 @@ mod tests {
                 ) == std::cmp::Ordering::Equal
             )
         }
+    }
+
+    #[test]
+    fn get_binary_all() {
+        use crate::immix::Heap;
+        let heap = Heap::new();
+        let binary = Arc::new(Binary::from(vec![45, 114, 111, 111, 116]));
+        let mut mb = MatchBuffer::from(binary);
+        mb.offset += 8;
+        let res = mb.get_binary_all(&heap, Flag::BSF_NONE).unwrap();
+
+        let value = &res.get_boxed_value::<SubBinary>().unwrap();
+        assert_eq!(4, value.size);
+        assert_eq!(1, value.offset);
+
+        assert_eq!(Some("root"), res.to_str());
     }
 }
