@@ -141,8 +141,8 @@ impl Table for HashTable {
     }
 
     // erase  (remove_entry in rust)
-    fn remove(&mut self, _key: Term) -> Result<Term> {
-        unimplemented!()
+    fn remove(&self, key: Term) -> Result<Term> {
+        Ok(Term::boolean(self.hashmap.remove(&key).is_some()))
     }
 
     fn remove_object(&mut self, _object: Term) -> Result<Term> {

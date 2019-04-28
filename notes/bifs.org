@@ -276,11 +276,11 @@
 
 - [ ] bif erlang:match_spec_test/3
 
-** ETS [11/37]
+** ETS [12/37]
 - [ ] bif ets:internal_request_all/0
 - [X] bif ets:new/2
 - [X] bif ets:delete/1
-- [ ] bif ets:delete/2
+- [X] bif ets:delete/2
 - [ ] bif ets:delete_object/2
 - [X] bif ets:first/1
 - [ ] bif ets:is_compiled_ms/1

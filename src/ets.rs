@@ -53,7 +53,7 @@ pub trait Table: Send + Sync {
     fn update_element(&self, process: &Pin<&mut Process>, key: Term, list: Term) -> Result<Term>;
 
     // erase  (remove_entry in rust)
-    fn remove(&mut self, key: Term) -> Result<Term>;
+    fn remove(&self, key: Term) -> Result<Term>;
 
     fn remove_object(&mut self, object: Term) -> Result<Term>;
 

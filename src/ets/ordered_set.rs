@@ -109,7 +109,7 @@ impl Table for OrderedSet {
     }
 
     // erase  (remove_entry in rust)
-    fn remove(&mut self, _key: Term) -> Result<Term> {
+    fn remove(&self, _key: Term) -> Result<Term> {
         unimplemented!()
     }
 

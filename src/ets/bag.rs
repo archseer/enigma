@@ -51,7 +51,12 @@ impl Table for Bag {
     }
 
     // put
-    fn insert(&self, _process: &Pin<&mut Process>, value: Term, _key_clash_fail: bool) -> Result<()> {
+    fn insert(
+        &self,
+        _process: &Pin<&mut Process>,
+        value: Term,
+        _key_clash_fail: bool,
+    ) -> Result<()> {
         let value = value.deep_clone(&self.heap);
         let key = get_key(self.meta().keypos, value);
         self.hashmap
@@ -94,12 +99,17 @@ impl Table for Bag {
         self.hashmap.read().contains_key(&key)
     }
 
-    fn update_element(&self, _process: &Pin<&mut Process>, _key: Term, _list: Term) -> Result<Term> {
+    fn update_element(
+        &self,
+        _process: &Pin<&mut Process>,
+        _key: Term,
+        _list: Term,
+    ) -> Result<Term> {
         unimplemented!();
     }
 
     // erase  (remove_entry in rust)
-    fn remove(&mut self, _key: Term) -> Result<Term> {
+    fn remove(&self, _key: Term) -> Result<Term> {
         unimplemented!()
     }
 
@@ -149,7 +159,12 @@ impl Table for Bag {
     //     unimplemented!()
     // }
 
-    fn select_count(&self, _process: &Pin<&mut Process>, _tid: Term, _pattern: Term) -> Result<Term> {
+    fn select_count(
+        &self,
+        _process: &Pin<&mut Process>,
+        _tid: Term,
+        _pattern: Term,
+    ) -> Result<Term> {
         unimplemented!()
     }
 

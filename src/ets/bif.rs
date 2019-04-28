@@ -414,6 +414,12 @@ pub fn delete_1(vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -
     Ok(atom!(TRUE))
 }
 
+pub fn delete_2(vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    let table = get_table(vm, args[0])?;
+
+    Ok(table.remove(args[1])?)
+}
+
 pub fn update_element_3(
     vm: &vm::Machine,
     process: &Pin<&mut Process>,
