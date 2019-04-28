@@ -386,6 +386,12 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
 
     atoms.register_atom("match");
     atoms.register_atom("nomatch");
+
+    atoms.register_atom("exclusive");
+    atoms.register_atom("append");
+    atoms.register_atom("sync");
+    atoms.register_atom("skip_type_check");
+
     atoms
 };
 
@@ -659,6 +665,11 @@ pub const ITERATOR: u32 = 229;
 
 pub const MATCH: u32 = 230;
 pub const NOMATCH: u32 = 231;
+
+pub const EXCLUSIVE: u32 = 232;
+pub const APPEND: u32 = 233;
+pub const SYNC: u32 = 234;
+pub const SKIP_TYPE_CHECK: u32 = 235;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

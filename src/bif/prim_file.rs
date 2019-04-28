@@ -4,7 +4,7 @@ use crate::bitstring::Binary;
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
 use crate::process::Process;
-use crate::value::{self, Cons, Term, TryFrom};
+use crate::value::{self, Cons, Term, TryFrom, Variant};
 use crate::vm;
 use std::fs;
 use std::pin::Pin;
@@ -305,8 +305,45 @@ pub fn list_dir_nif_1(
     Ok(tup2!(heap, atom!(OK), res))
 }
 
-#[cfg(test)]
-mod tests {
-    
+pub fn open_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    use std::fs::OpenOptions;
+    let heap = &process.context_mut().heap;
 
+    let mut opts = OpenOptions::new();
+    for value in Cons::try_from(&args[1])?.iter() {
+        match value.into_variant() {
+            Variant::Atom(atom::READ) => opts.read(true),
+            Variant::Atom(atom::WRITE) => opts.write(true),
+            Variant::Atom(atom::EXCLUSIVE) => unimplemented!(),
+            Variant::Atom(atom::APPEND) => opts.append(true),
+            Variant::Atom(atom::SYNC) => unimplemented!(),
+            Variant::Atom(atom::SKIP_TYPE_CHECK) => unimplemented!(),
+            // Modes like 'raw', 'ram', 'delayed_writes' etc are handled further up the chain.
+            _ => &mut opts,
+        };
+    }
+
+    // FIXME:
+    // if (modes & (EFILE_MODE_APPEND | EFILE_MODE_EXCLUSIVE)) {
+    //     /* 'append' and 'exclusive' are documented as "open for writing." */
+    //     modes |= EFILE_MODE_WRITE;
+    // } else if !(modes & EFILE_MODE_READ_WRITE) {
+    //     /* Defaulting to read if !(W|R) is undocumented, but specifically
+    //      * tested against in file_SUITE. */
+    //     modes |= EFILE_MODE_READ;
+    // }
+    let cons = Cons::try_from(&args[0])?;
+    let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
+    let file = match opts.open(path) {
+        Ok(file) => file,
+        Err(err) => return Ok(error_to_tuple(heap, err)),
+    };
+    Ok(tup2!(heap, atom!(OK), Term::file(heap, file)))
 }
+
+pub fn close_nif_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    unimplemented!()
+}
+
+#[cfg(test)]
+mod tests {}

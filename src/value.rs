@@ -288,6 +288,7 @@ pub const BOXED_SUBBINARY: u8 = 10;
 
 pub const BOXED_MODULE: u8 = 20;
 pub const BOXED_EXPORT: u8 = 21;
+pub const BOXED_FILE: u8 = 22;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -499,6 +500,13 @@ impl Term {
         }))
     }
 
+    pub fn file(heap: &Heap, value: std::fs::File) -> Self {
+        Term::from(heap.alloc(Boxed {
+            header: BOXED_FILE,
+            value,
+        }))
+    }
+
     pub fn boxed<T>(heap: &Heap, header: u8, value: T) -> Self {
         Term::from(heap.alloc(Boxed { header, value }))
     }
@@ -581,6 +589,7 @@ impl Term {
                 BOXED_SUBBINARY => Type::Binary,
                 BOXED_MODULE => Type::Ref, // init expects a module in progress as a ref
                 BOXED_EXPORT => Type::Closure, // exports are a type of function
+                BOXED_FILE => Type::Ref,   // files are stored as magic ref pointers in beam
                 i => unimplemented!("get_type for {}", i),
             },
             _ => unreachable!(),
@@ -1152,6 +1161,7 @@ impl std::fmt::Display for Variant {
                         let ptr = &*(*ptr as *const Boxed<module::MFA>);
                         write!(f, "&{}", ptr.value)
                     }
+                    BOXED_FILE => write!(f, "#File<REF>"),
                     _ => unimplemented!(),
                 }
             },

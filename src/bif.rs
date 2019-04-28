@@ -353,6 +353,8 @@ macro_rules! nif_map {
 pub static NIFS: Lazy<NifTable> = sync_lazy! {
     nif_map![
         "prim_file" => {
+            "open_nif", 2 => prim_file::open_nif_2,
+            "close_nif", 1 => prim_file::close_nif_1,
             "get_cwd_nif", 0 => prim_file::get_cwd_nif_0,
             "read_file_nif", 1 => prim_file::read_file_nif_1,
             "read_info_nif", 2 => prim_file::read_info_nif_2,
