@@ -179,6 +179,16 @@ pub fn system_info_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
             Ok(Term::pid(vm.system_logger.load(Ordering::Relaxed) as u32)) // TODO: unsafe
         }
         // thread 'tokio-runtime-worker-7' panicked at 'not yet implemented: system_info for :start_time', src/bif/info.rs:174:14
+        Variant::Pointer(..) => {
+            if let Ok(tup) = value::Tuple::try_from(&args[0]) {
+               match tup[0].into_variant() {
+                   Variant::Atom(atom::PURIFY) => return Err(Exception::new(Reason::EXC_BADARG)),
+                   _ => unimplemented!("system_info for {}", args[0])
+               } 
+            } else {
+                unimplemented!("system_info for {}", args[0])
+            }
+        }
         _ => unimplemented!("system_info for {}", args[0]),
     }
 }
