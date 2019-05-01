@@ -174,9 +174,12 @@ pub fn system_info_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
     match args[0].into_variant() {
         Variant::Atom(atom::OS_TYPE) => Ok(tup2!(heap, Term::atom(OS_FAMILY), atom!(TRUE))), // TODO: true should be :darwin
         Variant::Atom(atom::HIPE_ARCHITECTURE) => Ok(atom!(UNDEFINED)),
-        Variant::Atom(atom::SYSTEM_VERSION) => Ok(bitstring!(heap, "Erlang/OTP 21 [erts-10.3.1] [source] [64-bit] [smp:8:8] [ds:8:8:10] [async-threads:1] [enigma]\n")),
+        Variant::Atom(atom::SYSTEM_VERSION) => Ok(bitstring!(heap, "Erlang/OTP 22 [erts-10.3.4] [source] [64-bit] [smp:8:8] [ds:8:8:10] [async-threads:1] [enigma]\n")),
         Variant::Atom(atom::SYSTEM_LOGGER) => {
             Ok(Term::pid(vm.system_logger.load(Ordering::Relaxed) as u32)) // TODO: unsafe
+        }
+        Variant::Atom(atom::VERSION) => {
+            Ok(bitstring!(heap, "10.3.4"))
         }
         // thread 'tokio-runtime-worker-7' panicked at 'not yet implemented: system_info for :start_time', src/bif/info.rs:174:14
         Variant::Pointer(..) => {

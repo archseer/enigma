@@ -401,6 +401,8 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("eof");
 
     atoms.register_atom("beam_lib");
+    atoms.register_atom("version");
+
     atoms
 };
 
@@ -689,6 +691,8 @@ pub const LOCK_ORDER_VIOLATION: u32 = 239;
 pub const EOF: u32 = 240;
 
 pub const BEAM_LIB: u32 = 241;
+pub const VERSION: u32 = 242;
+
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)
 }
