@@ -354,6 +354,10 @@ macro_rules! nif_map {
 
 pub static NIFS: Lazy<NifTable> = sync_lazy! {
     nif_map![
+        "beam_lib" => {
+            "compress", 1 => prim_file::compress_1,
+            "uncompress", 1 => prim_file::uncompress_1,
+        },
         "prim_file" => {
             "open_nif", 2 => prim_file::open_nif_2,
             "close_nif", 1 => prim_file::close_nif_1,
@@ -1044,7 +1048,11 @@ fn bif_erlang_nif_error_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: 
     ))
 }
 
-fn bif_erlang_load_nif_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+pub fn bif_erlang_load_nif_2(
+    vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> Result {
     println!("Tried loading nif: {} with args {}", args[0], args[1]);
 
     use loader::LValue;
@@ -1063,32 +1071,7 @@ fn bif_erlang_load_nif_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[
         // TODO: this needs to be ensured to not eval after the module is loaded!
         let module = unsafe { &mut *(process.context_mut().ip.module as *mut module::Module) };
 
-        let mut exports = vm.exports.write();
-
-        for (name, arity, fun) in nifs {
-            // find func_info
-            if let Some(i) = module.instructions.iter().position(|ins| {
-                let lname = LValue::Atom(*name);
-                let larity = LValue::Literal(*arity);
-                ins.op == crate::opcodes::Opcode::FuncInfo
-                    && ins.args[1] == lname
-                    && ins.args[2] == larity
-            }) {
-                let mfa = module::MFA(atom, *name, *arity);
-                exports.insert(mfa, crate::exports_table::Export::Bif(*fun));
-
-                let pos = module.imports.len();
-                module.imports.push(mfa);
-                // replace instruction immediately after with call_nif
-                module.instructions[i + 1] = loader::Instruction {
-                    op: crate::opcodes::Opcode::CallExtOnly,
-                    args: vec![LValue::Literal(*arity), LValue::Literal(pos as u32)],
-                };
-                println!("NIF replaced {}", mfa);
-            } else {
-                panic!("NIF stub not found")
-            }
-        }
+        module.load_nifs(vm, nifs);
 
         return Ok(Term::atom(atom::OK));
     }

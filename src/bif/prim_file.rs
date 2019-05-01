@@ -566,5 +566,42 @@ pub fn altname_nif_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
     unimplemented!()
 }
 
+//
+
+pub fn compress_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    use libflate::gzip;
+    let heap = &process.context_mut().heap;
+    let string = crate::bif::erlang::list_to_iodata(args[0]).unwrap(); // TODO: error handling
+    let mut cursor = std::io::Cursor::new(string);
+
+    let mut encoder = gzip::Encoder::new(Vec::new()).unwrap();
+    std::io::copy(&mut cursor, &mut encoder).unwrap();
+    let encoded_data = encoder.finish().into_result().unwrap();
+
+    Ok(Term::binary(heap, Binary::from(encoded_data)))
+}
+
+pub fn uncompress_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    use libflate::gzip;
+    let heap = &process.context_mut().heap;
+    let string = crate::bif::erlang::list_to_iodata(args[0]).unwrap(); // TODO: error handling
+
+    println!("uncompressing: {:?}", string);
+
+    // check for gzip magic header
+    if string.len() < 2 || &string[..2] != &[0x1f, 0x8b] {
+        return Ok(Term::binary(heap, Binary::from(string)));
+    }
+
+    let mut data = Vec::new();
+
+    gzip::Decoder::new(std::io::Cursor::new(string))
+        .unwrap()
+        .read_to_end(&mut data)
+        .unwrap();
+
+    Ok(Term::binary(heap, Binary::from(data)))
+}
+
 #[cfg(test)]
 mod tests {}

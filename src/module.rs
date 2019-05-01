@@ -87,6 +87,36 @@ impl Module {
             }
         });
     }
+
+    pub fn load_nifs(&mut self, vm: &Machine, nifs: &Vec<(u32, u32, bif::Fn)>) {
+        use crate::loader::{Instruction, LValue};
+        let mut exports = vm.exports.write();
+
+        for (name, arity, fun) in nifs {
+            // find func_info
+            if let Some(i) = self.instructions.iter().position(|ins| {
+                let lname = LValue::Atom(*name);
+                let larity = LValue::Literal(*arity);
+                ins.op == crate::opcodes::Opcode::FuncInfo
+                    && ins.args[1] == lname
+                    && ins.args[2] == larity
+            }) {
+                let mfa = MFA(self.name, *name, *arity);
+                exports.insert(mfa, crate::exports_table::Export::Bif(*fun));
+
+                let pos = self.imports.len();
+                self.imports.push(mfa);
+                // replace instruction immediately after with call_nif
+                self.instructions[i + 1] = Instruction {
+                    op: crate::opcodes::Opcode::CallExtOnly,
+                    args: vec![LValue::Literal(*arity), LValue::Literal(pos as u32)],
+                };
+                println!("NIF replaced {}", mfa);
+            } else {
+                panic!("NIF stub not found")
+            }
+        }
+    }
 }
 
 pub fn load_module(vm: &Machine, path: &str) -> Result<*const Module, std::io::Error> {
@@ -105,8 +135,18 @@ pub fn finish_loading_modules(vm: &Machine, modules: Vec<Box<Module>>) {
         let mut registry = vm.modules.lock();
         let module = registry.add_module(module.name, module);
 
-        let mut exports = vm.exports.write();
-        module.process_exports(&mut *exports);
+        {
+            let mut exports = vm.exports.write();
+            module.process_exports(&mut *exports);
+        } // drop exports here so load_nifs will not deadlock
+
+        // FIXME: this is a nasty patch to load_nif on beam_lib.
+        if module.name == atom::BEAM_LIB {
+            // FIXME: eww, we recast a reference
+            let module = unsafe { &mut *(module as *const Module as *mut Module) };
+            let nifs = crate::bif::NIFS.get(&atom::BEAM_LIB).unwrap();
+            module.load_nifs(vm, nifs);
+        }
     }
 }
 
