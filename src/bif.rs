@@ -120,6 +120,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "throw", 1 => bif_erlang_throw_1,
             "exit", 1 => bif_erlang_exit_1,
             "exit", 2 => bif_erlang_exit_2,
+            "halt", 2 => bif_erlang_halt_2,
             "whereis", 1 => bif_erlang_whereis_1,
             "nif_error", 1 => bif_erlang_nif_error_1,
             "nif_error", 2 => bif_erlang_nif_error_2,
@@ -206,6 +207,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "erase", 0 => pdict::erase_0,
             "erase", 1 => pdict::erase_1,
 
+            "is_alive", 0 => is_alive,
 
             // dtrace
             "dt_put_tag", 1 => dtrace::dt_put_tag_1,
@@ -319,6 +321,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             // monitor nodes is unimplemented for now
             "monitor_nodes", 1 => monitor_nodes,
             "monitor_nodes", 2 => monitor_nodes,
+            "dflag_unicode_io", 1 => dflag_unicode_io,
         },
         "re" => {
             "run", 3 => regex::bif::run_3,
@@ -984,6 +987,17 @@ fn bif_erlang_error_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Te
     ))
 }
 
+fn bif_erlang_halt_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    // arg[0] exit code
+    // arg[1] options
+
+    if !args[1].is_nil() {
+        unimplemented!()
+    }
+
+    unimplemented!()
+}
+
 fn bif_erlang_raise_3(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
     let heap = &process.context_mut().heap;
 
@@ -1285,6 +1299,13 @@ fn socket_on_load_0(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Te
 }
 fn monitor_nodes(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> Result {
     Ok(atom!(OK))
+}
+fn is_alive(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> Result {
+    Ok(atom!(FALSE))
+}
+fn dflag_unicode_io(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> Result {
+    // TODO: stub for now
+    Ok(atom!(TRUE))
 }
 
 fn open_port_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
