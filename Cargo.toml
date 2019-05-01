@@ -53,6 +53,8 @@ termion = "1.5.1"
 tokio-stdin-stdout = "0.1.5"
 regex = "1.1.6"
 im = "12.3.4"
+bytes = "0.4.12"
+iovec = "0.1.2"
 
 [dev-dependencies]
 quickcheck = "0.8.0"
