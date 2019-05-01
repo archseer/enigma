@@ -868,7 +868,7 @@ mod tests {
     fn test_make_tuple_2() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
 
         let number = Term::int(2);
@@ -893,7 +893,7 @@ mod tests {
     fn test_make_tuple_2_bad_arg_wrong_type_of_tuple() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
 
         let number = Term::from(2.1);
@@ -912,7 +912,7 @@ mod tests {
     fn test_make_tuple_2_bad_arg_negative_number() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
 
         let number = Term::int(-1);
@@ -930,7 +930,7 @@ mod tests {
     fn test_tuple_make_tuple_3() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
@@ -968,7 +968,7 @@ mod tests {
     fn test_tuple_make_tuple_3_bad_arg_wrong_type_of_number() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
@@ -999,7 +999,7 @@ mod tests {
     fn test_tuple_make_tuple_3_bad_arg_negative_number() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
@@ -1030,7 +1030,7 @@ mod tests {
     fn test_tuple_make_tuple_3_bad_arg_wrong_type_of_init_list() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
         let _heap = &process.context_mut().heap;
 
@@ -1052,7 +1052,7 @@ mod tests {
     fn test_tuple_make_tuple_3_bad_arg_wrong_structure_init_list() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
@@ -1083,7 +1083,7 @@ mod tests {
     fn test_tuple_make_tuple_3_bad_arg_init_list_out_of_range() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 
@@ -1114,7 +1114,7 @@ mod tests {
     fn test_append_element_2() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
 
         let heap = &process.context_mut().heap;
@@ -1140,7 +1140,7 @@ mod tests {
     fn test_append_element_2_bad_arg_wrong_type_of_tuple() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
 
         let bad_tuple = Term::int(0);
@@ -1159,7 +1159,7 @@ mod tests {
     fn test_setelement_3() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
 
         let heap = &process.context_mut().heap;
@@ -1186,7 +1186,7 @@ mod tests {
     fn test_setelement_3_bad_arg_wrong_type_of_index() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
 
         let heap = &process.context_mut().heap;
@@ -1207,7 +1207,7 @@ mod tests {
     fn test_setelement_3_bad_arg_wrong_type_of_tuple() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
 
         let _heap = &process.context_mut().heap;
@@ -1228,7 +1228,7 @@ mod tests {
     fn test_setelement_3_bad_arg_tuple_out_of_range() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
 
         let heap = &process.context_mut().heap;
@@ -1249,7 +1249,7 @@ mod tests {
     fn test_tuple_to_list_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
 
         let heap = &process.context_mut().heap;
@@ -1281,7 +1281,7 @@ mod tests {
     fn test_tuple_to_list_1_bad_arg_wrong_type_of_tuple() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
 
         let bad_tuple = Term::from(1);
@@ -1299,7 +1299,7 @@ mod tests {
     fn test_list_to_iodata() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, module).unwrap();
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let process = process::cast(process);
         let heap = &process.context_mut().heap;
 

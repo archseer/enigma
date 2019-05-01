@@ -206,6 +206,7 @@ impl Process {
     pub fn with_rc(
         pid: PID,
         parent: PID,
+        group_leader: PID,
         context: ExecutionContext,
         // global_allocator: RcGlobalAllocator,
         // config: &Config,
@@ -216,7 +217,7 @@ impl Process {
             flags: Flag::INITIAL,
             state: StateFlag::INITIAL,
             parent,
-            group_leader: parent,
+            group_leader,
             name: None,
             initial_call: MFA(0, 0, 0),
             error_handler: atom::ERROR_HANDLER,
@@ -239,13 +240,19 @@ impl Process {
     pub fn from_block(
         pid: PID,
         parent: PID,
+        group_leader: PID,
         module: *const Module,
         // global_allocator: RcGlobalAllocator,
         // config: &Config,
     ) -> RcProcess {
         let context = ExecutionContext::new(module);
 
-        Process::with_rc(pid, parent, context /*global_allocator, config*/)
+        Process::with_rc(
+            pid,
+            parent,
+            group_leader,
+            context, /*global_allocator, config*/
+        )
     }
 
     #[allow(clippy::mut_from_ref)]
@@ -518,7 +525,12 @@ impl Process {
     }
 }
 
-pub fn allocate(vm: &Machine, parent: PID, module: *const Module) -> Result<RcProcess, Exception> {
+pub fn allocate(
+    vm: &Machine,
+    parent: PID,
+    group_leader: PID,
+    module: *const Module,
+) -> Result<RcProcess, Exception> {
     let mut process_table = vm.process_table.lock();
 
     let pid = process_table
@@ -526,7 +538,10 @@ pub fn allocate(vm: &Machine, parent: PID, module: *const Module) -> Result<RcPr
         .ok_or_else(|| Exception::new(Reason::EXC_SYSTEM_LIMIT))?;
 
     let process = Process::from_block(
-        pid, parent, module, /*, vm.global_allocator.clone(), &vm.config*/
+        pid,
+        parent,
+        group_leader,
+        module, /*, vm.global_allocator.clone(), &vm.config*/
     );
 
     process_table.map(pid, process.clone());
@@ -561,7 +576,7 @@ pub fn spawn(
     args: Term,
     flags: SpawnFlag,
 ) -> Result<Term, Exception> {
-    let new_proc = allocate(vm, parent.pid, module)?;
+    let new_proc = allocate(vm, parent.pid, parent.local_data().group_leader, module)?;
     let context = new_proc.context_mut();
     let mut ret = Term::pid(new_proc.pid);
 

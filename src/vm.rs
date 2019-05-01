@@ -698,7 +698,7 @@ impl Machine {
         let registry = self.modules.lock();
         //let module = unsafe { &*module::load_module(self, path).unwrap() };
         let module = registry.lookup(atom::from_str("erl_init")).unwrap();
-        let process = process::allocate(&self, 0 /* itself */, module).unwrap();
+        let process = process::allocate(&self, 0 /* itself */, 0, module).unwrap();
 
         /* TEMP */
         let context = process.context_mut();
