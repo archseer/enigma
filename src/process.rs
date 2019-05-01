@@ -646,7 +646,7 @@ pub fn spawn(
 }
 
 pub fn send_message(vm: &Machine, sender: PID, pid: Term, msg: Term) -> Result<Term, Exception> {
-    // println!("sending from={} to={}, msg={}", sender, pid, msg);
+    println!("sending from={} to={}, msg={}", sender, pid, msg);
     let receiver = match pid.into_variant() {
         value::Variant::Atom(name) => {
             if let Some(process) = vm.process_registry.lock().whereis(name) {

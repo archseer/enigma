@@ -123,16 +123,16 @@ pub fn spawn(
         Variant::Atom(atom::SPAWN) => {
             match tup[1].into_variant() {
                 Variant::Atom(atom::TTY_SL) => vm.runtime.executor().spawn(tty(pid, owner, input).unit_error().boxed().compat()),
-                _ => unimplemented!(),
+                _ => unimplemented!("port::spawn for {}", args),
             }
         }
         Variant::Atom(atom::FD) => {
             match (tup[1].into_variant(), tup[2].into_variant()) {
                 (Variant::Integer(2), Variant::Integer(2)) => vm.runtime.executor().spawn(stderr(pid, owner, input).unit_error().boxed().compat()),
-                _ => unimplemented!()
+                _ => unimplemented!("port::spawn for {}", args),
             }
         }
-        _ => unimplemented!()
+        _ => unimplemented!("port::spawn for {}", args),
     };
 
     Ok(pid)
@@ -140,10 +140,12 @@ pub fn spawn(
 
 pub fn send_message(
     vm: &Machine,
-    _from: PID,
+    from: PID,
     port: ID,
     msg: Term
     ) -> Result<Term, Exception> {
+    println!("sending from {} to port {} msg {}", from, port, msg);
+
     let res = vm.port_table.read().lookup(port).map(|port| port.chan.clone());
     if let Some(mut chan) = res {
         // TODO: error unhandled
@@ -239,6 +241,9 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
 
     // need to disable echo and canon
 
+    // TODO FIXME: this heap will get trashed if tty shuts down
+    let heap = crate::immix::Heap::new();
+
     loop {
         select! {
             msg = input.next() => {
@@ -246,8 +251,31 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
                 match msg {
                     // * Port ! {Owner, {command, Data}}
                     Some(Signal::Command(bytes)) => {
-                        out.write_all(&bytes).unwrap();
-                        out.flush().unwrap();
+                        match bytes[0] {
+                            // PUTC
+                            0 => {
+                                out.write_all(&bytes[1..]).unwrap();
+                                out.flush().unwrap();
+                            }
+                            // 1 MOVE
+                            // 2 INSC
+                            // 3 DELC
+                            // 4 BEEP
+                            // PUTC_SYNC
+                            5 => {
+                                out.write_all(&bytes[1..]).unwrap();
+                                out.flush().unwrap();
+
+                                crate::process::send_signal(&Machine::current(), owner, crate::process::Signal::Message {
+                                    from: id, // TODO: this was supposed to be port id, not pid
+                                    value: tup2!(&heap, Term::port(id), atom!(OK))
+                                });
+                            }
+                            n => unimplemented!("command {} for tty", n),
+                        }
+                        // POP first char as command
+                        // on 5 == sync_putc, we need to send back an ack
+                        // {port, :ok}
                     }
                     // * Port ! {Owner, {connect, NewOwner}}
                     Some(Signal::Connect(_new_owner)) => {

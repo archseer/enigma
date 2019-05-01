@@ -9,7 +9,7 @@ macro_rules! tup {
     ($heap:expr, $($value:expr),*) => {
         {
             let _cap = tup!(@count $($value),*);
-            let _tuple = value::tuple($heap, _cap as u32);
+            let _tuple = crate::value::tuple($heap, _cap as u32);
             let mut _i = 0usize;
             unsafe {
                 $(
@@ -22,7 +22,7 @@ macro_rules! tup {
 
     };
     ($heap:expr, $element1:expr, $element2:expr, $element3:expr, $element4:expr) => {{
-        let tuple = value::tuple($heap, 4);
+        let tuple = crate::value::tuple($heap, 4);
         unsafe {
             std::ptr::write(&mut tuple[0], $element1);
             std::ptr::write(&mut tuple[1], $element2);
@@ -36,7 +36,7 @@ macro_rules! tup {
 #[macro_export]
 macro_rules! tup2 {
     ($heap:expr, $element1:expr, $element2:expr) => {{
-        let tuple = value::tuple($heap, 2);
+        let tuple = crate::value::tuple($heap, 2);
         unsafe {
             std::ptr::write(&mut tuple[0], $element1);
             std::ptr::write(&mut tuple[1], $element2);
@@ -48,7 +48,7 @@ macro_rules! tup2 {
 #[macro_export]
 macro_rules! tup3 {
     ($heap:expr, $element1:expr, $element2:expr, $element3:expr) => {{
-        let tuple = value::tuple($heap, 3);
+        let tuple = crate::value::tuple($heap, 3);
         // use ptr write to avoid dropping uninitialized values!
         unsafe {
             std::ptr::write(&mut tuple[0], $element1);

@@ -755,8 +755,6 @@ fn bif_erlang_send_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
     let pid = args[0];
     let msg = args[1];
 
-    // println!("sending from {} to {} msg {}", process.pid, pid, msg);
-
     match pid.into_variant() {
         Variant::Port(id) => port::send_message(vm, process.pid, id, msg),
         _ => process::send_message(vm, process.pid, pid, msg),

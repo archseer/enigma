@@ -836,7 +836,6 @@ impl Machine {
                     // send x1 to x0, write result to x0
                     let pid = context.x[0];
                     let msg = context.x[1];
-                    // println!("sending from {} to {} msg {}", process.pid, pid, msg);
                     let res = match pid.into_variant() {
                         Variant::Port(id) => port::send_message(self, process.pid, id, msg),
                         _ => process::send_message(self, process.pid, pid, msg),
