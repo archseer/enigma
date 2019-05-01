@@ -289,6 +289,7 @@ pub const BOXED_SUBBINARY: u8 = 10;
 pub const BOXED_MODULE: u8 = 20;
 pub const BOXED_EXPORT: u8 = 21;
 pub const BOXED_FILE: u8 = 22;
+pub const BOXED_BUFFER: u8 = 23;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -507,6 +508,13 @@ impl Term {
         }))
     }
 
+    pub fn buffer(heap: &Heap, value: crate::bif::prim_buffer::Buffer) -> Self {
+        Term::from(heap.alloc(Boxed {
+            header: BOXED_BUFFER,
+            value,
+        }))
+    }
+
     pub fn boxed<T>(heap: &Heap, header: u8, value: T) -> Self {
         Term::from(heap.alloc(Boxed { header, value }))
     }
@@ -590,6 +598,7 @@ impl Term {
                 BOXED_MODULE => Type::Ref, // init expects a module in progress as a ref
                 BOXED_EXPORT => Type::Closure, // exports are a type of function
                 BOXED_FILE => Type::Ref,   // files are stored as magic ref pointers in beam
+                BOXED_BUFFER => Type::Ref, // files are stored as magic ref pointers in beam
                 i => unimplemented!("get_type for {}", i),
             },
             _ => unreachable!(),
@@ -1129,9 +1138,10 @@ impl std::fmt::Display for Variant {
                         write!(f, "#Ref<0.0.0.{}>", reference)
                     }
                     BOXED_BINARY => {
-                        // let binary = &(*(*ptr as *const Boxed<bitstring::RcBinary>)).value;
-                        // write!(f, "#Binary<{:.40?}>", binary.data) // up to 40 chars
-                        write!(f, "#Binary<>")
+                        let binary = &(*(*ptr as *const Boxed<bitstring::RcBinary>)).value;
+                        write!(f, "#Binary<{:.40?}>", binary.data) // up to 40 chars
+
+                        // write!(f, "#Binary<>")
                     }
                     BOXED_SUBBINARY => write!(f, "#SubBinary<>"),
                     BOXED_MATCHSTATE => write!(f, "#MatchState<>"),
@@ -1169,6 +1179,7 @@ impl std::fmt::Display for Variant {
                         write!(f, "&{}", ptr.value)
                     }
                     BOXED_FILE => write!(f, "#File<REF>"),
+                    BOXED_BUFFER => write!(f, "#Buffer<REF>"),
                     _ => unimplemented!(),
                 }
             },

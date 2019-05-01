@@ -25,6 +25,7 @@ mod load;
 mod maps;
 mod os;
 mod pdict;
+pub mod prim_buffer;
 mod prim_file;
 mod timer;
 
@@ -362,6 +363,17 @@ pub static NIFS: Lazy<NifTable> = sync_lazy! {
             "list_dir_nif", 1 => prim_file::list_dir_nif_1,
             "internal_native2name", 1 => prim_file::internal_native2name_1,
             "internal_name2native", 1 => prim_file::internal_name2native_1,
+        },
+        "prim_buffer" => {
+            "new", 0 => prim_buffer::bif::new_0,
+            "size", 1 => prim_buffer::bif::size_1,
+            "peek_head", 1 => prim_buffer::bif::peek_head_1,
+            "copying_read", 2 => prim_buffer::bif::copying_read_2,
+            "write", 2 => prim_buffer::bif::write_2,
+            "skip", 2 => prim_buffer::bif::skip_2,
+            "find_byte_index", 2 => prim_buffer::bif::find_byte_index_2,
+            "try_lock", 1 => prim_buffer::bif::try_lock_1,
+            "unlock", 1 => prim_buffer::bif::unlock_1,
         },
     ]
 };

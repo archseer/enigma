@@ -393,6 +393,11 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("skip_type_check");
 
     atoms.register_atom("purify");
+
+    atoms.register_atom("acquired");
+    atoms.register_atom("busy");
+    atoms.register_atom("lock_order_violation");
+
     atoms
 };
 
@@ -673,6 +678,10 @@ pub const SYNC: u32 = 234;
 pub const SKIP_TYPE_CHECK: u32 = 235;
 
 pub const PURIFY: u32 = 236;
+
+pub const ACQUIRED: u32 = 237;
+pub const BUSY: u32 = 238;
+pub const LOCK_ORDER_VIOLATION: u32 = 239;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)
