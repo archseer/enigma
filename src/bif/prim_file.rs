@@ -4,10 +4,45 @@ use crate::bitstring::Binary;
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
 use crate::process::Process;
-use crate::value::{self, Cons, Term, TryFrom, Variant};
+use crate::value::{self, Cons, Term, TryFrom, TryFromMut, Variant};
 use crate::vm;
-use std::fs;
+use std::fs::{self, File};
+use std::io::{Read, Write};
 use std::pin::Pin;
+
+impl TryFrom<Term> for std::fs::File {
+    type Error = value::WrongBoxError;
+
+    #[inline]
+    fn try_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
+        if let value::Variant::Pointer(ptr) = value.into_variant() {
+            unsafe {
+                if *ptr == value::BOXED_FILE {
+                    return Ok(&(*(ptr as *const value::Boxed<Self>)).value);
+                }
+            }
+        }
+        Err(value::WrongBoxError)
+    }
+}
+
+impl TryFromMut<Term> for std::fs::File {
+    type Error = value::WrongBoxError;
+
+    #[inline]
+    fn try_from_mut(value: &Term) -> Result<&mut Self, value::WrongBoxError> {
+        if let value::Variant::Pointer(ptr) = value.into_variant() {
+            unsafe {
+                if *ptr == value::BOXED_FILE {
+                    return Ok(&mut (*(ptr as *const value::Boxed<Self>
+                        as *mut value::Boxed<Self>))
+                        .value);
+                }
+            }
+        }
+        Err(value::WrongBoxError)
+    }
+}
 
 fn error_to_tuple(heap: &Heap, error: std::io::Error) -> Term {
     use std::io::ErrorKind;
@@ -23,6 +58,13 @@ fn error_to_tuple(heap: &Heap, error: std::io::Error) -> Term {
         _ => unimplemented!("error_to_tuple for {:?}", error),
     };
     tup2!(heap, atom!(ERROR), kind)
+}
+pub fn get_device_cwd_nif_1(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    unimplemented!()
 }
 
 pub fn get_cwd_nif_0(
@@ -42,6 +84,10 @@ pub fn get_cwd_nif_0(
         _ => Err(Exception::new(Reason::EXC_INTERNAL_ERROR)),
     }
     // TODO: make a function that converts io::Error to a tuple
+}
+
+pub fn set_cwd_nif_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    unimplemented!()
 }
 
 /// Reads an entire file into \c result, stopping after \c size bytes or EOF. It will read until
@@ -68,6 +114,14 @@ pub fn read_file_nif_1(
         atom!(OK),
         Term::binary(heap, Binary::from(bytes))
     ))
+}
+
+pub fn ipread_s32bu_p32bu_nif_3(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    unimplemented!()
 }
 
 // TODO: maybe we should pass around as OsString which is null terminated dunno
@@ -342,6 +396,173 @@ pub fn open_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term])
 }
 
 pub fn close_nif_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    let file = File::try_from_mut(&args[0])?;
+    drop(file); // TODO: the ref on heap is now garbage
+    Ok(atom!(OK))
+}
+
+pub fn read_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    let heap = &process.context_mut().heap;
+    let file = File::try_from_mut(&args[0])?;
+
+    let size = match args[1].into_variant() {
+        Variant::Integer(i) => i as usize,
+        // TODO: bigint
+        _ => unimplemented!(),
+        // _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    let mut buffer = vec![0; size];
+
+    eprintln!("read_nif_2: fd: {:?} size: {}", file, size);
+
+    match dbg!(file.read(&mut buffer)) {
+        Ok(0) => Ok(atom!(EOF)),
+        Ok(n) => {
+            buffer.truncate(n);
+            Ok(tup2!(
+                heap,
+                atom!(OK),
+                Term::binary(heap, Binary::from(buffer))
+            ))
+        }
+        Err(err) => return Ok(error_to_tuple(heap, err)),
+    }
+}
+
+pub fn write_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn pread_nif_3(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn pwrite_nif_3(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn seek_nif_3(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn sync_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn truncate_nif_1(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn allocate_nif_3(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn advise_nif_4(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    unimplemented!()
+}
+
+// filesystem ops
+
+pub fn make_hard_link_nif_2(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn make_soft_link_nif_2(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn rename_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn set_permissions_nif_2(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn set_owner_nif_3(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn set_time_nif_4(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn read_link_nif_1(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn make_dir_nif_1(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn del_file_nif_1(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn del_dir_nif_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    unimplemented!()
+}
+
+// internal nifs
+
+pub fn get_handle_nif_1(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn delayed_close_nif_1(
+    _vm: &vm::Machine,
+    process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
+    unimplemented!()
+}
+
+pub fn altname_nif_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 

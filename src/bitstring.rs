@@ -43,6 +43,8 @@ macro_rules! bit_offset {
     };
 }
 
+// TODO: replace RcBinary by a binary that keeps Bytes/BytesMut
+
 #[derive(Debug)]
 pub struct Binary {
     // pub flags: AtomicUsize, // TODO use AtomicU8 once integer_atomics lands in rust 1.33
@@ -123,6 +125,20 @@ impl From<&[u8]> for Binary {
             is_writable: true,
             data: value.to_vec(),
         }
+    }
+}
+
+impl AsRef<[u8]> for Binary {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.data.as_ref()
+    }
+}
+
+impl AsRef<[u8]> for Arc<Binary> {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.data.as_ref()
     }
 }
 

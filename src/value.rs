@@ -33,6 +33,14 @@ pub trait TryFrom<T>: Sized {
     fn try_from(value: &T) -> Result<&Self, Self::Error>;
 }
 
+pub trait TryFromMut<T>: Sized {
+    /// The type returned in the event of a conversion error.
+    type Error;
+
+    /// Performs the conversion.
+    fn try_from_mut(value: &T) -> Result<&mut Self, Self::Error>;
+}
+
 pub trait TryInto<T>: Sized {
     /// The type returned in the event of a conversion error.
     type Error;

@@ -357,10 +357,43 @@ pub static NIFS: Lazy<NifTable> = sync_lazy! {
         "prim_file" => {
             "open_nif", 2 => prim_file::open_nif_2,
             "close_nif", 1 => prim_file::close_nif_1,
-            "get_cwd_nif", 0 => prim_file::get_cwd_nif_0,
-            "read_file_nif", 1 => prim_file::read_file_nif_1,
+            "read_nif", 2 => prim_file::read_nif_2,
+            "write_nif", 2 => prim_file::write_nif_2,
+            "pread_nif", 3 => prim_file::pread_nif_3,
+            "pwrite_nif", 3 => prim_file::pwrite_nif_3,
+            "seek_nif", 3 => prim_file::seek_nif_3,
+            "sync_nif", 2 => prim_file::sync_nif_2,
+            "truncate_nif", 1 => prim_file::truncate_nif_1,
+            "allocate_nif", 3 => prim_file::allocate_nif_3,
+            "advise_nif", 4 => prim_file::advise_nif_4,
+
+            // filesystem ops
+            "make_hard_link_nif", 2 => prim_file::make_hard_link_nif_2,
+            "make_soft_link_nif", 2 => prim_file::make_soft_link_nif_2,
+            "rename_nif", 2 => prim_file::rename_nif_2,
             "read_info_nif", 2 => prim_file::read_info_nif_2,
+            "set_permissions_nif", 2 => prim_file::set_permissions_nif_2,
+            "set_owner_nif", 3 => prim_file::set_owner_nif_3,
+            "set_time_nif", 4 => prim_file::set_time_nif_4,
+            "read_link_nif", 1 => prim_file::read_link_nif_1,
             "list_dir_nif", 1 => prim_file::list_dir_nif_1,
+            "make_dir_nif", 1 => prim_file::make_dir_nif_1,
+            "del_file_nif", 1 => prim_file::del_file_nif_1,
+            "del_dir_nif", 1 => prim_file::del_dir_nif_1,
+            "get_device_cwd_nif", 1 => prim_file::get_device_cwd_nif_1,
+            "get_cwd_nif", 0 => prim_file::get_cwd_nif_0,
+            "set_cwd_nif", 1 => prim_file::set_cwd_nif_1,
+
+            // These operations are equivalent to chained calls of other operations,
+            // but have been moved down to avoid excessive rescheduling.
+            "ipread_s32bu_p32bu_nif", 3 => prim_file::ipread_s32bu_p32bu_nif_3,
+            "read_file_nif", 1 => prim_file::read_file_nif_1,
+
+            // internal nifs
+            "get_handle_nif", 1 => prim_file::get_handle_nif_1,
+            "delayed_close_nif", 1 => prim_file::delayed_close_nif_1,
+            "altname_nif", 1 => prim_file::altname_nif_1,
+
             "internal_native2name", 1 => prim_file::internal_native2name_1,
             "internal_name2native", 1 => prim_file::internal_name2native_1,
         },

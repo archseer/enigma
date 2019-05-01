@@ -398,6 +398,8 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("busy");
     atoms.register_atom("lock_order_violation");
 
+    atoms.register_atom("eof");
+
     atoms
 };
 
@@ -682,6 +684,8 @@ pub const PURIFY: u32 = 236;
 pub const ACQUIRED: u32 = 237;
 pub const BUSY: u32 = 238;
 pub const LOCK_ORDER_VIOLATION: u32 = 239;
+
+pub const EOF: u32 = 240;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)
