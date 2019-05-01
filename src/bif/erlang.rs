@@ -334,6 +334,11 @@ pub fn unicode_characters_to_binary_2(
         return Ok(Term::binary(heap, bitstring::Binary::new()));
     }
 
+    // if already binary, just return
+    if args[0].is_binary() {
+        return Ok(args[0]);
+    }
+
     let mut stack = Vec::new();
     let cons = Cons::try_from(&args[0])?;
     stack.push(cons.iter());
