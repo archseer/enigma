@@ -1885,15 +1885,9 @@ impl Machine {
                     let size = ins.args[3].to_u32() as usize;
                     let unit = ins.args[4].to_u32() as usize;
                     let flags = ins.args[5].to_u32();
+                    let mut flags = bitstring::Flag::from_bits(flags as u8).unwrap();
 
                     let bits = size * unit;
-
-                    // match bits {
-                    //     8 => unimplemented!()
-                    //     16 => unimplemented!()
-                    //     32 => unimplemented!()
-                    //     _ => unimplemented!() // slow fallback
-                    // }
 
                     // let size = size * (flags as usize >> 3); TODO: this was just because flags
                     // & size were packed together on BEAM
@@ -1903,11 +1897,88 @@ impl Machine {
                         .expand_arg(&ins.args[1])
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
-                        let res = ms.mb.get_integer(
-                            &context.heap,
-                            bits,
-                            bitstring::Flag::from_bits(flags as u8).unwrap(),
-                        );
+                        #[cfg(target_endian = "little")]
+                        macro_rules! native_endian {
+                            ($x:expr) => {
+                                if $x.contains(bitstring::Flag::BSF_NATIVE) {
+                                    $x.remove(bitstring::Flag::BSF_NATIVE);
+                                    $x.insert(bitstring::Flag::BSF_LITTLE);
+                                }
+                            };
+                        }
+
+                        #[cfg(target_endian = "big")]
+                        macro_rules! native_endian {
+                            ($x:expr) => {
+                                if $x.contains(bitstring::Flag::BSF_NATIVE) {
+                                    $x.remove(bitstring::Flag::BSF_NATIVE);
+                                    $x.remove(bitstring::Flag::BSF_LITTLE);
+                                }
+                            };
+                        }
+                        use std::convert::TryInto;
+                        native_endian!(flags);
+                        // fast path for common ops
+                        let res = match (bits, flags.contains(bitstring::Flag::BSF_LITTLE), flags.contains(bitstring::Flag::BSF_SIGNED)) {
+                            (8, true, true) => {
+                                // little endian, signed
+                                ms.mb.get_bytes(1).map(|b| Term::int(i32::from(i8::from_le_bytes((*b).try_into().unwrap()))))
+                            },
+                            (8, true, false) => {
+                                // little endian unsigned
+                                ms.mb.get_bytes(1).map(|b| Term::uint(&context.heap, u32::from(u8::from_le_bytes((*b).try_into().unwrap()))))
+                            },
+                            (8, false, true) => {
+                                // big endian signed
+                                ms.mb.get_bytes(1).map(|b| Term::int(i32::from(i8::from_be_bytes((*b).try_into().unwrap()))))
+                            },
+                            (8, false, false) => {
+                                // big endian unsigned
+                                ms.mb.get_bytes(1).map(|b| Term::uint(&context.heap, u32::from(u8::from_be_bytes((*b).try_into().unwrap()))))
+                            },
+                            (16, true, true) => {
+                                // little endian, signed
+                                ms.mb.get_bytes(2).map(|b| Term::int(i32::from(i16::from_le_bytes((*b).try_into().unwrap()))))
+                            },
+                            (16, true, false) => {
+                                // little endian unsigned
+                                ms.mb.get_bytes(2).map(|b| Term::uint(&context.heap, u32::from(u16::from_le_bytes((*b).try_into().unwrap()))))
+                            },
+                            (16, false, true) => {
+                                // big endian signed
+                                ms.mb.get_bytes(2).map(|b| Term::int(i32::from(i16::from_be_bytes((*b).try_into().unwrap()))))
+                            },
+                            (16, false, false) => {
+                                // big endian unsigned
+                                ms.mb.get_bytes(2).map(|b| Term::uint(&context.heap, u32::from(u16::from_be_bytes((*b).try_into().unwrap()))))
+                            },
+                            (32, true, true) => {
+                                // little endian, signed
+                                ms.mb.get_bytes(4).map(|b| Term::int(i32::from_le_bytes((*b).try_into().unwrap())))
+                            },
+                            (32, true, false) => {
+                                // little endian unsigned
+                                ms.mb.get_bytes(4).map(|b| Term::uint(&context.heap, u32::from_le_bytes((*b).try_into().unwrap())))
+                            },
+                            (32, false, true) => {
+                                // big endian signed
+                                ms.mb.get_bytes(4).map(|b| Term::int(i32::from_be_bytes((*b).try_into().unwrap())))
+                            },
+                            (32, false, false) => {
+                                // big endian unsigned
+                                ms.mb.get_bytes(4).map(|b| Term::uint(&context.heap, u32::from_be_bytes((*b).try_into().unwrap())))
+                            },
+                            // TODO: 64 bits
+                            // slow fallback 
+                            _ => {
+                                ms.mb.get_integer(
+                                    &context.heap,
+                                    bits,
+                                    flags,
+                                  )
+                            }
+                        };
+
                         if let Some(res) = res {
                             set_register!(context, &ins.args[6], res)
                         } else {

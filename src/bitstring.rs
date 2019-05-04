@@ -479,6 +479,40 @@ impl MatchBuffer {
         self.size - self.offset
     }
 
+    /// This function returns a Cow so we do zero-copy fetching if it's aligned.
+    pub fn get_bytes(&mut self, num_bytes: usize) -> Option<std::borrow::Cow<[u8]>> {
+        let num_bits = num_bytes * 8;
+        if self.remaining() < num_bits {
+            // Asked for too many bits.
+            return None;
+        }
+
+        let byte_offset = byte_offset!(self.offset);
+
+        if self.offset % 8 == 0 {
+            // aligned, advance cursor and return as a borrowed
+            self.offset += num_bits;
+            return Some(std::borrow::Cow::Borrowed(
+                &self.original.data[byte_offset..byte_offset + num_bytes],
+            ));
+        }
+        // unaligned, copy and return as owned
+        let mut buf = vec![0; num_bytes];
+        unsafe {
+            copy_bits(
+                self.original.data.as_ptr(),
+                byte_offset,
+                1,
+                buf.as_mut_ptr(),
+                0,
+                1,
+                num_bits,
+            )
+        };
+        self.offset += num_bits;
+        Some(std::borrow::Cow::Owned(buf))
+    }
+
     pub fn get_integer(&mut self, heap: &Heap, num_bits: usize, mut flags: Flag) -> Option<Term> {
         //    Uint bytes;
         //    Uint bits;
@@ -1662,5 +1696,18 @@ mod tests {
         assert_eq!(1, value.offset);
 
         assert_eq!(Some("root"), res.to_str());
+    }
+
+    #[test]
+    fn get_bytes() {
+        use crate::immix::Heap;
+        let heap = Heap::new();
+        let binary = Arc::new(Binary::from(vec![45, 114, 111, 111, 116]));
+        let mut mb = MatchBuffer::from(binary);
+        mb.offset += 8;
+        let res = mb.get_bytes(2).unwrap();
+
+        assert_eq!(&[114, 111], res.as_ref());
+        assert_eq!(24, mb.offset);
     }
 }
