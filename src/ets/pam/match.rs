@@ -319,18 +319,16 @@ pub fn run(
                         esp.push(c);
                     }
                 }
-                //                Opcode::ConsA() => {
-                //                    ehp = HAllocX(build_proc, 2, HEAP_XTRA);
-                //                    CDR(ehp) = *--esp;
-                //                    CAR(ehp) = esp[-1];
-                //                    esp[-1] = make_list(ehp);
-                //                }
-                //                Opcode::ConsB() => {
-                //                    ehp = HAllocX(build_proc, 2, HEAP_XTRA);
-                //                    CAR(ehp) = *--esp;
-                //                    CDR(ehp) = esp[-1];
-                //                    esp[-1] = make_list(ehp);
-                //                }
+                Opcode::ConsA() => {
+                    let tail = esp.pop().unwrap();
+                    let head = esp.pop().unwrap(); // it's in reverse
+                    esp.push(cons!(&process.context_mut().heap, head, tail))
+                }
+                Opcode::ConsB() => {
+                    let head = esp.pop().unwrap();
+                    let tail = esp.pop().unwrap();
+                    esp.push(cons!(&process.context_mut().heap, head, tail))
+                }
                 //                Opcode::MkTuple(n) => {
                 //                    ehp = HAllocX(build_proc, n+1, HEAP_XTRA);
                 //                    t = make_tuple(ehp);
@@ -381,16 +379,22 @@ pub fn run(
                 //                    }
                 //                    *esp++ = t;
                 //                }
-                //                Opcode::Call1(bif) => {
-                //                    t = (*bif)(build_proc, esp-1);
-                //                    if is_non_value(t) {
-                //                        if (do_catch)
-                //                            t = FAIL_TERM;
-                //                        else
-                //                            fail!();
-                //                    }
-                //                    esp[-1] = t;
-                //                }
+                Opcode::Call1(bif) => {
+                    let arg0 = esp.pop().unwrap();
+                    let args = &[arg0];
+                    match bif(vm, process, args) {
+                        Ok(t) => {
+                            esp.push(t);
+                        }
+                        Err(_) => {
+                            if do_catch {
+                                // t = FAIL_TERM;
+                            } else {
+                                fail!();
+                            }
+                        }
+                    }
+                }
                 Opcode::Call2(bif) => {
                     let arg1 = esp.pop().unwrap();
                     let arg0 = esp.pop().unwrap(); // it's in reverse
@@ -408,20 +412,24 @@ pub fn run(
                         }
                     }
                 }
-                //                Opcode::Call3(bif) => {
-                //                    bif_args[0] = esp[-1];
-                //                    bif_args[1] = esp[-2];
-                //                    bif_args[2] = esp[-3];
-                //                    t = (*bif)(build_proc, bif_args);
-                //                    if is_non_value(t) {
-                //                        if (do_catch)
-                //                            t = FAIL_TERM;
-                //                        else
-                //                            fail!();
-                //                    }
-                //                    esp -= 2;
-                //                    esp[-1] = t;
-                //                }
+                Opcode::Call3(bif) => {
+                    let arg2 = esp.pop().unwrap();
+                    let arg1 = esp.pop().unwrap();
+                    let arg0 = esp.pop().unwrap(); // it's in reverse
+                    let args = &[arg0, arg1, arg2];
+                    match bif(vm, process, args) {
+                        Ok(t) => {
+                            esp.push(t);
+                        }
+                        Err(_) => {
+                            if do_catch {
+                                // t = FAIL_TERM;
+                            } else {
+                                fail!();
+                            }
+                        }
+                    }
+                }
                 Opcode::PushVResult(n) => {
                     assert!(!variables[n].is_none());
                     if !in_flags.contains(Flag::COPY_RESULT) {
@@ -544,9 +552,9 @@ pub fn run(
                 //                Opcode::Selff() => {
                 //                    *esp++ = self->common.id;
                 //                }
-                //                Opcode::Waste() => {
-                //                    --esp;
-                //                }
+                Opcode::Waste() => {
+                    esp.pop();
+                }
                 Opcode::Return() => {
                     ret = esp.pop().unwrap();
                 }
@@ -802,7 +810,10 @@ pub fn run(
 
                     return Some(ret);
                 }
-                _ => unreachable!("Internal error: unexpected opcode in match program."),
+                _ => unreachable!(
+                    "Internal error: unexpected opcode in match program. {}",
+                    &pat.program[pc]
+                ),
             }
             pc += 1;
         }
