@@ -1,7 +1,7 @@
 // The nightly features that are commonly needed with async / await
 #![feature(await_macro, async_await, alloc_layout_extra)]
 #![feature(arbitrary_self_types)]
-#![recursion_limit = "512"] // yeowch
+#![recursion_limit = "1024"] // yeowch
 
 // This pulls in the `tokio-async-await` crate. While Rust 2018 doesn't require
 // `extern crate`, we need to pull in the macros.

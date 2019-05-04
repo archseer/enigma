@@ -144,7 +144,7 @@ pub fn send_message(
     port: ID,
     msg: Term
     ) -> Result<Term, Exception> {
-    println!("sending from {} to port {} msg {}", from, port, msg);
+    // println!("sending from {} to port {} msg {}", from, port, msg);
 
     let res = vm.port_table.read().lookup(port).map(|port| port.chan.clone());
     if let Some(mut chan) = res {
@@ -197,7 +197,7 @@ pub fn control(
 
         // TODO: error unhandled
         use futures::sink::SinkExt as FuturesSinkExt;
-        let bytes = msg.to_bytes().unwrap().to_owned();
+        let bytes = crate::bif::erlang::list_to_iodata(msg).unwrap();
         // let fut = chan
         //     .send(port::Signal::Command(bytes))
         //     .map_err(|_| ())
@@ -228,6 +228,7 @@ type Driver = fn(owner: PID, input: mpsc::UnboundedReceiver<Signal>);
 /// Port driver implementations.
 
 async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
+    use termion::terminal_size;
     let mut buf: [u8;1024] = [0;1024];
     // let mut stdin = tokio::io::stdin().compat();
     let mut stdin = tokio_stdin_stdout::stdin(0).compat();
@@ -244,6 +245,8 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
     // TODO FIXME: this heap will get trashed if tty shuts down
     let heap = crate::immix::Heap::new();
 
+    const TTYSL_DRV_CONTROL_MAGIC_NUMBER: usize = 0x018b0900;
+
     loop {
         select! {
             msg = input.next() => {
@@ -254,13 +257,28 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
                         match bytes[0] {
                             // PUTC
                             0 => {
+
                                 out.write_all(&bytes[1..]).unwrap();
                                 out.flush().unwrap();
                             }
                             // 1 MOVE
+                            1 => {
+                                let n = ((bytes[1] as u16) << 8) | bytes[2] as u16;
+                                write!(out, "{}", termion::cursor::Left(n));
+                            }
                             // 2 INSC
+                            2 => {
+
+                            }
                             // 3 DELC
-                            // 4 BEEP
+                            3 => {
+
+                            }
+                            // BEEP
+                            4 => {
+                                out.write_all(b"\x07").unwrap();
+                                out.flush().unwrap();
+                            }
                             // PUTC_SYNC
                             5 => {
                                 out.write_all(&bytes[1..]).unwrap();
@@ -288,8 +306,49 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
                     },
 
                     // port_control stuff (op_get_winsize)
-                    Some(Signal::Control{..}) => {
-                        unimplemented!("unimplemented control");
+                    Some(Signal::Control{from, reference, opcode, ..}) => {
+                        match opcode - TTYSL_DRV_CONTROL_MAGIC_NUMBER {
+                            // WINSIZE
+                            100 => {
+                                let (w, h) = terminal_size().unwrap();
+                                let w = u32::from(w).to_ne_bytes();
+                                let h = u32::from(h).to_ne_bytes();
+                                let bytes = &[w, h].concat();
+
+                                // basically bitstring!
+                                let mut list = Term::nil();
+                                for char in bytes.iter().copied().rev() {
+                                    list = cons!(&heap, Term::int(i32::from(char)), list);
+                                }
+
+                                crate::process::send_signal(&Machine::current(), from, crate::process::Signal::Message {
+                                    from: id, // TODO: this was supposed to be port id, not pid
+                                    value: tup2!(&heap, Term::reference(&heap, reference), list)
+                                });
+                            },
+                            // GET_UNICODE_STATE
+                            101 => {
+                                crate::process::send_signal(&Machine::current(), from, crate::process::Signal::Message {
+                                    from: id, // TODO: this was supposed to be port id, not pid
+                                    value: tup2!(&heap, Term::reference(&heap, reference), cons!(&heap, Term::int(1), Term::nil()))
+                                });
+                            },
+                            // SET_UNICODE_STATE
+                            102 => {
+                                crate::process::send_signal(&Machine::current(), from, crate::process::Signal::Message {
+                                    from: id, // TODO: this was supposed to be port id, not pid
+                                    value: tup2!(&heap, Term::reference(&heap, reference), cons!(&heap, Term::int(1), Term::nil()))
+                                });
+                            },
+                            _ => {
+                                crate::process::send_signal(&Machine::current(), from, crate::process::Signal::Message {
+                                    from: id, // TODO: this was supposed to be port id, not pid
+                                    value: tup2!(&heap, Term::reference(&heap, reference), atom!(BADARG))
+                                });
+                                println!("badarg yo");
+                                break;
+                            }
+                        }
                     }
   
                     // TODO, drop Signal::Close, just close sender
