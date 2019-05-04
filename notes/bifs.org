@@ -197,7 +197,7 @@
 ** System [1/2]
 - [ ] bif erlang:system_flag/2
 - [X] bif erlang:system_info/1
-** New in R9C [31/44]
+** New in R9C [33/44]
 - [ ] bif erlang:system_monitor/0
 - [ ] bif erlang:system_monitor/1
 - [ ] bif erlang:system_monitor/2
@@ -246,8 +246,8 @@
 - [X] ubif erlang:'bsl'/2
 - [X] ubif erlang:'bsr'/2
 - [X] ubif erlang:'bnot'/1
-- [ ] ubif erlang:'-'/1			sminus_1
-- [ ] ubif erlang:'+'/1			splus_1
+- [X] ubif erlang:'-'/1			sminus_1
+- [X] ubif erlang:'+'/1			splus_1
 
 
 ** New operators [16/22]

@@ -861,6 +861,26 @@ pub fn bnot_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) ->
     Ok(Term::int(!i1))
 }
 
+pub fn sminus_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    // if number, negate number else return error badarith
+    let heap = &process.context_mut().heap;
+    match args[0].into_number() {
+        Ok(value::Num::Integer(i)) => Ok(Term::int(-i)),
+        Ok(value::Num::Float(i)) => Ok(Term::from(-i)),
+        Ok(value::Num::Bignum(i)) => Ok(Term::bigint(heap, -i)),
+        _ => return Err(Exception::new(Reason::EXC_BADARITH)),
+    }
+}
+
+pub fn splus_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+    // if number, return number else return error badarith
+    let heap = &process.context_mut().heap;
+    match args[0].into_number() {
+        Ok(_) => Ok(args[0]),
+        _ => return Err(Exception::new(Reason::EXC_BADARITH)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -155,6 +155,8 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "list_to_tuple", 1 => erlang::list_to_tuple_1,
             "++", 2 => erlang::append_2,
             "append", 2 => erlang::append_2,
+            // "--", 2 => erlang::subtract_2,
+            // "subtract", 2 => erlang::subtract_2,
             "make_ref", 0 => erlang::make_ref_0,
             "process_info", 2 => info::process_info_2,
             "system_info", 1 => info::system_info_1,
@@ -187,8 +189,8 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "bsl", 2 => erlang::bsl_2,
             "bsr", 2 => erlang::bsr_2,
             "bnot", 1 => erlang::bnot_1,
-            // "-", 1 => erlang::sminus_1,
-            // "+", 1 => erlang::splus_1,
+            "-", 1 => erlang::sminus_1,
+            "+", 1 => erlang::splus_1,
 
            // loader
             "prepare_loading", 2 => load::prepare_loading_2,

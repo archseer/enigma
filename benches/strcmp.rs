@@ -7,7 +7,6 @@ use libenigma::bitstring;
 use libenigma::bitstring::{Binary, SubBinary};
 use libenigma::servo_arc::Arc;
 
-
 #[bench]
 fn bitstring_cmpbits(b: &mut Bencher) {
     let binary = Arc::new(Binary::from(vec![0x0B, 0xCD, 0xE]));
