@@ -15,6 +15,19 @@
 // pushv_result(2)
 // return
 // halt
+// ----
+// tuple(2)
+// pusht(2)
+// eq(#Pid<40>)
+// pop
+// eq(:application_master)
+// bind(1)
+// catch
+// push_c([])
+// pushv_result(1)
+// cons_b
+// return
+// halt
 use super::*;
 use crate::vm;
 

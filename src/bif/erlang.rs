@@ -874,7 +874,6 @@ pub fn sminus_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -
 
 pub fn splus_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     // if number, return number else return error badarith
-    let heap = &process.context_mut().heap;
     match args[0].into_number() {
         Ok(_) => Ok(args[0]),
         _ => return Err(Exception::new(Reason::EXC_BADARITH)),

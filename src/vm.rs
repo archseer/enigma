@@ -660,6 +660,7 @@ impl Machine {
         // Create the runtime
         let machine = self.clone();
         let mut runtime = tokio::runtime::Builder::new()
+            // .panic_handler(|err| std::panic::resume_unwind(err))
             .after_start(move || {
                 Machine::set_current(machine.clone()); // ughh double clone
             })
@@ -668,6 +669,7 @@ impl Machine {
 
         let machine = self.clone();
         let mut process_pool = tokio::runtime::Builder::new()
+            // .panic_handler(|err| std::panic::resume_unwind(err))
             .after_start(move || {
                 Machine::set_current(machine.clone());
             })
@@ -744,7 +746,7 @@ impl Machine {
                             // yield
                         } else {
                             process.exit(&vm, message);
-                            println!("pid={} action=exited", process.pid);
+                            // println!("pid={} action=exited", process.pid);
                             break // crashed
                         }
                     } else {
@@ -821,12 +823,12 @@ impl Machine {
                     // coming out of nowhere, probably, needed for NIFs.
 
                     // happens if no other clause matches
-                    eprintln!(
-                        "function clause! {} {} {:?}",
-                        context.expand_arg(&ins.args[0]),
-                        context.expand_arg(&ins.args[1]),
-                        ins.args[2]
-                    );
+                    // eprintln!(
+                    //     "function clause! {} {} {:?}",
+                    //     context.expand_arg(&ins.args[0]),
+                    //     context.expand_arg(&ins.args[1]),
+                    //     ins.args[2]
+                    // );
                     return Err(Exception::new(Reason::EXC_FUNCTION_CLAUSE));
                 }
                 Opcode::Return => {

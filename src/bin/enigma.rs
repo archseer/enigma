@@ -28,12 +28,12 @@ fn run() -> i32 {
         "-kernel",
         "start_distribution",
         "false",
-        "-kernel",
-        "logger_level",
-        "debug",
-        "-kernel",
-        "logger_log_progress",
-        "true",
+        // "-kernel",
+        // "logger_level",
+        // "debug",
+        // "-kernel",
+        // "logger_log_progress",
+        // "true",
         // "-kernel shell_history enabled",
     ]
     .iter()

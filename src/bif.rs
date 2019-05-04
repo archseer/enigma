@@ -903,19 +903,20 @@ fn bif_erlang_tuple_size_1(
     Ok(Term::uint(&process.context_mut().heap, tuple.len))
 }
 
-fn bif_erlang_byte_size_1(
-    _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
-) -> Result {
+fn bif_erlang_byte_size_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
     let heap = &process.context_mut().heap;
 
     // TODO: extracted from binary_size macro, share impl!
     let size = match args[0].get_boxed_header() {
-        Ok(value::BOXED_BINARY) => args[0].get_boxed_value::<bitstring::RcBinary>().unwrap().data.len(),
+        Ok(value::BOXED_BINARY) => args[0]
+            .get_boxed_value::<bitstring::RcBinary>()
+            .unwrap()
+            .data
+            .len(),
         Ok(value::BOXED_SUBBINARY) => {
             // TODO use ok_or to cast to some, then use ?
-            args[0].get_boxed_value::<bitstring::SubBinary>()
+            args[0]
+                .get_boxed_value::<bitstring::SubBinary>()
                 .unwrap()
                 .original
                 .data
@@ -956,7 +957,7 @@ fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[T
 }
 
 fn bif_erlang_exit_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
-    println!("exiting proc pid={} with {}", process.pid, args[0]);
+    // println!("exiting proc pid={} with {}", process.pid, args[0]);
     Err(Exception::with_value(Reason::EXC_EXIT, args[0]))
 }
 
@@ -1325,10 +1326,10 @@ fn open_port_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> 
 }
 
 fn port_control_3(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
-    println!(
-        "port_control called with {}, {}, {}",
-        args[0], args[1], args[2]
-    );
+    // println!(
+    //     "port_control called with {}, {}, {}",
+    //     args[0], args[1], args[2]
+    // );
     let port = match args[0].into_variant() {
         Variant::Port(id) => id,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),

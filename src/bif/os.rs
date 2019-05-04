@@ -31,7 +31,11 @@ pub fn get_env_var_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
     }
 }
 
-pub fn set_env_var_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn set_env_var_2(
+    _vm: &vm::Machine,
+    _process: &Pin<&mut Process>,
+    args: &[Term],
+) -> bif::Result {
     let cons = Cons::try_from(&args[0])?;
     let name = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
     let cons = Cons::try_from(&args[1])?;
@@ -59,7 +63,4 @@ pub fn getpid_0(_vm: &vm::Machine, process: &Pin<&mut Process>, _args: &[Term]) 
 }
 
 #[cfg(test)]
-mod tests {
-    
-
-}
+mod tests {}

@@ -388,6 +388,7 @@ pub fn open_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term])
     // }
     let cons = Cons::try_from(&args[0])?;
     let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
+
     let file = match opts.open(path) {
         Ok(file) => file,
         Err(err) => return Ok(error_to_tuple(heap, err)),
@@ -414,9 +415,9 @@ pub fn read_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term])
 
     let mut buffer = vec![0; size];
 
-    eprintln!("read_nif_2: fd: {:?} size: {}", file, size);
+    // eprintln!("read_nif_2: fd: {:?} size: {}", file, size);
 
-    match dbg!(file.read(&mut buffer)) {
+    match file.read(&mut buffer) {
         Ok(0) => Ok(atom!(EOF)),
         Ok(n) => {
             buffer.truncate(n);
@@ -585,8 +586,6 @@ pub fn uncompress_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
     use libflate::gzip;
     let heap = &process.context_mut().heap;
     let string = crate::bif::erlang::list_to_iodata(args[0]).unwrap(); // TODO: error handling
-
-    println!("uncompressing: {:?}", string);
 
     // check for gzip magic header
     if string.len() < 2 || &string[..2] != &[0x1f, 0x8b] {

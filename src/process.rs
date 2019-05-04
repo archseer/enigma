@@ -480,7 +480,7 @@ impl Process {
     pub fn exit(&self, vm: &Machine, reason: Exception) {
         let local_data = self.local_data_mut();
 
-        print!("pid={} exiting reason={}\r\n", self.pid, reason.value);
+        // print!("pid={} exiting reason={}\r\n", self.pid, reason.value);
 
         // set state to exiting
 
@@ -491,7 +491,7 @@ impl Process {
         // delete links
         for pid in local_data.links.drain() {
             // TODO: reason has to be deep cloned, make a constructor
-            println!("pid={} sending exit signal to from={}", self.pid, pid);
+            // println!("pid={} sending exit signal to from={}", self.pid, pid);
             let msg = Signal::Exit {
                 reason: reason.clone(),
                 from: self.pid,
@@ -646,7 +646,7 @@ pub fn spawn(
 }
 
 pub fn send_message(vm: &Machine, sender: PID, pid: Term, msg: Term) -> Result<Term, Exception> {
-    println!("sending from={} to={}, msg={}", sender, pid, msg);
+    // println!("sending from={} to={}, msg={}", sender, pid, msg);
     let receiver = match pid.into_variant() {
         value::Variant::Atom(name) => {
             if let Some(process) = vm.process_registry.lock().whereis(name) {

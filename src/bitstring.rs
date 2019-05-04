@@ -238,6 +238,7 @@ impl SubBinary {
 }
 
 // TODO: let's use nom to handle offsets & matches, and keep a reference to the binary
+// TODO: implement io::Read/io::Write
 #[derive(Debug)]
 pub struct MatchBuffer {
     /// Original binary
@@ -341,10 +342,12 @@ macro_rules! native_endian {
 
 #[cfg(target_endian = "big")]
 macro_rules! native_endian {
+    ($x:expr) => {
         if $x.contains(Flag::BSF_NATIVE) {
             $x.remove(Flag::BSF_NATIVE);
             $x.remove(Flag::BSF_LITTLE);
         }
+    };
 }
 
 macro_rules! binary_size {
@@ -725,7 +728,14 @@ impl MatchBuffer {
         //   erts_free(ERTS_ALC_T_TMP, (void *) LSB);
         // }
         // return res;
-        unimplemented!()
+        unimplemented!(
+            "get_integer {:?}, num_bits {}, flags: {:?}",
+            self,
+            num_bits,
+            flags
+        );
+        // get_integer MatchBuffer { original: Binary { is_writable: true, data: [204, 0, 0, 0, 63, 0, 0, 0] }, offset: 0, size: 64 }, num_bits 32, flags: BSF_LITTLE'
+        // <<W:32/native,H:32/native>> = list_to_binary(List),
     }
 
     pub fn get_float(&mut self, _heap: &Heap, num_bits: usize, mut flags: Flag) -> Option<Term> {
