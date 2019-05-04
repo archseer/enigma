@@ -2,13 +2,13 @@ use crate::atom;
 use crate::bif;
 use crate::bitstring;
 use crate::exception::{Exception, Reason};
-use crate::process::Process;
+use crate::process::RcProcess;
 use crate::value::{self, Cons, Term, TryFrom, TryInto, Tuple, Variant};
 use crate::vm;
 use lexical;
 use std::pin::Pin;
 
-pub fn make_tuple_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn make_tuple_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let num = match args[0].into_number() {
         Ok(value::Num::Integer(i)) if !i < 0 => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -23,7 +23,7 @@ pub fn make_tuple_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
     Ok(Term::from(tuple))
 }
 
-pub fn make_tuple_3(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn make_tuple_3(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let num = match args[0].into_number() {
         Ok(value::Num::Integer(i)) if !i < 0 => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -53,11 +53,7 @@ pub fn make_tuple_3(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
     Ok(Term::from(tuple))
 }
 
-pub fn append_element_2(
-    _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
-) -> bif::Result {
+pub fn append_element_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let t = Tuple::try_from(&args[0])?;
     let heap = &process.context_mut().heap;
     let new_tuple = value::tuple(heap, (t.len() + 1) as u32);
@@ -68,7 +64,7 @@ pub fn append_element_2(
     Ok(Term::from(new_tuple))
 }
 
-pub fn setelement_3(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn setelement_3(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let number = match args[0].into_number() {
         Ok(value::Num::Integer(i)) if !i < 1 => i - 1,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -87,7 +83,7 @@ pub fn setelement_3(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
 }
 
 // TODO swap with GetTupleElement ins?
-pub fn element_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn element_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let number = match args[0].into_number() {
         Ok(value::Num::Integer(i)) if !i < 1 => (i - 1) as usize,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -99,11 +95,7 @@ pub fn element_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term])
     Ok(t[number])
 }
 
-pub fn tuple_to_list_1(
-    _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
-) -> bif::Result {
+pub fn tuple_to_list_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let t = Tuple::try_from(&args[0])?;
     let mut n = (t.len() - 1) as i32;
     let mut list = Term::nil();
@@ -115,11 +107,7 @@ pub fn tuple_to_list_1(
     Ok(list)
 }
 
-pub fn binary_to_list_1(
-    _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
-) -> bif::Result {
+pub fn binary_to_list_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let binary = args[0];
 
     // TODO: extract as macro
@@ -153,11 +141,7 @@ pub fn binary_to_list_1(
 }
 
 /// convert a list of ascii integers to an atom
-pub fn list_to_atom_1(
-    _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
-    args: &[Term],
-) -> bif::Result {
+pub fn list_to_atom_1(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     // Eterm res;
     // byte *buf = (byte *) erts_alloc(ERTS_ALC_T_TMP, MAX_ATOM_SZ_LIMIT);
     // Sint written;
@@ -183,7 +167,7 @@ pub fn list_to_atom_1(
 /// conditionally convert a list of ascii integers to an atom
 pub fn list_to_existing_atom_1(
     _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
+    _process: &Pin<RcProcess>,
     _args: &[Term],
 ) -> bif::Result {
     // byte *buf = (byte *) erts_alloc(ERTS_ALC_T_TMP, MAX_ATOM_SZ_LIMIT);
@@ -287,11 +271,7 @@ pub fn list_to_iodata(list: Term) -> Result<Vec<u8>, Exception> {
     Ok(bytes)
 }
 
-pub fn list_to_binary_1(
-    _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
-) -> bif::Result {
+pub fn list_to_binary_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let bytes = list_to_iodata(args[0])?;
 
     let heap = &process.context_mut().heap;
@@ -301,7 +281,7 @@ pub fn list_to_binary_1(
 // it (badarg on bitstring)
 pub fn iolist_to_binary_1(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
+    process: &Pin<RcProcess>,
     args: &[Term],
 ) -> bif::Result {
     if args[0].is_binary() {
@@ -316,7 +296,7 @@ pub fn iolist_to_binary_1(
 
 pub fn unicode_characters_to_binary_2(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
+    process: &Pin<RcProcess>,
     args: &[Term],
 ) -> bif::Result {
     let mut bytes: Vec<u8> = Vec::new();
@@ -373,7 +353,7 @@ pub fn unicode_characters_to_binary_2(
 
 pub fn unicode_characters_to_list_2(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
+    process: &Pin<RcProcess>,
     args: &[Term],
 ) -> bif::Result {
     let heap = &process.context_mut().heap;
@@ -390,7 +370,7 @@ pub fn unicode_characters_to_list_2(
     }))
 }
 
-pub fn iolist_size_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn iolist_size_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     // basically list_to_iodata but it counts
     let list = args[0];
     let heap = &process.context_mut().heap;
@@ -469,11 +449,7 @@ pub fn iolist_size_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
     Ok(Term::uint64(heap, count as u64))
 }
 
-pub fn binary_to_term_1(
-    _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
-) -> bif::Result {
+pub fn binary_to_term_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     // TODO: needs to yield mid parsing...
     if let Some(string) = args[0].to_bytes() {
         match crate::etf::decode(string, &process.context_mut().heap) {
@@ -484,11 +460,7 @@ pub fn binary_to_term_1(
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
-pub fn atom_to_list_1(
-    _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
-) -> bif::Result {
+pub fn atom_to_list_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     match args[0].into_variant() {
         Variant::Atom(i) => {
             let string = atom::to_str(i).unwrap();
@@ -500,7 +472,7 @@ pub fn atom_to_list_1(
     }
 }
 
-pub fn pid_to_list_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn pid_to_list_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     match args[0].into_variant() {
         Variant::Pid(i) => {
             let string = format!("<0.0.{}>", i); // TODO: proper format
@@ -514,7 +486,7 @@ pub fn pid_to_list_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
 
 pub fn integer_to_list_1(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
+    process: &Pin<RcProcess>,
     args: &[Term],
 ) -> bif::Result {
     match args[0].into_number() {
@@ -537,7 +509,7 @@ pub fn integer_to_list_1(
     }
 }
 
-pub fn fun_to_list_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn fun_to_list_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     if args[0].get_type() != value::Type::Closure {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
@@ -548,7 +520,7 @@ pub fn fun_to_list_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
     Ok(bitstring!(heap, string))
 }
 
-pub fn ref_to_list_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn ref_to_list_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     if args[0].get_type() != value::Type::Ref {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
@@ -561,7 +533,7 @@ pub fn ref_to_list_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
 
 pub fn list_to_integer_1(
     _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
+    _process: &Pin<RcProcess>,
     args: &[Term],
 ) -> bif::Result {
     // list to string
@@ -573,11 +545,7 @@ pub fn list_to_integer_1(
     }
 }
 
-pub fn list_to_tuple_1(
-    _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
-) -> bif::Result {
+pub fn list_to_tuple_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     // list to tuple
     let heap = &process.context_mut().heap;
 
@@ -609,14 +577,14 @@ pub fn list_to_tuple_1(
     Ok(Term::from(tuple))
 }
 
-pub fn display_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn display_1(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     println!("{}\r", args[0]);
     Ok(atom!(TRUE))
 }
 
 pub fn display_string_1(
     _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
+    _process: &Pin<RcProcess>,
     args: &[Term],
 ) -> bif::Result {
     let cons = Cons::try_from(&args[0])?;
@@ -625,11 +593,7 @@ pub fn display_string_1(
     Ok(atom!(TRUE))
 }
 
-pub fn display_nl_0(
-    _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
-    _args: &[Term],
-) -> bif::Result {
+pub fn display_nl_0(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     println!("\r");
     Ok(atom!(TRUE))
 }
@@ -640,7 +604,7 @@ pub fn display_nl_0(
 /// and setting its tail to RHS without checking that RHS is a proper list. [] ++ 'not_a_list' will
 /// therefore result in 'not_a_list', and [1,2] ++ 3 will result in [1,2|3], and this is a bug that
 /// we have to live with.
-pub fn append_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn append_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let lhs = args[0];
     let rhs = args[1];
 
@@ -694,7 +658,7 @@ pub fn append_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
-pub fn make_ref_0(vm: &vm::Machine, process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
+pub fn make_ref_0(vm: &vm::Machine, process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
     let reference = vm.next_ref();
 
@@ -703,14 +667,14 @@ pub fn make_ref_0(vm: &vm::Machine, process: &Pin<&mut Process>, _args: &[Term])
 }
 
 // for the time being, these two functions are constant since we don't do distributed
-pub fn node_0(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
+pub fn node_0(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     Ok(atom!(NO_NODE_NO_HOST))
 }
-pub fn node_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
+pub fn node_1(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     Ok(atom!(NO_NODE_NO_HOST))
 }
 
-pub fn and_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn and_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     match (args[0].to_bool(), args[1].to_bool()) {
         (Some(true), Some(true)) => Ok(atom!(TRUE)),
         (Some(_), Some(_)) => Ok(atom!(FALSE)),
@@ -718,7 +682,7 @@ pub fn and_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> 
     }
 }
 
-pub fn or_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn or_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     match (args[0].to_bool(), args[1].to_bool()) {
         (Some(false), Some(false)) => Ok(atom!(FALSE)),
         (Some(_), Some(_)) => Ok(atom!(TRUE)),
@@ -726,7 +690,7 @@ pub fn or_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> b
     }
 }
 
-pub fn xor_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn xor_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     match (args[0].to_bool(), args[1].to_bool()) {
         (Some(true), Some(false)) => Ok(atom!(TRUE)),
         (Some(false), Some(true)) => Ok(atom!(TRUE)),
@@ -735,7 +699,7 @@ pub fn xor_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> 
     }
 }
 
-pub fn not_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn not_1(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     match args[0].to_bool() {
         Some(true) => Ok(atom!(FALSE)),
         Some(false) => Ok(atom!(TRUE)),
@@ -743,53 +707,53 @@ pub fn not_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> 
     }
 }
 
-pub fn sgt_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn sgt_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     Ok(Term::boolean(
         args[0].cmp(&args[1]) == std::cmp::Ordering::Greater,
     ))
 }
 
-pub fn sge_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn sge_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     // greater or equal
     Ok(Term::boolean(
         args[0].cmp(&args[1]) != std::cmp::Ordering::Less,
     ))
 }
 
-pub fn slt_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn slt_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     Ok(Term::boolean(
         args[0].cmp(&args[1]) == std::cmp::Ordering::Less,
     ))
 }
 
-pub fn sle_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn sle_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     // less or equal
     Ok(Term::boolean(
         args[0].cmp(&args[1]) != std::cmp::Ordering::Greater,
     ))
 }
 
-pub fn seq_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn seq_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     Ok(Term::boolean(args[0].eq(&args[1])))
 }
 
-pub fn seqeq_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn seqeq_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     Ok(Term::boolean(
         args[0].cmp(&args[1]) == std::cmp::Ordering::Equal,
     ))
 }
 
-pub fn sneq_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn sneq_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     Ok(Term::boolean(!args[0].eq(&args[1])))
 }
 
-pub fn sneqeq_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn sneqeq_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     Ok(Term::boolean(
         args[0].cmp(&args[1]) != std::cmp::Ordering::Equal,
     ))
 }
 
-pub fn bor_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn bor_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let i1 = match args[0].into_variant() {
         Variant::Integer(i) => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -801,7 +765,7 @@ pub fn bor_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> 
     Ok(Term::int(i1 | i2))
 }
 
-pub fn band_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn band_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let i1 = match args[0].into_variant() {
         Variant::Integer(i) => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -813,7 +777,7 @@ pub fn band_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) ->
     Ok(Term::int(i1 & i2))
 }
 
-pub fn bxor_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn bxor_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let i1 = match args[0].into_variant() {
         Variant::Integer(i) => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -825,7 +789,7 @@ pub fn bxor_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) ->
     Ok(Term::int(i1 ^ i2))
 }
 
-pub fn bsl_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn bsl_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let i1 = match args[0].into_variant() {
         Variant::Integer(i) => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -837,7 +801,7 @@ pub fn bsl_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> 
     Ok(Term::int(i1 << i2))
 }
 
-pub fn bsr_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn bsr_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let i1 = match args[0].into_variant() {
         Variant::Integer(i) => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -849,7 +813,7 @@ pub fn bsr_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> 
     Ok(Term::int(i1 >> i2))
 }
 
-pub fn bnot_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn bnot_1(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let i1 = match args[0].into_variant() {
         Variant::Integer(i) => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -857,7 +821,7 @@ pub fn bnot_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) ->
     Ok(Term::int(!i1))
 }
 
-pub fn sminus_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn sminus_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     // if number, negate number else return error badarith
     let heap = &process.context_mut().heap;
     match args[0].into_number() {
@@ -868,7 +832,7 @@ pub fn sminus_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -
     }
 }
 
-pub fn splus_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn splus_1(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     // if number, return number else return error badarith
     match args[0].into_number() {
         Ok(_) => Ok(args[0]),
@@ -888,9 +852,7 @@ mod tests {
     fn test_make_tuple_2() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
-
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let number = Term::int(2);
         let default = str_to_atom!("test");
         let args = vec![number, default];
@@ -913,9 +875,7 @@ mod tests {
     fn test_make_tuple_2_bad_arg_wrong_type_of_tuple() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
-
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let number = Term::from(2.1);
         let default = str_to_atom!("test");
         let args = vec![number, default];
@@ -932,9 +892,7 @@ mod tests {
     fn test_make_tuple_2_bad_arg_negative_number() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
-
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let number = Term::int(-1);
         let default = str_to_atom!("test");
         let args = vec![number, default];
@@ -950,8 +908,7 @@ mod tests {
     fn test_tuple_make_tuple_3() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let heap = &process.context_mut().heap;
 
         let number = Term::int(5);
@@ -988,8 +945,7 @@ mod tests {
     fn test_tuple_make_tuple_3_bad_arg_wrong_type_of_number() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let heap = &process.context_mut().heap;
 
         let number = Term::from(2.1);
@@ -1019,8 +975,7 @@ mod tests {
     fn test_tuple_make_tuple_3_bad_arg_negative_number() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let heap = &process.context_mut().heap;
 
         let number = Term::int(-1);
@@ -1050,8 +1005,7 @@ mod tests {
     fn test_tuple_make_tuple_3_bad_arg_wrong_type_of_init_list() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let _heap = &process.context_mut().heap;
 
         let number = Term::int(5);
@@ -1072,8 +1026,7 @@ mod tests {
     fn test_tuple_make_tuple_3_bad_arg_wrong_structure_init_list() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let heap = &process.context_mut().heap;
 
         let number = Term::int(5);
@@ -1103,8 +1056,7 @@ mod tests {
     fn test_tuple_make_tuple_3_bad_arg_init_list_out_of_range() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let heap = &process.context_mut().heap;
 
         let number = Term::int(5);
@@ -1134,9 +1086,7 @@ mod tests {
     fn test_append_element_2() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
-
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let heap = &process.context_mut().heap;
         let tuple = tup2!(&heap, Term::int(0), Term::int(1));
         let append = Term::int(2);
@@ -1160,9 +1110,7 @@ mod tests {
     fn test_append_element_2_bad_arg_wrong_type_of_tuple() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
-
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let bad_tuple = Term::int(0);
         let append = Term::int(2);
         let args = vec![bad_tuple, append];
@@ -1179,9 +1127,7 @@ mod tests {
     fn test_setelement_3() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
-
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let heap = &process.context_mut().heap;
         let index = Term::int(2);
         let tuple = tup3!(&heap, str_to_atom!("test"), Term::from(1), Term::from(2));
@@ -1206,9 +1152,7 @@ mod tests {
     fn test_setelement_3_bad_arg_wrong_type_of_index() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
-
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let heap = &process.context_mut().heap;
         let index = Term::from(1.1);
         let tuple = tup3!(&heap, str_to_atom!("test"), Term::from(1), Term::from(2));
@@ -1227,9 +1171,7 @@ mod tests {
     fn test_setelement_3_bad_arg_wrong_type_of_tuple() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
-
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let _heap = &process.context_mut().heap;
         let index = Term::int(1);
         let tuple = Term::from(1);
@@ -1248,9 +1190,7 @@ mod tests {
     fn test_setelement_3_bad_arg_tuple_out_of_range() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
-
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let heap = &process.context_mut().heap;
         let index = Term::int(4);
         let tuple = tup3!(&heap, str_to_atom!("test"), Term::from(1), Term::from(2));
@@ -1269,9 +1209,7 @@ mod tests {
     fn test_tuple_to_list_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
-
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let heap = &process.context_mut().heap;
         let tuple = tup2!(
             &heap,
@@ -1301,9 +1239,7 @@ mod tests {
     fn test_tuple_to_list_1_bad_arg_wrong_type_of_tuple() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
-
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let bad_tuple = Term::from(1);
         let args = vec![bad_tuple];
 
@@ -1319,8 +1255,7 @@ mod tests {
     fn test_list_to_iodata() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = process::allocate(&vm, 0, 0, module).unwrap();
-        let process = process::cast(process);
+        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
         let heap = &process.context_mut().heap;
 
         let binary = crate::bitstring::Binary::from(vec![0xAB, 0xCD, 0xEF]);

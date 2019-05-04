@@ -9,12 +9,12 @@ pub mod bif {
     use super::*;
     use crate::bif::Result;
     use crate::exception::{self, Exception, Reason};
-    use crate::process::Process;
+    use crate::process::RcProcess;
     use crate::value::{self, Term};
     use crate::vm;
     use std::pin::Pin;
 
-    pub fn run_3(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    pub fn run_3(vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
         let heap = &process.context_mut().heap;
         let string = crate::bif::erlang::list_to_iodata(args[0]).unwrap(); // TODO: error handling
         let pattern = crate::bif::erlang::list_to_iodata(args[1]).unwrap(); // TODO: error handling

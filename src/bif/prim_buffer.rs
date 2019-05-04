@@ -2,7 +2,7 @@ use crate::atom;
 use crate::bitstring::{Binary, RcBinary};
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
-use crate::process::Process;
+use crate::process::RcProcess;
 use crate::value::{self, Cons, Term, TryFrom, Variant};
 use crate::vm;
 use std::fs;
@@ -104,50 +104,46 @@ pub mod bif {
     use super::*;
     use crate::bif::Result;
 
-    pub fn new_0(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    pub fn new_0(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
         let heap = &process.context_mut().heap;
         let buf = Buffer::new();
         Ok(Term::buffer(heap, buf))
     }
 
-    pub fn size_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    pub fn size_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
         let heap = &process.context_mut().heap;
         let buf = Buffer::try_from(&args[0])?;
         Ok(Term::uint64(heap, buf.size() as u64))
     }
 
-    pub fn peek_head_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    pub fn peek_head_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
         let buf = Buffer::try_from(&args[0])?;
         unimplemented!()
     }
 
-    pub fn copying_read_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    pub fn copying_read_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
         let buf = Buffer::try_from(&args[0])?;
         unimplemented!()
     }
 
-    pub fn write_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    pub fn write_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
         // let buf = Buffer::try_from(&args[0])?;
         // parse into iovec
         // buf.write(iovec);
         unimplemented!()
     }
 
-    pub fn skip_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    pub fn skip_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
         // let buf = Buffer::try_from(&args[0])?;
         unimplemented!()
     }
 
-    pub fn find_byte_index_2(
-        _vm: &vm::Machine,
-        process: &Pin<&mut Process>,
-        args: &[Term],
-    ) -> Result {
+    pub fn find_byte_index_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
         let buf = Buffer::try_from(&args[0])?;
         unimplemented!()
     }
 
-    pub fn try_lock_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    pub fn try_lock_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
         let buf = Buffer::try_from(&args[0])?;
         if !buf.try_lock() {
             return Ok(atom!(BUSY));
@@ -155,7 +151,7 @@ pub mod bif {
         Ok(atom!(ACQUIRED))
     }
 
-    pub fn unlock_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    pub fn unlock_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
         let buf = Buffer::try_from(&args[0])?;
         if !buf.unlock() {
             return Err(Exception::with_value(
@@ -182,10 +178,7 @@ pub struct Cursor<T> {
 impl<T: AsRef<[u8]>> Cursor<T> {
     #[inline]
     pub(crate) fn new(bytes: T) -> Cursor<T> {
-        Cursor {
-            bytes,
-            pos: 0,
-        }
+        Cursor { bytes, pos: 0 }
     }
 }
 

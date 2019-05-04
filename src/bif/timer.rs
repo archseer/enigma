@@ -1,6 +1,6 @@
 use crate::bif;
 use crate::exception::{Exception, Reason};
-use crate::process::{self, Process};
+use crate::process::{self, RcProcess};
 use crate::value::{self, Term, TryFrom, Tuple, Variant};
 use crate::vm;
 use std::pin::Pin;
@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use tokio::prelude::*;
 use tokio::timer::Delay;
 
-pub fn send_after_3(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn send_after_3(vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     // time, dest, msg
     let delay = match args[0].to_int() {
         Some(i) if i >= 0 => i,

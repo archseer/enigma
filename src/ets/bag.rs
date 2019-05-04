@@ -15,7 +15,7 @@ unsafe impl Sync for Bag {}
 unsafe impl Send for Bag {}
 
 impl Bag {
-    pub fn new(meta: Metadata, _process: &Pin<&mut Process>) -> Self {
+    pub fn new(meta: Metadata, _process: &Pin<RcProcess>) -> Self {
         Self {
             meta,
             hashmap: RwLock::new(HashMap::new()),
@@ -34,29 +34,24 @@ impl Table for Bag {
         &self.meta
     }
 
-    fn first(&self, _process: &Pin<&mut Process>) -> Result<Term> {
+    fn first(&self, _process: &Pin<RcProcess>) -> Result<Term> {
         unimplemented!()
     }
 
-    fn next(&self, _process: &Pin<&mut Process>, _key: Term) -> Result<Term> {
+    fn next(&self, _process: &Pin<RcProcess>, _key: Term) -> Result<Term> {
         unimplemented!()
     }
 
-    fn last(&self, _process: &Pin<&mut Process>) -> Result<Term> {
+    fn last(&self, _process: &Pin<RcProcess>) -> Result<Term> {
         unimplemented!()
     }
 
-    fn prev(&self, _process: &Pin<&mut Process>, _key: Term) -> Result<Term> {
+    fn prev(&self, _process: &Pin<RcProcess>, _key: Term) -> Result<Term> {
         unimplemented!()
     }
 
     // put
-    fn insert(
-        &self,
-        _process: &Pin<&mut Process>,
-        value: Term,
-        _key_clash_fail: bool,
-    ) -> Result<()> {
+    fn insert(&self, _process: &Pin<RcProcess>, value: Term, _key_clash_fail: bool) -> Result<()> {
         let value = value.deep_clone(&self.heap);
         let key = get_key(self.meta().keypos, value);
         self.hashmap
@@ -67,7 +62,7 @@ impl Table for Bag {
         Ok(())
     }
 
-    fn get(&self, process: &Pin<&mut Process>, key: Term) -> Result<Term> {
+    fn get(&self, process: &Pin<RcProcess>, key: Term) -> Result<Term> {
         let heap = &process.context_mut().heap;
 
         match self.hashmap.read().get(&key) {
@@ -78,7 +73,7 @@ impl Table for Bag {
         }
     }
 
-    fn get_element(&self, process: &Pin<&mut Process>, key: Term, index: usize) -> Result<Term> {
+    fn get_element(&self, process: &Pin<RcProcess>, key: Term, index: usize) -> Result<Term> {
         let heap = &process.context_mut().heap;
 
         match self.hashmap.read().get(&key) {
@@ -99,12 +94,7 @@ impl Table for Bag {
         self.hashmap.read().contains_key(&key)
     }
 
-    fn update_element(
-        &self,
-        _process: &Pin<&mut Process>,
-        _key: Term,
-        _list: Term,
-    ) -> Result<Term> {
+    fn update_element(&self, _process: &Pin<RcProcess>, _key: Term, _list: Term) -> Result<Term> {
         unimplemented!();
     }
 
@@ -121,7 +111,7 @@ impl Table for Bag {
         unimplemented!()
     }
 
-    // int (*db_select_chunk)(process: &Pin<&mut Process>,
+    // int (*db_select_chunk)(process: &Pin<RcProcess>,
     // table: &Self, /* [in out] */
     //                        Eterm tid,
     // Eterm pattern,
@@ -133,7 +123,7 @@ impl Table for Bag {
     fn select(
         &self,
         _vm: &vm::Machine,
-        _process: &Pin<&mut Process>,
+        _process: &Pin<RcProcess>,
         _pattern: &pam::Pattern,
         _flags: pam::r#match::Flag,
         _reverse: bool,
@@ -141,56 +131,51 @@ impl Table for Bag {
         unimplemented!()
     }
 
-    // fn select_continue(&mut self, process: &Pin<&mut Process>, continuation: Term) -> Result<Term> {
+    // fn select_continue(&mut self, process: &Pin<RcProcess>, continuation: Term) -> Result<Term> {
     //     unimplemented!()
     // }
 
     fn select_delete(
         &self,
         _vm: &vm::Machine,
-        _process: &Pin<&mut Process>,
+        _process: &Pin<RcProcess>,
         _pattern: &pam::Pattern,
         _flags: pam::r#match::Flag,
     ) -> Result<Term> {
         unimplemented!()
     }
 
-    // fn select_delete_continue(&mut self, process: &Pin<&mut Process>, continuation: Term) -> Result<Term> {
+    // fn select_delete_continue(&mut self, process: &Pin<RcProcess>, continuation: Term) -> Result<Term> {
     //     unimplemented!()
     // }
 
-    fn select_count(
-        &self,
-        _process: &Pin<&mut Process>,
-        _tid: Term,
-        _pattern: Term,
-    ) -> Result<Term> {
+    fn select_count(&self, _process: &Pin<RcProcess>, _tid: Term, _pattern: Term) -> Result<Term> {
         unimplemented!()
     }
 
-    // fn select_count_continue(&self, process: &Pin<&mut Process>, continuation: Term) -> Result<Term> {
+    // fn select_count_continue(&self, process: &Pin<RcProcess>, continuation: Term) -> Result<Term> {
     //     unimplemented!()
     // }
 
     fn select_replace(
         &mut self,
-        _process: &Pin<&mut Process>,
+        _process: &Pin<RcProcess>,
         _tid: Term,
         _pattern: Term,
     ) -> Result<Term> {
         unimplemented!()
     }
 
-    // fn select_replace_continue(&mut self, process: &Pin<&mut Process>, continuation: Term) -> Result<Term> {
+    // fn select_replace_continue(&mut self, process: &Pin<RcProcess>, continuation: Term) -> Result<Term> {
     //     unimplemented!()
     // }
 
-    fn take(&mut self, _process: &Pin<&mut Process>, _key: Term) -> Result<Term> {
+    fn take(&mut self, _process: &Pin<RcProcess>, _key: Term) -> Result<Term> {
         unimplemented!()
     }
 
     /// takes reds, then returns new reds (equal to delete_all)
-    fn clear(&mut self, _process: &Pin<&mut Process>, _reds: usize) -> Result<usize> {
+    fn clear(&mut self, _process: &Pin<RcProcess>, _reds: usize) -> Result<usize> {
         unimplemented!()
     }
 }

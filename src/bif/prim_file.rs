@@ -3,7 +3,7 @@ use crate::bif;
 use crate::bitstring::Binary;
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
-use crate::process::Process;
+use crate::process::RcProcess;
 use crate::value::{self, Cons, Term, TryFrom, TryFromMut, Variant};
 use crate::vm;
 use std::fs::{self, File};
@@ -61,17 +61,13 @@ fn error_to_tuple(heap: &Heap, error: std::io::Error) -> Term {
 }
 pub fn get_device_cwd_nif_1(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
+    process: &Pin<RcProcess>,
     args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
 
-pub fn get_cwd_nif_0(
-    _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    _args: &[Term],
-) -> bif::Result {
+pub fn get_cwd_nif_0(_vm: &vm::Machine, process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
 
     match std::env::current_dir() {
@@ -86,17 +82,13 @@ pub fn get_cwd_nif_0(
     // TODO: make a function that converts io::Error to a tuple
 }
 
-pub fn set_cwd_nif_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn set_cwd_nif_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
 /// Reads an entire file into \c result, stopping after \c size bytes or EOF. It will read until
 /// EOF if size is 0.
-pub fn read_file_nif_1(
-    _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
-) -> bif::Result {
+pub fn read_file_nif_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     // arg[0] = filename
     let heap = &process.context_mut().heap;
 
@@ -118,7 +110,7 @@ pub fn read_file_nif_1(
 
 pub fn ipread_s32bu_p32bu_nif_3(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
+    process: &Pin<RcProcess>,
     args: &[Term],
 ) -> bif::Result {
     unimplemented!()
@@ -127,7 +119,7 @@ pub fn ipread_s32bu_p32bu_nif_3(
 // TODO: maybe we should pass around as OsString which is null terminated dunno
 pub fn internal_native2name_1(
     vm: &vm::Machine,
-    process: &Pin<&mut Process>,
+    process: &Pin<RcProcess>,
     args: &[Term],
 ) -> bif::Result {
     // we already validated the name into unicode in the previous command
@@ -137,7 +129,7 @@ pub fn internal_native2name_1(
 
 pub fn internal_name2native_1(
     _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
+    _process: &Pin<RcProcess>,
     args: &[Term],
 ) -> bif::Result {
     // we already validated the name into unicode in the previous command
@@ -146,7 +138,7 @@ pub fn internal_name2native_1(
 
 pub fn native_name_encoding_0(
     _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
+    _process: &Pin<RcProcess>,
     _args: &[Term],
 ) -> bif::Result {
     // TODO:
@@ -292,11 +284,7 @@ fn meta_to_tuple(heap: &Heap, meta: std::fs::Metadata) -> Term {
     )
 }
 
-pub fn read_info_nif_2(
-    _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
-) -> bif::Result {
+pub fn read_info_nif_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
 
     assert!(args.len() == 2);
@@ -325,11 +313,7 @@ pub fn read_info_nif_2(
     Ok(meta_to_tuple(heap, info))
 }
 
-pub fn list_dir_nif_1(
-    _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
-) -> bif::Result {
+pub fn list_dir_nif_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     // arg[0] = filename
     let heap = &process.context_mut().heap;
 
@@ -358,7 +342,7 @@ pub fn list_dir_nif_1(
     Ok(tup2!(heap, atom!(OK), res))
 }
 
-pub fn open_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn open_nif_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     use std::fs::OpenOptions;
     let heap = &process.context_mut().heap;
 
@@ -395,14 +379,14 @@ pub fn open_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term])
     Ok(tup2!(heap, atom!(OK), Term::file(heap, file)))
 }
 
-pub fn close_nif_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn close_nif_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let file = File::try_from_mut(&args[0])?;
     drop(file);
     // FIXME: ^ this does nothing since it's with a reference
     Ok(atom!(OK))
 }
 
-pub fn read_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn read_nif_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
     let file = File::try_from_mut(&args[0])?;
 
@@ -431,43 +415,35 @@ pub fn read_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term])
     }
 }
 
-pub fn write_nif_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
+pub fn write_nif_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
-pub fn pread_nif_3(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
+pub fn pread_nif_3(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
-pub fn pwrite_nif_3(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
+pub fn pwrite_nif_3(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
-pub fn seek_nif_3(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
+pub fn seek_nif_3(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
-pub fn sync_nif_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
+pub fn sync_nif_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
-pub fn truncate_nif_1(
-    _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
-    _args: &[Term],
-) -> bif::Result {
+pub fn truncate_nif_1(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
-pub fn allocate_nif_3(
-    _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
-    _args: &[Term],
-) -> bif::Result {
+pub fn allocate_nif_3(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
-pub fn advise_nif_4(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
+pub fn advise_nif_4(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
@@ -475,7 +451,7 @@ pub fn advise_nif_4(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Te
 
 pub fn make_hard_link_nif_2(
     _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
+    _process: &Pin<RcProcess>,
     _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
@@ -483,19 +459,19 @@ pub fn make_hard_link_nif_2(
 
 pub fn make_soft_link_nif_2(
     _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
+    _process: &Pin<RcProcess>,
     _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
 
-pub fn rename_nif_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
+pub fn rename_nif_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
 pub fn set_permissions_nif_2(
     _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
+    _process: &Pin<RcProcess>,
     _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
@@ -503,45 +479,33 @@ pub fn set_permissions_nif_2(
 
 pub fn set_owner_nif_3(
     _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
+    _process: &Pin<RcProcess>,
     _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
 
-pub fn set_time_nif_4(
-    _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
-    _args: &[Term],
-) -> bif::Result {
+pub fn set_time_nif_4(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
 pub fn read_link_nif_1(
     _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
+    _process: &Pin<RcProcess>,
     _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
 
-pub fn make_dir_nif_1(
-    _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
-    _args: &[Term],
-) -> bif::Result {
+pub fn make_dir_nif_1(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
-pub fn del_file_nif_1(
-    _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
-    _args: &[Term],
-) -> bif::Result {
+pub fn del_file_nif_1(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
-pub fn del_dir_nif_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn del_dir_nif_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
@@ -549,7 +513,7 @@ pub fn del_dir_nif_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
 
 pub fn get_handle_nif_1(
     _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
+    _process: &Pin<RcProcess>,
     _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
@@ -557,19 +521,19 @@ pub fn get_handle_nif_1(
 
 pub fn delayed_close_nif_1(
     _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
+    _process: &Pin<RcProcess>,
     _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
 
-pub fn altname_nif_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
+pub fn altname_nif_1(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
 //
 
-pub fn compress_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn compress_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     use libflate::gzip;
     let heap = &process.context_mut().heap;
     let string = crate::bif::erlang::list_to_iodata(args[0]).unwrap(); // TODO: error handling
@@ -582,7 +546,7 @@ pub fn compress_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term])
     Ok(Term::binary(heap, Binary::from(encoded_data)))
 }
 
-pub fn uncompress_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn uncompress_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     use libflate::gzip;
     let heap = &process.context_mut().heap;
     let string = crate::bif::erlang::list_to_iodata(args[0]).unwrap(); // TODO: error handling

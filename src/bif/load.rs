@@ -3,12 +3,12 @@ use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::loader::Loader;
 use crate::module::{self, Module};
-use crate::process::Process;
+use crate::process::RcProcess;
 use crate::value::{self, Cons, Term, TryFrom, TryInto, Variant};
 use crate::vm;
 use std::pin::Pin;
 
-pub fn pre_loaded_0(_vm: &vm::Machine, process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
+pub fn pre_loaded_0(_vm: &vm::Machine, process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
     use std::path::Path;
     let heap = &process.context_mut().heap;
 
@@ -22,7 +22,7 @@ pub fn pre_loaded_0(_vm: &vm::Machine, process: &Pin<&mut Process>, _args: &[Ter
 
 pub fn prepare_loading_2(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
+    process: &Pin<RcProcess>,
     args: &[Term],
 ) -> bif::Result {
     // arg[0] module name atom, arg[1] raw bytecode bytes
@@ -48,7 +48,7 @@ pub fn prepare_loading_2(
 
 pub fn has_prepared_code_on_load_1(
     _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
+    _process: &Pin<RcProcess>,
     args: &[Term],
 ) -> bif::Result {
     match args[0].try_into() {
@@ -60,11 +60,7 @@ pub fn has_prepared_code_on_load_1(
     }
 }
 
-pub fn finish_loading_1(
-    vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
-    args: &[Term],
-) -> bif::Result {
+pub fn finish_loading_1(vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
     value::Cons::try_from(&args[0])?
         .iter()
         .map(|v| {
@@ -81,7 +77,7 @@ pub fn finish_loading_1(
 
 pub fn get_module_info_2(
     vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
+    _process: &Pin<RcProcess>,
     args: &[Term],
 ) -> bif::Result {
     let name = match args[0].into_variant() {
