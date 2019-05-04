@@ -905,19 +905,25 @@ fn bif_erlang_tuple_size_1(
 
 fn bif_erlang_byte_size_1(
     _vm: &vm::Machine,
-    _process: &Pin<&mut Process>,
+    process: &Pin<&mut Process>,
     args: &[Term],
 ) -> Result {
-    // TODO: implement for SubBinary
-    let res = match &args[0].try_into() {
-        Ok(str) => {
-            let str: &bitstring::RcBinary = str; // type annotation
-            str.data.len()
+    let heap = &process.context_mut().heap;
+
+    // TODO: extracted from binary_size macro, share impl!
+    let size = match args[0].get_boxed_header() {
+        Ok(value::BOXED_BINARY) => args[0].get_boxed_value::<bitstring::RcBinary>().unwrap().data.len(),
+        Ok(value::BOXED_SUBBINARY) => {
+            // TODO use ok_or to cast to some, then use ?
+            args[0].get_boxed_value::<bitstring::SubBinary>()
+                .unwrap()
+                .original
+                .data
+                .len()
         }
-        _ => unimplemented!(),
-        //_ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
-    Ok(Term::int(res as i32)) // TODO: cast potentially unsafe
+    Ok(Term::uint64(heap, size as u64))
 }
 
 pub fn bif_erlang_map_size_1(
