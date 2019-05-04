@@ -336,7 +336,7 @@ pub enum Num {
 
 impl Term {
     #[inline(always)]
-    pub fn tag(&self) -> u8 {
+    pub fn tag(self) -> u8 {
         self.value.tag() as u8
     }
 
@@ -781,7 +781,7 @@ impl Term {
         }
     }
 
-    pub fn to_ref(&self) -> Option<process::Ref> {
+    pub fn to_ref(self) -> Option<process::Ref> {
         match self.get_boxed_header() {
             Ok(BOXED_REF) => {
                 // TODO use ok_or to cast to some, then use ?

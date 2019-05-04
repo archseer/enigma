@@ -1,14 +1,10 @@
 use crate::atom;
 use crate::bif;
-use crate::exception::{Exception, Reason};
+// use crate::exception::{Exception, Reason};
 use crate::process::Process;
-use crate::value::{self, Term, TryFrom, Tuple, Variant};
+use crate::value::Term;
 use crate::vm;
-use chrono::prelude::*;
-use num_bigint::ToBigInt;
-use num_traits::ToPrimitive;
 use std::pin::Pin;
-use std::time::SystemTime;
 
 // FIXME: these are all dummies unless dtrace is enabled
 

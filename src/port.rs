@@ -245,7 +245,7 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
     // TODO FIXME: this heap will get trashed if tty shuts down
     let heap = crate::immix::Heap::new();
 
-    const TTYSL_DRV_CONTROL_MAGIC_NUMBER: usize = 0x018b0900;
+    const TTYSL_DRV_CONTROL_MAGIC_NUMBER: usize = 0x018b_0900;
 
     loop {
         select! {
@@ -373,7 +373,6 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
             },
         }
     }
-    ()
 }
 
 async fn stderr(id: ID, _owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
@@ -407,5 +406,4 @@ async fn stderr(id: ID, _owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
         }
         // port_control stuff (op_get_winsize)
     }
-    ()
 }

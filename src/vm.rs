@@ -20,7 +20,6 @@ use crate::value::{self, Cons, Term, TryFrom, TryInto, TryIntoMut, Tuple, Varian
 use std::cell::RefCell;
 // use log::debug;
 use parking_lot::Mutex;
-use std::mem::transmute;
 use std::panic;
 use std::sync::atomic::AtomicUsize;
 use std::time;
@@ -243,7 +242,7 @@ fn call_error_handler(
     // Set up registers for call to error_handler:<func>/3.
     context.x[0] = Term::atom(mfa.0); // module
     context.x[1] = Term::atom(mfa.1); // func
-    context.x[2] = Term::from(args);
+    context.x[2] = args;
     op_jump_ptr!(context, ptr);
     Ok(())
 }
@@ -659,7 +658,7 @@ impl Machine {
 
         // Create the runtime
         let machine = self.clone();
-        let mut runtime = tokio::runtime::Builder::new()
+        let runtime = tokio::runtime::Builder::new()
             // .panic_handler(|err| std::panic::resume_unwind(err))
             .after_start(move || {
                 Machine::set_current(machine.clone()); // ughh double clone
@@ -668,7 +667,7 @@ impl Machine {
             .expect("failed to start new Runtime");
 
         let machine = self.clone();
-        let mut process_pool = tokio::runtime::Builder::new()
+        let process_pool = tokio::runtime::Builder::new()
             // .panic_handler(|err| std::panic::resume_unwind(err))
             .after_start(move || {
                 Machine::set_current(machine.clone());
@@ -695,7 +694,7 @@ impl Machine {
     fn terminate(&self) {}
 
     /// Starts the main process
-    pub fn start_main_process(&self, runtime: &mut tokio::runtime::Runtime, args: Vec<String>) {
+    pub fn start_main_process(&self, _runtime: &mut tokio::runtime::Runtime, args: Vec<String>) {
         println!("Starting main process...");
         let registry = self.modules.lock();
         //let module = unsafe { &*module::load_module(self, path).unwrap() };
@@ -764,7 +763,6 @@ impl Machine {
                 // TODO: waittimeout is an select on a oneshot or a delay
             }
         }
-        ()
         // }));
 
         /*
@@ -789,7 +787,7 @@ impl Machine {
     impl<'a, T> Captures<'a> for T {}
 
 impl Machine {
-    #[allow(clippy::cyclomatic_complexity)]
+    #[allow(clippy::cognitive_complexity)]
     pub fn run<'a: 'd, 'b: 'd, 'c: 'd, 'd>(
         &'a self,
         process: &'b mut Pin<&'c mut process::Process>,
@@ -935,7 +933,7 @@ impl Machine {
                                     op_jump!(context, label);
                                     // println!("select! resumption pid={}", process.pid);
                                 }
-                                Err(err) => {
+                                Err(_err) => {
                                     // timeout
                                     // println!("select! delay timeout {} pid={} ms={} m={:?}", ms, process.pid, context.expand_arg(&ins.args[1]), ins.args[1]);
                                     // println!("select! delay timeout {} pid={} ms={} err={:?}", ms, process.pid, context.expand_arg(&ins.args[1]), err);
@@ -943,7 +941,7 @@ impl Machine {
                                     // remove channel
                                     context.timeout.take();
 
-                                    () // continue to next instruction (timeout op)
+                                    // continue to next instruction (timeout op)
                                 }
 
                             }
@@ -1159,7 +1157,6 @@ impl Machine {
                 }
                 Opcode::TestHeap => {
                     // println!("TODO: TestHeap unimplemented!");
-                    ()
                 }
                 Opcode::Init => {
                     debug_assert_eq!(ins.args.len(), 1);
@@ -1412,12 +1409,12 @@ impl Machine {
                 Opcode::PutTuple => {
                     // put_tuple dest size
                     // followed by multiple put() ops (put val [potentially regX/Y])
-                    unimplemented!("Stray PutTuple that wasn't rewritten by the loader!")
+                    unreachable!("Stray PutTuple that wasn't rewritten by the loader!")
 
                     // Code compiled with OTP 22 and later uses put_tuple2 to to construct a tuple.
                     // PutTuple + Put is before OTP 22 and we should transform in loader to put_tuple2
                 }
-                Opcode::Put => unimplemented!("Stray Put that wasn't rewritten by the loader!"),
+                Opcode::Put => unreachable!("Stray Put that wasn't rewritten by the loader!"),
                 Opcode::PutTuple2 => {
                     debug_assert_eq!(ins.args.len(), 2);
                     // op: PutTuple2, args: [X(0), ExtendedList([Y(1), Y(0), X(0)])] }

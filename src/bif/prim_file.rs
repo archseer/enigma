@@ -221,7 +221,7 @@ const FILE_MIN_FILETIME: i64 = -2_145_916_800;
 fn meta_to_tuple(heap: &Heap, meta: std::fs::Metadata) -> Term {
     use std::os::unix::fs::MetadataExt;
 
-    let tup = tup!(
+    tup!(
         heap,
         atom!(FILE_INFO),
         Term::uint64(heap, meta.size()),
@@ -237,8 +237,7 @@ fn meta_to_tuple(heap: &Heap, meta: std::fs::Metadata) -> Term {
         Term::uint64(heap, meta.ino()),
         Term::uint(heap, meta.uid()),
         Term::uint(heap, meta.gid()),
-    );
-    tup
+    )
 }
 
 #[cfg(not(unix))]
@@ -398,7 +397,8 @@ pub fn open_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term])
 
 pub fn close_nif_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     let file = File::try_from_mut(&args[0])?;
-    drop(file); // TODO: the ref on heap is now garbage
+    drop(file);
+    // FIXME: ^ this does nothing since it's with a reference
     Ok(atom!(OK))
 }
 
@@ -427,47 +427,47 @@ pub fn read_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term])
                 Term::binary(heap, Binary::from(buffer))
             ))
         }
-        Err(err) => return Ok(error_to_tuple(heap, err)),
+        Err(err) => Ok(error_to_tuple(heap, err)),
     }
 }
 
-pub fn write_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn write_nif_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
-pub fn pread_nif_3(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn pread_nif_3(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
-pub fn pwrite_nif_3(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn pwrite_nif_3(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
-pub fn seek_nif_3(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn seek_nif_3(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
-pub fn sync_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn sync_nif_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
 pub fn truncate_nif_1(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
+    _process: &Pin<&mut Process>,
+    _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
 
 pub fn allocate_nif_3(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
+    _process: &Pin<&mut Process>,
+    _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
 
-pub fn advise_nif_4(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn advise_nif_4(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
@@ -475,68 +475,68 @@ pub fn advise_nif_4(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
 
 pub fn make_hard_link_nif_2(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
+    _process: &Pin<&mut Process>,
+    _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
 
 pub fn make_soft_link_nif_2(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
+    _process: &Pin<&mut Process>,
+    _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
 
-pub fn rename_nif_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn rename_nif_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
 pub fn set_permissions_nif_2(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
+    _process: &Pin<&mut Process>,
+    _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
 
 pub fn set_owner_nif_3(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
+    _process: &Pin<&mut Process>,
+    _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
 
 pub fn set_time_nif_4(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
+    _process: &Pin<&mut Process>,
+    _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
 
 pub fn read_link_nif_1(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
+    _process: &Pin<&mut Process>,
+    _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
 
 pub fn make_dir_nif_1(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
+    _process: &Pin<&mut Process>,
+    _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
 
 pub fn del_file_nif_1(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
+    _process: &Pin<&mut Process>,
+    _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
@@ -549,21 +549,21 @@ pub fn del_dir_nif_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
 
 pub fn get_handle_nif_1(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
+    _process: &Pin<&mut Process>,
+    _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
 
 pub fn delayed_close_nif_1(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
-    args: &[Term],
+    _process: &Pin<&mut Process>,
+    _args: &[Term],
 ) -> bif::Result {
     unimplemented!()
 }
 
-pub fn altname_nif_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn altname_nif_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
@@ -588,7 +588,7 @@ pub fn uncompress_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
     let string = crate::bif::erlang::list_to_iodata(args[0]).unwrap(); // TODO: error handling
 
     // check for gzip magic header
-    if string.len() < 2 || &string[..2] != &[0x1f, 0x8b] {
+    if string.len() < 2 || string[..2] != [0x1f, 0x8b] {
         return Ok(Term::binary(heap, Binary::from(string)));
     }
 

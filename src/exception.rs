@@ -403,7 +403,7 @@ fn next_catch(process: &Pin<&mut Process>) -> Option<InstrPtr> {
     // TODO: tracing instr handling here
 
     while ptr > 0 {
-        match context.stack[ptr - 1].clone().get_boxed_header() {
+        match context.stack[ptr - 1].get_boxed_header() {
             Ok(value::BOXED_CATCH) => {
                 let ptr = context.stack[ptr - 1]
                     .get_boxed_value::<InstrPtr>()

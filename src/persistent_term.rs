@@ -49,21 +49,21 @@ pub mod bif {
     use crate::vm;
     use std::pin::Pin;
 
-    pub fn get_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    pub fn get_1(vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> Result {
         match vm.persistent_terms.get(args[0]) {
             Some(val) => Ok(val),
-            None => return Err(Exception::new(Reason::EXC_BADARG)), // default
+            None => Err(Exception::new(Reason::EXC_BADARG)), // default
         }
     }
 
-    pub fn get_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    pub fn get_2(vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> Result {
         match vm.persistent_terms.get(args[0]) {
             Some(val) => Ok(val),
             None => Ok(args[1]), // default
         }
     }
 
-    pub fn put_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    pub fn put_2(vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> Result {
         vm.persistent_terms.put(args[0], args[1]);
         Ok(atom!(OK))
     }

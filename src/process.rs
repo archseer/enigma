@@ -10,7 +10,6 @@ use crate::module::{Module, MFA};
 // use crate::servo_arc::Arc; can't do receiver self
 use crate::signal_queue::SignalQueue;
 pub use crate::signal_queue::{ExitKind, Signal};
-use crate::tokio;
 use crate::value::{self, Term, TryInto};
 use crate::vm::Machine;
 use hashbrown::{HashMap, HashSet};
@@ -315,7 +314,7 @@ impl Process {
             Some(chan) => chan.send(()),
             None => Ok(()),
         };
-        () // TODO: pass through the chan.send result ret
+        // TODO: pass through the chan.send result ret
     }
 
     pub fn set_waiting_for_message(&self, value: bool) {
@@ -345,7 +344,7 @@ impl Process {
                     let heap = &self.context_mut().heap;
                     let binary = Term::from(heap.alloc(value::Boxed {
                         header: value::BOXED_BINARY,
-                        value: value,
+                        value,
                     }));
                     let msg = tup2!(heap, Term::port(from), tup2!(heap, atom!(DATA), binary));
                     self.local_data_mut().mailbox.send(msg);

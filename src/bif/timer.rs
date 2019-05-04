@@ -24,7 +24,7 @@ pub fn send_after_3(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]
     let msg = args[2];
     let from = process.pid;
 
-    let when = Instant::now() + Duration::from_millis(delay as u64);
+    let when = Instant::now() + Duration::from_millis(u64::from(delay));
     let fut = Delay::new(when)
         .and_then(move |_| {
             vm::Machine::with_current(|vm| process::send_message(vm, from, dest, msg));

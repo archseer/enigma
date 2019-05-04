@@ -88,8 +88,8 @@ impl Module {
         });
     }
 
-    pub fn load_nifs(&mut self, vm: &Machine, nifs: &Vec<(u32, u32, bif::Fn)>) {
-        use crate::loader::{Instruction, LValue};
+    pub fn load_nifs(&mut self, vm: &Machine, nifs: &[(u32, u32, bif::Fn)]) {
+        use crate::loader::LValue;
         let mut exports = vm.exports.write();
 
         for (name, arity, fun) in nifs {

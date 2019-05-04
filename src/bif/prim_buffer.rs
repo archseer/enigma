@@ -183,7 +183,7 @@ impl<T: AsRef<[u8]>> Cursor<T> {
     #[inline]
     pub(crate) fn new(bytes: T) -> Cursor<T> {
         Cursor {
-            bytes: bytes,
+            bytes,
             pos: 0,
         }
     }
@@ -244,7 +244,7 @@ impl<T> BufDeque<T> {
 impl<T: Buf> Buf for BufDeque<T> {
     #[inline]
     fn remaining(&self) -> usize {
-        self.bufs.iter().map(|buf| buf.remaining()).sum()
+        self.bufs.iter().map(bytes::buf::Buf::remaining).sum()
     }
 
     #[inline]

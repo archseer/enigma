@@ -76,7 +76,7 @@ impl Table for HashTable {
             .get(&key)
             // TODO: bag types
             .map(|v| cons!(heap, v.deep_clone(heap), Term::nil()))
-            .unwrap_or_else(|| Term::nil()))
+            .unwrap_or_else(Term::nil))
     }
 
     fn get_element(&self, process: &Pin<&mut Process>, key: Term, index: usize) -> Result<Term> {

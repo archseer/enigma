@@ -3,11 +3,6 @@
 #![feature(arbitrary_self_types)]
 #![recursion_limit = "1024"] // yeowch
 
-// This pulls in the `tokio-async-await` crate. While Rust 2018 doesn't require
-// `extern crate`, we need to pull in the macros.
-#[macro_use]
-extern crate tokio;
-
 #[macro_use]
 mod macros;
 #[macro_use]

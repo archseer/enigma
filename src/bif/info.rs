@@ -196,7 +196,7 @@ pub fn system_info_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term
     }
 }
 
-pub fn system_flag_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn system_flag_2(vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     use std::sync::atomic::Ordering;
     match args[0].into_variant() {
         Variant::Atom(atom::SYSTEM_LOGGER) => {

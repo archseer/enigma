@@ -672,7 +672,7 @@ fn bif_erlang_monitor_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[T
         }
         Variant::Atom(atom::PORT) => unimplemented!(),
         Variant::Atom(atom::TIME_OFFSET) => unimplemented!(),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(Exception::new(Reason::EXC_BADARG)),
     }
 }
 
@@ -883,7 +883,7 @@ pub fn bif_erlang_is_map_1(
 
 pub fn bif_erlang_is_map_key_2(
     _vm: &vm::Machine,
-    process: &Pin<&mut Process>,
+    _process: &Pin<&mut Process>,
     args: &[Term],
 ) -> Result {
     let key = &args[0];
@@ -956,7 +956,7 @@ fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[T
     Err(Exception::with_value(Reason::EXC_THROWN, args[0]))
 }
 
-fn bif_erlang_exit_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+fn bif_erlang_exit_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> Result {
     // println!("exiting proc pid={} with {}", process.pid, args[0]);
     Err(Exception::with_value(Reason::EXC_EXIT, args[0]))
 }
@@ -998,7 +998,7 @@ fn bif_erlang_error_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Te
     ))
 }
 
-fn bif_erlang_halt_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+fn bif_erlang_halt_2(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> Result {
     // arg[0] exit code
     // arg[1] options
 
@@ -1079,8 +1079,6 @@ pub fn bif_erlang_load_nif_2(
     args: &[Term],
 ) -> Result {
     println!("Tried loading nif: {} with args {}", args[0], args[1]);
-
-    use loader::LValue;
 
     if let Ok(cons) = args[0].try_into() {
         let name = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
@@ -1280,7 +1278,7 @@ pub fn bif_erlang_trunc_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: 
     }
 }
 
-fn io_printable_range_0(_vm: &vm::Machine, process: &Pin<&mut Process>, _args: &[Term]) -> Result {
+fn io_printable_range_0(_vm: &vm::Machine, _process: &Pin<&mut Process>, _args: &[Term]) -> Result {
     Ok(atom!(LATIN1))
 }
 
@@ -1343,7 +1341,7 @@ fn port_control_3(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) 
 }
 
 fn erts_internal_map_next_3(
-    vm: &vm::Machine,
+    _vm: &vm::Machine,
     process: &Pin<&mut Process>,
     args: &[Term],
 ) -> Result {
@@ -1376,7 +1374,7 @@ fn erts_internal_map_next_3(
 // FIXME: phash and phash2 are the same, and they don't match the ERTS ones. And they return 64 bit
 // vals instead of max 32 bit ones. *shrug*
 
-fn phash_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+fn phash_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     let heap = &process.context_mut().heap;
@@ -1387,11 +1385,11 @@ fn phash_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Resu
     match args[1].into_number() {
         Ok(value::Num::Integer(i)) => Ok(Term::uint64(heap, hash % i as u64)),
         Ok(_) => unimplemented!(),
-        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
+        Err(_) => Err(Exception::new(Reason::EXC_BADARG)),
     }
 }
 
-fn phash2_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+fn phash2_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     let heap = &process.context_mut().heap;
@@ -1401,7 +1399,7 @@ fn phash2_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Res
     Ok(Term::uint64(heap, hash))
 }
 
-fn phash2_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+fn phash2_2(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     let heap = &process.context_mut().heap;
@@ -1412,7 +1410,7 @@ fn phash2_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Res
     match args[1].into_number() {
         Ok(value::Num::Integer(i)) => Ok(Term::uint64(heap, hash % i as u64)),
         Ok(_) => unimplemented!(),
-        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
+        Err(_) => Err(Exception::new(Reason::EXC_BADARG)),
     }
 }
 

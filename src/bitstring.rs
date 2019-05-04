@@ -84,9 +84,7 @@ impl Binary {
     pub fn put_integer(&mut self, size: usize, int: Term) {
         if let value::Variant::Integer(value) = int.into_variant() {
             match size {
-                8 => unsafe {
-                    self.data.push(value as u8);
-                },
+                8 => self.data.push(value as u8),
                 _ => unimplemented!("bs_put_binary size {:?}", size),
             }
         } else {

@@ -323,9 +323,7 @@ pub fn unicode_characters_to_binary_2(
     let heap = &process.context_mut().heap;
 
     match args[1].into_variant() {
-        Variant::Atom(atom::UNICODE) | Variant::Atom(atom::UTF8) | Variant::Atom(atom::LATIN1) => {
-            ()
-        }
+        Variant::Atom(atom::UNICODE) | Variant::Atom(atom::UTF8) | Variant::Atom(atom::LATIN1) => {}
         _ => unimplemented!(), // only unicode atm
     }
 
@@ -381,9 +379,7 @@ pub fn unicode_characters_to_list_2(
     let heap = &process.context_mut().heap;
 
     match args[1].into_variant() {
-        Variant::Atom(atom::UNICODE) | Variant::Atom(atom::UTF8) | Variant::Atom(atom::LATIN1) => {
-            ()
-        }
+        Variant::Atom(atom::UNICODE) | Variant::Atom(atom::UTF8) | Variant::Atom(atom::LATIN1) => {}
         _ => unimplemented!(), // only unicode atm
     }
 
@@ -428,7 +424,7 @@ pub fn iolist_size_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
                         elem = cons.head;
 
                         match elem.into_variant() {
-                            Variant::Integer(i @ 0...255) => count += 1,
+                            Variant::Integer(_i @ 0...255) => count += 1,
                             Variant::Pointer(..) => match elem.to_bytes() {
                                 Some(data) => count += data.len(),
                                 None => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -446,7 +442,7 @@ pub fn iolist_size_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Ter
                     elem = cons.tail;
 
                     match elem.into_variant() {
-                        Variant::Integer(i @ 0...255) => count += 1,
+                        Variant::Integer(_i @ 0...255) => count += 1,
                         Variant::Pointer(..) => match elem.to_bytes() {
                             Some(data) => count += data.len(),
                             None => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -614,7 +610,7 @@ pub fn list_to_tuple_1(
 }
 
 pub fn display_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
-    print!("{}\r\n", args[0]);
+    println!("{}\r", args[0]);
     Ok(atom!(TRUE))
 }
 
@@ -634,7 +630,7 @@ pub fn display_nl_0(
     _process: &Pin<&mut Process>,
     _args: &[Term],
 ) -> bif::Result {
-    print!("\r\n");
+    println!("\r");
     Ok(atom!(TRUE))
 }
 
@@ -868,15 +864,15 @@ pub fn sminus_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -
         Ok(value::Num::Integer(i)) => Ok(Term::int(-i)),
         Ok(value::Num::Float(i)) => Ok(Term::from(-i)),
         Ok(value::Num::Bignum(i)) => Ok(Term::bigint(heap, -i)),
-        _ => return Err(Exception::new(Reason::EXC_BADARITH)),
+        _ => Err(Exception::new(Reason::EXC_BADARITH)),
     }
 }
 
-pub fn splus_1(_vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn splus_1(_vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     // if number, return number else return error badarith
     match args[0].into_number() {
         Ok(_) => Ok(args[0]),
-        _ => return Err(Exception::new(Reason::EXC_BADARITH)),
+        _ => Err(Exception::new(Reason::EXC_BADARITH)),
     }
 }
 

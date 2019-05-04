@@ -1464,7 +1464,7 @@ impl Compiler {
                     } else if p.len() >= 1 && p[0].is_atom() && is_variable(p[0]).is_none() {
                         self.fun(t)
                     } else {
-                        return Err(new_error(ErrorKind::Generic(format!("{} is neither a function call, nor a tuple (tuples are written {{{{ ... }}}}).", t))));
+                        Err(new_error(ErrorKind::Generic(format!("{} is neither a function call, nor a tuple (tuples are written {{{{ ... }}}}).", t))))
                     }
                 } else {
                     Ok(true)

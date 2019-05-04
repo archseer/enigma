@@ -489,7 +489,7 @@ pub fn select_delete_2(
     Ok(table.select_delete(vm, process, &pattern, flags)?)
 }
 
-pub fn member_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
+pub fn member_2(vm: &vm::Machine, _process: &Pin<&mut Process>, args: &[Term]) -> bif::Result {
     let table = get_table(vm, args[0])?;
 
     // eprintln!(
