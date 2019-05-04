@@ -209,6 +209,10 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "erase", 0 => pdict::erase_0,
             "erase", 1 => pdict::erase_1,
 
+            "phash", 2 => phash_2,
+            "phash2", 1 => phash2_1,
+            "phash2", 2 => phash2_2,
+
             "is_alive", 0 => is_alive,
 
             // dtrace
@@ -1360,6 +1364,49 @@ fn erts_internal_map_next_3(
         .iter()
         .fold(atom!(NONE), |acc, (key, val)| tup3!(heap, *key, *val, acc));
     Ok(res)
+}
+
+// FIXME: phash and phash2 are the same, and they don't match the ERTS ones. And they return 64 bit
+// vals instead of max 32 bit ones. *shrug*
+
+fn phash_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let heap = &process.context_mut().heap;
+    let mut hasher = DefaultHasher::new();
+    args[0].hash(&mut hasher);
+    let hash = hasher.finish();
+
+    match args[1].into_number() {
+        Ok(value::Num::Integer(i)) => Ok(Term::uint64(heap, hash % i as u64)),
+        Ok(_) => unimplemented!(),
+        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
+    }
+}
+
+fn phash2_1(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let heap = &process.context_mut().heap;
+    let mut hasher = DefaultHasher::new();
+    args[0].hash(&mut hasher);
+    let hash = hasher.finish();
+    Ok(Term::uint64(heap, hash))
+}
+
+fn phash2_2(vm: &vm::Machine, process: &Pin<&mut Process>, args: &[Term]) -> Result {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let heap = &process.context_mut().heap;
+    let mut hasher = DefaultHasher::new();
+    args[0].hash(&mut hasher);
+    let hash = hasher.finish();
+
+    match args[1].into_number() {
+        Ok(value::Num::Integer(i)) => Ok(Term::uint64(heap, hash % i as u64)),
+        Ok(_) => unimplemented!(),
+        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
+    }
 }
 
 #[cfg(test)]
