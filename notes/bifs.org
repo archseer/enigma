@@ -1,4 +1,4 @@
-* BIFs [53/117]
+* BIFs [54/105]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
@@ -37,12 +37,11 @@
 - [X] bif erts_internal:group_leader/2
 - [ ] bif erts_internal:group_leader/3
 - [ ] bif erlang:halt/2
-- [ ] bif erlang:phash/2
-- [ ] bif erlang:phash2/1
-- [ ] bif erlang:phash2/2
+- [X] bif erlang:phash/2
+- [X] bif erlang:phash2/1
+- [X] bif erlang:phash2/2
 - [X] ubif erlang:hd/1
 - [X] bif erlang:integer_to_list/1
-- [ ] bif erlang:is_alive/0
 - [X] ubif erlang:length/1
 - [X] bif erlang:link/1
 - [X] bif erlang:list_to_atom/1
@@ -65,11 +64,6 @@
 - [ ] bif erlang:md5_final/1
 - [X] bif erlang:module_loaded/1
 - [X] bif erlang:function_exported/3
-- [ ] bif erlang:monitor_node/2
-- [ ] bif erlang:monitor_node/3
-- [X] ubif erlang:node/1
-- [X] ubif erlang:node/0
-- [ ] bif erlang:nodes/1
 - [ ] bif erlang:now/0
 - [X] bif erlang:monotonic_time/0
 - [ ] bif erlang:monotonic_time/1
@@ -111,7 +105,15 @@
 - [X] bif erlang:unregister/1
 - [X] bif erlang:whereis/1
 - [X] bif erlang:spawn_opt/1
+
+** Distribution [2/12]
+- [ ] bif erlang:is_alive/0
 - [ ] bif erlang:setnode/2
+- [ ] bif erlang:monitor_node/2
+- [ ] bif erlang:monitor_node/3
+- [X] ubif erlang:node/1
+- [X] ubif erlang:node/0
+- [ ] bif erlang:nodes/1
 - [ ] bif erlang:dist_get_stat/1
 - [ ] bif erlang:dist_ctrl_input_handler/2
 - [ ] bif erlang:dist_ctrl_put_data/2
@@ -335,12 +337,12 @@
 - [ ] bif erl_ddll:monitor/2
 - [ ] bif erl_ddll:demonitor/1
 
-** Bifs in the re module  [0/5]
+** Bifs in the re module  [1/5]
 - [ ] bif re:version/0
 - [ ] bif re:compile/1
 - [ ] bif re:compile/2
 - [ ] bif re:run/2
-- [ ] bif re:run/3
+- [X] bif re:run/3
 
 ** Bifs in lists module. [5/5]
 - [X] bif lists:member/2
