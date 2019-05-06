@@ -59,7 +59,7 @@ pub struct Machine {
     pub process_pool: tokio::runtime::Runtime,
     pub runtime: tokio::runtime::Runtime,
 
-    pub exit: futures::channel::oneshot::Sender::<()>,
+    pub exit: Option<futures::channel::oneshot::Sender::<()>>,
 
     // env config, arguments, panic handler
 
@@ -624,21 +624,51 @@ pub const PRE_LOADED: &[&str] = &[
 
 impl Machine {
     pub fn new() -> Arc<Machine> {
-        Arc::new(Machine {
+        let vm = Arc::new(Machine {
             process_table: Mutex::new(ProcessTable::new()),
             process_registry: Mutex::new(ProcessRegistry::new()),
             port_table: PortTable::new(),
             start_time: time::Instant::now(),
             process_pool: unsafe { std::mem::uninitialized() }, // I'm sorry, but we need a ref to vm in threadpool
             runtime: unsafe { std::mem::uninitialized() }, // I'm sorry, but we need a ref to vm in threadpool
-            exit: unsafe { std::mem::uninitialized() },
+            exit: None,
             next_ref: AtomicUsize::new(1),
             system_logger: AtomicUsize::new(0),
             exports: ExportsTable::with_rc(),
             modules: ModuleRegistry::with_rc(),
             ets_tables: TableRegistry::with_rc(),
             persistent_terms: PersistentTermTable::new(),
-        })
+        });
+
+        // initialize tokio here
+
+        // let (trigger, exit) = futures::sync::oneshot::channel();
+
+        // Create the runtime
+        let machine = vm.clone();
+        let runtime = tokio::runtime::Builder::new()
+            // .panic_handler(|err| std::panic::resume_unwind(err))
+            .after_start(move || {
+                Machine::set_current(machine.clone()); // ughh double clone
+            })
+            .build()
+            .expect("failed to start new Runtime");
+
+        let machine = vm.clone();
+        let process_pool = tokio::runtime::Builder::new()
+            // .panic_handler(|err| std::panic::resume_unwind(err))
+            .after_start(move || {
+                Machine::set_current(machine.clone());
+            })
+            .build()
+            .expect("failed to start new Runtime");
+
+        unsafe {
+            std::ptr::write(&vm.runtime as *const tokio::runtime::Runtime as *mut tokio::runtime::Runtime, runtime);
+            std::ptr::write(&vm.process_pool as *const tokio::runtime::Runtime as *mut tokio::runtime::Runtime, process_pool);
+        }
+
+        vm
     }
 
     pub fn preload_modules(&self) {
@@ -654,36 +684,13 @@ impl Machine {
     /// This method returns true if the VM terminated successfully, false
     /// otherwise.
     pub fn start(self: &Arc<Self>, args: Vec<String>) {
-        // let (trigger, exit) = futures::sync::oneshot::channel();
-
-        // Create the runtime
-        let machine = self.clone();
-        let runtime = tokio::runtime::Builder::new()
-            // .panic_handler(|err| std::panic::resume_unwind(err))
-            .after_start(move || {
-                Machine::set_current(machine.clone()); // ughh double clone
-            })
-            .build()
-            .expect("failed to start new Runtime");
-
-        let machine = self.clone();
-        let process_pool = tokio::runtime::Builder::new()
-            // .panic_handler(|err| std::panic::resume_unwind(err))
-            .after_start(move || {
-                Machine::set_current(machine.clone());
-            })
-            .build()
-            .expect("failed to start new Runtime");
-
-        unsafe { std::ptr::write(&self.runtime as *const tokio::runtime::Runtime as *mut tokio::runtime::Runtime, runtime); }
-        unsafe { std::ptr::write(&self.process_pool as *const tokio::runtime::Runtime as *mut tokio::runtime::Runtime, process_pool); }
-        let vm = unsafe { &mut *(&**self as *const Machine as *mut Machine) };
-
         let (tx, rx) = futures::channel::oneshot::channel::<()>();
 
-        unsafe { std::ptr::write(&self.exit as *const futures::channel::oneshot::Sender::<()> as *mut futures::channel::oneshot::Sender::<()>, tx); }
+        let vm = unsafe { &mut *(&**self as *const Machine as *mut Machine) };
 
-        self.start_main_process(&mut vm.runtime, args);
+        vm.exit = Some(tx);
+
+        self.start_main_process(args);
 
         // Wait until the runtime becomes idle and shut it down.
         vm.runtime.block_on(rx.into_future().boxed().compat()).unwrap();
@@ -694,7 +701,7 @@ impl Machine {
     fn terminate(&self) {}
 
     /// Starts the main process
-    pub fn start_main_process(&self, _runtime: &mut tokio::runtime::Runtime, args: Vec<String>) {
+    pub fn start_main_process(&self, args: Vec<String>) {
         println!("Starting main process...");
         let registry = self.modules.lock();
         //let module = unsafe { &*module::load_module(self, path).unwrap() };
@@ -1966,7 +1973,7 @@ impl Machine {
                                 ms.mb.get_bytes(4).map(|b| Term::uint(&context.heap, u32::from_be_bytes((*b).try_into().unwrap())))
                             },
                             // TODO: 64 bits
-                            // slow fallback 
+                            // slow fallback
                             _ => {
                                 ms.mb.get_integer(
                                     &context.heap,
