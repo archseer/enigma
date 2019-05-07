@@ -57,9 +57,30 @@ pub fn process_info_aux(
                 }
             }
         }
-        atom::CURRENT_FUNCTION => unimplemented!(),
-        atom::CURRENT_LOCATION => unimplemented!(),
-        atom::CURRENT_STACKTRACE => unimplemented!(), // TODO
+        atom::CURRENT_FUNCTION => {
+            //process.context_mut().ip.lookup_func_info()
+            unimplemented!()
+        }
+        atom::CURRENT_LOCATION => {
+            let fi = process.context_mut().ip.lookup_func_info().unwrap();
+            crate::exception::erts_build_mfa_item(&fi, heap, Term::nil())
+        }
+        atom::CURRENT_STACKTRACE => {
+            let mut trace = Vec::with_capacity(crate::exception::DEFAULT_BACKTRACE_SIZE as usize);
+            crate::exception::erts_save_stacktrace(
+                process,
+                &mut trace,
+                crate::exception::DEFAULT_BACKTRACE_SIZE,
+            );
+            trace.into_iter().rev().fold(Term::nil(), |acc, ptr| {
+                let func_info = ptr.lookup_func_info().unwrap();
+                cons!(
+                    heap,
+                    crate::exception::erts_build_mfa_item(&func_info, heap, Term::nil()),
+                    acc
+                )
+            })
+        }
         atom::INITIAL_CALL => {
             let call = local_data.initial_call;
             tup3!(
@@ -187,7 +208,7 @@ pub fn system_info_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
                match tup[0].into_variant() {
                    Variant::Atom(atom::PURIFY) => return Err(Exception::new(Reason::EXC_BADARG)),
                    _ => unimplemented!("system_info for {}", args[0])
-               } 
+               }
             } else {
                 unimplemented!("system_info for {}", args[0])
             }

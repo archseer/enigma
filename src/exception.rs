@@ -221,7 +221,7 @@ macro_rules! exception_code {
 }
 
 const MAX_BACKTRACE_SIZE: u32 = 64;
-const DEFAULT_BACKTRACE_SIZE: u32 = 8;
+pub const DEFAULT_BACKTRACE_SIZE: u32 = 8;
 
 const EXIT_TAGS: [u32; 3] = [atom::ERROR, atom::EXIT, atom::THROW];
 
@@ -635,7 +635,7 @@ fn save_stacktrace(
     // }
 
     // Save the actual stack trace
-    erts_save_stacktrace(process, s, depth);
+    erts_save_stacktrace(process, &mut s.trace, depth);
 
     // Package args and stack trace
     // c_p->ftrace = CONS(hp, args, make_big((Eterm *) s));
@@ -662,9 +662,9 @@ pub fn erts_save_stacktrace(process: &RcProcess, trace: &mut Vec<InstrPtr>, mut 
         }) = &context.stack[ptr - 1].try_into()
         {
             if let Some(cp) = *boxed_cp {
-                if Some(&cp) != s.trace.last() {
+                if Some(&cp) != trace.last() {
                     // Record non-duplicates only
-                    s.trace.push(cp); // -1
+                    trace.push(cp); // -1
                     depth -= 1;
                 }
             }

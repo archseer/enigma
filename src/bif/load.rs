@@ -96,7 +96,7 @@ pub fn get_module_info_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
     Ok(keys.into_iter().fold(Term::nil(), |acc, key| {
         cons!(
             heap,
-            tup2!(heap, key, get_module_info(module, key).unwrap()),
+            tup2!(heap, key, get_module_info(heap, module, key).unwrap()),
             acc
         )
     }))
@@ -110,16 +110,29 @@ pub fn get_module_info_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
 
     let registry = vm.modules.lock();
     let module = registry.lookup(name).unwrap();
-    let res = get_module_info(module, args[1]).unwrap();
+    let heap = &process.context_mut().heap;
+    let res = get_module_info(heap, module, args[1]).unwrap();
     Ok(res)
 }
 
-fn get_module_info(module: &Module, what: Term) -> bif::Result {
+fn get_module_info(heap: &crate::immix::Heap, module: &Module, what: Term) -> bif::Result {
     match what.into_variant() {
         Variant::Atom(atom::MODULE) => Ok(Term::atom(module.name)),
         //Variant::Atom(atom::MD5) => md5_of_module(p, code_hdr),
-        Variant::Atom(atom::EXPORTS) => unimplemented!(),
-        Variant::Atom(atom::FUNCTIONS) => unimplemented!(),
+        Variant::Atom(atom::EXPORTS) => {
+            Ok(module.exports.iter().rev().fold(Term::nil(), |acc, mfa| {
+                cons!(
+                    heap,
+                    tup2!(heap, Term::atom(mfa.0), Term::uint(heap, mfa.1)),
+                    acc
+                )
+            }))
+        }
+        Variant::Atom(atom::FUNCTIONS) => {
+            Ok(module.funs.keys().fold(Term::nil(), |acc, &(f, a)| {
+                cons!(heap, tup2!(heap, Term::atom(f), Term::uint(heap, a)), acc)
+            }))
+        }
         Variant::Atom(atom::NIFS) => unimplemented!(),
         Variant::Atom(atom::ATTRIBUTES) => unimplemented!(),
         Variant::Atom(atom::COMPILE) => unimplemented!(),
