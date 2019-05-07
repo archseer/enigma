@@ -24,7 +24,7 @@ fn run() -> i32 {
             .to_str()
             .unwrap(),
         "--",
-        "-init_debug",
+        // "-init_debug",
         "-kernel",
         "start_distribution",
         "false",

@@ -111,7 +111,7 @@ impl Module {
                     op: crate::opcodes::Opcode::CallExtOnly,
                     args: vec![LValue::Literal(*arity), LValue::Literal(pos as u32)],
                 };
-                println!("NIF replaced {}", mfa);
+            // println!("NIF replaced {}", mfa);
             } else {
                 panic!("NIF stub not found")
             }
@@ -123,7 +123,6 @@ pub fn load_module(vm: &Machine, path: &str) -> Result<*const Module, std::io::E
     let mut registry = vm.modules.lock();
     let mut exports = vm.exports.write();
 
-    println!("Loading file: {}", path);
     registry.parse_module(path).map(|module| {
         module.process_exports(&mut *exports);
         module as *const Module

@@ -702,7 +702,7 @@ impl Machine {
 
     /// Starts the main process
     pub fn start_main_process(&self, args: Vec<String>) {
-        println!("Starting main process...");
+        // println!("Starting main process...");
         let registry = self.modules.lock();
         //let module = unsafe { &*module::load_module(self, path).unwrap() };
         let module = registry.lookup(atom::from_str("erl_init")).unwrap();
@@ -718,7 +718,7 @@ impl Machine {
                 .map(|arg| Term::binary(&context.heap, bitstring::Binary::from(arg.into_bytes()))),
             &context.heap,
         );
-        println!("argv {}", context.x[1]);
+        // println!("argv {}", context.x[1]);
         op_jump!(context, module.funs[&(fun, arity)]);
         /* TEMP */
 

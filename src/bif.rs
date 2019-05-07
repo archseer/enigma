@@ -1262,7 +1262,6 @@ fn dflag_unicode_io(_vm: &vm::Machine, _process: &Pin<RcProcess>, _args: &[Term]
 }
 
 fn open_port_2(vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
-    println!("open_port called with {}, {}", args[0], args[1]);
     let pid = port::spawn(vm, process.pid, args[0], args[1])?;
     Ok(Term::port(pid))
 }
