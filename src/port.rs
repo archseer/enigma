@@ -555,8 +555,10 @@ impl Renderer {
         let pos = i16::from_be_bytes(bytes[1..3].try_into().unwrap());
         if pos < 0 {
             write!(self.out, "{}", termion::cursor::Left(-pos as u16));
+            self.line.pos -= -pos as usize;
         } else {
             write!(self.out, "{}", termion::cursor::Right(pos as u16));
+            self.line.pos += pos as usize;
         }
         self.out.flush().unwrap();
     }
@@ -588,7 +590,10 @@ impl Renderer {
             }
             // move cursor
         }
-        // TODO: need to redraw
+        // TODO: need to redraw more efficiently and with multiline
+        write!(self.out, "\r{}", termion::clear::CurrentLine);
+        self.out.write_all(self.line.as_str().as_bytes()).unwrap();
+        self.out.flush().unwrap();
     }
 
     pub fn delete_chars(&mut self, bytes: &[u8]) {
@@ -599,7 +604,10 @@ impl Renderer {
         } else { // delete backwards
             self.line.backspace((-n) as usize);
         }
-        // TODO: need to redraw
+        // TODO: need to redraw more efficiently and with multiline
+        write!(self.out, "\r{}", termion::clear::CurrentLine);
+        self.out.write_all(self.line.as_str().as_bytes()).unwrap();
+        self.out.flush().unwrap();
     }
 }
 
