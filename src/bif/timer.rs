@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use tokio::prelude::*;
 use tokio::timer::Delay;
 
-pub fn send_after_3(vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn send_after_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // time, dest, msg
     let delay = match args[0].to_int() {
         Some(i) if i >= 0 => i,

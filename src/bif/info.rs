@@ -131,7 +131,7 @@ pub fn process_info_aux(
     Ok(tup2!(heap, Term::atom(item), res))
 }
 
-pub fn process_info_2(vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn process_info_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // args are pid, `[item, .. ]` or just `item`.
     // response is `[tup,..]` or just `tup`
     if !args[0].is_pid() {
@@ -167,7 +167,7 @@ const OS_FAMILY: u32 = atom::UNIX;
 #[cfg(target_family = "windows")]
 const OS_FAMILY: u32 = atom::WIN32;
 
-pub fn system_info_1(vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn system_info_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     use std::sync::atomic::Ordering;
     let heap = &process.context_mut().heap;
 
@@ -196,7 +196,7 @@ pub fn system_info_1(vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) 
     }
 }
 
-pub fn system_flag_2(vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn system_flag_2(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     use std::sync::atomic::Ordering;
     match args[0].into_variant() {
         Variant::Atom(atom::SYSTEM_LOGGER) => {
@@ -212,11 +212,11 @@ pub fn system_flag_2(vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term])
     }
 }
 
-pub fn group_leader_0(_vm: &vm::Machine, process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
+pub fn group_leader_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     Ok(Term::pid(process.local_data().group_leader))
 }
 
-pub fn group_leader_2(vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn group_leader_2(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     if !args[0].is_pid() {
         return Err(Exception::new(Reason::EXC_BADARG));
     }

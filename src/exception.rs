@@ -305,7 +305,7 @@ impl TryFrom<Term> for StackTrace {
 // handle_error(Process* c_p, BeamInstr* pc, ErtsCodeMFA *bif_mfa)
 // {
 pub fn handle_error(
-    process: &Pin<RcProcess>,
+    process: &RcProcess,
     mut exc: Exception, /*, bif_mfa: &MFA*/
 ) -> Option<InstrPtr> {
     // print!(
@@ -389,7 +389,7 @@ pub fn handle_error(
 
 /// Find the nearest catch handler
 /// TODO: return is instr pointer
-fn next_catch(process: &Pin<RcProcess>) -> Option<InstrPtr> {
+fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
     let context = process.context_mut();
     let mut ptr = context.stack.len();
     let mut prev = ptr;
@@ -428,7 +428,7 @@ fn next_catch(process: &Pin<RcProcess>) -> Option<InstrPtr> {
 }
 
 /// Terminating the process when an exception is not caught
-fn terminate_process(process: &Pin<RcProcess>, mut exc: Exception) {
+fn terminate_process(process: &RcProcess, mut exc: Exception) {
     // let heap = &process.context_mut().heap;
 
     // Add a stacktrace if this is an error.
@@ -465,7 +465,7 @@ fn terminate_process(process: &Pin<RcProcess>, mut exc: Exception) {
 }
 
 /// Build and add a symbolic stack trace to the error value.
-pub fn add_stacktrace(process: &Pin<RcProcess>, value: Term, trace: Term) -> Term {
+pub fn add_stacktrace(process: &RcProcess, value: Term, trace: Term) -> Term {
     let heap = &process.context_mut().heap;
     let origin = build_stacktrace(process, trace);
     tup2!(heap, value, origin)
@@ -473,7 +473,7 @@ pub fn add_stacktrace(process: &Pin<RcProcess>, value: Term, trace: Term) -> Ter
 
 /// Forming the correct error value from the internal error code.
 /// This does not update c_p->fvalue or c_p->freason.
-fn expand_error_value(process: &Pin<RcProcess>, reason: Reason, value: Term) -> Term {
+fn expand_error_value(process: &RcProcess, reason: Reason, value: Term) -> Term {
     match exception_code!(reason) {
         // primary
         0 => {
@@ -534,7 +534,7 @@ fn expand_error_value(process: &Pin<RcProcess>, reason: Reason, value: Term) -> 
 // save_stacktrace(Process* c_p, BeamInstr* pc, Eterm* reg,
 // 		ErtsCodeMFA *bif_mfa, Eterm args) {
 fn save_stacktrace(
-    process: &Pin<RcProcess>,
+    process: &RcProcess,
     exc: &mut Exception,
     /*bif_mfa: &MFA,*/ mut args: Term,
 ) {
@@ -642,7 +642,7 @@ fn save_stacktrace(
     exc.trace = cons!(heap, args, Term::from(boxed));
 }
 
-fn erts_save_stacktrace(process: &Pin<RcProcess>, s: &mut StackTrace, mut depth: u32) {
+pub fn erts_save_stacktrace(process: &RcProcess, trace: &mut Vec<InstrPtr>, mut depth: u32) {
     let context = process.context_mut();
     if depth == 0 {
         return;
@@ -712,7 +712,7 @@ fn is_raised_exc(exc: Term) -> bool {
 
 /// Creating a list with the argument registers
 // static Eterm
-fn make_arglist(process: &Pin<RcProcess>, mut a: usize) -> Term {
+fn make_arglist(process: &RcProcess, mut a: usize) -> Term {
     let context = process.context_mut();
     let mut args = Term::nil();
     while a > 0 {
@@ -727,7 +727,7 @@ fn make_arglist(process: &Pin<RcProcess>, mut a: usize) -> Term {
 /// holds the given args and the quick-saved data (encoded as a bignum).
 ///
 /// If the bignum is negative, the given args is a complete stacktrace.
-pub fn build_stacktrace(process: &Pin<RcProcess>, exc: Term) -> Term {
+pub fn build_stacktrace(process: &RcProcess, exc: Term) -> Term {
     let heap = &process.context_mut().heap;
 
     // TODO: awkward
@@ -786,7 +786,7 @@ pub fn build_stacktrace(process: &Pin<RcProcess>, exc: Term) -> Term {
 }
 
 /// Build a single {M,F,A,Loction} item to be part of a stack trace.
-fn erts_build_mfa_item(fi: &(MFA, Option<FuncInfo>), heap: &Heap, args: Term) -> Term {
+pub fn erts_build_mfa_item(fi: &(MFA, Option<FuncInfo>), heap: &Heap, args: Term) -> Term {
     let mut loc = Term::nil();
 
     if let Some((_file, line)) = fi.1 {

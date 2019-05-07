@@ -104,46 +104,46 @@ pub mod bif {
     use super::*;
     use crate::bif::Result;
 
-    pub fn new_0(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
+    pub fn new_0(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
         let heap = &process.context_mut().heap;
         let buf = Buffer::new();
         Ok(Term::buffer(heap, buf))
     }
 
-    pub fn size_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
+    pub fn size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
         let heap = &process.context_mut().heap;
         let buf = Buffer::try_from(&args[0])?;
         Ok(Term::uint64(heap, buf.size() as u64))
     }
 
-    pub fn peek_head_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
+    pub fn peek_head_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
         let buf = Buffer::try_from(&args[0])?;
         unimplemented!()
     }
 
-    pub fn copying_read_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
+    pub fn copying_read_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
         let buf = Buffer::try_from(&args[0])?;
         unimplemented!()
     }
 
-    pub fn write_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
+    pub fn write_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
         // let buf = Buffer::try_from(&args[0])?;
         // parse into iovec
         // buf.write(iovec);
         unimplemented!()
     }
 
-    pub fn skip_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
+    pub fn skip_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
         // let buf = Buffer::try_from(&args[0])?;
         unimplemented!()
     }
 
-    pub fn find_byte_index_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
+    pub fn find_byte_index_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
         let buf = Buffer::try_from(&args[0])?;
         unimplemented!()
     }
 
-    pub fn try_lock_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
+    pub fn try_lock_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
         let buf = Buffer::try_from(&args[0])?;
         if !buf.try_lock() {
             return Ok(atom!(BUSY));
@@ -151,7 +151,7 @@ pub mod bif {
         Ok(atom!(ACQUIRED))
     }
 
-    pub fn unlock_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> Result {
+    pub fn unlock_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
         let buf = Buffer::try_from(&args[0])?;
         if !buf.unlock() {
             return Err(Exception::with_value(

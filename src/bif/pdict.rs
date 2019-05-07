@@ -7,7 +7,7 @@ use crate::vm;
 use std::pin::Pin;
 
 /// Get the whole pdict.
-pub fn get_0(_vm: &vm::Machine, process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
+pub fn get_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     let pdict = &process.local_data_mut().dictionary;
     let heap = &process.context_mut().heap;
 
@@ -22,7 +22,7 @@ pub fn get_0(_vm: &vm::Machine, process: &Pin<RcProcess>, _args: &[Term]) -> bif
 }
 
 /// Get the value for key in pdict.
-pub fn get_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn get_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let pdict = &process.local_data_mut().dictionary;
     Ok(pdict
         .get(&(args[0]))
@@ -31,7 +31,7 @@ pub fn get_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif:
 }
 
 /// Get all the keys in pdict.
-pub fn get_keys_0(_vm: &vm::Machine, process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
+pub fn get_keys_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     let pdict = &process.local_data_mut().dictionary;
     let heap = &process.context_mut().heap;
 
@@ -42,7 +42,7 @@ pub fn get_keys_0(_vm: &vm::Machine, process: &Pin<RcProcess>, _args: &[Term]) -
 }
 
 /// Return all the keys that have val
-pub fn get_keys_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn get_keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let pdict = &process.local_data_mut().dictionary;
     let heap = &process.context_mut().heap;
 
@@ -57,7 +57,7 @@ pub fn get_keys_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) ->
 }
 
 /// Set the key to val. Return undefined if a key was inserted, or old val if it was updated.
-pub fn put_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn put_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let pdict = &mut process.local_data_mut().dictionary;
     Ok(pdict
         .insert(args[0], args[1])
@@ -65,7 +65,7 @@ pub fn put_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif:
 }
 
 /// Remove all pdict entries, returning the pdict.
-pub fn erase_0(_vm: &vm::Machine, process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
+pub fn erase_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     // deletes all the entries, returning the whole dict tuple
     let pdict = &mut process.local_data_mut().dictionary;
     let heap = &process.context_mut().heap;
@@ -82,7 +82,7 @@ pub fn erase_0(_vm: &vm::Machine, process: &Pin<RcProcess>, _args: &[Term]) -> b
 }
 
 /// Remove a single entry from the pdict and return it.
-pub fn erase_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn erase_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // deletes a single entry, returning the val
     let pdict = &mut process.local_data_mut().dictionary;
     Ok(pdict.remove(&(args[0])).unwrap_or_else(|| atom!(UNDEFINED)))

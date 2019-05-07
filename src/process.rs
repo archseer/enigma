@@ -562,7 +562,7 @@ bitflags! {
 
 pub fn spawn(
     vm: &Machine,
-    parent: &Pin<RcProcess>,
+    parent: &RcProcess,
     module: *const Module,
     func: u32,
     args: Term,
@@ -626,8 +626,6 @@ pub fn spawn(
         let heap = &parent.context_mut().heap;
         ret = tup2!(heap, ret, Term::reference(heap, reference))
     }
-
-    let new_proc = std::pin::Pin::new(new_proc);
 
     let future = crate::vm::run_with_error_handling(new_proc);
     vm.process_pool

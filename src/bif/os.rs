@@ -9,13 +9,13 @@ use crate::vm;
 use std::env;
 use std::pin::Pin;
 
-pub fn list_env_vars_0(_vm: &vm::Machine, process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
+pub fn list_env_vars_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
     Ok(env::vars()
         .map(|(key, val)| tup2!(heap, bitstring!(heap, key), bitstring!(heap, val)))
         .fold(Term::nil(), |acc, val| cons!(heap, val, acc)))
 }
-pub fn get_env_var_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn get_env_var_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
     let cons = Cons::try_from(&args[0])?;
     let name = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
@@ -27,7 +27,7 @@ pub fn get_env_var_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term])
     }
 }
 
-pub fn set_env_var_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn set_env_var_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let cons = Cons::try_from(&args[0])?;
     let name = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
     let cons = Cons::try_from(&args[1])?;
@@ -37,7 +37,7 @@ pub fn set_env_var_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]
     Ok(atom!(TRUE))
 }
 
-pub fn unset_env_var_1(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn unset_env_var_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let cons = Cons::try_from(&args[0])?;
     let name = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
 
@@ -45,7 +45,7 @@ pub fn unset_env_var_1(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Ter
     Ok(atom!(TRUE))
 }
 
-pub fn getpid_0(_vm: &vm::Machine, process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
+pub fn getpid_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
     Ok(Term::uint(heap, std::process::id()))
 }

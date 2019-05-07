@@ -58,8 +58,8 @@ macro_rules! fail {
 #[allow(dead_code)]
 pub fn run(
     vm: &vm::Machine,
-    process: &Pin<RcProcess>,
-    // pself: &Pin<RcProcess>,
+    process: &RcProcess,
+    // pself: &RcProcess,
     pat: &pam::Pattern,
     term: Term,     /*Eterm *termp, arity: usize*/
     in_flags: Flag, /*, Uint32 *return_flags*/

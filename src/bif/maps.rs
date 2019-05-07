@@ -8,13 +8,13 @@ use hamt_rs::HamtMap;
 use std::pin::Pin;
 
 // TODO: deprecated past OTP 22
-pub fn new_0(_vm: &vm::Machine, process: &Pin<RcProcess>, _args: &[Term]) -> bif::Result {
+pub fn new_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
     let new_map = HAMT::new();
     Ok(Term::map(heap, new_map))
 }
 
-pub fn find_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let key = &args[0];
     let map = &args[1];
     if let Ok(value::Map(map)) = map.try_into() {
@@ -31,7 +31,7 @@ pub fn find_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
-pub fn get_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn get_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let map = &args[1];
     // println!("maps:get/2: {} and {}", args[0], args[1]);
     if let Ok(value::Map(map)) = map.try_into() {
@@ -48,7 +48,7 @@ pub fn get_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
-pub fn from_list_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn from_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let mut list = &args[0];
     if !list.is_list() {
         return Err(Exception::new(Reason::EXC_BADARG));
@@ -69,7 +69,7 @@ pub fn from_list_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -
     Ok(Term::map(heap, map))
 }
 
-pub fn to_list_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
     let map = &args[0];
     if let Ok(value::Map(map)) = map.try_into() {
@@ -81,7 +81,7 @@ pub fn to_list_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> 
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
-pub fn is_key_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn is_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let map = &args[1];
     if let Ok(value::Map(map)) = map.try_into() {
         let target = &args[0];
@@ -91,7 +91,7 @@ pub fn is_key_2(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> 
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
-pub fn keys_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let map = &args[0];
     if let Ok(value::Map(map)) = map.try_into() {
         let heap = &process.context_mut().heap;
@@ -101,7 +101,7 @@ pub fn keys_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
-pub fn merge_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn merge_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let map1 = match args[0].try_into() {
         Ok(value::Map(map)) => map,
         _ => return Err(Exception::with_value(Reason::EXC_BADMAP, args[0])),
@@ -118,7 +118,7 @@ pub fn merge_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bi
     Ok(Term::map(heap, new_map))
 }
 
-pub fn put_3(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
     let key = args[0];
     let value = args[1];
@@ -130,7 +130,7 @@ pub fn put_3(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif:
     Err(Exception::with_value(Reason::EXC_BADMAP, map))
 }
 
-pub fn remove_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn remove_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
     let key = args[0];
     let map = args[1];
@@ -141,7 +141,7 @@ pub fn remove_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> b
     Err(Exception::with_value(Reason::EXC_BADMAP, map))
 }
 
-pub fn update_3(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn update_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let key = args[0];
     let value = args[1];
     let map = args[2];
@@ -160,7 +160,7 @@ pub fn update_3(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> b
     Err(Exception::with_value(Reason::EXC_BADMAP, map))
 }
 
-pub fn values_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn values_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let map = args[0];
     if let Ok(value::Map(map)) = map.try_into() {
         let heap = &process.context_mut().heap;
@@ -170,7 +170,7 @@ pub fn values_1(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> b
     Err(Exception::with_value(Reason::EXC_BADMAP, map))
 }
 
-pub fn take_2(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+pub fn take_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let key = args[0];
     let map = args[1];
     if let Ok(value::Map(map)) = map.try_into() {

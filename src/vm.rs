@@ -211,7 +211,7 @@ macro_rules! call_error_handler {
 #[inline]
 fn call_error_handler(
     vm: &Machine,
-    process: &Pin<RcProcess>,
+    process: &RcProcess,
     mfa: &module::MFA,
     func: u32,
 ) -> Result<(), Exception> {
@@ -722,7 +722,6 @@ impl Machine {
         op_jump!(context, module.funs[&(fun, arity)]);
         /* TEMP */
 
-        let process = std::pin::Pin::new(process);
         let future = run_with_error_handling(process);
         self.process_pool.executor().spawn(future.unit_error().boxed().compat());
 
@@ -732,7 +731,7 @@ impl Machine {
 
     /// Executes a single process, terminating in the event of an error.
     pub async fn run_with_error_handling(
-        mut process: Pin<RcProcess>
+        mut process: RcProcess
     ) {
 
         // We are using AssertUnwindSafe here so we can pass a &mut Worker to
@@ -797,7 +796,7 @@ impl Machine {
     #[allow(clippy::cognitive_complexity)]
     pub fn run<'a: 'c, 'b: 'c, 'c>(
         &'a self,
-        process: &'b mut Pin<RcProcess>,
+        process: &'b mut RcProcess,
     ) -> impl std::future::Future<Output = Result<process::State, Exception>> + Captures<'a> + Captures<'b> + 'c {
         async move {  // workaround for https://github.com/rust-lang/rust/issues/56238
         let context = process.context_mut();
