@@ -75,6 +75,33 @@ pub fn finish_loading_1(vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Ter
         })
 }
 
+pub fn get_module_info_1(vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+    let name = match args[0].into_variant() {
+        Variant::Atom(i) => i,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    let registry = vm.modules.lock();
+    let module = registry.lookup(name).unwrap();
+    let heap = &process.context_mut().heap;
+    let keys = vec![
+        atom!(MD5),
+        atom!(NATIVE),
+        atom!(COMPILE),
+        atom!(ATTRIBUTES),
+        atom!(EXPORTS),
+        atom!(MODULE),
+    ];
+
+    Ok(keys.into_iter().fold(Term::nil(), |acc, key| {
+        cons!(
+            heap,
+            tup2!(heap, key, get_module_info(module, key).unwrap()),
+            acc
+        )
+    }))
+}
+
 pub fn get_module_info_2(
     vm: &vm::Machine,
     _process: &Pin<RcProcess>,
@@ -101,7 +128,7 @@ fn get_module_info(module: &Module, what: Term) -> bif::Result {
         Variant::Atom(atom::ATTRIBUTES) => unimplemented!(),
         Variant::Atom(atom::COMPILE) => unimplemented!(),
         Variant::Atom(atom::NATIVE_ADDRESSES) => unimplemented!(),
-        Variant::Atom(atom::NATIVE) => unimplemented!(),
+        Variant::Atom(atom::NATIVE) => Ok(atom!(FALSE)), // TODO
         _ => Err(Exception::new(Reason::EXC_BADARG)),
     }
 }

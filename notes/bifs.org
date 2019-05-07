@@ -380,13 +380,13 @@
 - [ ] bif erlang:hibernate/3
 - [ ] bif error_logger:warning_map/0
 
-** New Bifs in R10B. [4/9]
-- [ ] bif erlang:get_module_info/1
+** New Bifs in R10B. [6/9]
+- [X] bif erlang:get_module_info/1
 - [X] bif erlang:get_module_info/2
 - [X] ubif erlang:is_boolean/1
 - [ ] bif string:list_to_integer/1
 - [ ] bif string:list_to_float/1
-- [ ] bif erlang:make_fun/3
+- [X] bif erlang:make_fun/3
 - [X] bif erlang:iolist_size/1
 - [X] bif erlang:iolist_to_binary/1
 - [ ] bif erlang:list_to_existing_atom/1

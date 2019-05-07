@@ -840,6 +840,21 @@ pub fn splus_1(_vm: &vm::Machine, _process: &Pin<RcProcess>, args: &[Term]) -> b
     }
 }
 
+pub fn make_fun_3(_vm: &vm::Machine, process: &Pin<RcProcess>, args: &[Term]) -> bif::Result {
+    // module, func, arity? return BOXED_EXPORT
+    let heap = &process.context_mut().heap;
+    match (
+        args[0].into_variant(),
+        args[1].into_variant(),
+        args[2].into_variant(),
+    ) {
+        (Variant::Atom(m), Variant::Atom(f), Variant::Integer(a)) if a > 0 => {
+            Ok(Term::export(heap, crate::module::MFA(m, f, a as u32)))
+        }
+        _ => Err(Exception::new(Reason::EXC_BADARG)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
