@@ -446,22 +446,19 @@ pub fn run(
                     assert!(!variables[n].is_none());
                     esp.push(variables[n])
                 }
-                //                Opcode::PushExpr() => {
-                //                    if in_flags & ERTS_PAM_COPY_RESULT {
-                //                        Uint sz;
-                //                        Eterm* top;
-                //                        sz = size_object(term);
-                //                        top = HAllocX(build_proc, sz, HEAP_XTRA);
-                //                        if in_flags & ERTS_PAM_CONTIGUOUS_TUPLE {
-                //                            assert!(is_tuple(term));
-                //                            *esp++ = copy_shallow(tuple_val(term), sz, &top, &MSO(build_proc));
-                //                        } else {
-                //                            *esp++ = copy_struct(term, sz, &top, &MSO(build_proc));
-                //                        }
-                //                    } else {
-                //                        *esp++ = term;
-                //                    }
-                //                }
+                Opcode::PushExpr() => {
+                    if in_flags.contains(Flag::COPY_RESULT) {
+                        if in_flags.contains(Flag::CONTIGUOUS_TUPLE) {
+                            assert!(term.is_tuple());
+                            // TODO: use a shallow copy later esp.push(copy_shallow(tuple_val(term), sz, &top, &MSO(build_proc)))
+                            esp.push(term.deep_clone(&process.context_mut().heap)); // build_proc
+                        } else {
+                            esp.push(term.deep_clone(&process.context_mut().heap)); // build_proc
+                        }
+                    } else {
+                        esp.push(term);
+                    }
+                }
                 //                Opcode::PushArrayAsList() => {
                 //                    n = arity; /* Only happens when 'term' is an array */
                 //                    tp = termp;
