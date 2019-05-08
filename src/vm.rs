@@ -262,7 +262,7 @@ macro_rules! op_call_ext {
             Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
             Some(Export::Bif(APPLY_2)) => {
                 // I'm cheating here, *shrug*
-                op_apply_fun!($vm, $context)
+                op_apply_fun!($vm, $context, $process)
             }
             Some(Export::Bif(APPLY_3)) => {
                 // I'm cheating here, *shrug*
@@ -427,7 +427,7 @@ macro_rules! op_apply {
 }
 
 macro_rules! op_apply_fun {
-    ($vm:expr, $context:expr) => {{
+    ($vm:expr, $context:expr, $process:expr) => {{
         // Walk down the 3rd parameter of apply (the argument list) and copy
         // the parameters to the x registers (reg[]).
 
@@ -451,11 +451,27 @@ macro_rules! op_apply_fun {
         }
         //context.x[arity] = fun;
 
+        // TODO: this part matches CallFun, extract
         if let Ok(closure) = value::Closure::try_from(&fun) {
             op_call_fun!($vm, $context, closure, arity);
+        } else if let Ok(mfa) = module::MFA::try_from(&fun) {
+            // TODO: deduplicate this part
+            let export = { $vm.exports.read().lookup(&mfa) }; // drop the exports lock
+
+            match export {
+                Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
+                Some(Export::Bif(bif)) => {
+                    op_call_bif!($vm, $context, &$process, bif, mfa.2 as usize, true) // TODO is return true ok
+                }
+                None => {
+                    // println!("apply setup_error_handler");
+                    call_error_handler!($vm, &$process, &mfa);
+                    // apply_setup_error_handler
+                }
+            }
         } else {
             // TODO raise error
-            unimplemented!("TODO: possible EXPORT")
+            unreachable!()
         }
     }};
 }
