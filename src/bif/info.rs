@@ -182,6 +182,49 @@ pub fn process_info_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
     }
 }
 
+pub fn fun_info_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let heap = &process.context_mut().heap;
+    if let Ok(closure) = value::Closure::try_from(&args[0]) {
+        match args[1].into_variant() {
+            Variant::Atom(atom::TYPE) => Ok(atom!(LOCAL)),
+            Variant::Atom(atom::PID) => unimplemented!(),
+            Variant::Atom(atom::MODULE) => Ok(Term::atom(closure.mfa.0)),
+            Variant::Atom(atom::NEW_INDEX) => unimplemented!(),
+            Variant::Atom(atom::NEW_UNIQ) => unimplemented!(),
+            Variant::Atom(atom::INDEX) => unimplemented!(),
+            Variant::Atom(atom::UNIQ) => unimplemented!(),
+            Variant::Atom(atom::ENV) => {
+                if let Some(terms) = &closure.binding {
+                    Ok(Cons::from_iter(terms.iter().copied(), heap))
+                } else {
+                    Ok(Term::nil())
+                }
+            }
+            Variant::Atom(atom::REFC) => unimplemented!(),
+            Variant::Atom(atom::ARITY) => Ok(Term::atom(closure.mfa.2)),
+            Variant::Atom(atom::NAME) => unimplemented!(),
+            _ => unimplemented!(),
+        }
+    } else if let Ok(mfa) = crate::module::MFA::try_from(&args[0]) {
+        match args[1].into_variant() {
+            Variant::Atom(atom::TYPE) => Ok(atom!(EXTERNAL)),
+            Variant::Atom(atom::PID) => Ok(atom!(UNDEFINED)),
+            Variant::Atom(atom::MODULE) => Ok(Term::atom(mfa.0)),
+            Variant::Atom(atom::NEW_INDEX) => Ok(atom!(UNDEFINED)),
+            Variant::Atom(atom::NEW_UNIQ) => Ok(atom!(UNDEFINED)),
+            Variant::Atom(atom::INDEX) => Ok(atom!(UNDEFINED)),
+            Variant::Atom(atom::UNIQ) => Ok(atom!(UNDEFINED)),
+            Variant::Atom(atom::ENV) => Ok(Term::nil()),
+            Variant::Atom(atom::REFC) => Ok(atom!(UNDEFINED)),
+            Variant::Atom(atom::ARITY) => Ok(Term::uint(heap, mfa.2)),
+            Variant::Atom(atom::NAME) => Ok(Term::atom(mfa.1)),
+            _ => unimplemented!(),
+        }
+    } else {
+        Err(Exception::new(Reason::EXC_BADARG))
+    }
+}
+
 #[cfg(target_family = "unix")]
 const OS_FAMILY: u32 = atom::UNIX;
 
@@ -202,6 +245,15 @@ pub fn system_info_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
         Variant::Atom(atom::VERSION) => {
             Ok(bitstring!(heap, "10.3.4"))
         }
+        Variant::Atom(atom::MACHINE) => {
+            Ok(bitstring!(heap, "ENIGMA")) // maybe needs to be BEAM
+        }
+        Variant::Atom(atom::OTP_RELEASE) => {
+            Ok(bitstring!(heap, "22"))
+        }
+        // Variant::Atom(atom::START_TIME) => {
+        //     Ok(Term::int(vm.start_time))
+        // }
         // thread 'tokio-runtime-worker-7' panicked at 'not yet implemented: system_info for :start_time', src/bif/info.rs:174:14
         Variant::Pointer(..) => {
             if let Ok(tup) = value::Tuple::try_from(&args[0]) {

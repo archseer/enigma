@@ -403,6 +403,21 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("beam_lib");
     atoms.register_atom("version");
 
+    atoms.register_atom("type");
+    atoms.register_atom("pid");
+    atoms.register_atom("new_index");
+    atoms.register_atom("new_uniq");
+    atoms.register_atom("index");
+    atoms.register_atom("uniq");
+    atoms.register_atom("env");
+    atoms.register_atom("refc");
+    atoms.register_atom("arity");
+    atoms.register_atom("name");
+    atoms.register_atom("local");
+    atoms.register_atom("external");
+    atoms.register_atom("machine");
+    atoms.register_atom("otp_release");
+
     atoms
 };
 
@@ -692,6 +707,21 @@ pub const EOF: u32 = 240;
 
 pub const BEAM_LIB: u32 = 241;
 pub const VERSION: u32 = 242;
+
+pub const TYPE: u32 = 243;
+pub const PID: u32 = 244;
+pub const NEW_INDEX: u32 = 245;
+pub const NEW_UNIQ: u32 = 246;
+pub const INDEX: u32 = 247;
+pub const UNIQ: u32 = 248;
+pub const ENV: u32 = 249;
+pub const REFC: u32 = 250;
+pub const ARITY: u32 = 251;
+pub const NAME: u32 = 252;
+pub const LOCAL: u32 = 253;
+pub const EXTERNAL: u32 = 254;
+pub const MACHINE: u32 = 255;
+pub const OTP_RELEASE: u32 = 256;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)
