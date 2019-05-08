@@ -279,11 +279,7 @@ pub fn list_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
 }
 // TODO iolist_to_binary is the same, input can be a binary (is_binary() true), and we just return
 // it (badarg on bitstring)
-pub fn iolist_to_binary_1(
-    _vm: &vm::Machine,
-    process: &RcProcess,
-    args: &[Term],
-) -> bif::Result {
+pub fn iolist_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     if args[0].is_binary() {
         return Ok(args[0]);
     }
@@ -484,11 +480,7 @@ pub fn pid_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
     }
 }
 
-pub fn integer_to_list_1(
-    _vm: &vm::Machine,
-    process: &RcProcess,
-    args: &[Term],
-) -> bif::Result {
+pub fn integer_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     match args[0].into_number() {
         Ok(value::Num::Integer(i)) => {
             let string = lexical::to_string(i);
@@ -531,11 +523,7 @@ pub fn ref_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
     Ok(bitstring!(heap, string))
 }
 
-pub fn list_to_integer_1(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> bif::Result {
+pub fn list_to_integer_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     // list to string
     let cons = Cons::try_from(&args[0])?;
     let string = value::cons::unicode_list_to_buf(cons, 2048)?;
@@ -582,11 +570,7 @@ pub fn display_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif:
     Ok(atom!(TRUE))
 }
 
-pub fn display_string_1(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> bif::Result {
+pub fn display_string_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let cons = Cons::try_from(&args[0])?;
     let string = value::cons::unicode_list_to_buf(cons, 2048)?;
     print!("{}", string);
@@ -656,6 +640,32 @@ pub fn append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
 
     // assert!(!(BIF_P->flags & F_DISABLE_GC));
     Err(Exception::new(Reason::EXC_BADARG))
+}
+
+pub fn subtract_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    // TODO: a more efficient impl
+    // calculate len A
+    // calculate len B
+    // copy B to vec
+    // subtract B from A, shrinking B as els consumed
+    // copy result to proc heap
+    //
+    // use linear scan on small elems
+    // use hashset for larger one
+
+    if args[0].is_nil() || args[1].is_nil() {
+        return Ok(args[0]);
+    }
+
+    let mut a: Vec<Term> = Cons::try_from(&args[0])?.into_iter().copied().collect();
+    let b = Cons::try_from(&args[1])?;
+
+    for item in b {
+        a.iter().position(|x| *x == *item).map(|i| a.remove(i));
+    }
+
+    let heap = &process.context_mut().heap;
+    Ok(Cons::from_iter(a.into_iter(), heap))
 }
 
 pub fn make_ref_0(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {

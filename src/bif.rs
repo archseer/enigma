@@ -156,8 +156,8 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "list_to_tuple", 1 => erlang::list_to_tuple_1,
             "++", 2 => erlang::append_2,
             "append", 2 => erlang::append_2,
-            // "--", 2 => erlang::subtract_2,
-            // "subtract", 2 => erlang::subtract_2,
+            "--", 2 => erlang::subtract_2,
+            "subtract", 2 => erlang::subtract_2,
             "make_ref", 0 => erlang::make_ref_0,
             "process_info", 2 => info::process_info_2,
             "system_info", 1 => info::system_info_1,
@@ -433,12 +433,7 @@ pub fn is_bif(mfa: &module::MFA) -> bool {
 }
 
 #[inline]
-pub fn apply(
-    vm: &vm::Machine,
-    process: &RcProcess,
-    mfa: &module::MFA,
-    args: &[Term],
-) -> Result {
+pub fn apply(vm: &vm::Machine, process: &RcProcess, mfa: &module::MFA, args: &[Term]) -> Result {
     // println!("bif_apply {}", mfa);
     match BIFS.get(mfa) {
         Some(fun) => fun(vm, process, args),
@@ -778,35 +773,19 @@ pub fn bif_erlang_is_list_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Ter
     Ok(Term::boolean(args[0].is_list()))
 }
 
-pub fn bif_erlang_is_tuple_1(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> Result {
+pub fn bif_erlang_is_tuple_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_tuple()))
 }
 
-pub fn bif_erlang_is_float_1(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> Result {
+pub fn bif_erlang_is_float_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_float()))
 }
 
-pub fn bif_erlang_is_integer_1(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> Result {
+pub fn bif_erlang_is_integer_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_integer()))
 }
 
-pub fn bif_erlang_is_number_1(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> Result {
+pub fn bif_erlang_is_number_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_number()))
 }
 
@@ -814,11 +793,7 @@ pub fn bif_erlang_is_port_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Ter
     Ok(Term::boolean(args[0].is_port()))
 }
 
-pub fn bif_erlang_is_reference_1(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> Result {
+pub fn bif_erlang_is_reference_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_ref()))
 }
 
@@ -826,27 +801,15 @@ pub fn bif_erlang_is_pid_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term
     Ok(Term::boolean(args[0].is_pid()))
 }
 
-pub fn bif_erlang_is_binary_1(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> Result {
+pub fn bif_erlang_is_binary_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_binary()))
 }
 
-pub fn bif_erlang_is_bitstring_1(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> Result {
+pub fn bif_erlang_is_bitstring_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_bitstring()))
 }
 
-pub fn bif_erlang_is_function_1(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> Result {
+pub fn bif_erlang_is_function_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_function()))
 }
 
@@ -860,11 +823,7 @@ pub fn bif_erlang_is_map_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term
     Ok(Term::boolean(args[0].is_map()))
 }
 
-pub fn bif_erlang_is_map_key_2(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> Result {
+pub fn bif_erlang_is_map_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     let key = &args[0];
     let map = &args[1];
     if let Ok(value::Map(map)) = map.try_into() {
@@ -1078,11 +1037,7 @@ pub fn bif_erlang_apply_3(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term
 }
 
 /// this sets some process info- trapping exits or the error handler
-pub fn bif_erlang_process_flag_2(
-    _vm: &vm::Machine,
-    process: &RcProcess,
-    args: &[Term],
-) -> Result {
+pub fn bif_erlang_process_flag_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
     match args[0].into_variant() {
         Variant::Atom(atom::TRAP_EXIT) => {
             let local_data = process.local_data_mut();
@@ -1156,11 +1111,7 @@ fn bif_erlang_unregister_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
-fn bif_erlang_is_process_alive_1(
-    vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> Result {
+fn bif_erlang_is_process_alive_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     /* (Atom, Pid|Port)   */
     if let Variant::Pid(pid) = args[0].into_variant() {
         let res = vm.process_table.lock().contains_key(pid);
@@ -1170,11 +1121,7 @@ fn bif_erlang_is_process_alive_1(
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
-fn bif_erlang_function_exported_3(
-    vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> Result {
+fn bif_erlang_function_exported_3(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     if !args[0].is_atom() || !args[1].is_atom() || !args[2].is_smallint() {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
@@ -1188,11 +1135,7 @@ fn bif_erlang_function_exported_3(
     Ok(atom!(FALSE))
 }
 
-fn bif_erlang_module_loaded_1(
-    vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> Result {
+fn bif_erlang_module_loaded_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     if !args[0].is_atom() {
         return Err(Exception::new(Reason::EXC_BADARG));
     }

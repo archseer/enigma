@@ -1,4 +1,4 @@
-* BIFs [54/105]
+* BIFs [55/105]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
@@ -52,7 +52,7 @@
 - [ ] bif erlang:list_to_port/1
 - [ ] bif erlang:list_to_ref/1
 - [X] bif erlang:list_to_tuple/1
-- [ ] bif erlang:loaded/0
+- [X] bif erlang:loaded/0
 - [X] bif erlang:localtime/0
 - [ ] bif erlang:localtime_to_universaltime/2
 - [X] bif erlang:make_ref/0
@@ -252,14 +252,14 @@
 - [X] ubif erlang:'+'/1			splus_1
 
 
-** New operators [16/22]
+** New operators [18/22]
 - [X] bif erlang:'!'/2		ebif_bang_2
 - [X] bif erlang:send/2
 - [X] bif erlang:send/3
 - [X] bif erlang:'++'/2		ebif_plusplus_2
 - [X] bif erlang:append/2
-- [ ] bif erlang:'--'/2		ebif_minusminus_2
-- [ ] bif erlang:subtract/2
+- [X] bif erlang:'--'/2		ebif_minusminus_2
+- [X] bif erlang:subtract/2
 
 - [X] ubif erlang:is_atom/1
 - [X] ubif erlang:is_list/1
