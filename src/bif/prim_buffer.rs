@@ -3,7 +3,7 @@ use crate::bitstring::{Binary, RcBinary};
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, TryFrom, Variant};
+use crate::value::{self, Cons, Term, TryFrom, TryFromMut, Variant};
 use crate::vm;
 use std::fs;
 use std::pin::Pin;
@@ -28,6 +28,7 @@ use std::sync::atomic::AtomicU32;
 
 type IOQueue = BufDeque<Cursor<RcBinary>>;
 
+#[derive(Debug)]
 pub struct Buffer {
     // accumulator: Vec<u8>,
     ioqueue: IOQueue,
@@ -100,6 +101,22 @@ impl TryFrom<Term> for Buffer {
     }
 }
 
+impl TryFromMut<Term> for Buffer {
+    type Error = value::WrongBoxError;
+
+    #[inline]
+    fn try_from_mut(value: &Term) -> Result<&mut Buffer, value::WrongBoxError> {
+        if let Variant::Pointer(ptr) = value.into_variant() {
+            unsafe {
+                if *ptr == value::BOXED_BUFFER {
+                    return Ok(&mut (*(ptr as *mut value::Boxed<Self>)).value);
+                }
+            }
+        }
+        Err(value::WrongBoxError)
+    }
+}
+
 pub mod bif {
     use super::*;
     use crate::bif::Result;
@@ -133,9 +150,18 @@ pub mod bif {
         unimplemented!()
     }
 
-    pub fn skip_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-        // let buf = Buffer::try_from(&args[0])?;
-        unimplemented!()
+    // a skip 0 makes no sense
+    pub fn skip_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+        let buf = Buffer::try_from_mut(&args[0])?;
+        let cnt = match args[1].into_variant() {
+            Variant::Integer(i) if i >= 0 => i as usize,
+            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        };
+        if buf.size() < cnt {
+            return Err(Exception::new(Reason::EXC_BADARG));
+        }
+        buf.skip(cnt);
+        Ok(atom!(OK))
     }
 
     pub fn find_byte_index_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
@@ -216,6 +242,7 @@ impl<T: AsRef<[u8]>> Buf for Cursor<T> {
     }
 }
 
+#[derive(Debug)]
 struct BufDeque<T> {
     bufs: VecDeque<T>,
 }
