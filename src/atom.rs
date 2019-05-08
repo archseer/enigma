@@ -418,6 +418,9 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("machine");
     atoms.register_atom("otp_release");
 
+    atoms.register_atom("bof");
+    atoms.register_atom("cur");
+
     atoms
 };
 
@@ -722,6 +725,9 @@ pub const LOCAL: u32 = 253;
 pub const EXTERNAL: u32 = 254;
 pub const MACHINE: u32 = 255;
 pub const OTP_RELEASE: u32 = 256;
+
+pub const BOF: u32 = 257;
+pub const CUR: u32 = 258;
 
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)

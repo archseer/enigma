@@ -7,6 +7,7 @@ use crate::process::RcProcess;
 use crate::value::{self, Cons, Term, TryFrom, TryFromMut, Variant};
 use crate::vm;
 use std::fs::{self, File};
+use std::io::prelude::*;
 use std::io::{Read, Write};
 use std::pin::Pin;
 
@@ -59,11 +60,7 @@ fn error_to_tuple(heap: &Heap, error: std::io::Error) -> Term {
     };
     tup2!(heap, atom!(ERROR), kind)
 }
-pub fn get_device_cwd_nif_1(
-    _vm: &vm::Machine,
-    process: &RcProcess,
-    args: &[Term],
-) -> bif::Result {
+pub fn get_device_cwd_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
@@ -117,11 +114,7 @@ pub fn ipread_s32bu_p32bu_nif_3(
 }
 
 // TODO: maybe we should pass around as OsString which is null terminated dunno
-pub fn internal_native2name_1(
-    vm: &vm::Machine,
-    process: &RcProcess,
-    args: &[Term],
-) -> bif::Result {
+pub fn internal_native2name_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // we already validated the name into unicode in the previous command
     bif::erlang::binary_to_list_1(vm, process, args)
     // Ok(args[0])
@@ -427,8 +420,30 @@ pub fn pwrite_nif_3(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> 
     unimplemented!()
 }
 
-pub fn seek_nif_3(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> bif::Result {
-    unimplemented!()
+pub fn seek_nif_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    use std::io::SeekFrom;
+    let heap = &process.context_mut().heap;
+    // file, :bof->set/:cur->cur/:eof->end, 0
+    let file = File::try_from_mut(&args[0])?;
+    let pos = match args[2].into_variant() {
+        Variant::Integer(i) if i >= 0 => i as usize,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    let seek = match args[1].into_variant() {
+        Variant::Atom(atom::BOF) => {
+            if pos < 0 {
+                return Err(Exception::new(Reason::EXC_BADARG));
+            }
+            SeekFrom::Start(pos as u64)
+        }
+        Variant::Atom(atom::CUR) => SeekFrom::Current(pos as i64),
+        Variant::Atom(atom::EOF) => SeekFrom::End(pos as i64),
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    match file.seek(seek) {
+        Ok(new_pos) => Ok(tup2!(heap, atom!(OK), Term::uint64(heap, new_pos))),
+        Err(err) => Ok(error_to_tuple(heap, err)),
+    }
 }
 
 pub fn sync_nif_2(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> bif::Result {
@@ -477,11 +492,7 @@ pub fn set_permissions_nif_2(
     unimplemented!()
 }
 
-pub fn set_owner_nif_3(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    _args: &[Term],
-) -> bif::Result {
+pub fn set_owner_nif_3(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
@@ -489,11 +500,7 @@ pub fn set_time_nif_4(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -
     unimplemented!()
 }
 
-pub fn read_link_nif_1(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    _args: &[Term],
-) -> bif::Result {
+pub fn read_link_nif_1(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
@@ -511,19 +518,11 @@ pub fn del_dir_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
 
 // internal nifs
 
-pub fn get_handle_nif_1(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    _args: &[Term],
-) -> bif::Result {
+pub fn get_handle_nif_1(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
-pub fn delayed_close_nif_1(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    _args: &[Term],
-) -> bif::Result {
+pub fn delayed_close_nif_1(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> bif::Result {
     unimplemented!()
 }
 
