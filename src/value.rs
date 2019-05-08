@@ -1034,6 +1034,11 @@ impl Ord for Variant {
                             let t2 = &*(*p2 as *const Tuple);
                             t1.cmp(t2)
                         }
+                        BOXED_REF => {
+                            let r1 = &(*(*p1 as *const Boxed<process::Ref>)).value;
+                            let r2 = &(*(*p2 as *const Boxed<process::Ref>)).value;
+                            r1.cmp(r2)
+                        }
                         BOXED_MAP => unimplemented!(),
                         BOXED_CLOSURE => unreachable!(),
                         // TODO: handle other boxed types
