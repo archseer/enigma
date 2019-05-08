@@ -6,7 +6,7 @@ use parking_lot::Mutex;
 pub type RcModuleRegistry = Mutex<ModuleRegistry>;
 
 pub struct ModuleRegistry {
-    modules: HashMap<u32, Box<Module>>,
+    pub modules: HashMap<u32, Box<Module>>,
 }
 
 impl ModuleRegistry {

@@ -131,6 +131,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "unregister", 1 => bif_erlang_unregister_1,
             "is_process_alive", 1 => bif_erlang_is_process_alive_1,
             "function_exported", 3 => bif_erlang_function_exported_3,
+            "loaded", 0 => bif_erlang_loaded_0,
             "module_loaded", 1 => bif_erlang_module_loaded_1,
             "process_flag", 2 => bif_erlang_process_flag_2,
             "process_info", 2 => info::process_info_2,
@@ -1202,6 +1203,17 @@ fn bif_erlang_module_loaded_1(
         return Ok(atom!(TRUE));
     }
     Ok(atom!(FALSE))
+}
+
+fn bif_erlang_loaded_0(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+    let heap = &process.context_mut().heap;
+    Ok(vm
+        .modules
+        .lock()
+        .modules
+        .keys()
+        .copied()
+        .fold(Term::nil(), |acc, name| cons!(heap, Term::atom(name), acc)))
 }
 
 // kept the original OTP comment
