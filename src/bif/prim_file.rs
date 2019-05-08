@@ -508,8 +508,19 @@ pub fn make_dir_nif_1(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -
     unimplemented!()
 }
 
-pub fn del_file_nif_1(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> bif::Result {
-    unimplemented!()
+pub fn del_file_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    // arg[0] = filename
+    let heap = &process.context_mut().heap;
+
+    // TODO: needs to work with binary and list based strings
+    // TODO bitstrings or non zero offsets can fail ...
+    let cons = Cons::try_from(&args[0])?;
+    let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
+
+    match fs::remove_file(path) {
+        Ok(()) => Ok(atom!(OK)),
+        Err(err) => Ok(error_to_tuple(heap, err)),
+    }
 }
 
 pub fn del_dir_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
