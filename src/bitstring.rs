@@ -270,7 +270,7 @@ impl From<SubBinary> for MatchBuffer {
             original: binary.original,
             //base: binary_bytes(original),
             offset,
-            size: len * 8 + offset + binary.bitsize, // todo + offset looks like a bug
+            size: len * 8 + binary.bitsize, // todo + offset looks like a bug, that was for SubBinary handling I think size of sub+offset of sub
         }
     }
 }
