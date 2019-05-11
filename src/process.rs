@@ -39,7 +39,7 @@ pub type Ref = usize;
 // ---> sched should have it's own ExecutionContext
 // also this way, regs could be a &mut [] slice with no clone?
 
-pub const MAX_REG: usize = 16;
+pub const MAX_REG: usize = 1024;
 
 bitflags! {
     pub struct Flag: u8 {
@@ -48,12 +48,12 @@ bitflags! {
     }
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct ExecutionContext {
     /// X registers.
     pub x: [Term; MAX_REG],
     /// Floating point registers.
-    pub f: [f64; MAX_REG],
+    pub f: [f64; 16],
     /// Stack (accessible through Y registers).
     pub stack: Vec<Term>,
     pub heap: Heap,
@@ -99,7 +99,7 @@ impl ExecutionContext {
 impl ExecutionContext {
     pub fn new(module: *const Module) -> ExecutionContext {
         ExecutionContext {
-            x: [Term::nil(); 16],
+            x: [Term::nil(); MAX_REG],
             f: [0.0f64; 16],
             stack: Vec::new(),
             heap: Heap::new(),
@@ -141,7 +141,6 @@ bitflags! {
     }
 }
 
-#[derive(Debug)]
 pub struct LocalData {
     // allocator, panic handler
     context: Box<ExecutionContext>,
@@ -181,7 +180,6 @@ pub struct LocalData {
     pub dictionary: HashMap<Term, Term>,
 }
 
-#[derive(Debug)]
 pub struct Process {
     /// Data stored in a process that should only be modified by a single thread
     /// at once.
