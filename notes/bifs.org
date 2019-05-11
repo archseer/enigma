@@ -1,4 +1,4 @@
-* BIFs [55/105]
+* BIFs [56/105]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
@@ -90,7 +90,7 @@
 - [ ] ubif erlang:size/1
 - [X] bif erlang:spawn/3
 - [X] bif erlang:spawn_link/3
-- [ ] bif erlang:split_binary/2
+- [X] bif erlang:split_binary/2
 - [ ] bif erlang:statistics/1
 - [ ] bif erlang:term_to_binary/1
 - [ ] bif erlang:term_to_binary/2

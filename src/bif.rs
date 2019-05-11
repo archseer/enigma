@@ -171,6 +171,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "display", 1 => erlang::display_1,
             "display_string", 1 => erlang::display_string_1,
             "display_nl", 0 => erlang::display_nl_0,
+            "split_binary", 2 => erlang::split_binary_2,
 
             // logic
             "and", 2 => erlang::and_2,

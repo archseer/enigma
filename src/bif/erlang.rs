@@ -865,6 +865,69 @@ pub fn make_fun_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
     }
 }
 
+pub fn split_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    // bin, pos
+    let heap = &process.context_mut().heap;
+
+    let pos = match args[1].into_variant() {
+        Variant::Integer(i) if i >= 0 => i as usize,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    if !args[0].is_binary() {
+        return Err(Exception::new(Reason::EXC_BADARG));
+    }
+
+    // TODO: this was a get_real_binary macro before
+    let (bin, offset, bit_offset, size, bitsize) = match args[0].get_boxed_header() {
+        Ok(value::BOXED_BINARY) => {
+            // TODO use ok_or to cast to some, then use ?
+            let value = &args[0].get_boxed_value::<bitstring::RcBinary>().unwrap();
+            (*value, 0, 0, value.data.len(), 0)
+        }
+        Ok(value::BOXED_SUBBINARY) => {
+            // TODO use ok_or to cast to some, then use ?
+            let value = &args[0].get_boxed_value::<bitstring::SubBinary>().unwrap();
+            (
+                &value.original,
+                value.offset,
+                value.bit_offset,
+                value.size,
+                value.bitsize,
+            )
+        }
+        _ => unreachable!(),
+    };
+
+    if size < pos {
+        return Err(Exception::new(Reason::EXC_BADARG));
+    }
+
+    let sb1 = bitstring::SubBinary {
+        original: bin.clone(),
+        size: pos,
+        offset: offset + pos,
+        bit_offset,
+        bitsize: 0,
+        is_writable: false,
+    };
+
+    let sb2 = bitstring::SubBinary {
+        original: bin.clone(),
+        size: size - pos,
+        offset: offset + pos,
+        bit_offset,
+        bitsize, // The extra bits go into the second binary.
+        is_writable: false,
+    };
+
+    Ok(tup2!(
+        heap,
+        Term::subbinary(heap, sb1),
+        Term::subbinary(heap, sb2)
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
