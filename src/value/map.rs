@@ -1,10 +1,11 @@
-use super::{Boxed, Term, TryFrom, Variant, WrongBoxError, BOXED_MAP};
-use hamt_rs::HamtMap;
+use super::{Boxed, Term, TryFrom, TryFromMut, Variant, WrongBoxError, BOXED_MAP};
+// use hamt_rs::HamtMap;
+use im::hashmap::HashMap;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
 // TODO: evaluate using im-rs or https://github.com/orium/rpds HashTrieMap
-pub type HAMT = HamtMap<Term, Term>;
+pub type HAMT = HashMap<Term, Term>;
 
 #[derive(Eq, Clone)]
 pub struct Map(pub HAMT);
@@ -19,6 +20,22 @@ impl TryFrom<Term> for Map {
             unsafe {
                 if *ptr == BOXED_MAP {
                     return Ok(&(*(ptr as *const Boxed<Self>)).value);
+                }
+            }
+        }
+        Err(WrongBoxError)
+    }
+}
+
+impl TryFromMut<Term> for Map {
+    type Error = WrongBoxError;
+
+    #[inline]
+    fn try_from_mut(value: &Term) -> Result<&mut Self, WrongBoxError> {
+        if let Variant::Pointer(ptr) = value.into_variant() {
+            unsafe {
+                if *ptr == BOXED_MAP {
+                    return Ok(&mut (*(ptr as *const Boxed<Self> as *mut Boxed<Self>)).value);
                 }
             }
         }

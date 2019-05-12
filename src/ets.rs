@@ -6,7 +6,6 @@ use crate::process::{self, RcProcess};
 use hashbrown::HashMap;
 use parking_lot::Mutex;
 use std::collections::BTreeMap;
-use std::pin::Pin;
 use std::sync::Arc; // servo_arc doesn't work with trait objects
 
 #[macro_export]
@@ -87,12 +86,7 @@ pub trait Table: Send + Sync {
 
     // fn select_count_continue(&self, process: &RcProcess, continuation: Term) -> Result<Term>;
 
-    fn select_replace(
-        &mut self,
-        process: &RcProcess,
-        tid: Term,
-        pattern: Term,
-    ) -> Result<Term>;
+    fn select_replace(&mut self, process: &RcProcess, tid: Term, pattern: Term) -> Result<Term>;
 
     // fn select_replace_continue(&mut self, process: &RcProcess, continuation: Term) -> Result<Term>;
 

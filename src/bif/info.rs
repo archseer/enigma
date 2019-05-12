@@ -5,7 +5,6 @@ use crate::process::{Process, RcProcess};
 use crate::value::{self, Cons, Term, TryFrom, Variant};
 use crate::vm;
 use crate::Itertools;
-use std::pin::Pin;
 
 pub fn process_info_aux(
     _vm: &vm::Machine,

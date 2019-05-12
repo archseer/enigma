@@ -6,7 +6,6 @@ use crate::module::{self, Module};
 use crate::process::RcProcess;
 use crate::value::{self, Cons, Term, TryFrom, TryInto, Variant};
 use crate::vm;
-use std::pin::Pin;
 
 pub fn pre_loaded_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     use std::path::Path;
@@ -20,11 +19,7 @@ pub fn pre_loaded_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> b
     Ok(Cons::from_iter(iter, heap))
 }
 
-pub fn prepare_loading_2(
-    _vm: &vm::Machine,
-    process: &RcProcess,
-    args: &[Term],
-) -> bif::Result {
+pub fn prepare_loading_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // arg[0] module name atom, arg[1] raw bytecode bytes
     let heap = &process.context_mut().heap;
 

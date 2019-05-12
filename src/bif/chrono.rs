@@ -7,7 +7,6 @@ use crate::vm;
 use chrono::prelude::*;
 use num_bigint::ToBigInt;
 use num_traits::ToPrimitive;
-use std::pin::Pin;
 use std::time::SystemTime;
 
 /// http://erlang.org/doc/apps/erts/time_correction.html

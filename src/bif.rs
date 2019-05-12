@@ -13,7 +13,6 @@ use crate::value::{self, Cons, Term, TryFrom, TryInto, Tuple, Variant};
 use crate::vm;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
-use std::pin::Pin;
 
 pub mod arith;
 mod chrono;
@@ -829,7 +828,7 @@ pub fn bif_erlang_is_map_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[
     let key = &args[0];
     let map = &args[1];
     if let Ok(value::Map(map)) = map.try_into() {
-        return Ok(Term::boolean(map.find(key).is_some()));
+        return Ok(Term::boolean(map.contains_key(key)));
     }
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
@@ -1344,7 +1343,7 @@ mod tests {
     fn test_bif_erlang_is_atom_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::atom(3)];
         let res = bif_erlang_is_atom_1(&vm, &process, &args);
         assert_eq!(res, Ok(atom!(TRUE)));
@@ -1358,7 +1357,7 @@ mod tests {
     fn test_bif_erlang_is_tuple_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let args = vec![tup2!(heap, Term::int(1), Term::int(2))];
@@ -1374,7 +1373,7 @@ mod tests {
     fn test_bif_erlang_is_list_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let args = vec![value::cons(heap, Term::int(1), Term::int(2))];
@@ -1389,7 +1388,7 @@ mod tests {
     fn test_bif_erlang_is_float_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::from(3.00)];
         let res = bif_erlang_is_float_1(&vm, &process, &args);
         assert_eq!(res, Ok(atom!(TRUE)));
@@ -1403,7 +1402,7 @@ mod tests {
     fn test_bif_erlang_is_integer_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::int(3)];
         let res = bif_erlang_is_integer_1(&vm, &process, &args);
         assert_eq!(res, Ok(atom!(TRUE)));
@@ -1417,7 +1416,7 @@ mod tests {
     fn test_bif_erlang_is_number_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::int(3)];
         let res = bif_erlang_is_number_1(&vm, &process, &args);
         assert_eq!(res, Ok(atom!(TRUE)));
@@ -1440,7 +1439,7 @@ mod tests {
     fn test_bif_erlang_is_port_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::port(80)];
         let res = bif_erlang_is_port_1(&vm, &process, &args);
         assert_eq!(res, Ok(atom!(TRUE)));
@@ -1454,7 +1453,7 @@ mod tests {
     fn test_bif_erlang_is_reference_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let args = vec![Term::reference(heap, 197)];
@@ -1470,7 +1469,7 @@ mod tests {
     fn test_bif_erlang_is_binary_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let str = bitstring::Binary::new();
@@ -1487,7 +1486,7 @@ mod tests {
     fn test_bif_erlang_is_bitstring_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let str = bitstring::Binary::new();
@@ -1504,7 +1503,7 @@ mod tests {
     fn test_bif_erlang_is_function_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let args = vec![Term::closure(
@@ -1526,7 +1525,7 @@ mod tests {
     fn test_bif_erlang_is_boolean_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::atom(atom::TRUE)];
         let res = bif_erlang_is_boolean_1(&vm, &process, &args);
         assert_eq!(res, Ok(atom!(TRUE)));
@@ -1540,7 +1539,7 @@ mod tests {
     fn test_bif_erlang_is_map_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let map = map!(heap, Term::atom(1) => Term::int(1));
@@ -1557,7 +1556,7 @@ mod tests {
     fn test_bif_tuple_size_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let args = vec![tup3!(heap, Term::int(1), Term::int(2), Term::int(1))];
@@ -1570,11 +1569,10 @@ mod tests {
     fn test_bif_map_size_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
-        let map =
-            map!(heap, str_to_atom!("test") => Term::int(1), str_to_atom!("test2") => Term::int(3));
+        let map = map!(heap, atom!(VALUE) => Term::int(1), atom!(ALL) => Term::int(3));
         let args = vec![map];
         let res = bif_erlang_map_size_1(&vm, &process, &args);
 

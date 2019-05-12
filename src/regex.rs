@@ -12,7 +12,6 @@ pub mod bif {
     use crate::process::RcProcess;
     use crate::value::{self, Term};
     use crate::vm;
-    use std::pin::Pin;
 
     pub fn run_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
         let heap = &process.context_mut().heap;

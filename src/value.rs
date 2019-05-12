@@ -882,7 +882,7 @@ impl Term {
                         // Term::map(heap, map.0.clone()) need to deep_clone kvs
                         let mut new_map = HAMT::new();
                         for (key, value) in map.0.iter() {
-                            new_map = new_map.plus(key.deep_clone(heap), value.deep_clone(heap));
+                            new_map.insert(key.deep_clone(heap), value.deep_clone(heap));
                         }
                         Term::map(heap, new_map)
                     }

@@ -613,8 +613,8 @@ impl Renderer {
 
 #[cfg(test)]
 mod test {
-    use super::{ChangeListener, DeleteListener, Direction, LineBuffer, MAX_LINE};
-    use crate::keymap::{At, CharSearch, Word};
+    use super::{Direction, LineBuffer, MAX_LINE};
+    // use crate::keymap::{At, CharSearch, Word};
     use std::cell::RefCell;
     use std::rc::Rc;
 

@@ -4,7 +4,6 @@ use crate::bif;
 use crate::process::RcProcess;
 use crate::value::{self, Term};
 use crate::vm;
-use std::pin::Pin;
 
 /// Get the whole pdict.
 pub fn get_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
@@ -99,7 +98,7 @@ mod tests {
     fn test_bif_pdict() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::atom(1), Term::int(2)];
         let res = put_2(&vm, &process, &args);
         assert_eq!(res, Ok(atom!(UNDEFINED)));

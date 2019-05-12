@@ -6,7 +6,6 @@ use crate::process::RcProcess;
 use crate::value::{self, Term};
 use crate::vm;
 use num_bigint::BigInt;
-use std::pin::Pin;
 // use num_bigint::ToBigInt;
 use num_traits::Signed;
 use statrs;
@@ -227,7 +226,7 @@ mod tests {
     fn test_abs_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::int(-1)];
         let res = abs_1(&vm, &process, &args);
         assert_eq!(res, Ok(Term::int(1)));
@@ -237,7 +236,7 @@ mod tests {
     fn test_add_2() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::int(1), Term::int(2)];
         let res = add_2(&vm, &process, &args);
         assert_eq!(res, Ok(Term::int(3)));
@@ -247,7 +246,7 @@ mod tests {
     fn test_sub_2() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::int(2), Term::int(1)];
         let res = sub_2(&vm, &process, &args);
         assert_eq!(res, Ok(Term::int(1)));
@@ -257,7 +256,7 @@ mod tests {
     fn test_mult_2() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::int(2), Term::int(4)];
         let res = mult_2(&vm, &process, &args);
         assert_eq!(res, Ok(Term::int(8)));
@@ -267,7 +266,7 @@ mod tests {
     fn test_intdiv_2() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::int(8), Term::int(4)];
         let res = intdiv_2(&vm, &process, &args);
         assert_eq!(res, Ok(Term::int(2)));
@@ -277,7 +276,7 @@ mod tests {
     fn test_mod_2() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::int(4), Term::int(3)];
         let res = mod_2(&vm, &process, &args);
         assert_eq!(res, Ok(Term::int(1)));
@@ -289,7 +288,7 @@ mod tests {
     fn test_math_cos_1() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::int(1)];
         let res = math_cos_1(&vm, &process, &args);
         assert_eq!(res, Ok(Term::from(1.0_f64.cos())));

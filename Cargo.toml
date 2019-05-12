@@ -39,7 +39,6 @@ time = "0.1.40"
 chrono = "0.4.6"
 bitflags = "1.0.4"
 getopts = "0.2.18"
-hamt-rs = { git = "https://github.com/archseer/hamt-rs/", branch = "remove-reqs" }
 log = "0.4"
 hashbrown = "0.3.0"
 nodrop = "0.1.13"

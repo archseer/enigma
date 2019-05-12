@@ -24,7 +24,6 @@ use std::panic;
 use std::sync::atomic::AtomicUsize;
 use std::time;
 
-use std::pin::Pin;
 // use tokio::prelude::*;
 use futures::{
   compat::*,
@@ -2564,7 +2563,7 @@ impl Machine {
                         let mut iter = list.chunks_exact(2);
                         while let Some([key, value]) = iter.next() {
                             // TODO: optimize by having the ExtendedList store Term instead of LValue
-                            map = map.plus(context.expand_arg(key), context.expand_arg(value))
+                            map.insert(context.expand_arg(key), context.expand_arg(value));
                         }
                         set_register!(context, dest, Term::map(&context.heap, map))
                     } else {
@@ -2585,7 +2584,7 @@ impl Machine {
                         // exist, jump to fail label.
                         let mut iter = list.iter();
                         while let Some(key) = iter.next() {
-                            if map.find(&context.expand_arg(key)).is_some() {
+                            if map.contains_key(&context.expand_arg(key)) {
                                 // ok
                             } else {
                                 op_jump!(context, *fail);
@@ -2610,7 +2609,7 @@ impl Machine {
                         // exist, jump to fail label.
                         let mut iter = list.chunks_exact(2);
                         while let Some([key, dest]) = iter.next() {
-                            if let Some(&val) = map.find(&context.expand_arg(key)) {
+                            if let Some(&val) = map.get(&context.expand_arg(key)) {
                                 set_register!(context, dest, val)
                             } else {
                                 op_jump!(context, *fail);
@@ -2636,7 +2635,7 @@ impl Machine {
                         let mut iter = list.chunks_exact(2);
                         while let Some([key, value]) = iter.next() {
                             // TODO: optimize by having the ExtendedList store Term instead of LValue
-                            map = map.plus(context.expand_arg(key), context.expand_arg(value))
+                            map.insert(context.expand_arg(key), context.expand_arg(value));
                         }
                         set_register!(context, dest, Term::map(&context.heap, map))
                     }

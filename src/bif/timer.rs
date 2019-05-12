@@ -3,7 +3,6 @@ use crate::exception::{Exception, Reason};
 use crate::process::{self, RcProcess};
 use crate::value::{self, Term, TryFrom, Tuple, Variant};
 use crate::vm;
-use std::pin::Pin;
 
 use std::time::{Duration, Instant};
 use tokio::prelude::*;

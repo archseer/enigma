@@ -172,7 +172,7 @@ pub fn decode_map<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
         let (rest, key) = decode_value(new_rest, heap)?;
         let (rest, val) = decode_value(rest, heap)?;
 
-        map = map.plus(key, val);
+        map.insert(key, val);
         new_rest = rest;
     }
     Ok((new_rest, Term::map(heap, map)))

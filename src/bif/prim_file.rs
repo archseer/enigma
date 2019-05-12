@@ -9,7 +9,6 @@ use crate::vm;
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::io::{Read, Write};
-use std::pin::Pin;
 
 impl TryFrom<Term> for std::fs::File {
     type Error = value::WrongBoxError;

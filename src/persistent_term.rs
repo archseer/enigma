@@ -47,7 +47,6 @@ pub mod bif {
     use crate::process::RcProcess;
     use crate::value::Term;
     use crate::vm;
-    use std::pin::Pin;
 
     pub fn get_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
         match vm.persistent_terms.get(args[0]) {

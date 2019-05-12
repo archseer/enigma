@@ -4,7 +4,6 @@ use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
 use crate::value::{self, Cons, Term, TryFrom, TryInto, Tuple};
 use crate::vm;
-use std::pin::Pin;
 
 pub fn member_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     // need to bump reductions as we go
@@ -206,7 +205,7 @@ mod tests {
     fn test_member_2() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let elem = Term::atom(1);
@@ -224,7 +223,7 @@ mod tests {
     fn test_keyfind_3() {
         let vm = vm::Machine::new();
         let module: *const module::Module = std::ptr::null();
-        let process = std::pin::Pin::new(process::allocate(&vm, 0, 0, module).unwrap());
+        let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
 
         let elem = Term::atom(1);

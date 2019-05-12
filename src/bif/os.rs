@@ -7,7 +7,6 @@ use crate::process::RcProcess;
 use crate::value::{self, Cons, Term, TryFrom};
 use crate::vm;
 use std::env;
-use std::pin::Pin;
 
 pub fn list_env_vars_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;

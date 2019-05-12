@@ -157,12 +157,7 @@ impl Table for OrderedSet {
     //     unimplemented!()
     // }
 
-    fn select_replace(
-        &mut self,
-        _process: &RcProcess,
-        _tid: Term,
-        _pattern: Term,
-    ) -> Result<Term> {
+    fn select_replace(&mut self, _process: &RcProcess, _tid: Term, _pattern: Term) -> Result<Term> {
         unimplemented!()
     }
 
