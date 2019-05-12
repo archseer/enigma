@@ -756,7 +756,7 @@ impl Machine {
         //let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         let vm = Machine::current();
         loop {
-            match await!(vm.run(&mut process)) {
+            match vm.run(&mut process).await {
                 Err(message) => {
                     if message.reason != Reason::TRAP {
                         // just a regular error
@@ -915,7 +915,7 @@ impl Machine {
 
                     // LOCK mailbox on looprec, unlock on wait/waittimeout
                     let cancel = process.context_mut().recv_channel.take().unwrap();
-                    await!(cancel); // suspend process
+                    cancel.await; // suspend process
 
                     // println!("pid={} resumption ", process.pid);
                     process.process_incoming()?;
@@ -941,14 +941,14 @@ impl Machine {
                             let label = ins.args[0].to_u32();
                             op_jump!(context, label);
 
-                            await!(cancel); // suspend process
+                            cancel.await; // suspend process
                             // println!("select! resumption pid={}", process.pid);
                         },
                         Variant::Integer(ms) => {
                             let when = time::Duration::from_millis(ms as u64);
                             use tokio::prelude::FutureExt;
 
-                            match await!(cancel.into_future().boxed().compat().timeout(when).compat()) {
+                            match cancel.into_future().boxed().compat().timeout(when).compat().await {
                                 Ok(()) =>  {
                                     // jump to success (start of recv loop)
                                     let label = ins.args[0].to_u32();

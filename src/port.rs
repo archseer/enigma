@@ -45,11 +45,11 @@ impl Port {
 
     // TODO: probably better to return the future here and await outside
     // pub async fn send_message(&mut self, msg: Vec<u8>) { // Result<(), mpsc::SendError> {
-    //     await!(self.chan.send_async(Signal::Command(msg)));
+    //     self.chan.send_async(Signal::Command(msg)).await;
     // }
 
     // pub async fn control(&mut self, sig: usize) -> Result<(), mpsc::SendError> {
-    //     await!(self.chan.send_async(Signal::Control(sig)))
+    //     self.chan.send_async(Signal::Control(sig)).await
     // }
 }
 
@@ -164,8 +164,8 @@ pub fn send_message(
                         //     .map_err(|_| ())
                         //     .boxed()
                         //     .compat();
-                        // TODO: can probably do without await!, if we make sure we don't need 'static
-                        let future = async move { await!(chan.send(Signal::Command(bytes))); };
+                        // TODO: can probably do without await, if we make sure we don't need 'static
+                        let future = async move {chan.send(Signal::Command(bytes)).await; };
                         vm.runtime.executor().spawn(future.unit_error().boxed().compat());
                     }
                     _ => unimplemented!("msg to port {}", msg),
@@ -202,14 +202,14 @@ pub fn control(
         //     .map_err(|_| ())
         //     .boxed()
         //     .compat();
-        //     TODO: can probably do without await!, if we make sure we don't need 'static
+        //     TODO: can probably do without await, if we make sure we don't need 'static
         let future = async move {
-            await!(chan.send(Signal::Control {
+            chan.send(Signal::Control {
                 from,
                 reference,
                 opcode,
                 data: bytes,
-            }));
+            }).await;
         };
         vm.runtime.executor().spawn(future.unit_error().boxed().compat());
 
@@ -864,7 +864,7 @@ async fn stderr(id: ID, _owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
     let mut input = input.fuse();
 
     loop {
-        match await!(input.next()) {
+        match input.next().await {
             // * Port ! {Owner, {command, Data}}
             Some(Signal::Command(bytes)) => {
                 stderr.write_all(&bytes).unwrap();
