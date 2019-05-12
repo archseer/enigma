@@ -4,8 +4,6 @@ use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
 use crate::value::{self, Term, TryFrom, TryInto, HAMT};
 use crate::vm;
-use hamt_rs::HamtMap;
-use std::pin::Pin;
 
 // TODO: deprecated past OTP 22
 pub fn new_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
@@ -18,7 +16,7 @@ pub fn find_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Res
     let key = &args[0];
     let map = &args[1];
     if let Ok(value::Map(map)) = map.try_into() {
-        match map.find(key) {
+        match map.get(key) {
             Some(value) => {
                 let heap = &process.context_mut().heap;
                 return Ok(tup2!(heap, atom!(OK), *value));
@@ -36,7 +34,7 @@ pub fn get_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Res
     // println!("maps:get/2: {} and {}", args[0], args[1]);
     if let Ok(value::Map(map)) = map.try_into() {
         let target = &args[0];
-        match map.find(target) {
+        match map.get(target) {
             Some(value) => {
                 return Ok(*value);
             }
@@ -53,13 +51,13 @@ pub fn from_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif
     if !list.is_list() {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
-    let mut map = HamtMap::new();
+    let mut map = HAMT::new();
     while let Ok(value::Cons { head, tail }) = list.try_into() {
         if let Ok(tuple) = value::Tuple::try_from(head) {
             if tuple.len != 2 {
                 return Err(Exception::new(Reason::EXC_BADARG));
             }
-            map = map.plus(tuple[0], tuple[1]);
+            map.insert(tuple[0], tuple[1]);
         } else {
             return Err(Exception::new(Reason::EXC_BADARG));
         }
@@ -85,7 +83,7 @@ pub fn is_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::
     let map = &args[1];
     if let Ok(value::Map(map)) = map.try_into() {
         let target = &args[0];
-        let exist = map.find(target).is_some();
+        let exist = map.contains_key(target);
         return Ok(Term::boolean(exist));
     }
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
@@ -95,7 +93,7 @@ pub fn keys_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Res
     let map = &args[0];
     if let Ok(value::Map(map)) = map.try_into() {
         let heap = &process.context_mut().heap;
-        let list = iter_to_list!(heap, map.iter().map(|(k, _)| k).cloned());
+        let list = iter_to_list!(heap, map.keys().copied());
         return Ok(list);
     }
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
@@ -110,12 +108,10 @@ pub fn merge_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
         Ok(value::Map(map)) => map,
         _ => return Err(Exception::with_value(Reason::EXC_BADMAP, args[1])),
     };
-    let mut new_map = map2.clone();
-    for (k, v) in map1.iter() {
-        new_map = new_map.plus(*k, *v);
-    }
     let heap = &process.context_mut().heap;
-    Ok(Term::map(heap, new_map))
+    let map1 = map1.clone();
+    let map2 = map2.clone();
+    Ok(Term::map(heap, map1.union(map2)))
 }
 
 pub fn put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
@@ -124,7 +120,8 @@ pub fn put_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resu
     let value = args[1];
     let map = args[2];
     if let Ok(value::Map(map)) = map.try_into() {
-        let new_map = map.clone().plus(key, value);
+        let mut new_map = map.clone();
+        new_map.insert(key, value);
         return Ok(Term::map(heap, new_map));
     }
     Err(Exception::with_value(Reason::EXC_BADMAP, map))
@@ -135,7 +132,8 @@ pub fn remove_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
     let key = args[0];
     let map = args[1];
     if let Ok(value::Map(map)) = map.try_into() {
-        let new_map = map.clone().minus(&key);
+        let mut new_map = map.clone();
+        new_map.remove(&key);
         return Ok(Term::map(heap, new_map));
     }
     Err(Exception::with_value(Reason::EXC_BADMAP, map))
@@ -146,9 +144,9 @@ pub fn update_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
     let value = args[1];
     let map = args[2];
     if let Ok(value::Map(map)) = map.try_into() {
-        match map.find(&key) {
+        match map.get(&key) {
             Some(_v) => {
-                let new_map = map.clone().plus(key, value);
+                let new_map = map.update(key, value);
                 let heap = &process.context_mut().heap;
                 return Ok(Term::map(heap, new_map));
             }
@@ -164,7 +162,7 @@ pub fn values_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
     let map = args[0];
     if let Ok(value::Map(map)) = map.try_into() {
         let heap = &process.context_mut().heap;
-        let list = iter_to_list!(heap, map.iter().map(|(_, v)| v).cloned());
+        let list = iter_to_list!(heap, map.values().copied());
         return Ok(list);
     }
     Err(Exception::with_value(Reason::EXC_BADMAP, map))
@@ -174,14 +172,11 @@ pub fn take_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Res
     let key = args[0];
     let map = args[1];
     if let Ok(value::Map(map)) = map.try_into() {
-        let result = if let Some(value) = map.find(&key) {
-            let new_map = map.clone().minus(&key);
-            let heap = &process.context_mut().heap;
-            tup2!(heap, *value, Term::map(heap, new_map))
-        } else {
-            str_to_atom!("error")
+        let heap = &process.context_mut().heap;
+        return match map.extract(&key) {
+            Some((val, new_map)) => Ok(tup2!(heap, val, Term::map(heap, new_map))),
+            None => Ok(atom!(ERROR)),
         };
-        return Ok(result);
     }
     Err(Exception::with_value(Reason::EXC_BADMAP, map))
 }
@@ -466,9 +461,9 @@ mod tests {
         let res = merge_2(&vm, &process, &args);
         if let Ok(value::Map(map)) = res.unwrap().try_into() {
             assert_eq!(map.len(), 3);
-            assert_eq!(map.find(&str_to_atom!("test")), Some(&Term::int(1)));
-            assert_eq!(map.find(&str_to_atom!("test2")), Some(&Term::int(2)));
-            assert_eq!(map.find(&str_to_atom!("test3")), Some(&Term::int(4)));
+            assert_eq!(map.get(&str_to_atom!("test")), Some(&Term::int(1)));
+            assert_eq!(map.get(&str_to_atom!("test2")), Some(&Term::int(2)));
+            assert_eq!(map.get(&str_to_atom!("test3")), Some(&Term::int(4)));
         } else {
             panic!();
         }
@@ -525,13 +520,13 @@ mod tests {
         let key = str_to_atom!("test");
 
         let value = Term::int(2);
-        let map: value::HAMT = HamtMap::new();
+        let map = HAMT::new();
         let args = vec![key, value, Term::map(heap, map)];
 
         let res = put_3(&vm, &process, &args);
 
         if let Ok(value::Map(map)) = res.unwrap().try_into() {
-            assert_eq!(map.find(&key), Some(&value));
+            assert_eq!(map.get(&key), Some(&value));
         } else {
             panic!();
         }
@@ -571,7 +566,7 @@ mod tests {
         let res = remove_2(&vm, &process, &args);
 
         if let Ok(value::Map(map)) = res.unwrap().try_into() {
-            assert_eq!(map.find(&key).is_none(), true);
+            assert_eq!(map.get(&key).is_none(), true);
         } else {
             panic!();
         }
@@ -610,7 +605,7 @@ mod tests {
         let res = update_3(&vm, &process, &args);
 
         if let Ok(value::Map(map)) = res.unwrap().try_into() {
-            assert_eq!(map.find(&key), Some(&update_value));
+            assert_eq!(map.get(&key), Some(&update_value));
         } else {
             panic!();
         }
@@ -625,7 +620,7 @@ mod tests {
 
         let key = str_to_atom!("test");
         let value = Term::int(2);
-        let map: value::HAMT = HamtMap::new();
+        let map = HAMT::new();
         let args = vec![key, value, Term::map(heap, map)];
 
         let res = update_3(&vm, &process, &args);
@@ -713,7 +708,7 @@ mod tests {
             assert_eq!(&Term::int(2), iter.next().unwrap());
             if let Ok(value::Map(map)) = iter.next().unwrap().try_into() {
                 assert_eq!(map.len(), 1);
-                assert_eq!(map.find(&str_to_atom!("test")), Some(&Term::int(1)));
+                assert_eq!(map.get(&str_to_atom!("test")), Some(&Term::int(1)));
             } else {
                 panic!();
             }

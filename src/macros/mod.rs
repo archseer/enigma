@@ -111,7 +111,7 @@ macro_rules! map {
             // let mut _map = ::std::collections::HashMap::with_capacity(_cap);
             let mut _map = value::HAMT::new();
             $(
-                _map = _map.plus($key, $value);
+                _map.insert($key, $value);
             )*
             Term::map($heap, _map)
         }
