@@ -542,7 +542,7 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 ** New in 20.1 [0/1]
 - [ ] bif erlang:iolist_to_iovec/1
 
-** New in 21.0 [3/11]
+** New in 21.0 [4/11]
 - [ ] bif erts_internal:get_dflags/0
 - [ ] bif erts_internal:new_connection/1
 - [ ] bif erts_internal:abort_connection/2
@@ -550,7 +550,7 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 - [X] bif ets:whereis/1
 - [ ] bif erts_internal:gather_alloc_histograms/1
 - [ ] bif erts_internal:gather_carrier_info/1
-- [ ] ubif erlang:map_get/2
+- [X] ubif erlang:map_get/2
 - [X] ubif erlang:is_map_key/2
 - [ ] bif ets:internal_delete_all/2
 - [X] bif ets:internal_select_delete/2

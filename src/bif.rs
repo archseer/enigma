@@ -105,6 +105,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "is_boolean", 1 => bif_erlang_is_boolean_1,
             "is_map", 1 => bif_erlang_is_map_1,
             "is_map_key", 2 => bif_erlang_is_map_key_2,
+            "map_get", 2 => bif_erlang_map_get_2,
             "hd", 1 => bif_erlang_hd_1,
             "tl", 1 => bif_erlang_tl_1,
             "trunc", 1 => bif_erlang_trunc_1,
@@ -829,6 +830,22 @@ pub fn bif_erlang_is_map_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[
     let map = &args[1];
     if let Ok(value::Map(map)) = map.try_into() {
         return Ok(Term::boolean(map.contains_key(key)));
+    }
+    Err(Exception::with_value(Reason::EXC_BADMAP, *map))
+}
+
+pub fn bif_erlang_map_get_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+    let key = &args[0];
+    let map = &args[1];
+    if let Ok(value::Map(map)) = map.try_into() {
+        match map.get(key) {
+            Some(value) => {
+                return Ok(*value);
+            }
+            None => {
+                return Err(Exception::with_value(Reason::EXC_BADKEY, *key));
+            }
+        };
     }
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
