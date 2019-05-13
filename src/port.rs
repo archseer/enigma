@@ -2,6 +2,7 @@ use crate::value::{Term, Variant, Tuple, TryFrom};
 use crate::process::{PID, Ref};
 use crate::exception::{Exception, Reason};
 use crate::atom;
+use crate::value;
 use crate::vm::Machine;
 use crate::servo_arc::Arc;
 
@@ -113,7 +114,7 @@ pub fn spawn(
 ) -> Result<ID, Exception> {
     let tup = Tuple::try_from(&args)?;
 
-    // TODO: opts 
+    // TODO: opts
     let (port, input) = mpsc::unbounded::<Signal>();
     // put the port (sender) in a ports table
     let pid = vm.port_table.write().insert(owner, port);
@@ -122,6 +123,13 @@ pub fn spawn(
         Variant::Atom(atom::SPAWN) => {
             match tup[1].into_variant() {
                 Variant::Atom(atom::TTY_SL) => vm.runtime.executor().spawn(tty(pid, owner, input).unit_error().boxed().compat()),
+                Variant::Cons(..) => {
+                    let cons = value::Cons::try_from(&tup[1]).unwrap();
+                    match value::cons::unicode_list_to_buf(cons, 2048).unwrap().as_ref() {
+                        "tty_sl -c -e" => vm.runtime.executor().spawn(tty(pid, owner, input).unit_error().boxed().compat()),
+                        _ => unimplemented!("port::spawn for {}", args),
+                    };
+                }
                 _ => unimplemented!("port::spawn for {}", args),
             }
         }
@@ -222,7 +230,7 @@ pub fn control(
 }
 
 // TODO: needs type async fn
-type Driver = fn(owner: PID, input: mpsc::UnboundedReceiver<Signal>); 
+type Driver = fn(owner: PID, input: mpsc::UnboundedReceiver<Signal>);
 
 // Port driver implementations.
 
@@ -834,7 +842,7 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
                             }
                         }
                     }
-  
+
                     // TODO, drop Signal::Close, just close sender
                     None => break,
                 }
