@@ -188,6 +188,20 @@ pub fn send_message(
     Ok(msg)
 }
 
+pub fn close(vm: &Machine, from: PID, port: ID) -> Result<(), Exception> {
+    let res = vm.port_table.read().lookup(port).map(|port| port.chan.clone());
+
+    if let Some(mut chan) = res {
+        // TODO: error unhandled
+        //use futures::sink::SinkExt as FuturesSinkExt;
+
+        // FIXME: This is some spooky shit
+        chan.send(Signal::Close).boxed().compat();
+        //vm.runtime.executor().spawn();
+    }
+    Ok(())
+}
+
 /// Schedules a port operation and returns a ref. When we're done, need to reply to sender with
 /// {ref, data}.
 pub fn control(

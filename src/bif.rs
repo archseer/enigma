@@ -307,6 +307,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "garbage_collect", 1 => garbage_collect_1,
             "scheduler_wall_time", 1 => scheduler_wall_time_1,
             "open_port", 2 => open_port_2,
+            "port_close", 1 => erts_internal_port_close_1,
             "port_control", 3 => port_control_3,
             "spawn_system_process", 3 => bif_erlang_spawn_3, // TODO: aliased to normal spawn for now
             "map_next", 3 => erts_internal_map_next_3,
@@ -1256,6 +1257,15 @@ fn port_control_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Resul
     };
     let reference = port::control(vm, process.pid, port, opcode, args[2])?;
     Ok(Term::reference(&process.context_mut().heap, reference))
+}
+
+fn erts_internal_port_close_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+    let port = match args[0].into_variant() {
+        Variant::Port(id) => id,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    port::close(vm, process.pid, port)?;
+    Ok(atom!(TRUE))
 }
 
 fn erts_internal_map_next_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {

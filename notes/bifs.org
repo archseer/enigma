@@ -120,13 +120,13 @@
 - [ ] bif erlang:dist_ctrl_get_data/1
 - [ ] bif erlang:dist_ctrl_get_data_notification/1
 
-** Static native functions in erts_internal [0/21]
+** Static native functions in erts_internal [1/21]
 - [ ] bif erts_internal:port_info/1
 - [ ] bif erts_internal:port_info/2
 - [ ] bif erts_internal:port_call/3
 - [ ] bif erts_internal:port_command/3
 - [ ] bif erts_internal:port_control/3
-- [ ] bif erts_internal:port_close/1
+- [x] bif erts_internal:port_close/1
 - [ ] bif erts_internal:port_connect/2
 - [ ] bif erts_internal:request_system_task/3
 - [ ] bif erts_internal:request_system_task/4
@@ -476,7 +476,7 @@ The dtrace BIF's are always present, but give dummy results if dynamic trace is 
 - [ ] bif erlang:dt_get_tag_data/0
 - [ ] bif erlang:dt_spread_tag/1
 - [ ] bif erlang:dt_restore_tag/1
-These are dummies even with enabled dynamic trace unless vm probes are enabled. 
+These are dummies even with enabled dynamic trace unless vm probes are enabled.
 They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 - [ ] bif erlang:dt_prepend_vm_tag_data/1
 - [ ] bif erlang:dt_append_vm_tag_data/1
