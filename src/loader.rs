@@ -682,19 +682,16 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], LValue> {
     } else {
         // Bit 4 is 1 means that bits 5-6-7 contain amount of bytes+2 to store
         // the value
-        let n_bytes = (b >> 5) + 2;
+        let mut n_bytes = (b as u32 >> 5) + 2;
+        let mut rest = rest;
         if n_bytes == 9 {
-            println!("more than 9!");
-            //     // bytes=9 means upper 5 bits were set to 1, special case 0b11111xxx
-            //     // which means that following nested tagged value encodes size,
-            //     // followed by the bytes (Size+9)
-            //     let bnext = r.read_u8();
-            //     if let Integral::Small(tmp) = read_word(bnext, r) {
-            //       n_bytes = tmp as Word + 9;
-            //     } else {
-            //       panic!("{}read word encountered a wrong byte length", module())
-            //     }
-            unimplemented!()
+            // bytes=9 means upper 5 bits were set to 1, special case 0b11111xxx
+            // which means that following nested tagged value encodes size,
+            // followed by the bytes (Size+9)
+            let (r, len) = be_u8(rest)?;
+            let (r, size) = read_smallint(len, r)?;
+            n_bytes = size as u32 + 9; // TODO: enforce unsigned
+            rest = r;
         }
 
         // Read the remaining big endian bytes and convert to int
@@ -849,4 +846,5 @@ mod tests {
             Ok((&[] as &[u8], LValue::Literal(15)))
         );
     }
+    // TODO: test encoding/decoding 38374938373887374983978484
 }
