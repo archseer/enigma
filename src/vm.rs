@@ -364,7 +364,7 @@ macro_rules! op_apply {
                 return Err(Exception::new(Reason::EXC_BADARG));
             }
 
-            if module.to_u32() != atom::ERLANG && func.to_u32() != atom::APPLY {
+            if module.to_u32() != atom::ERLANG || func.to_u32() != atom::APPLY {
                 break;
             }
 
