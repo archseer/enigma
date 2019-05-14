@@ -193,11 +193,10 @@ pub fn close(vm: &Machine, from: PID, port: ID) -> Result<(), Exception> {
 
     if let Some(mut chan) = res {
         // TODO: error unhandled
-        //use futures::sink::SinkExt as FuturesSinkExt;
+        use futures::sink::SinkExt as FuturesSinkExt;
 
-        // FIXME: This is some spooky shit
-        chan.send(Signal::Close).boxed().compat();
-        //vm.runtime.executor().spawn();
+        let future = async move {chan.send(Signal::Close).await; };
+        vm.runtime.executor().spawn(future.unit_error().boxed().compat());
     }
     Ok(())
 }
