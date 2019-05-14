@@ -347,44 +347,70 @@ macro_rules! op_call_fun {
 //TODO: need op_apply_fun, but it should use x0 as mod, x1 as fun, etc
 macro_rules! op_apply {
     ($vm:expr, $context:expr, $process:expr, $return: expr) => {{
-        // Walk down the 3rd parameter of apply (the argument list) and copy
-        // the parameters to the x registers (reg[]).
-        let module = $context.x[0];
-        let func = $context.x[1];
-        let mut tmp = $context.x[2];
+        let mut module = $context.x[0];
+        let mut func = $context.x[1];
+        let mut args = $context.x[2];
 
-        if !func.is_atom() || !module.is_atom() {
-            $context.x[0] = module;
-            $context.x[1] = func;
-            $context.x[2] = Term::nil();
-            println!(
-                "pid={} tried to apply not a func {}:{}",
-                $process.pid, module, func
-            );
+        loop {
+            if !func.is_atom() || !module.is_atom() {
+                $context.x[0] = module;
+                $context.x[1] = func;
+                $context.x[2] = Term::nil();
+                println!(
+                    "pid={} tried to apply not a func {}:{}",
+                    $process.pid, module, func
+                );
 
-            return Err(Exception::new(Reason::EXC_BADARG));
-        }
+                return Err(Exception::new(Reason::EXC_BADARG));
+            }
 
-        // Handle apply of apply/3...
-        if module.to_u32() == atom::ERLANG && func.to_u32() == atom::APPLY {
-            unimplemented!("apply of apply")
+            if module.to_u32() != atom::ERLANG && func.to_u32() != atom::APPLY {
+                break;
+            }
+
+            // Handle apply of apply/3...
+
             // continually loop over args to resolve
+            let a = args;
+
+            if let Ok(cons) = Cons::try_from(&a) {
+                let m = cons.head;
+                let a = cons.tail;
+
+                if let Ok(cons) = Cons::try_from(&a) {
+                    let f = cons.head;
+                    let a = cons.tail;
+
+                    if let Ok(cons) = Cons::try_from(&a) {
+                        let a = cons.head;
+                        if cons.tail.is_nil() {
+                            module = m;
+                            func = f;
+                            args = a;
+                            continue;
+                        }
+                    }
+                }
+            }
         }
 
         let mut arity = 0;
 
-        while let Ok(value::Cons { head, tail }) = tmp.try_into() {
+        // Walk down the 3rd parameter of apply (the argument list) and copy
+        // the parameters to the x registers (reg[]).
+
+        while let Ok(value::Cons { head, tail }) = args.try_into() {
             if arity < process::MAX_REG - 1 {
                 $context.x[arity] = *head;
                 arity += 1;
-                tmp = *tail
+                args = *tail
             } else {
                 return Err(Exception::new(Reason::EXC_SYSTEM_LIMIT));
             }
         }
 
-        if !tmp.is_nil() {
-            /* Must be well-formed list */
+        if !args.is_nil() {
+            // Must be well-formed list
             return Err(Exception::new(Reason::EXC_BADARG));
         }
 
@@ -431,20 +457,20 @@ macro_rules! op_apply_fun {
         // the parameters to the x registers (reg[]).
 
         let fun = $context.x[0];
-        let mut tmp = $context.x[1];
+        let mut args = $context.x[1];
         let mut arity = 0;
 
-        while let Ok(value::Cons { head, tail }) = tmp.try_into() {
+        while let Ok(value::Cons { head, tail }) = args.try_into() {
             if arity < process::MAX_REG - 1 {
                 $context.x[arity] = *head;
                 arity += 1;
-                tmp = *tail
+                args = *tail
             } else {
                 return Err(Exception::new(Reason::EXC_SYSTEM_LIMIT));
             }
         }
 
-        if !tmp.is_nil() {
+        if !args.is_nil() {
             /* Must be well-formed list */
             return Err(Exception::new(Reason::EXC_BADARG));
         }
@@ -523,8 +549,7 @@ macro_rules! op_fixed_apply {
 
         // Handle apply of apply/3...
         if module.to_u32() == atom::ERLANG && func.to_u32() == atom::APPLY && $arity == 3 {
-            unimplemented!("fixed_apply of apply")
-            // return apply(p, reg, I, stack_offset);
+            op_apply!($vm, $context, $process, $return);
         }
 
         /*
