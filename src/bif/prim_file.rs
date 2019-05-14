@@ -79,7 +79,14 @@ pub fn get_cwd_nif_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> 
 }
 
 pub fn set_cwd_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    unimplemented!()
+    let heap = &process.context_mut().heap;
+    let cons = Cons::try_from(&args[0])?;
+    let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
+
+    match std::env::set_current_dir(path) {
+        Ok(()) => Ok(atom!(OK)),
+        Err(err) => return Ok(error_to_tuple(heap, err)),
+    }
 }
 
 /// Reads an entire file into \c result, stopping after \c size bytes or EOF. It will read until
