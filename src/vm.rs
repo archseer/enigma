@@ -641,25 +641,46 @@ macro_rules! safepoint_and_reduce {
     }};
 }
 
-pub const PRE_LOADED: &[&str] = &[
-    "otp/erts/preloaded/ebin/erts_code_purger.beam",
-    "otp/erts/preloaded/ebin/erl_init.beam",
-    "otp/erts/preloaded/ebin/init.beam",
-    "otp/erts/preloaded/ebin/prim_buffer.beam",
-    "otp/erts/preloaded/ebin/prim_eval.beam",
-    "otp/erts/preloaded/ebin/prim_inet.beam",
-    "otp/erts/preloaded/ebin/prim_file.beam",
-    "otp/erts/preloaded/ebin/zlib.beam",
-    "otp/erts/preloaded/ebin/prim_zip.beam",
-    "otp/erts/preloaded/ebin/erl_prim_loader.beam",
-    "otp/erts/preloaded/ebin/erlang.beam",
-    "otp/erts/preloaded/ebin/erts_internal.beam",
-    "otp/erts/preloaded/ebin/erl_tracer.beam",
-    "otp/erts/preloaded/ebin/erts_literal_area_collector.beam",
-    "otp/erts/preloaded/ebin/erts_dirty_process_signal_handler.beam",
-    "otp/erts/preloaded/ebin/atomics.beam",
-    "otp/erts/preloaded/ebin/counters.beam",
-    "otp/erts/preloaded/ebin/persistent_term.beam",
+pub const PRE_LOADED_NAMES: &[&str] = &[
+    "erts_code_purger",
+    "erl_init",
+    "init",
+    "prim_buffer",
+    "prim_eval",
+    "prim_inet",
+    "prim_file",
+    "zlib",
+    "prim_zip",
+    "erl_prim_loader",
+    "erlang",
+    "erts_internal",
+    "erl_tracer",
+    "erts_literal_area_collector",
+    "erts_dirty_process_signal_handler",
+    "atomics",
+    "counters",
+    "persistent_term",
+];
+
+pub const PRE_LOADED: &[&[u8]] = &[
+    include_bytes!("../otp/erts/preloaded/ebin/erts_code_purger.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/erl_init.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/init.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/prim_buffer.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/prim_eval.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/prim_inet.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/prim_file.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/zlib.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/prim_zip.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/erl_prim_loader.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/erlang.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/erts_internal.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/erl_tracer.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/erts_literal_area_collector.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/erts_dirty_process_signal_handler.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/atomics.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/counters.beam"),
+    include_bytes!("../otp/erts/preloaded/ebin/persistent_term.beam"),
 ];
 
 impl Machine {
@@ -712,8 +733,8 @@ impl Machine {
     }
 
     pub fn preload_modules(&self) {
-        PRE_LOADED.iter().for_each(|path| {
-            module::load_module(self, path).unwrap();
+        PRE_LOADED.iter().for_each(|bytecode| {
+            module::load_bytes(self, bytecode).unwrap();
         })
     }
 
@@ -1478,7 +1499,7 @@ impl Machine {
                 }
                 Opcode::Badmatch => {
                     let value = context.expand_arg(&ins.args[0]);
-                    println!("Badmatch: {}", value);
+                    // println!("Badmatch: {}", value);
                     return Err(Exception::with_value(Reason::EXC_BADMATCH, value));
                 }
                 Opcode::IfEnd => {

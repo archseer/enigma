@@ -119,11 +119,21 @@ impl Module {
     }
 }
 
+pub fn load_bytes(vm: &Machine, bytes: &[u8]) -> Result<*const Module, std::io::Error> {
+    let mut registry = vm.modules.lock();
+    let mut exports = vm.exports.write();
+
+    registry.parse_module(bytes).map(|module| {
+        module.process_exports(&mut *exports);
+        module as *const Module
+    })
+}
+
 pub fn load_module(vm: &Machine, path: &str) -> Result<*const Module, std::io::Error> {
     let mut registry = vm.modules.lock();
     let mut exports = vm.exports.write();
 
-    registry.parse_module(path).map(|module| {
+    registry.parse_file(path).map(|module| {
         module.process_exports(&mut *exports);
         module as *const Module
     })
