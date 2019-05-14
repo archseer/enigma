@@ -114,6 +114,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "map_size", 1 => bif_erlang_map_size_1,
             "iolist_size", 1 => erlang::iolist_size_1,
             "length", 1 => bif_erlang_length_1,
+            "size", 1 => bif_erlang_size_1,
             "error", 1 => bif_erlang_error_1,
             "error", 2 => bif_erlang_error_2,
             "raise", 3 => bif_erlang_raise_3,
@@ -895,6 +896,24 @@ pub fn bif_erlang_length_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]
     let heap = &process.context_mut().heap;
 
     Ok(Term::uint(heap, cons.iter().count() as u32))
+}
+
+pub fn bif_erlang_size_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+    if args[0].is_nil() {
+        return Ok(Term::int(0));
+    }
+    // TODO: binary
+    if let Ok(tup) = Tuple::try_from(&args[0]) {
+        let heap = &process.context_mut().heap;
+
+        return Ok(Term::uint64(heap, tup.len() as u64));
+    }
+
+    if args[0].is_binary() {
+        return bif_erlang_byte_size_1(vm, process, args);
+    }
+
+    Err(Exception::new(Reason::EXC_BADARG))
 }
 
 fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
