@@ -8,12 +8,10 @@ use crate::value::{self, Cons, Term, TryFrom, TryInto, Variant};
 use crate::vm;
 
 pub fn pre_loaded_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
-    use std::path::Path;
     let heap = &process.context_mut().heap;
 
-    let iter = vm::PRE_LOADED
+    let iter = vm::PRE_LOADED_NAMES
         .iter()
-        .map(|path| Path::new(path).file_stem().unwrap().to_str().unwrap())
         .map(|name| Term::atom(atom::from_str(name)));
 
     Ok(Cons::from_iter(iter, heap))
@@ -29,9 +27,10 @@ pub fn prepare_loading_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     args[1]
         .to_bytes()
         .ok_or_else(|| Exception::new(Reason::EXC_BADARG))
+        .map(|bytes| maybe_uncompress(bytes))
         .and_then(|bytes| {
             loader
-                .load_file(bytes)
+                .load_file(bytes.as_ref())
                 // we box to allocate a permanent space, then we unbox since we'll carry around
                 // the raw pointer that we will Box::from_raw when finalizing.
                 .map(|module| {
@@ -39,6 +38,24 @@ pub fn prepare_loading_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
                 })
                 .or_else(|_| Ok(tup2!(heap, atom!(ERROR), atom!(BADFILE))))
         })
+}
+
+fn maybe_uncompress(bytes: &[u8]) -> std::borrow::Cow<[u8]> {
+    use libflate::gzip;
+    use std::io::Read;
+
+    // check for gzip magic header
+    if bytes.len() > 2 && bytes[..2] == [0x1f, 0x8b] {
+        let mut data = Vec::new();
+        gzip::Decoder::new(bytes)
+            .unwrap()
+            .read_to_end(&mut data)
+            .unwrap();
+
+        std::borrow::Cow::Owned(data)
+    } else {
+        std::borrow::Cow::Borrowed(bytes)
+    }
 }
 
 pub fn has_prepared_code_on_load_1(

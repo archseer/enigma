@@ -96,12 +96,12 @@ pub fn element_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif:
 
 pub fn tuple_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let t = Tuple::try_from(&args[0])?;
-    let mut n = (t.len() - 1) as i32;
+    let mut n = t.len();
     let mut list = Term::nil();
     let heap = &process.context_mut().heap;
-    while n >= 0 {
-        list = cons!(heap, t[n as usize], list);
+    while n > 0 {
         n -= 1;
+        list = cons!(heap, t[n as usize], list);
     }
     Ok(list)
 }

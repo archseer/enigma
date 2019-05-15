@@ -17,11 +17,18 @@ impl ModuleRegistry {
     }
 
     /// Parses a full file path pointing to a module.
-    pub fn parse_module(&mut self, path: &str) -> Result<&Module, std::io::Error> {
+    pub fn parse_file(&mut self, path: &str) -> Result<&Module, std::io::Error> {
         let bytes = std::fs::read(path)?;
 
+        self.parse_module(&bytes[..])
+    }
+
+    /// Parses a full file path pointing to a module.
+    pub fn parse_module(&mut self, bytes: &[u8]) -> Result<&Module, std::io::Error> {
         let loader = Loader::new();
-        let module = loader.load_file(&bytes[..]).unwrap();
+        let module = loader.load_file(bytes).unwrap();
+
+        // TODO: handle uncompress, like the bif does
 
         let name = module.name;
         Ok(self.add_module(name, Box::new(module)))

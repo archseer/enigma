@@ -114,6 +114,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "map_size", 1 => bif_erlang_map_size_1,
             "iolist_size", 1 => erlang::iolist_size_1,
             "length", 1 => bif_erlang_length_1,
+            "size", 1 => bif_erlang_size_1,
             "error", 1 => bif_erlang_error_1,
             "error", 2 => bif_erlang_error_2,
             "raise", 3 => bif_erlang_raise_3,
@@ -307,6 +308,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "garbage_collect", 1 => garbage_collect_1,
             "scheduler_wall_time", 1 => scheduler_wall_time_1,
             "open_port", 2 => open_port_2,
+            "port_close", 1 => erts_internal_port_close_1,
             "port_control", 3 => port_control_3,
             "spawn_system_process", 3 => bif_erlang_spawn_3, // TODO: aliased to normal spawn for now
             "map_next", 3 => erts_internal_map_next_3,
@@ -896,6 +898,24 @@ pub fn bif_erlang_length_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]
     Ok(Term::uint(heap, cons.iter().count() as u32))
 }
 
+pub fn bif_erlang_size_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+    if args[0].is_nil() {
+        return Ok(Term::int(0));
+    }
+    // TODO: binary
+    if let Ok(tup) = Tuple::try_from(&args[0]) {
+        let heap = &process.context_mut().heap;
+
+        return Ok(Term::uint64(heap, tup.len() as u64));
+    }
+
+    if args[0].is_binary() {
+        return bif_erlang_byte_size_1(vm, process, args);
+    }
+
+    Err(Exception::new(Reason::EXC_BADARG))
+}
+
 fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Err(Exception::with_value(Reason::EXC_THROWN, args[0]))
 }
@@ -1256,6 +1276,15 @@ fn port_control_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Resul
     };
     let reference = port::control(vm, process.pid, port, opcode, args[2])?;
     Ok(Term::reference(&process.context_mut().heap, reference))
+}
+
+fn erts_internal_port_close_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+    let port = match args[0].into_variant() {
+        Variant::Port(id) => id,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    port::close(vm, process.pid, port)?;
+    Ok(atom!(TRUE))
 }
 
 fn erts_internal_map_next_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {

@@ -58,7 +58,6 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> 
             Ok((rest, Term::from(f64::from_bits(flt))))
         }
         // TODO:
-        // BitBinary
         // AtomCacheRef_
         Tag::SmallInteger => {
             let (rest, int) = be_u8(rest)?;
@@ -75,6 +74,7 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> 
         // Pid
         Tag::String => decode_string(rest, heap),
         Tag::Binary => decode_binary(rest, heap),
+        Tag::BitBinary => decode_bitstring(rest, heap),
         // NewFun
         Tag::Export => decode_export(rest, heap),
         // NewReference
@@ -224,6 +224,26 @@ pub fn decode_binary<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term>
 
     let (rest, bytes) = take!(rest, len)?;
     Ok((rest, Term::binary(heap, bitstring::Binary::from(bytes))))
+}
+
+pub fn decode_bitstring<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
+    let (rest, len) = be_u32(rest)?;
+    let (rest, bits) = be_u8(rest)?;
+    if len == 0 && bits == 0 {
+        return Ok((rest, Term::binary(heap, bitstring::Binary::new())));
+    }
+
+    if bits > 8 {
+        panic!("Tag::BitBinary with invalid len bits");
+    }
+
+    let (rest, bytes) = take!(rest, len)?;
+    let bin = crate::servo_arc::Arc::new(bitstring::Binary::from(bytes));
+    let num_bits = len as usize * 8 + bits as usize;
+    Ok((
+        rest,
+        Term::subbinary(heap, bitstring::SubBinary::new(bin, num_bits, 0, false)),
+    ))
 }
 
 pub fn decode_export<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {

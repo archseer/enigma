@@ -127,7 +127,21 @@ impl Hash for Term {
                 }
                 BOXED_REF => {
                     let value = &self.get_boxed_value::<process::Ref>().unwrap();
+
                     BOXED_REF.hash(state);
+                    value.hash(state)
+                }
+                BOXED_BIGINT => {
+                    let value = &self.get_boxed_value::<BigInt>().unwrap();
+
+                    BOXED_BIGINT.hash(state);
+                    value.hash(state)
+                }
+                BOXED_MAP => {
+                    let value = &self.get_boxed_value::<Map>().unwrap();
+
+                    BOXED_MAP.hash(state);
+                    value.0.hash(state)
                 }
                 _ => unimplemented!("unimplemented Hash for {}", self),
             },
@@ -950,6 +964,12 @@ impl PartialEq for Variant {
                         // TODO: handle other boxed types
                         // ref, bigint, cp, catch, stacktrace, binary, subbinary
                         // TODO: binary and subbinary need to be compared
+                        BOXED_BIGINT => {
+                            // TODO: bigint with int compare?
+                            let i1 = &(*(*p1 as *const Boxed<BigInt>)).value;
+                            let i2 = &(*(*p2 as *const Boxed<BigInt>)).value;
+                            i1.eq(i2)
+                        }
                         BOXED_BINARY => {
                             let b1 = &*(*p1 as *const Boxed<bitstring::RcBinary>);
                             let b2 = &*(*p2 as *const Boxed<bitstring::RcBinary>);
