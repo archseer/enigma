@@ -73,7 +73,7 @@ impl InstrPtr {
             } else if ptr < module.lines[mid + 1].pos {
                 let res = module.lines[mid];
 
-                if res.pos == LINE_INVALID_LOCATION {
+                if res.loc == LINE_INVALID_LOCATION {
                     return None;
                 }
 

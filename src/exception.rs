@@ -563,11 +563,8 @@ fn save_stacktrace(
 
     let s = &mut boxed.value;
 
-    /*
-     * If the failure was in a BIF other than 'error/1', 'error/2',
-     * 'exit/1' or 'throw/1', save BIF-MFA and save the argument
-     * registers by consing up an arglist.
-     */
+    // If the failure was in a BIF other than 'error/1', 'error/2', 'exit/1' or 'throw/1', save
+    // BIF-MFA and save the argument registers by consing up an arglist.
     //     if (bif_mfa) {
     // 	if (bif_mfa->module == am_erlang) {
     // 	    switch (bif_mfa->function) {

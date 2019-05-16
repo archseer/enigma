@@ -879,7 +879,7 @@ impl Machine {
             let ins = &module.instructions[context.ip.ptr as usize];
             context.ip.ptr += 1;
 
-            // println!(
+            // info!(
             //     "proc pid={:?} reds={:?} mod={:?} offs={:?} ins={:?} args={:?}",
             //     process.pid,
             //     context.reds,
@@ -1451,9 +1451,9 @@ impl Machine {
                     debug_assert_eq!(ins.args.len(), 3);
                     // source, element, dest
                     let source = context.expand_arg(&ins.args[0]);
-                    let n = ins.args[1].to_u32();
+                    let n = ins.args[1].to_u32() as usize;
                     if let Ok(t) = Tuple::try_from(&source) {
-                        set_register!(context, &ins.args[2], t[n as usize])
+                        set_register!(context, &ins.args[2], t[n])
                     } else {
                         panic!("GetTupleElement: source is of wrong type")
                     }
@@ -1516,7 +1516,7 @@ impl Machine {
                 Opcode::CaseEnd => {
                     // Raises the case_clause exception with the value of Arg0
                     let value = context.expand_arg(&ins.args[0]);
-                    println!("err=case_clause val={}", value);
+                    // println!("err=case_clause val={}", value);
                     return Err(Exception::with_value(Reason::EXC_CASE_CLAUSE, value));
                 }
                 Opcode::Try => {

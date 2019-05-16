@@ -295,7 +295,6 @@ impl<'a> Loader<'a> {
         });
 
         while let Some(mut instruction) = code_iter.next() {
-            pos += 1;
             let instruction = match &instruction.op {
                 Opcode::Line => {
                     // args: [Literal(4)]
@@ -313,21 +312,19 @@ impl<'a> Loader<'a> {
                             let loc = self.line_items[item as usize].1 as usize;
                             // TODO: map as loc => offset
 
-                            if pos - 1 == last_func_start {
+                            if pos > 0 && pos - 1 == last_func_start {
                                 // This line instruction directly follows the func_info
                                 // instruction. Its address must be adjusted to point to
                                 // func_info instruction.
                                 self.lines.push(Line {
-                                    pos: last_func_start - 1,
+                                    pos: last_func_start,
                                     loc,
                                 })
                             } else {
                                 //} else if (li <= stp->func_line[function_number-1] || stp->line_instr[li-1].loc != loc) {
-                                // /*
-                                // * Only store the location if it is different
-                                // * from the previous location in the same function.
-                                // */
-                                self.lines.push(Line { pos: pos - 1, loc })
+                                // Only store the location if it is different from the previous
+                                // location in the same function.
+                                self.lines.push(Line { pos, loc })
                             }
                         } else {
                             unreachable!()
@@ -437,6 +434,7 @@ impl<'a> Loader<'a> {
                 _ => instruction,
             };
 
+            pos += 1;
             self.instructions.push(instruction);
         }
 
