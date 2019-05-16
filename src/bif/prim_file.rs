@@ -373,15 +373,18 @@ pub fn open_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
 
     let file = match opts.open(path) {
         Ok(file) => file,
-        Err(err) => return Ok(error_to_tuple(heap, err)),
+        Err(err) => {
+            println!("pid={} attempted open on {}, failed.", process.pid, args[0]);
+            return Ok(error_to_tuple(heap, err));
+        }
     };
     Ok(tup2!(heap, atom!(OK), Term::file(heap, file)))
 }
 
 pub fn close_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let file = File::try_from_mut(&args[0])?;
-    drop(file);
-    // FIXME: ^ this does nothing since it's with a reference
+    unsafe { std::ptr::drop_in_place(file) }
+    // FIXME: ^
     Ok(atom!(OK))
 }
 
