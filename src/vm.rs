@@ -708,7 +708,7 @@ impl Machine {
         // Create the runtime
         let machine = vm.clone();
         let runtime = tokio::runtime::Builder::new()
-            // .panic_handler(|err| std::panic::resume_unwind(err))
+            .panic_handler(|err| std::panic::resume_unwind(err))
             .after_start(move || {
                 Machine::set_current(machine.clone()); // ughh double clone
             })
@@ -717,7 +717,7 @@ impl Machine {
 
         let machine = vm.clone();
         let process_pool = tokio::runtime::Builder::new()
-            // .panic_handler(|err| std::panic::resume_unwind(err))
+            .panic_handler(|err| std::panic::resume_unwind(err))
             .after_start(move || {
                 Machine::set_current(machine.clone());
             })
