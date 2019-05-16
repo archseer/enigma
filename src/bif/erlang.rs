@@ -532,6 +532,16 @@ pub fn list_to_integer_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term])
     }
 }
 
+pub fn list_to_float_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    // list to string
+    let cons = Cons::try_from(&args[0])?;
+    let string = value::cons::unicode_list_to_buf(cons, 2048)?;
+    match lexical::try_parse::<f64, _>(string) {
+        Ok(f) => Ok(Term::from(f)),
+        Err(err) => panic!("errored with {}", err), //TODO
+    }
+}
+
 pub fn list_to_tuple_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // list to tuple
     let heap = &process.context_mut().heap;
@@ -807,6 +817,7 @@ pub fn bsl_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Res
         Variant::Integer(i) => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
+    // TODO: need to use overflowing_shl
     Ok(Term::int(i1 << i2))
 }
 
@@ -819,6 +830,7 @@ pub fn bsr_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Res
         Variant::Integer(i) => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
+    // TODO: need to use overflowing_shr
     Ok(Term::int(i1 >> i2))
 }
 

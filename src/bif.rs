@@ -154,6 +154,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "fun_to_list", 1 => erlang::fun_to_list_1,
             "ref_to_list", 1 => erlang::ref_to_list_1,
             "list_to_integer", 1 => erlang::list_to_integer_1,
+            "list_to_float", 1 => erlang::list_to_float_1,
             "list_to_tuple", 1 => erlang::list_to_tuple_1,
             "++", 2 => erlang::append_2,
             "append", 2 => erlang::append_2,
