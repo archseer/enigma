@@ -575,11 +575,11 @@ impl Renderer {
         use std::convert::TryInto;
         let pos = i16::from_be_bytes(bytes[1..3].try_into().unwrap());
         if pos < 0 {
+            self.line.move_backward(-pos as usize);
             write!(self.out, "{}", termion::cursor::Left(-pos as u16));
-            self.line.pos -= -pos as usize;
         } else {
+            self.line.move_forward(pos as usize);
             write!(self.out, "{}", termion::cursor::Right(pos as u16));
-            self.line.pos += pos as usize;
         }
         self.out.flush().unwrap();
     }
@@ -614,6 +614,7 @@ impl Renderer {
         // TODO: need to redraw more efficiently and with multiline
         write!(self.out, "\r{}", termion::clear::CurrentLine);
         self.out.write_all(self.line.as_str().as_bytes()).unwrap();
+        write!(self.out, "\r{}", termion::cursor::Right(self.line.pos as u16));
         self.out.flush().unwrap();
     }
 
@@ -628,6 +629,7 @@ impl Renderer {
         // TODO: need to redraw more efficiently and with multiline
         write!(self.out, "\r{}", termion::clear::CurrentLine);
         self.out.write_all(self.line.as_str().as_bytes()).unwrap();
+        write!(self.out, "\r{}", termion::cursor::Right(self.line.pos as u16));
         self.out.flush().unwrap();
     }
 }
@@ -735,6 +737,63 @@ mod test {
     }
 }
 
+// termios
+use std::{io, mem};
+use libc::c_int;
+
+pub fn get_terminal_attr() -> io::Result<Termios> {
+    extern "C" {
+        pub fn tcgetattr(fd: c_int, termptr: *mut Termios) -> c_int;
+    }
+    unsafe {
+        let mut termios = mem::zeroed();
+        cvt(tcgetattr(0, &mut termios))?;
+        Ok(termios)
+    }
+}
+
+pub fn set_terminal_attr(termios: &Termios) -> io::Result<()> {
+    extern "C" {
+        pub fn tcsetattr(fd: c_int, opt: c_int, termptr: *const Termios) -> c_int;
+    }
+    cvt(unsafe { tcsetattr(0, 0, termios) }).and(Ok(()))
+}
+
+pub fn raw_terminal_attr(termios: &mut Termios) {
+    extern "C" {
+        pub fn cfmakeraw(termptr: *mut Termios);
+    }
+    unsafe { cfmakeraw(termios) }
+
+}
+
+use libc::termios as Termios;
+
+// Support functions for converting libc return values to io errors {
+trait IsMinusOne {
+    fn is_minus_one(&self) -> bool;
+}
+
+macro_rules! impl_is_minus_one {
+        ($($t:ident)*) => ($(impl IsMinusOne for $t {
+            fn is_minus_one(&self) -> bool {
+                *self == -1
+            }
+        })*)
+    }
+
+impl_is_minus_one! { i8 i16 i32 i64 isize }
+
+fn cvt<T: IsMinusOne>(t: T) -> io::Result<T> {
+    if t.is_minus_one() {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(t)
+    }
+}
+// } End of support functions
+// termios
+
 async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
     use termion::terminal_size;
     let mut buf: [u8;1024] = [0;1024];
@@ -747,6 +806,10 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
     // for raw mode
     use termion::raw::IntoRawMode;
     let mut stdout = std::io::stdout().into_raw_mode().unwrap();
+
+    let mut ios = get_terminal_attr().unwrap();
+    ios.c_lflag |= (libc::ISIG); // IEXTEN
+    set_terminal_attr(&ios).unwrap();
 
     // need to disable echo and canon
 
@@ -850,7 +913,6 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
                                     from: id, // TODO: this was supposed to be port id, not pid
                                     value: tup2!(&heap, Term::reference(&heap, reference), atom!(BADARG))
                                 });
-                                println!("badarg yo");
                                 break;
                             }
                         }

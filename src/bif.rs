@@ -1038,7 +1038,7 @@ fn bif_erlang_nif_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
 }
 
 pub fn bif_erlang_load_nif_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-    println!("Tried loading nif: {} with args {}", args[0], args[1]);
+    // println!("Tried loading nif: {} with args {}", args[0], args[1]);
 
     if let Ok(cons) = args[0].try_into() {
         let name = value::cons::unicode_list_to_buf(cons, 2048).unwrap();

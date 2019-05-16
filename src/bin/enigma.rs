@@ -44,7 +44,7 @@ fn run() -> i32 {
 
     vm.start(args);
 
-    println!("execution time: {:?}", vm.elapsed_time());
+    // println!("execution time: {:?}", vm.elapsed_time());
     0
 }
 

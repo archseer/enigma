@@ -130,7 +130,7 @@ pub fn get_module_info_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
 fn get_module_info(heap: &crate::immix::Heap, module: &Module, what: Term) -> bif::Result {
     match what.into_variant() {
         Variant::Atom(atom::MODULE) => Ok(Term::atom(module.name)),
-        //Variant::Atom(atom::MD5) => md5_of_module(p, code_hdr),
+        Variant::Atom(atom::MD5) => unimplemented!(),
         Variant::Atom(atom::EXPORTS) => {
             Ok(module.exports.iter().rev().fold(Term::nil(), |acc, mfa| {
                 cons!(

@@ -29,7 +29,7 @@ use futures::{
   compat::*,
   future::{FutureExt, TryFutureExt},
   // io::AsyncWriteExt,
-  // stream::StreamExt,
+  stream::StreamExt,
   // sink::SinkExt,
 };
 // use futures::prelude::*;
@@ -753,8 +753,15 @@ impl Machine {
 
         self.start_main_process(args);
 
+        // Create an infinite stream of "Ctrl+C" notifications. Each item received
+        // on this stream may represent multiple ctrl-c signals.
+        use futures01::future::Future;
+        use futures01::stream::Stream;
+        let ctrl_c = tokio_signal::ctrl_c().flatten_stream();
+
         // Wait until the runtime becomes idle and shut it down.
-        vm.runtime.block_on(rx.into_future().boxed().compat()).unwrap();
+        vm.runtime.block_on(ctrl_c.into_future()).ok().unwrap();
+        // TODO: proper shutdown
         // self.process_pool.shutdown_on_idle().wait().unwrap();
         // runtime.shutdown_now().wait(); // TODO: block_on
     }
