@@ -67,16 +67,18 @@ impl InstrPtr {
 
         while high > low {
             let mid = low + (high - low) / 2;
-            if self.ptr < module.lines[mid].1 {
+            let ptr = self.ptr as usize;
+            if ptr < module.lines[mid].pos {
                 high = mid;
-            } else if self.ptr < module.lines[mid + 1].1 {
+            } else if ptr < module.lines[mid + 1].pos {
                 let res = module.lines[mid];
 
-                if res == LINE_INVALID_LOCATION {
+                if res.pos == LINE_INVALID_LOCATION {
                     return None;
                 }
 
-                return Some(res);
+                // TODO: fname
+                return Some((0, res.loc as u32)); // unsafe cast
             } else {
                 low = mid + 1;
             }

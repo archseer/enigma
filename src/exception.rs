@@ -799,7 +799,7 @@ pub fn erts_build_mfa_item(fi: &(MFA, Option<FuncInfo>), heap: &Heap, args: Term
         // };
         let file_term = Term::atom(2);
 
-        let mut tuple = tup2!(heap, Term::atom(atom::LINE), Term::int(line as i32));
+        let mut tuple = tup2!(heap, Term::atom(atom::LINE), Term::uint(heap, line));
         loc = cons!(heap, tuple, loc);
 
         tuple = tup2!(heap, Term::atom(atom::FILE), file_term);

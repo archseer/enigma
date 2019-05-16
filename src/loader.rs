@@ -17,7 +17,15 @@ use std::io::{Cursor, Read};
 pub type FuncInfo = (u32, u32);
 
 /// Declares a location as invalid.
-pub const LINE_INVALID_LOCATION: FuncInfo = (0, 0);
+pub const LINE_INVALID_LOCATION: usize = 0;
+
+#[derive(Debug, Clone, Copy)]
+pub struct Line {
+    /// position inside the bytecode
+    pub pos: usize,
+    /// line number inside the original file
+    pub loc: usize,
+}
 
 pub struct Loader<'a> {
     atoms: Vec<&'a str>,
@@ -29,7 +37,8 @@ pub struct Loader<'a> {
     atom_map: HashMap<u32, u32>, // TODO: remove this; local id -> global id
     funs: HashMap<(u32, u32), u32>, // (fun name as atom, arity) -> offset
     labels: HashMap<u32, u32>,   // label -> offset
-    lines: Vec<FuncInfo>,
+    line_items: Vec<FuncInfo>,
+    lines: Vec<Line>,
     file_names: Vec<&'a str>,
     code: &'a [u8],
     literal_heap: Heap,
@@ -86,6 +95,7 @@ impl<'a> Loader<'a> {
             atom_map: HashMap::new(),
             labels: HashMap::new(),
             funs: HashMap::new(),
+            line_items: Vec::new(),
             lines: Vec::new(),
             file_names: Vec::new(),
             code: &[],
@@ -237,11 +247,11 @@ impl<'a> Loader<'a> {
 
         // if (erts_no_line_info) { return (); }
 
-        let (_, (lines, file_names)) = decode_lines(chunk).unwrap();
+        let (_, (line_items, file_names)) = decode_lines(chunk).unwrap();
 
-        self.lines = lines;
+        self.line_items = line_items;
         self.file_names = file_names;
-        // TODO: insert file names into atom table, remap lines to point to atoms
+        // TODO: insert file names into atom table, remap line_items to point to atoms
 
         // Allocate the arrays to be filled while code is being loaded.
         // stp->line_instr = (LineInstr *) erts_alloc(ERTS_ALC_T_PREPARED_CODE,
@@ -276,47 +286,52 @@ impl<'a> Loader<'a> {
         let (_, code) = scan_instructions(self.code).unwrap();
 
         let mut code_iter = code.into_iter();
+        let mut pos = 0;
+        let mut last_func_start = 0;
+
+        self.lines.push(Line {
+            pos: LINE_INVALID_LOCATION,
+            loc: 0,
+        });
 
         while let Some(mut instruction) = code_iter.next() {
+            pos += 1;
             let instruction = match &instruction.op {
                 Opcode::Line => {
                     // args: [Literal(4)]
-                    if !self.lines.is_empty() {
-                        // BeamInstr item = code[ci-1];
-                        // BeamInstr loc;
-                        // unsigned int li;
+                    if !self.line_items.is_empty() {
+                        if let LValue::Literal(item) = instruction.args[0] {
+                            // if (item >= stp->num_line_items) {
+                            // LoadError2(stp, "line instruction index overflow (%u/%u)",
+                            // item, stp->num_line_items);
+                            // }
+                            // li = stp->current_li;
+                            // if (li >= stp->num_line_instrs) {
+                            // LoadError2(stp, "line instruction table overflow (%u/%u)",
+                            // li, stp->num_line_instrs);
+                            // }
+                            let loc = self.line_items[item as usize].1 as usize;
+                            // TODO: map as loc => offset
 
-                        // if (item >= stp->num_line_items) {
-                        // LoadError2(stp, "line instruction index overflow (%u/%u)",
-                        // item, stp->num_line_items);
-                        // }
-                        // li = stp->current_li;
-                        // if (li >= stp->num_line_instrs) {
-                        // LoadError2(stp, "line instruction table overflow (%u/%u)",
-                        // li, stp->num_line_instrs);
-                        // }
-                        // loc = stp->line_item[item];
-                        // TODO: map as loc => offset
-
-                        // if (ci - 2 == last_func_start) {
-                        // /*
-                        // * This line instruction directly follows the func_info
-                        // * instruction. Its address must be adjusted to point to
-                        // * func_info instruction.
-                        // */
-                        // stp->line_instr[li].pos = last_func_start - FUNC_INFO_SZ;
-                        // stp->line_instr[li].loc = stp->line_item[item];
-                        // stp->current_li++;
-                        // } else if (li <= stp->func_line[function_number-1] ||
-                        // stp->line_instr[li-1].loc != loc) {
-                        // /*
-                        // * Only store the location if it is different
-                        // * from the previous location in the same function.
-                        // */
-                        // stp->line_instr[li].pos = ci - 2;
-                        // stp->line_instr[li].loc = stp->line_item[item];
-                        // stp->current_li++;
-                        // }
+                            if pos - 1 == last_func_start {
+                                // This line instruction directly follows the func_info
+                                // instruction. Its address must be adjusted to point to
+                                // func_info instruction.
+                                self.lines.push(Line {
+                                    pos: last_func_start - 1,
+                                    loc,
+                                })
+                            } else {
+                                //} else if (li <= stp->func_line[function_number-1] || stp->line_instr[li-1].loc != loc) {
+                                // /*
+                                // * Only store the location if it is different
+                                // * from the previous location in the same function.
+                                // */
+                                self.lines.push(Line { pos: pos - 1, loc })
+                            }
+                        } else {
+                            unreachable!()
+                        }
                     }
                     continue;
                 }
@@ -333,6 +348,7 @@ impl<'a> Loader<'a> {
                     // record function data M:F/A
                     // don't skip so we can apply tracing during runtime
                     if let [_module, LValue::Atom(f), LValue::Literal(a)] = &instruction.args[..] {
+                        last_func_start = pos; // store pos for line number data
                         let f = self.atom_map[&(*f - 1)]; // necessary because atoms weren't remapped yet
                         self.funs
                             .insert((f, *a as u32), (self.instructions.len() as u32) + 1); // need to point after func_info
@@ -343,8 +359,10 @@ impl<'a> Loader<'a> {
                 }
                 Opcode::IntCodeEnd => {
                     // push a pointer to the end of instructions
-                    self.funs
-                        .insert(LINE_INVALID_LOCATION, self.instructions.len() as u32);
+                    self.funs.insert(
+                        (LINE_INVALID_LOCATION as u32, 0),
+                        self.instructions.len() as u32,
+                    );
                     break;
                 }
                 Opcode::OnLoad => unimplemented!("on_load instruction"),
@@ -500,7 +518,7 @@ fn decode_lines<'a>(rest: &'a [u8]) -> IResult<&'a [u8], (Vec<FuncInfo>, Vec<&st
 
 fn decode_line_items<'a>(rest: &'a [u8], mut count: u32) -> IResult<&'a [u8], Vec<(u32, u32)>> {
     let mut vec = Vec::with_capacity(count as usize);
-    vec.push(LINE_INVALID_LOCATION); // 0th index = undefined location
+    vec.push((LINE_INVALID_LOCATION as u32, 0 as u32)); // 0th index = undefined location
     let mut fname_index = 0;
 
     let mut new_rest = rest;

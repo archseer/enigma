@@ -3,7 +3,7 @@ use crate::bif;
 use crate::exports_table::ExportsTable;
 use crate::immix::Heap;
 use crate::instr_ptr::InstrPtr;
-use crate::loader::{FuncInfo, Instruction};
+use crate::loader::{FuncInfo, Instruction, Line};
 use crate::value::{self, Term, TryFrom, Variant};
 use crate::vm::Machine;
 use hashbrown::HashMap;
@@ -62,7 +62,7 @@ pub struct Module {
     pub funs: HashMap<(u32, u32), u32>, // (fun name as atom, arity) -> offset
     pub instructions: Vec<Instruction>,
     // debugging info
-    pub lines: Vec<FuncInfo>,
+    pub lines: Vec<Line>,
     /// Atom name of the module.
     pub name: u32,
     pub on_load: Option<u32>,
