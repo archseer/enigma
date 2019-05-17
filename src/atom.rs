@@ -111,10 +111,10 @@ impl AtomTable {
     }
 }
 
-pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
+pub static ATOMS: Lazy<AtomTable> = Lazy::new(|| {
     let atoms = AtomTable::new();
-    atoms.register_atom("nil");   // 0
-    atoms.register_atom("true");  // 1
+    atoms.register_atom("nil"); // 0
+    atoms.register_atom("true"); // 1
     atoms.register_atom("false"); // 2
     atoms.register_atom("undefined"); // 3
     atoms.register_atom("value"); // 4
@@ -371,7 +371,6 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("command");
     atoms.register_atom("data");
 
-
     atoms.register_atom("DOWN");
     atoms.register_atom("UP");
     atoms.register_atom("EXIT");
@@ -422,7 +421,7 @@ pub static ATOMS: Lazy<AtomTable> = sync_lazy! {
     atoms.register_atom("cur");
 
     atoms
-};
+});
 
 pub const TRUE: u32 = 1;
 pub const FALSE: u32 = 2;

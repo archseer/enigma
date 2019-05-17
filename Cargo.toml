@@ -18,7 +18,7 @@ name = "enigma"
 test = false
 
 [dependencies]
-tokio = "0.1.17"
+tokio = "0.1.20"
 # Only needs to be explicitly imported if you want to make use of
 # the machinery to convert promises back and forth between 0.1 and 0.3
 # (which is built into the provided await! macro only otherwise):
@@ -26,42 +26,40 @@ tokio = "0.1.17"
 futures-preview = {git = "https://github.com/rust-lang-nursery/futures-rs/", features = ["compat", "io-compat", "async-await", "nightly"]}
 
 futures01 = { package = "futures", version = "0.1" }
-nom = "4.1.1"
+nom = "4.2.3"
 num-bigint = "0.2.2"
-num-traits = "0.2.4"
+num-traits = "0.2.6"
 num-integer = "0.1.39"
-libflate = "0.1"
-once_cell = "0.1.6"
-# parking_lot = "0.8.0"
-parking_lot = "0.7.1"
+libflate = "0.1.22"
+once_cell = "0.2.0"
+parking_lot = "0.8.0"
 allocator_api = "0.6.0"
-time = "0.1.40"
+time = "0.1.42"
 chrono = "0.4.6"
 bitflags = "1.0.4"
-getopts = "0.2.18"
-log = "0.4"
+getopts = "0.2.19"
+log = "0.4.6"
 hashbrown = "0.3.0"
 nodrop = "0.1.13"
-statrs = "0.10.0"
+statrs = "0.11.0"
 lexical = "2.1.0"
 dirs = "1.0.5"
-owning_ref = "0.4.0" # chashmap dependency
 # futures-native-timers = { git = "https://github.com/tinaun/futures-native-timers" }
-tokio-threadpool = "0.1.13"
+tokio-threadpool = "0.1.14"
 tokio-executor = "0.1.7"
-termion = "1.5.1"
+termion = "1.5.2"
 tokio-stdin-stdout = "0.1.5"
 regex = "1.1.6"
 im = "12.3.4"
 bytes = "0.4.12"
 iovec = "0.1.2"
-unicode-segmentation = "1.2.1"
+unicode-segmentation = "1.3.0"
 tokio-signal = "0.2.7"
-libc = "0.2.54"
+libc = "0.2.55"
 simplelog = "0.5.3"
 
 [dev-dependencies]
-quickcheck = "0.8.0"
+quickcheck = "0.8.3"
 
 [profile.release]
 # lto = true

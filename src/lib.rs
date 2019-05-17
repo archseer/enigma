@@ -14,7 +14,6 @@ pub mod nanbox;
 pub mod atom;
 mod bif;
 pub mod bitstring;
-pub mod chashmap;
 pub mod etf;
 pub mod ets;
 pub mod exports_table;
@@ -33,9 +32,6 @@ pub mod regex;
 pub mod servo_arc;
 pub mod signal_queue;
 pub mod value;
-
-#[macro_use]
-extern crate once_cell;
 
 #[macro_use]
 extern crate bitflags;

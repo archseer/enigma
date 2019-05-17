@@ -1,12 +1,13 @@
 use super::*;
-use crate::chashmap::CHashMap;
 use crate::immix::Heap;
 use crate::value::{Cons, Term, TryFrom, TryInto, TryIntoMut, Tuple, Variant};
 use error::*;
+use hashbrown::HashMap;
+use parking_lot::RwLock;
 
 pub(crate) struct HashTable {
     meta: Metadata,
-    hashmap: CHashMap<Term, Term>,
+    hashmap: RwLock<HashMap<Term, Term>>,
     heap: Heap,
 }
 
@@ -17,7 +18,7 @@ impl HashTable {
     pub fn new(meta: Metadata, _process: &RcProcess) -> Self {
         Self {
             meta,
-            hashmap: CHashMap::new(),
+            hashmap: RwLock::new(HashMap::new()),
             heap: Heap::new(),
         }
     }
@@ -54,7 +55,7 @@ impl Table for HashTable {
         // TODO deep copy that value
         let value = value.deep_clone(&self.heap);
         let key = get_key(self.meta().keypos, value);
-        self.hashmap.insert(key, value);
+        self.hashmap.write().insert(key, value);
         Ok(())
     }
 
@@ -68,6 +69,7 @@ impl Table for HashTable {
         // println!("debug: end----");
         Ok(self
             .hashmap
+            .read()
             .get(&key)
             // TODO: bag types
             .map(|v| cons!(heap, v.deep_clone(heap), Term::nil()))
@@ -77,7 +79,7 @@ impl Table for HashTable {
     fn get_element(&self, process: &RcProcess, key: Term, index: usize) -> Result<Term> {
         let heap = &process.context_mut().heap;
 
-        match self.hashmap.get(&key) {
+        match self.hashmap.read().get(&key) {
             Some(value) => {
                 let tup = Tuple::try_from(&*value).unwrap();
                 assert!(tup.len() > index);
@@ -89,15 +91,15 @@ impl Table for HashTable {
 
     // contains_key ? why is result a Term, not bool
     fn member(&self, key: Term) -> bool {
-        self.hashmap.contains_key(&key)
+        self.hashmap.read().contains_key(&key)
     }
 
     fn update_element(&self, _process: &RcProcess, key: Term, list: Term) -> Result<Term> {
-        let item = match self.hashmap.get_mut(&key) {
+        let mut table = self.hashmap.write();
+        let item = match table.get_mut(&key) {
             Some(item) => item,
             None => return Ok(atom!(FALSE)), // return BadKey
         };
-
         // println!("item! {}", *item);
         // println!("values {}", list);
         // TODO verify that items are always tuples
@@ -137,7 +139,7 @@ impl Table for HashTable {
 
     // erase  (remove_entry in rust)
     fn remove(&self, key: Term) -> Result<Term> {
-        Ok(Term::boolean(self.hashmap.remove(&key).is_some()))
+        Ok(Term::boolean(self.hashmap.write().remove(&key).is_some()))
     }
 
     fn remove_object(&mut self, _object: Term) -> Result<Term> {
@@ -168,11 +170,11 @@ impl Table for HashTable {
         let heap = &process.context_mut().heap;
         let res = self
             .hashmap
-            .clone() // TODO: eww, temporary until I implement my own buckets
-            .into_iter()
+            .read()
+            .iter()
             .fold(Term::nil(), |acc, (_key, val)| {
                 // println!("running select for {}", val);
-                match pam::r#match::run(vm, process, pattern, val, flags) {
+                match pam::r#match::run(vm, process, pattern, *val, flags) {
                     Some(val) => cons!(heap, val, acc),
                     None => acc,
                 }
@@ -195,7 +197,7 @@ impl Table for HashTable {
         let heap = &process.context_mut().heap;
         let mut count = 0;
         let am_true = atom!(TRUE);
-        self.hashmap.retain(|_key, val| {
+        self.hashmap.write().retain(|_key, val| {
             // println!("running retain for {}", val);
             match pam::r#match::run(vm, process, pattern, *val, flags) {
                 Some(res) if res == am_true => {
@@ -221,12 +223,7 @@ impl Table for HashTable {
     //     unimplemented!()
     // }
 
-    fn select_replace(
-        &mut self,
-        _process: &RcProcess,
-        _tid: Term,
-        _pattern: Term,
-    ) -> Result<Term> {
+    fn select_replace(&mut self, _process: &RcProcess, _tid: Term, _pattern: Term) -> Result<Term> {
         unimplemented!()
     }
 

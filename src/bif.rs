@@ -60,7 +60,7 @@ pub type Result = std::result::Result<Term, Exception>;
 pub type Fn = fn(&vm::Machine, &RcProcess, &[Term]) -> Result;
 type BifTable = HashMap<module::MFA, Fn>;
 
-pub static BIFS: Lazy<BifTable> = sync_lazy! {
+pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
     bif_map![
         "erlang" => {
             "abs", 1 => arith::abs_1,
@@ -350,7 +350,7 @@ pub static BIFS: Lazy<BifTable> = sync_lazy! {
             "native_name_encoding", 0 => prim_file::native_name_encoding_0,
         },
     ]
-};
+});
 
 type NifTable = HashMap<u32, Vec<(u32, u32, Fn)>>;
 
@@ -369,7 +369,7 @@ macro_rules! nif_map {
     };
 }
 
-pub static NIFS: Lazy<NifTable> = sync_lazy! {
+pub static NIFS: Lazy<NifTable> = Lazy::new(|| {
     nif_map![
         "beam_lib" => {
             "compress", 1 => prim_file::compress_1,
@@ -430,7 +430,7 @@ pub static NIFS: Lazy<NifTable> = sync_lazy! {
             "unlock", 1 => prim_buffer::bif::unlock_1,
         },
     ]
-};
+});
 
 #[inline]
 pub fn is_bif(mfa: &module::MFA) -> bool {

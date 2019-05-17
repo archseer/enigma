@@ -196,7 +196,7 @@ impl std::fmt::Display for Opcode {
 // The table of callable bif's, i e guard bif's and
 // some special animals that can provide us with trace
 // information. This array is sorted on init.
-pub static GUARD_BIFS: Lazy<HashMap<(u32, usize), (bif::Fn, Flag)>> = sync_lazy! {
+pub static GUARD_BIFS: Lazy<HashMap<(u32, usize), (bif::Fn, Flag)>> = Lazy::new(|| {
     let mut table: HashMap<(u32, usize), (bif::Fn, Flag)> = HashMap::new();
 
     table.insert((atom::IS_ATOM, 1), (bif::bif_erlang_is_atom_1, Flag::DBIF_ALL));
@@ -256,7 +256,7 @@ pub static GUARD_BIFS: Lazy<HashMap<(u32, usize), (bif::Fn, Flag)>> = sync_lazy!
     // table.insert((atom::SET_TCW, 1), (&set_trace_control_word_1, Flag::DBIF_TRACE_BODY));
     // table.insert((atom::SET_TCW_FAKE, 1), (&set_trace_control_word_fake_1, Flag::DBIF_TRACE_BODY));
     table
-};
+});
 
 
 /// Check if object represents a "match" variable i.e and atom $N where N is an integer.
