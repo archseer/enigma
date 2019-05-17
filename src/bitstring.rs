@@ -350,15 +350,19 @@ macro_rules! native_endian {
 
 macro_rules! binary_size {
     ($str:expr) => {
+        // TODO: use a trait
         match $str.get_boxed_header() {
             Ok(value::BOXED_BINARY) => $str.get_boxed_value::<RcBinary>().unwrap().data.len(),
             Ok(value::BOXED_SUBBINARY) => {
                 // TODO use ok_or to cast to some, then use ?
-                $str.get_boxed_value::<SubBinary>()
-                    .unwrap()
-                    .original
-                    .data
-                    .len()
+                let sub = $str.get_boxed_value::<SubBinary>().unwrap();
+                let mut size = sub.size;
+
+                if sub.bitsize > 0 {
+                    // round up
+                    size += 1;
+                }
+                size
             }
             _ => unreachable!(),
         }

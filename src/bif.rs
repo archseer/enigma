@@ -870,12 +870,15 @@ fn bif_erlang_byte_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
             .len(),
         Ok(value::BOXED_SUBBINARY) => {
             // TODO use ok_or to cast to some, then use ?
-            args[0]
-                .get_boxed_value::<bitstring::SubBinary>()
-                .unwrap()
-                .original
-                .data
-                .len()
+            let sub = args[0].get_boxed_value::<bitstring::SubBinary>().unwrap();
+
+            let mut size = sub.size;
+
+            if sub.bitsize > 0 {
+                // round up
+                size += 1;
+            }
+            size
         }
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
