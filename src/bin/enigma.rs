@@ -4,6 +4,15 @@ use std::env;
 use std::process;
 
 fn run() -> i32 {
+    use simplelog::*;
+    use std::fs::File;
+    CombinedLogger::init(vec![WriteLogger::new(
+        LevelFilter::Info,
+        Config::default(),
+        File::create("enigma.log").unwrap(),
+    )])
+    .unwrap();
+
     let _args: Vec<String> = env::args().collect();
 
     let vm = vm::Machine::new();

@@ -58,6 +58,7 @@ iovec = "0.1.2"
 unicode-segmentation = "1.2.1"
 tokio-signal = "0.2.7"
 libc = "0.2.54"
+simplelog = "0.5.3"
 
 [dev-dependencies]
 quickcheck = "0.8.0"

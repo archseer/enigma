@@ -40,6 +40,9 @@ extern crate once_cell;
 #[macro_use]
 extern crate bitflags;
 
+#[macro_use]
+extern crate log;
+
 #[cfg(test)]
 #[macro_use]
 extern crate quickcheck;
