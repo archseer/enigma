@@ -1059,6 +1059,11 @@ impl Ord for Variant {
                             let r2 = &(*(*p2 as *const Boxed<process::Ref>)).value;
                             r1.cmp(r2)
                         }
+                        BOXED_MAP => {
+                            let m1 = &*(*p1 as *const Boxed<Map>);
+                            let m2 = &*(*p2 as *const Boxed<Map>);
+                            m1.value.0.cmp(&m2.value.0)
+                        }
                         BOXED_MAP => unimplemented!(),
                         BOXED_CLOSURE => unreachable!(),
                         // TODO: handle other boxed types
@@ -1260,5 +1265,31 @@ mod tests {
 
         let v3 = tup3!(heap, Term::int(1), Term::int(1), Term::int(1));
         assert!(!v1.eq(&v3));
+    }
+
+    #[test]
+    fn test_map_comparison() {
+        let heap = &Heap::new();
+        let v1 = map!(heap, atom!(MAX) => Term::int(2));
+        let v2 = map!(heap, atom!(MAX) => Term::int(2));
+        assert_eq!(std::cmp::Ordering::Equal, v1.cmp(&v2));
+
+        // %{a: 1, d: 1} < %{a: 1, c: 1} => false
+        let v1 = map!(heap, atom!(MAX) => Term::int(2), atom!(HIGH) => Term::int(1));
+        let v2 = map!(heap, atom!(MAX) => Term::int(2), atom!(MEDIUM) => Term::int(1));
+        assert_eq!(std::cmp::Ordering::Less, v1.cmp(&v2));
+        // %{a: 1, c: 1} < %{a: 1, d: 1} => true
+        assert_eq!(std::cmp::Ordering::Greater, v2.cmp(&v1));
+
+        // %{a: 1, b: 1} < %{a: 1, b: 2} => true
+        let v1 = map!(heap, atom!(MAX) => Term::int(2), atom!(HIGH) => Term::int(1));
+        let v2 = map!(heap, atom!(MAX) => Term::int(2), atom!(HIGH) => Term::int(2));
+        assert_eq!(std::cmp::Ordering::Less, v1.cmp(&v2));
+        assert_eq!(std::cmp::Ordering::Greater, v2.cmp(&v1));
+
+        // %{a: 2} < %{a: 1, b: 1} => false
+        let v1 = map!(heap, atom!(MAX) => Term::int(1));
+        let v2 = map!(heap, atom!(MAX) => Term::int(2), atom!(HIGH) => Term::int(1));
+        assert_eq!(std::cmp::Ordering::Less, v1.cmp(&v2));
     }
 }
