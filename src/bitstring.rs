@@ -263,14 +263,15 @@ impl From<RcBinary> for MatchBuffer {
 
 impl From<SubBinary> for MatchBuffer {
     fn from(binary: SubBinary) -> Self {
-        let len = binary.original.data.len();
+        // let len = binary.original.data.len();
+        let len = binary.size;
         let offset = 8 * binary.offset + binary.bit_offset as usize;
 
         MatchBuffer {
             original: binary.original,
             //base: binary_bytes(original),
             offset,
-            size: len * 8 + binary.bitsize, // todo + offset looks like a bug, that was for SubBinary handling I think size of sub+offset of sub
+            size: len * 8 + offset + binary.bitsize, // + offset so that we get correct remaining()
         }
     }
 }

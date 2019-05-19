@@ -447,9 +447,9 @@ pub fn iolist_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
 pub fn binary_to_term_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // TODO: needs to yield mid parsing...
     if let Some(string) = args[0].to_bytes() {
-        match crate::etf::decode(string, &process.context_mut().heap) {
-            Ok((_, term)) => return Ok(term),
-            Err(error) => panic!("binary_to_term error: {:?}", error),
+        match Ok(crate::etf::decode(string, &process.context_mut().heap)) {
+            Ok(term) => return Ok(term),
+            Err::<_, std::io::Error>(error) => panic!("binary_to_term error: {:?}", error),
         };
     }
     Err(Exception::new(Reason::EXC_BADARG))

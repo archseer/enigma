@@ -179,7 +179,7 @@ impl<'a> Loader<'a> {
     fn load_attributes(&mut self, chunk: Chunk) {
         // Contains two parts: a proplist of module attributes, encoded as External Term Format,
         // and a compiler info (options and version) encoded similarly.
-        let (_rest, _val) = etf::decode(chunk, &self.literal_heap).unwrap();
+        let _val = etf::decode(chunk, &self.literal_heap);
     }
 
     fn load_local_fun_table(&mut self, chunk: Chunk) {
@@ -488,7 +488,7 @@ fn decode_literals<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Vec<Ter
         _count: be_u32
             >> literals:
                 many0!(complete!(do_parse!(
-                    _size: be_u32 >> literal: call!(etf::decode, heap) >> (literal)
+                    size: be_u32 >> literal: take!(size) >> (etf::decode(literal, heap))
                 )))
             >> (literals)
     )

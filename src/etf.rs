@@ -15,6 +15,9 @@ enum Tag {
     NewFloat = 70,
     BitBinary = 77,
     AtomCacheRef_ = 82,
+    NewPid = 88,
+    NewPort = 89,
+    NewerReferenceExt = 90,
     SmallInteger = 97,
     Integer = 98,
     Float = 99,
@@ -40,11 +43,31 @@ enum Tag {
     SmallAtomU8 = 119,
 }
 
-pub fn decode<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
+pub fn decode<'a>(bytes: &'a [u8], heap: &Heap) -> Term {
     // starts with  be_u8 that's 131
-    let (rest, ver) = be_u8(rest)?;
+    let (rest, ver) = be_u8(bytes).unwrap();
     assert_eq!(ver, 131, "Expected ETF version number to be 131!");
-    decode_value(rest, heap)
+
+    if rest[0] == 80 {
+        use libflate::zlib;
+        use std::io::Read;
+        let (rest, _) = be_u8(rest).unwrap();
+        let (rest, size) = be_u32(rest).unwrap();
+
+        let mut data = Vec::with_capacity(size as usize);
+
+        // let iocursor = std::io::Cursor::new(rest);
+        zlib::Decoder::new(rest)
+            .unwrap()
+            .read_to_end(&mut data)
+            .unwrap();
+
+        let (_, term) = decode_value(&data, heap).unwrap();
+        term
+    } else {
+        let (_, term) = decode_value(rest, heap).unwrap();
+        term
+    }
 }
 
 pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {

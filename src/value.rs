@@ -12,7 +12,7 @@ use crate::nanbox::TypedNanBox;
 use crate::process;
 use crate::servo_arc::Arc;
 use allocator_api::Layout;
-use num_bigint::BigInt;
+pub use num_bigint::BigInt;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
@@ -823,7 +823,8 @@ impl Term {
                 }
 
                 let offset = value.offset; // byte_offset!
-                Some(&value.original.data[offset..value.size + 1])
+                                           // TODO: handle bitstring
+                Some(&value.original.data[offset..offset + value.size])
             }
             _ => None,
         }
@@ -846,7 +847,7 @@ impl Term {
                 }
 
                 let offset = value.offset;
-                std::str::from_utf8(&value.original.data[offset..value.size + 1]).ok()
+                std::str::from_utf8(&value.original.data[offset..offset + value.size]).ok()
             }
             _ => None,
         }
@@ -1064,7 +1065,6 @@ impl Ord for Variant {
                             let m2 = &*(*p2 as *const Boxed<Map>);
                             m1.value.0.cmp(&m2.value.0)
                         }
-                        BOXED_MAP => unimplemented!(),
                         BOXED_CLOSURE => unreachable!(),
                         // TODO: handle other boxed types
                         // ref, bigint, cp, catch, stacktrace, binary, subbinary

@@ -9,7 +9,7 @@ use crate::persistent_term;
 use crate::port;
 use crate::process::{self, RcProcess};
 use crate::regex;
-use crate::value::{self, Cons, Term, TryFrom, TryInto, Tuple, Variant};
+use crate::value::{self, BigInt, Cons, Term, TryFrom, TryInto, Tuple, Variant};
 use crate::vm;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
