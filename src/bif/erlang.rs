@@ -455,6 +455,26 @@ pub fn binary_to_term_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
+pub fn binary_to_atom_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    match args[1].into_variant() {
+        Variant::Atom(atom::LATIN1) => (),
+        Variant::Atom(atom::UNICODE) => (),
+        Variant::Atom(atom::UTF8) => (),
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    if let Some(bytes) = args[0].to_bytes() {
+        return match std::str::from_utf8(bytes) {
+            Ok(string) => {
+                let atom = atom::from_str(string);
+                Ok(Term::atom(atom))
+            }
+            Err(_) => Err(Exception::new(Reason::EXC_BADARG)),
+        };
+    }
+    Err(Exception::new(Reason::EXC_BADARG))
+}
+
 pub fn atom_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     match args[0].into_variant() {
         Variant::Atom(i) => {

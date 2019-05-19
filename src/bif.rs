@@ -145,6 +145,7 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "tuple_to_list", 1 => erlang::tuple_to_list_1,
             "binary_to_list", 1 => erlang::binary_to_list_1,
             "binary_to_term", 1 => erlang::binary_to_term_1,
+            "binary_to_atom", 2 => erlang::binary_to_atom_2,
             "list_to_atom", 1 => erlang::list_to_atom_1,
             "list_to_binary", 1 => erlang::list_to_binary_1,
             "iolist_to_binary", 1 => erlang::iolist_to_binary_1,
