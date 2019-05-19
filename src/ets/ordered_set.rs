@@ -70,10 +70,13 @@ impl Table for OrderedSet {
     fn get(&self, process: &RcProcess, key: Term) -> Result<Term> {
         let heap = &process.context_mut().heap;
 
-        match self.hashmap.read().get(&key) {
-            Some(val) => Ok(val.deep_clone(heap)),
-            None => Ok(Term::nil()),
-        }
+        Ok(self
+            .hashmap
+            .read()
+            .get(&key)
+            // TODO: bag types
+            .map(|v| cons!(heap, v.deep_clone(heap), Term::nil()))
+            .unwrap_or_else(Term::nil))
     }
 
     fn get_element(&self, process: &RcProcess, key: Term, index: usize) -> Result<Term> {
@@ -99,8 +102,8 @@ impl Table for OrderedSet {
     }
 
     // erase  (remove_entry in rust)
-    fn remove(&self, _key: Term) -> Result<Term> {
-        unimplemented!()
+    fn remove(&self, key: Term) -> Result<Term> {
+        Ok(Term::boolean(self.hashmap.write().remove(&key).is_some()))
     }
 
     fn remove_object(&mut self, _object: Term) -> Result<Term> {
