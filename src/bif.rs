@@ -3,7 +3,6 @@ use crate::bif;
 use crate::bitstring;
 use crate::ets;
 use crate::exception::{Exception, Reason, StackTrace};
-use crate::loader;
 use crate::module;
 use crate::persistent_term;
 use crate::port;
@@ -64,6 +63,7 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
     bif_map![
         "erlang" => {
             "abs", 1 => arith::abs_1,
+            "round", 1 => arith::round_1,
             "date", 0 => chrono::date_0,
             "localtime", 0 => chrono::localtime_0,
             "monotonic_time", 0 => chrono::monotonic_time_0,
@@ -111,6 +111,7 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "trunc", 1 => bif_erlang_trunc_1,
             "tuple_size", 1 => bif_erlang_tuple_size_1,
             "byte_size", 1 => bif_erlang_byte_size_1,
+            "bit_size", 1 => bif_erlang_bit_size_1,
             "map_size", 1 => bif_erlang_map_size_1,
             "iolist_size", 1 => erlang::iolist_size_1,
             "length", 1 => bif_erlang_length_1,
@@ -881,6 +882,29 @@ fn bif_erlang_byte_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
                 size += 1;
             }
             size
+        }
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    Ok(Term::uint64(heap, size as u64))
+}
+
+fn bif_erlang_bit_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+    let heap = &process.context_mut().heap;
+
+    // TODO: extracted from binary_size macro, share impl!
+    let size = match args[0].get_boxed_header() {
+        Ok(value::BOXED_BINARY) => {
+            args[0]
+                .get_boxed_value::<bitstring::RcBinary>()
+                .unwrap()
+                .data
+                .len()
+                * 8
+        }
+        Ok(value::BOXED_SUBBINARY) => {
+            // TODO use ok_or to cast to some, then use ?
+            let sub = args[0].get_boxed_value::<bitstring::SubBinary>().unwrap();
+            sub.size * 8 + sub.bitsize
         }
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };

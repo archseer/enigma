@@ -11,6 +11,16 @@ use num_traits::Signed;
 use statrs;
 use std::ops::{Add, Mul, Sub};
 
+pub fn round_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let heap = &process.context_mut().heap;
+    match &args[0].into_number() {
+        Ok(value::Num::Integer(..)) => Ok(args[0]),
+        Ok(value::Num::Float(f)) => Ok(Term::int64(heap, f.round() as i64)),
+        Ok(value::Num::Bignum(..)) => Ok(args[0]),
+        _ => Err(Exception::new(Reason::EXC_BADARG)),
+    }
+}
+
 pub fn abs_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
     match &args[0].into_number() {
