@@ -313,6 +313,7 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "port_control", 3 => port_control_3,
             "spawn_system_process", 3 => bif_erlang_spawn_3, // TODO: aliased to normal spawn for now
             "map_next", 3 => erts_internal_map_next_3,
+            "time_unit", 0 =>  erts_internal_time_unit_0,
         },
         "unicode" => {
             "characters_to_binary", 2 => erlang::unicode_characters_to_binary_2,
@@ -1316,6 +1317,12 @@ fn erts_internal_map_next_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term
         .iter()
         .fold(atom!(NONE), |acc, (key, val)| tup3!(heap, *key, *val, acc));
     Ok(res)
+}
+
+fn erts_internal_time_unit_0(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+    let heap = &process.context_mut().heap;
+    let unit: u64 = 1000 * 1000 * 1000;
+    Ok(Term::uint64(heap, unit))
 }
 
 // FIXME: phash and phash2 are the same, and they don't match the ERTS ones. And they return 64 bit

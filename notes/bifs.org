@@ -134,7 +134,7 @@
 - [ ] bif erts_internal:map_to_tuple_keys/1
 - [ ] bif erts_internal:term_type/1
 - [ ] bif erts_internal:map_hashmap_children/1
-- [ ] bif erts_internal:time_unit/0
+- [X] bif erts_internal:time_unit/0
 - [ ] bif erts_internal:perf_counter_unit/0
 - [ ] bif erts_internal:is_system_process/1
 - [ ] bif erts_internal:system_check/1

@@ -46,26 +46,21 @@ pub fn localtime_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bi
 // now_0 is deprecated
 
 pub fn monotonic_time_0(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
-    // TODO: needs https://github.com/rust-lang/rust/issues/50202
-    // .as_nanos()
-
     let heap = &process.context_mut().heap;
 
     Ok(Term::bigint(
         heap,
-        vm.elapsed_time().as_secs().to_bigint().unwrap(),
+        vm.elapsed_time().as_nanos().to_bigint().unwrap(),
     ))
 }
 
 // TODO monotonic_time_1
 pub fn monotonic_time_1(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
-    // TODO: needs https://github.com/rust-lang/rust/issues/50202
-    // .as_nanos()
     let heap = &process.context_mut().heap;
 
     Ok(Term::bigint(
         heap,
-        vm.elapsed_time().as_secs().to_bigint().unwrap(),
+        vm.elapsed_time().as_nanos().to_bigint().unwrap(),
     ))
 }
 
