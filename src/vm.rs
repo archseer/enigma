@@ -1609,7 +1609,7 @@ impl Machine {
                             //     FCALLS -= erts_garbage_collect_nobump(c_p, 3, reg+2, 1, FCALLS);
                             // }
                             context.x[0] =
-                                tup2!(&context.heap, Term::atom(atom::EXIT), context.x[2]);
+                                tup2!(&context.heap, Term::atom(atom::EXIT_U), context.x[2]);
                         }
                     }
                 }
