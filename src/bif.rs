@@ -1221,7 +1221,7 @@ pub fn bif_erlang_trunc_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
     let heap = &process.context_mut().heap;
     match &args[0].into_number() {
         Ok(value::Num::Integer(i)) => Ok(Term::int(*i)),
-        Ok(value::Num::Float(f)) => Ok(Term::from(f.trunc())),
+        Ok(value::Num::Float(f)) => Ok(Term::int64(heap, f.trunc() as i64)),
         Ok(value::Num::Bignum(v)) => Ok(Term::bigint(heap, v.clone())),
         Err(_) => Err(Exception::new(Reason::EXC_BADARG)),
     }
