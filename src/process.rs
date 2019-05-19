@@ -80,7 +80,6 @@ pub struct ExecutionContext {
 
 impl ExecutionContext {
     #[inline]
-    // TODO: expand_arg should return by value
     pub fn expand_arg(&self, arg: &LValue) -> Term {
         match arg {
             // TODO: optimize away into a reference somehow at load time

@@ -95,11 +95,11 @@ impl Module {
         for (name, arity, fun) in nifs {
             // find func_info
             if let Some(i) = self.instructions.iter().position(|ins| {
-                let lname = LValue::Atom(*name);
-                let larity = LValue::Literal(*arity);
+                // let lname = LValue::Atom(*name);
+                // let larity = LValue::Literal(*arity);
                 ins.op == crate::opcodes::Opcode::FuncInfo
-                    && ins.args[1] == lname
-                    && ins.args[2] == larity
+                    && ins.args[1].to_u32() == *name
+                    && ins.args[2].to_u32() == *arity
             }) {
                 let mfa = MFA(self.name, *name, *arity);
                 exports.insert(mfa, crate::exports_table::Export::Bif(*fun));

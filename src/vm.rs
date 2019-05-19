@@ -268,8 +268,7 @@ macro_rules! op_call_ext {
                 op_apply!($vm, $context, $process, $return);
             }
             Some(Export::Bif(bif)) => {
-                // TODO: precompute which exports are bifs
-                // also precompute the bif lookup
+                // TODO: precompute which exports are bifs to avoid exports table reads
                 // call_ext_only Ar=u Bif=u$is_bif => \
                 // allocate u Ar | call_bif Bif | deallocate_return u
 
@@ -1058,7 +1057,7 @@ impl Machine {
                         op_jump!(context, *i);
 
                         // let (mfa, _) = context.ip.lookup_func_info().unwrap();
-                        // println!("pid={} action=call mfa={}", process.pid, mfa);
+                        // info!("pid={} action=call mfa={}", process.pid, mfa);
                     } else {
                         unreachable!()
                     }
@@ -1075,7 +1074,7 @@ impl Machine {
                         op_jump!(context, *i);
 
                         // let (mfa, _) = context.ip.lookup_func_info().unwrap();
-                        // println!("pid={} action=call_last mfa={}", process.pid, mfa);
+                        // info!("pid={} action=call_last mfa={}", process.pid, mfa);
                     } else {
                         unreachable!()
                     }
@@ -1089,7 +1088,7 @@ impl Machine {
                         op_jump!(context, *l);
 
                         // let (mfa, _) = context.ip.lookup_func_info().unwrap();
-                        // println!("pid={} action=call_only mfa={}", process.pid, mfa);
+                        // info!("pid={} action=call_only mfa={}", process.pid, mfa);
                     } else {
                         unreachable!()
                     }
@@ -1131,10 +1130,8 @@ impl Machine {
                 }
                 Opcode::Bif0 => {
                     // literal import, x reg
-                    if let [LValue::Literal(dest), reg] = &ins.args[..] {
-                        // TODO: precompute these lookups
-                        let mfa = &module.imports[*dest as usize];
-                        let val = bif::apply(self, &process, mfa, &[]).unwrap(); // bif0 can't fail
+                    if let [LValue::Bif(bif), reg] = &ins.args[..] {
+                        let val = bif(self, &process, &[]).unwrap(); // bif0 can't fail
                         set_register!(context, reg, val);
                     } else {
                         unreachable!()
@@ -1142,11 +1139,9 @@ impl Machine {
                 }
                 Opcode::Bif1 => {
                     // literal import, arg, x reg
-                    if let [fail, LValue::Literal(dest), arg1, reg] = &ins.args[..] {
+                    if let [fail, LValue::Bif(bif), arg1, reg] = &ins.args[..] {
                         let args = &[context.expand_arg(arg1)];
-                        // TODO: precompute these lookups
-                        let mfa = &module.imports[*dest as usize];
-                        match bif::apply(self, &process, mfa, args) {
+                        match bif(self, &process, args) {
                             Ok(val) => set_register!(context, reg, val),
                             Err(exc) => cond_fail!(context, fail, exc),
                         }
@@ -1156,11 +1151,9 @@ impl Machine {
                 }
                 Opcode::Bif2 => {
                     // literal import, arg, arg, x reg
-                    if let [fail, LValue::Literal(dest), arg1, arg2, reg] = &ins.args[..] {
+                    if let [fail, LValue::Bif(bif), arg1, arg2, reg] = &ins.args[..] {
                         let args = &[context.expand_arg(arg1), context.expand_arg(arg2)];
-                        // TODO: precompute these lookups
-                        let mfa = &module.imports[*dest as usize];
-                        match bif::apply(self, &process, mfa, args) {
+                        match bif(self, &process, args) {
                             Ok(val) => set_register!(context, reg, val),
                             Err(exc) => cond_fail!(context, fail, exc),
                         }
@@ -1371,17 +1364,11 @@ impl Machine {
                     // arg, fail, dests
                     // loop over dests
                     if let [arg, LValue::Label(fail), LValue::ExtendedList(vec)] = &ins.args[..] {
-                        let arg = match context.expand_arg(arg).into_lvalue() {
-                            Some(val) => val,
-                            None => {
-                                op_jump!(context, *fail);
-                                continue;
-                            }
-                        };
+                        let arg = context.expand_arg(arg).into_variant();
                         let mut i = 0;
                         loop {
                             // if key matches, jump to the following label
-                            if vec[i] == arg {
+                            if vec[i].into_value() == arg {
                                 let label = vec[i + 1].to_u32();
                                 op_jump!(context, label);
                                 break;
@@ -1401,14 +1388,16 @@ impl Machine {
                     // tuple fail dests
                     if let [arg, LValue::Label(fail), LValue::ExtendedList(vec)] = &ins.args[..] {
                         if let Ok(tup) = Tuple::try_from(&context.expand_arg(arg)) {
-                            let len = LValue::Literal(tup.len);
+                            let len = tup.len;
                             let mut i = 0;
                             loop {
                                 // if key matches, jump to the following label
-                                if vec[i] == len {
-                                    let label = vec[i + 1].to_u32();
-                                    op_jump!(context, label);
-                                    break;
+                                if let LValue::Literal(n) = vec[i] {
+                                    if n == len {
+                                        let label = vec[i + 1].to_u32();
+                                        op_jump!(context, label);
+                                        break;
+                                    }
                                 }
 
                                 i += 2;
@@ -1659,11 +1648,10 @@ impl Machine {
                 }
                 Opcode::GcBif1 => {
                     // fail label, live, bif, arg1, dest
-                    if let LValue::Literal(i) = &ins.args[2] {
+                    if let LValue::Bif(bif) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
                         let args = &[context.expand_arg(&ins.args[3])];
-                        let mfa = &module.imports[*i as usize];
-                        match bif::apply(self, &process, mfa, args) {
+                        match bif(self, &process, args) {
                             Ok(val) => set_register!(context, &ins.args[4], val),
                             Err(exc) => cond_fail!(context, ins.args[0], exc),
                         }
@@ -2485,15 +2473,14 @@ impl Machine {
                 }
                 Opcode::GcBif2 => {
                     // fail label, live, bif, arg1, arg2, dest
-                    if let LValue::Literal(i) = &ins.args[2] {
+                    if let LValue::Bif(bif) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
                         let args = &[
                             context.expand_arg(&ins.args[3]),
                             context.expand_arg(&ins.args[4]),
                         ];
-                        let mfa = &module.imports[*i as usize];
 
-                        match bif::apply(self, &process, mfa, args) {
+                        match bif(self, &process, args) {
                             Ok(val) => set_register!(context, &ins.args[5], val),
                             Err(exc) => cond_fail!(context, ins.args[0], exc),
                         }
@@ -2503,16 +2490,15 @@ impl Machine {
                 }
                 Opcode::GcBif3 => {
                     // fail label, live, bif, arg1, arg2, arg3, dest
-                    if let LValue::Literal(i) = &ins.args[2] {
+                    if let LValue::Bif(bif) = &ins.args[2] {
                         // TODO: GcBif needs to handle GC as necessary
                         let args = &[
                             context.expand_arg(&ins.args[3]),
                             context.expand_arg(&ins.args[4]),
                             context.expand_arg(&ins.args[5]),
                         ];
-                        let mfa = &module.imports[*i as usize];
 
-                        match bif::apply(self, &process, mfa, args) {
+                        match bif(self, &process, args) {
                             Ok(val) => set_register!(context, &ins.args[6], val),
                             Err(exc) => cond_fail!(context, ins.args[0], exc),
                         }

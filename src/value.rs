@@ -652,6 +652,7 @@ impl Term {
     }
 
     /// A method that's optimized for retrieving number types.
+    #[inline]
     pub fn into_number(self) -> Result<Num, ()> {
         match self.into_variant() {
             Variant::Integer(i) => Ok(Num::Integer(i)),
@@ -670,7 +671,6 @@ impl Term {
     }
 
     // TODO: ExtendedList should instead become a Term vec
-    // TODO: might be atoms only??
     pub fn into_lvalue(self) -> Option<loader::LValue> {
         match self.into_variant() {
             Variant::Integer(i) => Some(loader::LValue::Integer(i)),

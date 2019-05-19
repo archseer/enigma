@@ -49,7 +49,7 @@ pub struct Loader<'a> {
 /// Compact term encoding values. BEAM does some tricks to be able to share the memory layout with
 /// regular values, but for the most part we don't need this (it also doesn't fit nanboxed values
 /// well).
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Clone)]
 pub enum LValue {
     // TODO: these dupe LTerm values
     Atom(u32),
@@ -58,6 +58,7 @@ pub enum LValue {
     Nil,
     Binary(Arc<bitstring::Binary>),
     Str(Vec<u8>), // TODO this is so avoid constructing a full binary
+    Bif(crate::bif::Fn),
     BigInt(BigInt),
     //
     Literal(u32),
@@ -70,6 +71,18 @@ pub enum LValue {
     ExtendedLiteral(u32), // TODO; replace at load time
 }
 
+// LValue as { X(), Y(), Literal(), Constant(integer | atom | nil term)
+
+impl std::fmt::Debug for LValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            LValue::Integer(i) => write!(f, "int({})", i),
+            LValue::Atom(i) => write!(f, "atom({})", i),
+            _ => write!(f, "lvalue<>"),
+        }
+    }
+}
+
 impl LValue {
     pub fn to_u32(&self) -> u32 {
         match *self {
@@ -78,6 +91,22 @@ impl LValue {
             LValue::Label(i) => i,
             LValue::Integer(i) => i as u32,
             _ => unimplemented!("to_u32 for {:?}", self),
+        }
+    }
+
+    pub fn from_lit(&self) -> u32 {
+        match *self {
+            LValue::Literal(i) => i,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn into_value(&self) -> crate::value::Variant {
+        match *self {
+            LValue::Integer(i) => crate::value::Variant::Integer(i),
+            LValue::Atom(i) => crate::value::Variant::Atom(i),
+            LValue::Nil => crate::value::Variant::Nil(crate::value::Special::Nil),
+            _ => unimplemented!("into_value for {:?}", self),
         }
     }
 }
@@ -430,6 +459,67 @@ impl<'a> Loader<'a> {
                 Opcode::Put => {
                     // put should always have been caught by the put_tuple case and translated to put_tuple2
                     unreachable!()
+                }
+                // postprocess Bif0, Bif1, Bif2, GcBif1, GcBif2, GcBif3 to contain Fn ptrs
+                Opcode::Bif0 => {
+                    let dest = instruction.args[0].from_lit();
+                    let mfa = &self.imports[dest as usize];
+                    let fun = match crate::bif::BIFS.get(mfa) {
+                        Some(fun) => fun,
+                        None => unimplemented!("BIF {} not implemented", mfa),
+                    };
+                    instruction.args[0] = LValue::Bif(*fun);
+                    instruction
+                }
+                Opcode::Bif1 => {
+                    let dest = instruction.args[1].from_lit();
+                    let mfa = &self.imports[dest as usize];
+                    let fun = match crate::bif::BIFS.get(mfa) {
+                        Some(fun) => fun,
+                        None => unimplemented!("BIF {} not implemented", mfa),
+                    };
+                    instruction.args[1] = LValue::Bif(*fun);
+                    instruction
+                }
+                Opcode::Bif2 => {
+                    let dest = instruction.args[1].from_lit();
+                    let mfa = &self.imports[dest as usize];
+                    let fun = match crate::bif::BIFS.get(mfa) {
+                        Some(fun) => fun,
+                        None => unimplemented!("BIF {} not implemented", mfa),
+                    };
+                    instruction.args[1] = LValue::Bif(*fun);
+                    instruction
+                }
+                Opcode::GcBif1 => {
+                    let dest = instruction.args[2].from_lit();
+                    let mfa = &self.imports[dest as usize];
+                    let fun = match crate::bif::BIFS.get(mfa) {
+                        Some(fun) => fun,
+                        None => unimplemented!("BIF {} not implemented", mfa),
+                    };
+                    instruction.args[2] = LValue::Bif(*fun);
+                    instruction
+                }
+                Opcode::GcBif2 => {
+                    let dest = instruction.args[2].from_lit();
+                    let mfa = &self.imports[dest as usize];
+                    let fun = match crate::bif::BIFS.get(mfa) {
+                        Some(fun) => fun,
+                        None => unimplemented!("BIF {} not implemented", mfa),
+                    };
+                    instruction.args[2] = LValue::Bif(*fun);
+                    instruction
+                }
+                Opcode::GcBif3 => {
+                    let dest = instruction.args[2].from_lit();
+                    let mfa = &self.imports[dest as usize];
+                    let fun = match crate::bif::BIFS.get(mfa) {
+                        Some(fun) => fun,
+                        None => unimplemented!("BIF {} not implemented", mfa),
+                    };
+                    instruction.args[2] = LValue::Bif(*fun);
+                    instruction
                 }
                 _ => instruction,
             };
