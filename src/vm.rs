@@ -1722,15 +1722,24 @@ impl Machine {
                     // gen_put_integer(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
                     // [Label(0), Integer(8), Literal(1), Literal(0), Y(0)]'
                     // Size can be atom all
-                    if let [_fail, LValue::Integer(size), LValue::Literal(unit), _flags, src] = &ins.args[..] {
+                    if let [_fail, size, LValue::Literal(unit), _flags, src] = &ins.args[..] {
                         // TODO: fail label
-                        let size = *size as u32 * *unit;
+                        let size = match context.expand_arg(size).into_variant() {
+                            Variant::Integer(i) => i as usize,
+                            // LValue::Literal(i) => i as usize, // TODO: unsure if correct
+                            Variant::Atom(atom::START) => 0,
+                            _ => unreachable!("{:?}", ins.args[1]),
+                        };
 
-                        if size != 8 {
-                            unimplemented!("bs_put_integer size * unit != 8");
+                        let size = size * (*unit as usize);
+
+                        // ins: Instruction { op: BsPutInteger, args: [Label(0), Integer(1024), Literal(1), Literal(0), Integer(0)] }
+                        println!("put_integer src is {}", context.expand_arg(src));
+                        if size != 8 { // 1024, unit 1
+                            println!("ins: {:?}", ins);
+                            unimplemented!("bs_put_integer size * unit != 8, actual: {} from unit {}", size, unit);
                             //fail!(context, fail);
                         }
-                        println!("src is {}", context.expand_arg(src));
 
                         unsafe {
                             (*context.bs).put_integer(size as usize, context.expand_arg(src));
@@ -1748,8 +1757,8 @@ impl Machine {
                         }
 
                         if let Ok(value) = bitstring::RcBinary::try_from(&context.expand_arg(src)) {
-                            match size {
-                                LValue::Atom(atom::ALL) => unsafe {
+                            match context.expand_arg(size).into_variant() {
+                                Variant::Atom(atom::ALL) => unsafe {
                                     (*context.bs).put_binary(&value);
                                 },
                                 _ => unimplemented!("bs_put_binary size {:?}", size),
@@ -1774,8 +1783,8 @@ impl Machine {
                         if let Variant::Float(value::Float(f)) =
                             context.expand_arg(src).into_variant()
                         {
-                            match size {
-                                LValue::Atom(atom::ALL) => unsafe {
+                            match context.expand_arg(size).into_variant() {
+                                Variant::Atom(atom::ALL) => unsafe {
                                     (*context.bs).put_float(f);
                                 },
                                 _ => unimplemented!("bs_put_float size {:?}", size),
@@ -2156,16 +2165,16 @@ impl Machine {
                     }
                 }
                 Opcode::BsSave2 => {
-                    debug_assert_eq!(ins.args.len(), 2);
+                    // debug_assert_eq!(ins.args.len(), 2);
                     // cxt slot
                     if let Ok(ms) = context
                         .expand_arg(&ins.args[0])
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
-                        let slot = match ins.args[1] {
-                            LValue::Integer(i) => i as usize,
-                            LValue::Literal(i) => i as usize, // TODO: unsure if correct
-                            LValue::Atom(atom::START) => 0,
+                        let slot = match context.expand_arg(&ins.args[1]).into_variant() {
+                            Variant::Integer(i) => i as usize,
+                            // LValue::Literal(i) => i as usize, // TODO: unsure if correct
+                            Variant::Atom(atom::START) => 0,
                             _ => unreachable!("{:?}", ins.args[1]),
                         };
                         ms.saved_offsets[slot] = ms.mb.offset;
@@ -2174,16 +2183,16 @@ impl Machine {
                     }
                 }
                 Opcode::BsRestore2 => {
-                    debug_assert_eq!(ins.args.len(), 2);
+                    // debug_assert_eq!(ins.args.len(), 2);
                     // cxt slot
                     if let Ok(ms) = context
                         .expand_arg(&ins.args[0])
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
-                        let slot = match ins.args[1] {
-                            LValue::Integer(i) => i as usize,
-                            LValue::Literal(i) => i as usize,
-                            LValue::Atom(atom::START) => 0,
+                        let slot = match context.expand_arg(&ins.args[1]).into_variant() {
+                            Variant::Integer(i) => i as usize,
+                            // LValue::Literal(i) => i as usize,
+                            Variant::Atom(atom::START) => 0,
                             _ => unreachable!(),
                         };
                         ms.mb.offset = ms.saved_offsets[slot];

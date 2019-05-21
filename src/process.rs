@@ -79,18 +79,19 @@ pub struct ExecutionContext {
 }
 
 impl ExecutionContext {
-    #[inline]
+    #[inline(always)]
     pub fn expand_arg(&self, arg: &LValue) -> Term {
         match arg {
             // TODO: optimize away into a reference somehow at load time
             LValue::ExtendedLiteral(i) => unsafe { (*self.ip.module).literals[*i as usize] },
             LValue::X(i) => self.x[*i as usize],
             LValue::Y(i) => self.stack[self.stack.len() - (*i + 2) as usize],
-            LValue::Integer(i) => Term::int(*i), // TODO: make LValue i32
-            LValue::Atom(i) => Term::atom(*i),
-            LValue::Nil => Term::nil(),
+            LValue::Constant(i) => *i,
+            // LValue::Integer(i) => Term::int(*i),
+            // LValue::Atom(i) => Term::atom(*i),
+            // LValue::Nil => Term::nil(),
             LValue::BigInt(i) => Term::bigint(&self.heap, i.clone()), // TODO: very unperformant, make int term hold up to i48
-            value => unimplemented!("expand unimplemented for {:?}", value),
+            value => unreachable!("expand unimplemented for {:?}", value),
         }
     }
 }
@@ -100,7 +101,7 @@ impl ExecutionContext {
         ExecutionContext {
             x: [Term::nil(); MAX_REG],
             f: [0.0f64; 16],
-            stack: Vec::new(),
+            stack: Vec::with_capacity(32),
             heap: Heap::new(),
             catches: 0,
             ip: InstrPtr { ptr: 0, module },

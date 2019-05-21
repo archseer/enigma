@@ -51,6 +51,8 @@ pub struct Loader<'a> {
 /// well).
 #[derive(Clone)]
 pub enum LValue {
+    /// Atom | Integer | Character | Nil (| Binary | BigInt in the future)
+    Constant(Term),
     // TODO: these dupe LTerm values
     Atom(u32),
     Integer(i32),
@@ -84,16 +86,19 @@ impl std::fmt::Debug for LValue {
 }
 
 impl LValue {
+    #[inline]
     pub fn to_u32(&self) -> u32 {
         match *self {
             LValue::Literal(i) => i,
             LValue::Atom(i) => i,
             LValue::Label(i) => i,
             LValue::Integer(i) => i as u32,
+            LValue::Constant(i) => i.to_u32(),
             _ => unimplemented!("to_u32 for {:?}", self),
         }
     }
 
+    #[inline]
     pub fn from_lit(&self) -> u32 {
         match *self {
             LValue::Literal(i) => i,
@@ -101,12 +106,20 @@ impl LValue {
         }
     }
 
+    pub fn into_term(&self) -> crate::value::Term {
+        match *self {
+            LValue::Constant(t) => t,
+            _ => unreachable!("into_term for {:?}", self),
+        }
+    }
+
     pub fn into_value(&self) -> crate::value::Variant {
         match *self {
+            LValue::Constant(t) => t.into_variant(),
             LValue::Integer(i) => crate::value::Variant::Integer(i),
             LValue::Atom(i) => crate::value::Variant::Atom(i),
             LValue::Nil => crate::value::Variant::Nil(crate::value::Special::Nil),
-            _ => unimplemented!("into_value for {:?}", self),
+            _ => unreachable!("into_value for {:?}", self),
         }
     }
 }
@@ -534,10 +547,11 @@ impl<'a> Loader<'a> {
             match arg {
                 LValue::Atom(i) => {
                     if *i == 0 {
-                        return LValue::Nil;
+                        return LValue::Constant(Term::nil());
                     }
-                    LValue::Atom(atom_map[&(*i - 1)])
+                    LValue::Constant(Term::atom(atom_map[&(*i - 1)]))
                 }
+                LValue::Integer(i) => LValue::Constant(Term::int(*i)),
                 LValue::Label(l) => {
                     if *l == 0 {
                         return LValue::Label(0);
@@ -837,8 +851,8 @@ fn compact_term(i: &[u8]) -> IResult<&[u8], LValue> {
         if let LValue::Integer(val) = val {
             return match tag {
                 0 => Ok((rest, LValue::Literal(val as u32))),
-                1 => Ok((rest, LValue::Integer(val))), // TODO: this cast is unsafe
-                2 => Ok((rest, LValue::Atom(val as u32))),
+                1 => Ok((rest, LValue::Integer(val))),
+                2 => Ok((rest, LValue::Atom(val as u32))), // remapped into const at postprocess
                 3 => Ok((rest, LValue::X(val as u32))),
                 4 => Ok((rest, LValue::Y(val as u32))),
                 5 => Ok((rest, LValue::Label(val as u32))),
