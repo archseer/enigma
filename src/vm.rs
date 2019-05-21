@@ -119,21 +119,6 @@ impl Machine {
     }
 }
 
-macro_rules! set_register {
-    ($context:expr, $register:expr, $value:expr) => {{
-        match $register {
-            &LValue::X(reg) => {
-                $context.x[reg as usize] = $value;
-            }
-            &LValue::Y(reg) => {
-                let len = $context.stack.len();
-                $context.stack[(len - (reg + 2) as usize)] = $value;
-            }
-            _reg => unimplemented!("set_reg"),
-        }
-    }};
-}
-
 macro_rules! expand_float {
     ($context:expr, $value:expr) => {{
         match &$value {
@@ -253,7 +238,7 @@ macro_rules! op_call_ext {
     ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr, $return: expr) => {{
         let mfa = unsafe { &(*$context.ip.module).imports[*$dest as usize] };
 
-        // println!("pid={} action=call_ext mfa={}", $process.pid, mfa);
+        // info!("pid={} action=call_ext mfa={}", $process.pid, mfa);
 
         let export = { $vm.exports.read().lookup(mfa) }; // drop the exports lock
 
@@ -272,19 +257,7 @@ macro_rules! op_call_ext {
                 // call_ext_only Ar=u Bif=u$is_bif => \
                 // allocate u Ar | call_bif Bif | deallocate_return u
 
-                // make a slice out of arity x registers
-                let args = &$context.x[0..*$arity as usize];
-                match bif($vm, $process, args) {
-                    // TODO: should use call_bif?
-                    Ok(val) => {
-                        set_register!($context, &LValue::X(0), val); // HAXX
-                        if $return {
-                            // TODO: figure out returns
-                            op_return!($process, $context);
-                        }
-                    }
-                    Err(exc) => return Err(exc),
-                }
+                op_call_bif!($vm, $context, $process, bif, *$arity as usize, $return)
             }
             None => {
                 // call error_handler here
@@ -305,7 +278,7 @@ macro_rules! op_call_bif {
         let args = &$context.x[0..$arity];
         match $bif($vm, $process, args) {
             Ok(val) => {
-                set_register!($context, &LValue::X(0), val); // HAXX
+                $context.set_register(&LValue::X(0), val); // HAXX
                 if $return {
                     // TODO: figure out returns
                     op_return!($process, $context);
@@ -549,6 +522,7 @@ macro_rules! op_fixed_apply {
         // Handle apply of apply/3...
         if module.to_u32() == atom::ERLANG && func.to_u32() == atom::APPLY && $arity == 3 {
             op_apply!($vm, $context, $process, $return);
+            continue;
         }
 
         /*
@@ -589,7 +563,7 @@ macro_rules! op_fixed_apply {
 
 macro_rules! op_is_type {
     ($context:expr, $args:expr, $op:ident) => {{
-        debug_assert_eq!($args.len(), 2);
+        // debug_assert_eq!($args.len(), 2);
 
         let val = $context.expand_arg(&$args[1]);
 
@@ -610,7 +584,7 @@ macro_rules! to_expr {
 
 macro_rules! op_float {
     ($context:expr, $args:expr, $op:tt) => {{
-        debug_assert_eq!($args.len(), 4);
+        // debug_assert_eq!($args.len(), 4);
 
         // TODO: I think this fail is always unused
         if let [_fail, LValue::FloatReg(a), LValue::FloatReg(b), LValue::FloatReg(dest)] = $args {
@@ -867,7 +841,7 @@ impl Machine {
     ) -> impl std::future::Future<Output = Result<process::State, Exception>> + Captures<'a> + Captures<'b> + 'c {
         async move {  // workaround for https://github.com/rust-lang/rust/issues/56238
         let context = process.context_mut();
-        context.reds = 1000; // self.config.reductions;
+        context.reds = 2000; // self.config.reductions;
 
         // process the incoming signal queue
         process.process_incoming()?;
@@ -901,6 +875,17 @@ impl Machine {
                     //     ins.args[2]
                     // );
                     return Err(Exception::new(Reason::EXC_FUNCTION_CLAUSE));
+                }
+                Opcode::Jump => {
+                    // debug_assert_eq!(ins.args.len(), 1);
+                    let label = ins.args[0].to_u32();
+                    op_jump!(context, label)
+                }
+                Opcode::Move => {
+                    // debug_assert_eq!(ins.args.len(), 2);
+                    // arg1 can be either a value or a register
+                    let val = context.expand_arg(&ins.args[0]);
+                    context.set_register(&ins.args[1], val)
                 }
                 Opcode::Return => {
                     op_return!(process, context);
@@ -943,7 +928,7 @@ impl Machine {
                 Opcode::LoopRecEnd => {
                     // label
                     // Advance the save pointer to the next message and jump back to Label.
-                    debug_assert_eq!(ins.args.len(), 1);
+                    // debug_assert_eq!(ins.args.len(), 1);
 
                     process.local_data_mut().mailbox.advance();
 
@@ -953,7 +938,7 @@ impl Machine {
                 Opcode::Wait => {
                     // label
                     // jump to label, set wait flag on process
-                    debug_assert_eq!(ins.args.len(), 1);
+                    // debug_assert_eq!(ins.args.len(), 1);
 
                     let label = ins.args[0].to_u32();
                     op_jump!(context, label);
@@ -1132,7 +1117,7 @@ impl Machine {
                     // literal import, x reg
                     if let [LValue::Bif(bif), reg] = &ins.args[..] {
                         let val = bif(self, &process, &[]).unwrap(); // bif0 can't fail
-                        set_register!(context, reg, val);
+                        context.set_register(reg, val);
                     } else {
                         unreachable!()
                     }
@@ -1142,7 +1127,7 @@ impl Machine {
                     if let [fail, LValue::Bif(bif), arg1, reg] = &ins.args[..] {
                         let args = &[context.expand_arg(arg1)];
                         match bif(self, &process, args) {
-                            Ok(val) => set_register!(context, reg, val),
+                            Ok(val) => context.set_register(reg, val),
                             Err(exc) => cond_fail!(context, fail, exc),
                         }
                     } else {
@@ -1154,7 +1139,7 @@ impl Machine {
                     if let [fail, LValue::Bif(bif), arg1, arg2, reg] = &ins.args[..] {
                         let args = &[context.expand_arg(arg1), context.expand_arg(arg2)];
                         match bif(self, &process, args) {
-                            Ok(val) => set_register!(context, reg, val),
+                            Ok(val) => context.set_register(reg, val),
                             Err(exc) => cond_fail!(context, fail, exc),
                         }
                     } else {
@@ -1199,6 +1184,7 @@ impl Machine {
                         context
                             .stack
                             .resize(context.stack.len() + *need as usize, Term::nil());
+                        // TODO: heap allocating CP is expensive, use a catch stack and the CP is a int ptr?
                         context.stack.push(Term::cp(&context.heap, context.cp));
                         context.cp = None;
                     } else {
@@ -1226,8 +1212,8 @@ impl Machine {
                     // println!("TODO: TestHeap unimplemented!");
                 }
                 Opcode::Init => {
-                    debug_assert_eq!(ins.args.len(), 1);
-                    set_register!(context, &ins.args[0], Term::nil())
+                    // debug_assert_eq!(ins.args.len(), 1);
+                    context.set_register(&ins.args[0], Term::nil())
                 }
                 Opcode::Deallocate => {
                     // literal nwords
@@ -1238,7 +1224,7 @@ impl Machine {
                     }
                 }
                 Opcode::IsGe => {
-                    debug_assert_eq!(ins.args.len(), 3);
+                    // debug_assert_eq!(ins.args.len(), 3);
 
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
@@ -1251,7 +1237,7 @@ impl Machine {
                     }
                 }
                 Opcode::IsLt => {
-                    debug_assert_eq!(ins.args.len(), 3);
+                    // debug_assert_eq!(ins.args.len(), 3);
 
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
@@ -1264,7 +1250,7 @@ impl Machine {
                     }
                 }
                 Opcode::IsEq => {
-                    debug_assert_eq!(ins.args.len(), 3);
+                    // debug_assert_eq!(ins.args.len(), 3);
 
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
@@ -1277,7 +1263,7 @@ impl Machine {
                     }
                 }
                 Opcode::IsNe => {
-                    debug_assert_eq!(ins.args.len(), 3);
+                    // debug_assert_eq!(ins.args.len(), 3);
 
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
@@ -1288,7 +1274,7 @@ impl Machine {
                     }
                 }
                 Opcode::IsEqExact => {
-                    debug_assert_eq!(ins.args.len(), 3);
+                    // debug_assert_eq!(ins.args.len(), 3);
 
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
@@ -1301,7 +1287,7 @@ impl Machine {
                     }
                 }
                 Opcode::IsNeExact => {
-                    debug_assert_eq!(ins.args.len(), 3);
+                    // debug_assert_eq!(ins.args.len(), 3);
 
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
@@ -1413,42 +1399,31 @@ impl Machine {
                         }
                     }
                 }
-                Opcode::Jump => {
-                    debug_assert_eq!(ins.args.len(), 1);
-                    let label = ins.args[0].to_u32();
-                    op_jump!(context, label)
-                }
-                Opcode::Move => {
-                    debug_assert_eq!(ins.args.len(), 2);
-                    // arg1 can be either a value or a register
-                    let val = context.expand_arg(&ins.args[0]);
-                    set_register!(context, &ins.args[1], val)
-                }
                 Opcode::GetList => {
-                    debug_assert_eq!(ins.args.len(), 3);
+                    // debug_assert_eq!(ins.args.len(), 3);
                     // source, head, tail
                     if let Ok(value::Cons { head, tail }) =
                         context.expand_arg(&ins.args[0]).try_into()
                     {
-                        set_register!(context, &ins.args[1], *head);
-                        set_register!(context, &ins.args[2], *tail);
+                        context.set_register(&ins.args[1], *head);
+                        context.set_register(&ins.args[2], *tail);
                     } else {
                         panic!("badarg to GetList")
                     }
                 }
                 Opcode::GetTupleElement => {
-                    debug_assert_eq!(ins.args.len(), 3);
+                    // debug_assert_eq!(ins.args.len(), 3);
                     // source, element, dest
                     let source = context.expand_arg(&ins.args[0]);
                     let n = ins.args[1].to_u32() as usize;
                     if let Ok(t) = Tuple::try_from(&source) {
-                        set_register!(context, &ins.args[2], t[n])
+                        context.set_register(&ins.args[2], t[n])
                     } else {
                         panic!("GetTupleElement: source is of wrong type")
                     }
                 }
                 Opcode::SetTupleElement => {
-                    debug_assert_eq!(ins.args.len(), 3);
+                    // debug_assert_eq!(ins.args.len(), 3);
                     // new_el tuple pos
                     let el = context.expand_arg(&ins.args[0]);
                     let tuple = context.expand_arg(&ins.args[1]);
@@ -1461,13 +1436,13 @@ impl Machine {
                     }
                 }
                 Opcode::PutList => {
-                    debug_assert_eq!(ins.args.len(), 3);
+                    // debug_assert_eq!(ins.args.len(), 3);
                     // put_list H T Dst::slot()
                     // Creates a cons cell with [H|T] and places the value into Dst.
                     let head = context.expand_arg(&ins.args[0]);
                     let tail = context.expand_arg(&ins.args[1]);
                     let cons = cons!(&context.heap, head, tail);
-                    set_register!(context, &ins.args[2], cons)
+                    context.set_register(&ins.args[2], cons)
                 }
                 Opcode::PutTuple => {
                     // put_tuple dest size
@@ -1479,7 +1454,7 @@ impl Machine {
                 }
                 Opcode::Put => unreachable!("Stray Put that wasn't rewritten by the loader!"),
                 Opcode::PutTuple2 => {
-                    debug_assert_eq!(ins.args.len(), 2);
+                    // debug_assert_eq!(ins.args.len(), 2);
                     // op: PutTuple2, args: [X(0), ExtendedList([Y(1), Y(0), X(0)])] }
                     if let LValue::ExtendedList(list) = &ins.args[1] {
                         let arity = list.len();
@@ -1490,7 +1465,7 @@ impl Machine {
                                 std::ptr::write(&mut tuple[i], context.expand_arg(&list[i]));
                             }
                         }
-                        set_register!(context, &ins.args[0], Term::from(tuple))
+                        context.set_register(&ins.args[0], Term::from(tuple))
                     }
                 }
                 Opcode::Badmatch => {
@@ -1514,8 +1489,7 @@ impl Machine {
                     // create a catch context that wraps f - fail label, and stores to y - reg.
                     context.catches += 1;
                     let fail = ins.args[1].to_u32();
-                    set_register!(
-                        context,
+                    context.set_register(
                         &ins.args[0],
                         Term::catch(
                             &context.heap,
@@ -1527,17 +1501,17 @@ impl Machine {
                     );
                 }
                 Opcode::TryEnd => {
-                    debug_assert_eq!(ins.args.len(), 1);
+                    // debug_assert_eq!(ins.args.len(), 1);
                     // y
                     context.catches -= 1;
-                    set_register!(context, &ins.args[0], Term::nil()) // TODO: make_blank macro
+                    context.set_register(&ins.args[0], Term::nil()) // TODO: make_blank macro
                 }
                 Opcode::TryCase => {
                     // pops a catch context in y  Erases the label saved in the Arg0 slot. Noval in R0 indicate that something is caught. If so, R0 is set to R1, R1 — to R2, R2 — to R3.
 
                     // TODO: this initial part is identical to TryEnd
                     context.catches -= 1;
-                    set_register!(context, &ins.args[0], Term::nil()); // TODO: make_blank macro
+                    context.set_register(&ins.args[0], Term::nil()); // TODO: make_blank macro
 
                     assert!(context.x[0].is_none());
                     // TODO: c_p->fvalue = NIL;
@@ -1555,8 +1529,7 @@ impl Machine {
                     // create a catch context that wraps f - fail label, and stores to y - reg.
                     context.catches += 1;
                     let fail = ins.args[1].to_u32();
-                    set_register!(
-                        context,
+                    context.set_register(
                         &ins.args[0],
                         Term::catch(
                             &context.heap,
@@ -1568,7 +1541,7 @@ impl Machine {
                     );
                 }
                 Opcode::CatchEnd => {
-                    debug_assert_eq!(ins.args.len(), 1);
+                    // debug_assert_eq!(ins.args.len(), 1);
                     // y
                     // Pops a “catch” context. Erases the label saved in the Arg0 slot. Noval in R0
                     // indicates that something is caught. If R1 contains atom throw then R0 is set
@@ -1581,7 +1554,7 @@ impl Machine {
 
                     // TODO: this initial part is identical to TryEnd
                     context.catches -= 1; // TODO: this is overflowing
-                    set_register!(context, &ins.args[0], Term::nil()); // TODO: make_blank macro
+                    context.set_register(&ins.args[0], Term::nil()); // TODO: make_blank macro
 
                     if context.x[0].is_none() {
                         // c_p->fvalue = NIL;
@@ -1603,7 +1576,7 @@ impl Machine {
                     }
                 }
                 Opcode::Raise => {
-                    debug_assert_eq!(ins.args.len(), 2);
+                    // debug_assert_eq!(ins.args.len(), 2);
                     // Raises the exception. The instruction is garbled by backward compatibility. Arg0 is a stack trace
                     // and Arg1 is the value accompanying the exception. The reason of the raised exception is dug up
                     // from the stack trace
@@ -1652,7 +1625,7 @@ impl Machine {
                         // TODO: GcBif needs to handle GC as necessary
                         let args = &[context.expand_arg(&ins.args[3])];
                         match bif(self, &process, args) {
-                            Ok(val) => set_register!(context, &ins.args[4], val),
+                            Ok(val) => context.set_register(&ins.args[4], val),
                             Err(exc) => cond_fail!(context, ins.args[0], exc),
                         }
                     } else {
@@ -1678,7 +1651,7 @@ impl Machine {
                         let s2 = context.expand_arg(s2).to_u32();
 
                         let res = Term::int(((s1 + s2) * (*unit)) as i32);
-                        set_register!(context, dest, res)
+                        context.set_register(dest, res)
                     } else {
                         unreachable!()
                     }
@@ -1713,7 +1686,7 @@ impl Machine {
                         let term = Term::binary(&context.heap, binary);
                         // TODO ^ ensure this pointer stays valid after heap alloc
                         context.bs = &**term.get_boxed_value::<bitstring::RcBinary>().unwrap() as *const bitstring::Binary as *mut bitstring::Binary;
-                        set_register!(context, dest, term);
+                        context.set_register(dest, term);
                     } else {
                         unreachable!()
                     }
@@ -1807,7 +1780,7 @@ impl Machine {
                     }
                 }
                 Opcode::BsStartMatch2 => {
-                    debug_assert_eq!(ins.args.len(), 5);
+                    // debug_assert_eq!(ins.args.len(), 5);
                     // fail, src, live, slots?, dst
                     // check if src is a match context with space for n slots (matches) else
                     // allocate one. if we can't, jump to fail.
@@ -1858,7 +1831,7 @@ impl Machine {
                                 //     context = make_matchstate(expanded);
                                 //     $REFRESH_GEN_DEST();
                                 // }
-                                set_register!(context, &ins.args[4], cxt);
+                                context.set_register(&ins.args[4], cxt);
                             }
                         }
                         value::BOXED_BINARY | value::BOXED_SUBBINARY => {
@@ -1868,7 +1841,7 @@ impl Machine {
                             let result = bitstring::start_match_2(&context.heap, cxt, slots);
 
                             if let Some(res) = result {
-                                set_register!(context, &ins.args[4], res)
+                                context.set_register(&ins.args[4], res)
                             } else {
                                 fail!(context, ins.args[0]);
                             }
@@ -1879,7 +1852,7 @@ impl Machine {
                     }
                 }
                 Opcode::BsStartMatch3 => {
-                    debug_assert_eq!(ins.args.len(), 4);
+                    // debug_assert_eq!(ins.args.len(), 4);
                     // fail, src, live, dst
 
                     let cxt = context.expand_arg(&ins.args[1]);
@@ -1899,7 +1872,7 @@ impl Machine {
                                 let actual_slots = ms.saved_offsets.len();
                                 // We're not compatible with contexts created by bs_start_match2.
                                 assert!(actual_slots == 0);
-                                set_register!(context, &ins.args[3], cxt);
+                                context.set_register(&ins.args[3], cxt);
                             }
                         }
                         value::BOXED_BINARY | value::BOXED_SUBBINARY => {
@@ -1909,7 +1882,7 @@ impl Machine {
                             let result = bitstring::start_match_3(&context.heap, cxt);
 
                             if let Some(res) = result {
-                                set_register!(context, &ins.args[3], res)
+                                context.set_register(&ins.args[3], res)
                             } else {
                                 fail!(context, ins.args[0]);
                             }
@@ -1920,20 +1893,20 @@ impl Machine {
                     }
                 }
                 Opcode::BsGetPosition => {
-                    debug_assert_eq!(ins.args.len(), 3);
+                    // debug_assert_eq!(ins.args.len(), 3);
                     // cxt dst live
                     if let Ok(ms) = context
                         .expand_arg(&ins.args[0])
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
                         // TODO: unsafe cast
-                        set_register!(context, &ins.args[1], Term::int(ms.mb.offset as i32));
+                        context.set_register(&ins.args[1], Term::int(ms.mb.offset as i32));
                     } else {
                         unreachable!()
                     };
                 }
                 Opcode::BsSetPosition => {
-                    debug_assert_eq!(ins.args.len(), 2);
+                    // debug_assert_eq!(ins.args.len(), 2);
                     // cxt pos
 
                     if let Ok(ms) = context
@@ -1947,7 +1920,7 @@ impl Machine {
                     };
                 }
                 Opcode::BsGetInteger2 => {
-                    debug_assert_eq!(ins.args.len(), 7);
+                    // debug_assert_eq!(ins.args.len(), 7);
                     // bs_get_integer2 Fail=f Ms=xy Live=u Sz=sq Unit=u Flags=u Dst=d
 
                     let size = ins.args[3].to_u32() as usize;
@@ -2048,18 +2021,18 @@ impl Machine {
                         };
 
                         if let Some(res) = res {
-                            set_register!(context, &ins.args[6], res)
+                            context.set_register(&ins.args[6], res)
                         } else {
                             fail!(context, ins.args[0]);
                         }
                     };
                 }
                 Opcode::BsGetFloat2 => {
-                    debug_assert_eq!(ins.args.len(), 7);
+                    // debug_assert_eq!(ins.args.len(), 7);
                     // bs_get_float2 Fail=f Ms=xy Live=u Sz=sq Unit=u Flags=u Dst=d
 
-                    let size = match ins.args[3] {
-                        LValue::Integer(size) if size <= 64 => size as usize,
+                    let size = match context.expand_arg(&ins.args[3]).into_variant() {
+                        Variant::Integer(size) if size <= 64 => size as usize,
                         _ => {
                             fail!(context, ins.args[0]);
                         }
@@ -2080,14 +2053,14 @@ impl Machine {
                             bitstring::Flag::from_bits(flags as u8).unwrap(),
                         );
                         if let Some(res) = res {
-                            set_register!(context, &ins.args[6], res)
+                            context.set_register(&ins.args[6], res)
                         } else {
                             fail!(context, ins.args[0]);
                         }
                     };
                 }
                 Opcode::BsGetBinary2 => {
-                    debug_assert_eq!(ins.args.len(), 7);
+                    // debug_assert_eq!(ins.args.len(), 7);
 
                     let flags = ins.args[5].to_u32();
                     // let size = size * (flags as usize >> 3); TODO: this was just because flags
@@ -2109,14 +2082,14 @@ impl Machine {
                         };
 
                         if let Some(res) = res {
-                            set_register!(context, &ins.args[6], res)
+                            context.set_register(&ins.args[6], res)
                         } else {
                             fail!(context, ins.args[0]);
                         }
                     };
                 }
                 Opcode::BsSkipBits2 => {
-                    debug_assert_eq!(ins.args.len(), 5);
+                    // debug_assert_eq!(ins.args.len(), 5);
                     // fail, ms, size, unit, flags
 
                     if let Ok(ms) = context
@@ -2143,7 +2116,7 @@ impl Machine {
                     }
                 }
                 Opcode::BsTestTail2 => {
-                    debug_assert_eq!(ins.args.len(), 3);
+                    // debug_assert_eq!(ins.args.len(), 3);
                     // fail, ms, bits
                     // TODO: beam specializes bits 0
                     // Checks that the matching context Arg1 has exactly Arg2 unmatched bits. Jumps
@@ -2201,7 +2174,7 @@ impl Machine {
                     }
                 }
                 Opcode::BsContextToBinary => {
-                    debug_assert_eq!(ins.args.len(), 1);
+                    // debug_assert_eq!(ins.args.len(), 1);
                     // Converts the matching context to a (sub)binary using almost the same code as
                     // i bs get binary all reuse rx f I.
 
@@ -2218,14 +2191,14 @@ impl Machine {
                             &context.heap,
                             bitstring::SubBinary::new(ms.mb.original.clone(), size, offs, false),
                         );
-                        set_register!(context, &ins.args[0], res);
+                        context.set_register(&ins.args[0], res);
                     } else {
                         // next0
                         unreachable!()
                     }
                 }
                 Opcode::BsTestUnit => {
-                    debug_assert_eq!(ins.args.len(), 3);
+                    // debug_assert_eq!(ins.args.len(), 3);
                     // fail cxt unit
                     // Checks that the size of the remainder of the matching context is divisible
                     // by unit, else jump to fail
@@ -2245,7 +2218,7 @@ impl Machine {
                     }
                 }
                 Opcode::BsMatchString => {
-                    debug_assert_eq!(ins.args.len(), 4);
+                    // debug_assert_eq!(ins.args.len(), 4);
                     // fail cxt bits str
 
                     // byte* bytes = (byte *) $Ptr;
@@ -2293,13 +2266,13 @@ impl Machine {
                     }
                 }
                 Opcode::BsInitWritable => {
-                    debug_assert_eq!(ins.args.len(), 0);
+                    // debug_assert_eq!(ins.args.len(), 0);
                     context.x[0] = bitstring::init_writable(&process, context.x[0]);
                 }
                 // BsGet and BsSkip should be implemented over an Iterator inside a match context (.skip/take)
                 // maybe we can even use nom for this
                 Opcode::BsAppend => {
-                    debug_assert_eq!(ins.args.len(), 8);
+                    // debug_assert_eq!(ins.args.len(), 8);
                     // append and init also sets the string as current (state.current_binary) [seems to be used to copy string literals too]
 
                     // bs_append Fail Size Extra Live Unit Bin Flags Dst => \
@@ -2313,7 +2286,7 @@ impl Machine {
                     let res = bitstring::append(&process, src, size, extra_words, unit);
 
                     if let Some(res) = res {
-                        set_register!(context, &ins.args[5], res)
+                        context.set_register(&ins.args[5], res)
                     } else {
                         // TODO: execute fail only if non zero, else raise
                         /* TODO not yet: c_p->freason is already set (to BADARG or SYSTEM_LIMIT). */
@@ -2321,7 +2294,7 @@ impl Machine {
                     }
                 }
                 Opcode::BsPrivateAppend => {
-                    debug_assert_eq!(ins.args.len(), 6);
+                    // debug_assert_eq!(ins.args.len(), 6);
                     // bs_private_append Fail Size Unit Bin Flags Dst
 
                     let size = context.expand_arg(&ins.args[1]);
@@ -2331,7 +2304,7 @@ impl Machine {
                     let res = bitstring::private_append(&process, src, size, unit);
 
                     if let Some(res) = res {
-                        set_register!(context, &ins.args[5], res)
+                        context.set_register(&ins.args[5], res)
                     } else {
                         /* TODO not yet: c_p->freason is already set (to BADARG or SYSTEM_LIMIT). */
                         fail!(context, ins.args[0]);
@@ -2339,12 +2312,20 @@ impl Machine {
                     unimplemented!("bs_private_append") // TODO
                 }
                 Opcode::BsInitBits => {
-                    debug_assert_eq!(ins.args.len(), 6);
+                    // bs_init_bits Fail Sz=u Words=u==0 Regs Flags Dst => i_bs_init Sz Regs Dst
+
+                    // Words is heap alloc size
+                    // regs is live regs for GC
+                    // flags is unused?
+
+                    // size is in bits
+                    // debug_assert_eq!(ins.args.len(), 6);
                     // TODO: RcBinary has to be set to is_writable = false
+                    // context.x[0] = bitstring::init_bits(&process, context.x[0], ..);
                     unimplemented!("bs_init_bits") // TODO
                 }
                 Opcode::BsGetUtf8 => {
-                    debug_assert_eq!(ins.args.len(), 5);
+                    // debug_assert_eq!(ins.args.len(), 5);
                     // fail ms u u dest
 
                     // TODO: this cast can fail
@@ -2354,14 +2335,14 @@ impl Machine {
                     {
                         let res = ms.mb.get_utf8();
                         if let Some(res) = res {
-                            set_register!(context, &ins.args[4], res)
+                            context.set_register(&ins.args[4], res)
                         } else {
                             fail!(context, ins.args[0]);
                         }
                     };
                 }
                 Opcode::BsGetUtf16 => {
-                    debug_assert_eq!(ins.args.len(), 5);
+                    // debug_assert_eq!(ins.args.len(), 5);
                     // fail ms u flags dest
 
                     let flags = ins.args[5].to_u32();
@@ -2375,14 +2356,14 @@ impl Machine {
                             .mb
                             .get_utf16(bitstring::Flag::from_bits(flags as u8).unwrap());
                         if let Some(res) = res {
-                            set_register!(context, &ins.args[4], res)
+                            context.set_register(&ins.args[4], res)
                         } else {
                             fail!(context, ins.args[0]);
                         }
                     };
                 }
                 Opcode::BsSkipUtf8 => {
-                    debug_assert_eq!(ins.args.len(), 4);
+                    // debug_assert_eq!(ins.args.len(), 4);
                     // fail ms u u
 
                     // TODO: this cast can fail
@@ -2399,7 +2380,7 @@ impl Machine {
                     }
                 }
                 Opcode::BsSkipUtf16 => {
-                    debug_assert_eq!(ins.args.len(), 4);
+                    // debug_assert_eq!(ins.args.len(), 4);
                     // fail ms u flags
 
                     let flags = ins.args[5].to_u32();
@@ -2420,12 +2401,12 @@ impl Machine {
                     }
                 }
                 Opcode::Fclearerror => {
-                    debug_assert_eq!(ins.args.len(), 0);
+                    // debug_assert_eq!(ins.args.len(), 0);
                     // TODO: BEAM checks for unhandled errors
                     context.f[0] = 0.0;
                 }
                 Opcode::Fcheckerror => {
-                    debug_assert_eq!(ins.args.len(), 1);
+                    // debug_assert_eq!(ins.args.len(), 1);
                     // I think it always checks register fr0
                     if !context.f[0].is_finite() {
                         return Err(Exception::new(Reason::EXC_BADARITH));
@@ -2473,7 +2454,7 @@ impl Machine {
                 Opcode::Fmul => op_float!(context, &ins.args[..], *),
                 Opcode::Fdiv => op_float!(context, &ins.args[..], /),
                 Opcode::Fnegate => {
-                    debug_assert_eq!(ins.args.len(), 2);
+                    // debug_assert_eq!(ins.args.len(), 2);
                     if let [LValue::FloatReg(a), LValue::FloatReg(dest)] = ins.args[..] {
                         context.f[dest as usize] = -context.f[a as usize];
                     } else {
@@ -2490,7 +2471,7 @@ impl Machine {
                         ];
 
                         match bif(self, &process, args) {
-                            Ok(val) => set_register!(context, &ins.args[5], val),
+                            Ok(val) => context.set_register(&ins.args[5], val),
                             Err(exc) => cond_fail!(context, ins.args[0], exc),
                         }
                     } else {
@@ -2508,7 +2489,7 @@ impl Machine {
                         ];
 
                         match bif(self, &process, args) {
-                            Ok(val) => set_register!(context, &ins.args[6], val),
+                            Ok(val) => context.set_register(&ins.args[6], val),
                             Err(exc) => cond_fail!(context, ins.args[0], exc),
                         }
                     } else {
@@ -2576,29 +2557,29 @@ impl Machine {
                     }
                 }
                 Opcode::GetHd => {
-                    debug_assert_eq!(ins.args.len(), 2);
+                    // debug_assert_eq!(ins.args.len(), 2);
                     // source head
                     if let Ok(value::Cons { head, .. }) =
                         Cons::try_from(&context.expand_arg(&ins.args[0]))
                     {
-                        set_register!(context, &ins.args[1], *head);
+                        context.set_register(&ins.args[1], *head);
                     } else {
                         unreachable!()
                     }
                 }
                 Opcode::GetTl => {
-                    debug_assert_eq!(ins.args.len(), 2);
+                    // debug_assert_eq!(ins.args.len(), 2);
                     // source head
                     if let Ok(value::Cons { tail, .. }) =
                         context.expand_arg(&ins.args[0]).try_into()
                     {
-                        set_register!(context, &ins.args[1], *tail);
+                        context.set_register(&ins.args[1], *tail);
                     } else {
                         unreachable!()
                     }
                 }
                 Opcode::PutMapAssoc => {
-                    debug_assert_eq!(ins.args.len(), 5);
+                    // debug_assert_eq!(ins.args.len(), 5);
                     // F Map Dst Live Rest=* (atom with module name??)
                     if let [LValue::Label(_fail), map, dest, _live, LValue::ExtendedList(list)] =
                         &ins.args[..]
@@ -2613,13 +2594,13 @@ impl Machine {
                             // TODO: optimize by having the ExtendedList store Term instead of LValue
                             map.insert(context.expand_arg(key), context.expand_arg(value));
                         }
-                        set_register!(context, dest, Term::map(&context.heap, map))
+                        context.set_register(dest, Term::map(&context.heap, map))
                     } else {
                         unreachable!()
                     }
                 }
                 Opcode::HasMapFields => {
-                    debug_assert_eq!(ins.args.len(), 3);
+                    // debug_assert_eq!(ins.args.len(), 3);
                     // fail src N
                     // TODO: make a macro or make the try_into() return an Exception so we can use ?
                     if let [LValue::Label(fail), map, LValue::ExtendedList(list)] = &ins.args[..] {
@@ -2644,7 +2625,7 @@ impl Machine {
                     }
                 }
                 Opcode::GetMapElements => {
-                    debug_assert_eq!(ins.args.len(), 3);
+                    // debug_assert_eq!(ins.args.len(), 3);
                     // fail src N
                     // TODO: make a macro or make the try_into() return an Exception so we can use ?
                     if let [LValue::Label(fail), map, LValue::ExtendedList(list)] = &ins.args[..] {
@@ -2658,7 +2639,7 @@ impl Machine {
                         let mut iter = list.chunks_exact(2);
                         while let Some([key, dest]) = iter.next() {
                             if let Some(&val) = map.get(&context.expand_arg(key)) {
-                                set_register!(context, dest, val)
+                                context.set_register(dest, val)
                             } else {
                                 op_jump!(context, *fail);
                                 break; // TODO: original impl loops over everything
@@ -2670,7 +2651,7 @@ impl Machine {
                     // TODO: in the future, put_map_exact is an optimization for flatmaps (tuple
                     // maps), where the keys in the tuple stay the same, since you can memcpy the
                     // key tuple (and other optimizations)
-                    debug_assert_eq!(ins.args.len(), 5);
+                    // debug_assert_eq!(ins.args.len(), 5);
                     // F Map Dst Live Rest=* (atom with module name??)
                     if let [LValue::Label(_fail), map, dest, _live, LValue::ExtendedList(list)] =
                         &ins.args[..]
@@ -2685,11 +2666,11 @@ impl Machine {
                             // TODO: optimize by having the ExtendedList store Term instead of LValue
                             map.insert(context.expand_arg(key), context.expand_arg(value));
                         }
-                        set_register!(context, dest, Term::map(&context.heap, map))
+                        context.set_register(dest, Term::map(&context.heap, map))
                     }
                 }
                 Opcode::IsTaggedTuple => {
-                    debug_assert_eq!(ins.args.len(), 4);
+                    // debug_assert_eq!(ins.args.len(), 4);
                     let reg = context.expand_arg(&ins.args[1]);
                     let n = ins.args[2].to_u32();
                     let atom = context.expand_arg(&ins.args[3]);

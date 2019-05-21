@@ -670,28 +670,27 @@ impl Term {
         }
     }
 
-    // TODO: ExtendedList should instead become a Term vec
-    pub fn into_lvalue(self) -> Option<loader::LValue> {
-        match self.into_variant() {
-            Variant::Integer(i) => Some(loader::LValue::Integer(i)),
-            Variant::Atom(i) => Some(loader::LValue::Atom(i)),
-            Variant::Nil(..) => Some(loader::LValue::Nil),
-            // TODO Variant::Float(self::Float(i)) => Num::Float(i),
-            _ => None,
-        }
-    }
+    // // TODO: ExtendedList should instead become a Term vec
+    // pub fn into_lvalue(self) -> Option<loader::LValue> {
+    //     match self.into_variant() {
+    //         // TODO: use get type
+    //         Variant::Integer(i) => Some(loader::LValue::Constant(self)),
+    //         Variant::Atom(i) => Some(loader::LValue::Constant(self)),
+    //         Variant::Nil(..) => Some(loader::LValue::Constant(self)),
+    //         // TODO Variant::Float(self::Float(i)) => Num::Float(i),
+    //         _ => None,
+    //     }
+    // }
 
     // ------
 
     #[inline]
     pub fn is_integer(self) -> bool {
-        match self.into_variant() {
-            Variant::Integer(_) => true,
-            Variant::Pointer(ptr) => unsafe {
-                match *ptr {
-                    BOXED_BIGINT => true,
-                    _ => false,
-                }
+        match self.value.tag() as u8 {
+            TERM_INTEGER => true,
+            TERM_POINTER => match self.get_boxed_header().unwrap() {
+                BOXED_BIGINT => true,
+                _ => false,
             },
             _ => false,
         }

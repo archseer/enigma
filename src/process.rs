@@ -94,6 +94,20 @@ impl ExecutionContext {
             value => unreachable!("expand unimplemented for {:?}", value),
         }
     }
+
+    #[inline]
+    pub fn set_register(&mut self, register: &LValue, value: Term) {
+        match register {
+            &LValue::X(reg) => {
+                self.x[reg as usize] = value;
+            }
+            &LValue::Y(reg) => {
+                let len = self.stack.len();
+                self.stack[(len - (reg + 2) as usize)] = value;
+            }
+            _reg => unreachable!("set_reg"),
+        }
+    }
 }
 
 impl ExecutionContext {
