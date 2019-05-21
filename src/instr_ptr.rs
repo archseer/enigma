@@ -87,24 +87,6 @@ impl InstrPtr {
     }
 }
 
-// TODO: these are kinda messy since Opt<ptr> vs ptr deboxes differently
-
-// TODO: to be TryFrom once rust stabilizes the trait
-impl TryFrom<Term> for value::Boxed<Option<InstrPtr>> {
-    type Error = value::WrongBoxError;
-
-    #[inline]
-    fn try_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
-        if let value::Variant::Pointer(ptr) = value.into_variant() {
-            unsafe {
-                if *ptr == value::BOXED_CP {
-                    return Ok(&*(ptr as *const value::Boxed<Option<InstrPtr>>));
-                }
-            }
-        }
-        Err(value::WrongBoxError)
-    }
-}
 // TODO: to be TryFrom once rust stabilizes the trait
 impl TryFrom<Term> for value::Boxed<InstrPtr> {
     type Error = value::WrongBoxError;

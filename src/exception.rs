@@ -5,7 +5,6 @@ use crate::loader::FuncInfo;
 use crate::module::MFA;
 use crate::process::RcProcess;
 use crate::value::{self, Term, TryFrom, TryInto, Variant};
-use std::pin::Pin;
 
 /// http://erlang.org/doc/reference_manual/errors.html#exceptions
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -394,7 +393,7 @@ fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
     let mut ptr = context.stack.len();
     let mut prev = ptr;
 
-    debug_assert!(context.stack.last().unwrap().is_cp());
+    // debug_assert!(context.stack.last().unwrap().is_cp());
     // ASSERT(ptr <= STACK_START(c_p));
     if ptr == 0 {
         return None;
@@ -405,21 +404,34 @@ fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
     while ptr > 0 {
         match context.stack[ptr - 1].get_boxed_header() {
             Ok(value::BOXED_CATCH) => {
-                let ptr = context.stack[ptr - 1]
+                // this is a mess because we store the cp stack separately now.
+                let mut prev = context.stack.len();
+                let mut c = 0;
+                let iter = context.callstack.iter().rev();
+                for &(n, _) in iter {
+                    let n = n as usize;
+                    if prev - n <= (ptr - 1) {
+                        break;
+                    }
+                    prev -= n;
+                    c += 1;
+                }
+
+                let ptr = *context.stack[ptr - 1]
                     .get_boxed_value::<InstrPtr>()
-                    .unwrap()
-                    .clone();
+                    .unwrap();
 
                 // Unwind the stack up to the current frame.
                 context.stack.truncate(prev);
+                context.callstack.truncate(context.callstack.len() - c);
                 // context.stack.shrink_to_fit();
                 // TODO: tracing handling here
                 return Some(ptr);
             }
-            Ok(value::BOXED_CP) => {
-                prev = ptr;
-                // TODO: OTP does tracing instr handling here
-            }
+            // Ok(value::BOXED_CP) => {
+            //     prev = ptr;
+            //     // TODO: OTP does tracing instr handling here
+            // }
             _ => (),
         }
         ptr -= 1;
@@ -644,7 +656,7 @@ pub fn erts_save_stacktrace(process: &RcProcess, trace: &mut Vec<InstrPtr>, mut 
     if depth == 0 {
         return;
     }
-    let mut ptr = context.stack.len();
+    let mut ptr = context.callstack.len();
 
     /*
      * Traverse the stack backwards and add all unique continuation
@@ -653,17 +665,12 @@ pub fn erts_save_stacktrace(process: &RcProcess, trace: &mut Vec<InstrPtr>, mut 
      * Skip trace stack frames.
      */
     while ptr > 0 && depth > 0 {
-        if let Ok(value::Boxed {
-            header: value::BOXED_CP,
-            value: boxed_cp,
-        }) = &context.stack[ptr - 1].try_into()
-        {
-            if let Some(cp) = *boxed_cp {
-                if Some(&cp) != trace.last() {
-                    // Record non-duplicates only
-                    trace.push(cp); // -1
-                    depth -= 1;
-                }
+        let (_, cp) = context.callstack[ptr - 1];
+        if let Some(cp) = cp {
+            if Some(&cp) != trace.last() {
+                // Record non-duplicates only
+                trace.push(cp); // -1
+                depth -= 1;
             }
         }
         ptr -= 1

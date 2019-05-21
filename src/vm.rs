@@ -141,7 +141,7 @@ macro_rules! expand_float {
             LValue::Y(reg) => {
                 let len = $context.stack.len();
                 if let Variant::Float(value::Float(f)) =
-                    $context.stack[len - (*reg + 2) as usize].into_variant()
+                    $context.stack[len - (*reg + 1) as usize].into_variant()
                 {
                     f
                 } else {
@@ -168,20 +168,12 @@ macro_rules! op_jump_ptr {
 
 macro_rules! op_deallocate {
     ($context:expr, $nwords:expr) => {{
-        let cp = $context.stack.pop().unwrap();
+        let (_, cp) = $context.callstack.pop().unwrap();
         $context
             .stack
             .truncate($context.stack.len() - $nwords as usize);
 
-        if let Ok(value::Boxed {
-            header: value::BOXED_CP,
-            value: cp,
-        }) = cp.try_into()
-        {
-            $context.cp = *cp;
-        } else {
-            panic!("Bad CP value! {:?}", cp)
-        }
+        $context.cp = cp;
     }};
 }
 
@@ -1152,8 +1144,7 @@ impl Machine {
                         for _ in 0..*stackneed {
                             context.stack.push(Term::nil())
                         }
-                        context.stack.push(Term::cp(&context.heap, context.cp));
-                        context.cp = None;
+                        context.callstack.push((*stackneed, context.cp.take()));
                     } else {
                         unreachable!()
                     }
@@ -1172,8 +1163,7 @@ impl Machine {
                             .stack
                             .resize(context.stack.len() + *stackneed as usize, Term::nil());
                         // TODO: check heap for heapneed space!
-                        context.stack.push(Term::cp(&context.heap, context.cp));
-                        context.cp = None;
+                        context.callstack.push((*stackneed, context.cp.take()));
                     } else {
                         unreachable!()
                     }
@@ -1184,9 +1174,7 @@ impl Machine {
                         context
                             .stack
                             .resize(context.stack.len() + *need as usize, Term::nil());
-                        // TODO: heap allocating CP is expensive, use a catch stack and the CP is a int ptr?
-                        context.stack.push(Term::cp(&context.heap, context.cp));
-                        context.cp = None;
+                        context.callstack.push((*need, context.cp.take()));
                     } else {
                         unreachable!()
                     }
@@ -1202,8 +1190,7 @@ impl Machine {
                             .stack
                             .resize(context.stack.len() + *stackneed as usize, Term::nil());
                         // TODO: check heap for heapneed space!
-                        context.stack.push(Term::cp(&context.heap, context.cp));
-                        context.cp = None;
+                        context.callstack.push((*stackneed, context.cp.take()));
                     } else {
                         unreachable!()
                     }
@@ -2425,7 +2412,7 @@ impl Machine {
                         }
                         &LValue::Y(reg) => {
                             let len = context.stack.len();
-                            context.stack[len - (reg + 2) as usize] = Term::from(f);
+                            context.stack[len - (reg + 1) as usize] = Term::from(f);
                         }
                         &LValue::FloatReg(reg) => {
                             context.f[reg as usize] = f;
@@ -2500,11 +2487,11 @@ impl Machine {
                     // trim N, _remain
                     // drop N words from stack, (but keeping the cp). Second arg unused?
                     let nwords = ins.args[0].to_u32();
-                    let cp = context.stack.pop().unwrap();
+                    // let cp = context.stack.pop().unwrap();
                     context
                         .stack
                         .truncate(context.stack.len() - nwords as usize);
-                    context.stack.push(cp);
+                    // context.stack.push(cp);
                 }
                 Opcode::MakeFun2 => {
                     // literal n -> points to lambda

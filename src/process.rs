@@ -56,6 +56,8 @@ pub struct ExecutionContext {
     pub f: [f64; 16],
     /// Stack (accessible through Y registers).
     pub stack: Vec<Term>,
+    /// Stores continuation pointers
+    pub callstack: Vec<(u32, Option<InstrPtr>)>,
     pub heap: Heap,
     /// Number of catches on stack.
     pub catches: usize,
@@ -85,7 +87,7 @@ impl ExecutionContext {
             // TODO: optimize away into a reference somehow at load time
             LValue::ExtendedLiteral(i) => unsafe { (*self.ip.module).literals[*i as usize] },
             LValue::X(i) => self.x[*i as usize],
-            LValue::Y(i) => self.stack[self.stack.len() - (*i + 2) as usize],
+            LValue::Y(i) => self.stack[self.stack.len() - (*i + 1) as usize],
             LValue::Constant(i) => *i,
             // LValue::Integer(i) => Term::int(*i),
             // LValue::Atom(i) => Term::atom(*i),
@@ -103,7 +105,7 @@ impl ExecutionContext {
             }
             &LValue::Y(reg) => {
                 let len = self.stack.len();
-                self.stack[(len - (reg + 2) as usize)] = value;
+                self.stack[(len - (reg + 1) as usize)] = value;
             }
             _reg => unreachable!("set_reg"),
         }
@@ -116,6 +118,7 @@ impl ExecutionContext {
             x: [Term::nil(); MAX_REG],
             f: [0.0f64; 16],
             stack: Vec::with_capacity(32),
+            callstack: Vec::with_capacity(8),
             heap: Heap::new(),
             catches: 0,
             ip: InstrPtr { ptr: 0, module },

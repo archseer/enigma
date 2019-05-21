@@ -301,7 +301,7 @@ pub const BOXED_MAP: u8 = 3;
 pub const BOXED_BIGINT: u8 = 4;
 pub const BOXED_CLOSURE: u8 = 5;
 // TODO: these should be direct pointers, no heap
-pub const BOXED_CP: u8 = 6;
+// pub const BOXED_CP: u8 = 6;
 pub const BOXED_CATCH: u8 = 7;
 pub const BOXED_STACKTRACE: u8 = 8;
 
@@ -337,7 +337,7 @@ pub enum Type {
     Binary,
 
     // runtime values
-    CP,
+    // CP,
     Catch,
     MatchState,
 }
@@ -495,13 +495,6 @@ impl Term {
         }))
     }
 
-    pub fn cp(heap: &Heap, value: Option<InstrPtr>) -> Self {
-        Term::from(heap.alloc(Boxed {
-            header: BOXED_CP,
-            value,
-        }))
-    }
-
     pub fn catch(heap: &Heap, value: InstrPtr) -> Self {
         Term::from(heap.alloc(Boxed {
             header: BOXED_CATCH,
@@ -613,7 +606,7 @@ impl Term {
                 BOXED_MAP => Type::Map,
                 BOXED_BIGINT => Type::Number,
                 BOXED_CLOSURE => Type::Closure,
-                BOXED_CP => Type::CP,
+                // BOXED_CP => Type::CP,
                 BOXED_CATCH => Type::Catch,
                 BOXED_MATCHSTATE => Type::MatchState,
                 BOXED_SUBBINARY => Type::Binary,
@@ -757,10 +750,10 @@ impl Term {
         self.get_type() == Type::Map
     }
 
-    #[inline]
-    pub fn is_cp(self) -> bool {
-        self.get_type() == Type::CP
-    }
+    // #[inline]
+    // pub fn is_cp(self) -> bool {
+    //     self.get_type() == Type::CP
+    // }
 
     pub fn to_u32(self) -> u32 {
         match self.into_variant() {
@@ -1204,10 +1197,10 @@ impl std::fmt::Display for Variant {
                         let ptr = &*(*ptr as *const Boxed<Closure>);
                         write!(f, "#Fun<{}>", ptr.value.mfa)
                     }
-                    BOXED_CP => {
-                        let ptr = &*(*ptr as *const Boxed<Option<InstrPtr>>);
-                        write!(f, "CP<{:?}>", ptr.value)
-                    }
+                    // BOXED_CP => {
+                    //     let ptr = &*(*ptr as *const Boxed<Option<InstrPtr>>);
+                    //     write!(f, "CP<{:?}>", ptr.value)
+                    // }
                     BOXED_CATCH => write!(f, "CATCH"),
                     BOXED_STACKTRACE => write!(f, "STRACE"),
                     BOXED_MODULE => write!(f, "MODULE<>"),
