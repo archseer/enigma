@@ -1,4 +1,4 @@
-* BIFs [59/105]
+* BIFs [61/105]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
@@ -25,7 +25,7 @@
 - [ ] bif erlang:exit_signal/2
 - [ ] bif erlang:external_size/1
 - [ ] bif erlang:external_size/2
-- [ ] ubif erlang:float/1
+- [X] ubif erlang:float/1
 - [ ] bif erlang:float_to_list/1
 - [ ] bif erlang:float_to_list/2
 - [ ] bif erlang:fun_info/2
@@ -100,7 +100,7 @@
 - [X] ubif erlang:trunc/1
 - [X] bif erlang:tuple_to_list/1
 - [X] bif erlang:universaltime/0
-- [ ] bif erlang:universaltime_to_localtime/1
+- [X] bif erlang:universaltime_to_localtime/1
 - [X] bif erlang:unlink/1
 - [X] bif erlang:unregister/1
 - [X] bif erlang:whereis/1

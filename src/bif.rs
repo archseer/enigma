@@ -62,6 +62,7 @@ type BifTable = HashMap<module::MFA, Fn>;
 pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
     bif_map![
         "erlang" => {
+            "float", 1 => arith::float_1,
             "abs", 1 => arith::abs_1,
             "round", 1 => arith::round_1,
             "date", 0 => chrono::date_0,
