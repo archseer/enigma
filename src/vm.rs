@@ -270,7 +270,7 @@ macro_rules! op_call_bif {
         let args = &$context.x[0..$arity];
         match $bif($vm, $process, args) {
             Ok(val) => {
-                $context.set_register(&LValue::X(0), val); // HAXX
+                $context.x[0] = val; // HAXX, return value emulated
                 if $return {
                     // TODO: figure out returns
                     op_return!($process, $context);
@@ -472,7 +472,7 @@ macro_rules! op_return {
             $context.cp = None;
         } else {
             // println!("Process pid={} exited with normal, x0: {}", $process.pid, $context.x[0]);
-            break;
+            return Ok(process::State::Done)
         }
     }};
 }
@@ -555,8 +555,6 @@ macro_rules! op_fixed_apply {
 
 macro_rules! op_is_type {
     ($context:expr, $args:expr, $op:ident) => {{
-        // debug_assert_eq!($args.len(), 2);
-
         let val = $context.expand_arg(&$args[1]);
 
         if !val.$op() {
@@ -576,8 +574,6 @@ macro_rules! to_expr {
 
 macro_rules! op_float {
     ($context:expr, $args:expr, $op:tt) => {{
-        // debug_assert_eq!($args.len(), 4);
-
         // TODO: I think this fail is always unused
         if let [_fail, LValue::FloatReg(a), LValue::FloatReg(b), LValue::FloatReg(dest)] = $args {
             $context.f[*dest as usize] = to_expr!($context.f[*a as usize] $op $context.f[*b as usize]);
@@ -593,8 +589,7 @@ macro_rules! safepoint_and_reduce {
         //     return Ok(());
         // }
 
-        // Reduce once we've exhausted all the instructions in a
-        // context.
+        // Reduce once we've exhausted all the instructions in a context.
         if $reductions > 0 {
             $reductions -= 1;
         } else {
@@ -796,6 +791,12 @@ impl Machine {
                 Ok(process::State::Yield) => (), // yield
                 Ok(process::State::Done) => {
                     process.exit(&vm, Exception::with_value(Reason::EXC_EXIT, atom!(NORMAL)));
+
+                    // Terminate once the main process has finished execution.
+                    if process.is_main() {
+                        vm.terminate();
+                    }
+
                     break
                 }, // exited OK
                 // TODO: wait is an await on a oneshot
@@ -844,15 +845,17 @@ impl Machine {
             let ins = &module.instructions[context.ip.ptr as usize];
             context.ip.ptr += 1;
 
-            // info!(
-            //     "proc pid={:?} reds={:?} mod={:?} offs={:?} ins={:?} args={:?}",
-            //     process.pid,
-            //     context.reds,
-            //     atom::to_str(module.name).unwrap(),
-            //     context.ip.ptr,
-            //     ins.op,
-            //     ins.args
-            // );
+            // if process.pid > 70 {
+            //     info!(
+            //         "proc pid={:?} reds={:?} mod={:?} offs={:?} ins={:?} args={:?}",
+            //         process.pid,
+            //         context.reds,
+            //         atom::to_str(module.name).unwrap(),
+            //         context.ip.ptr,
+            //         ins.op,
+            //         ins.args
+            //     );
+            // }
 
             match &ins.op {
                 Opcode::FuncInfo => {
@@ -920,7 +923,6 @@ impl Machine {
                 Opcode::LoopRecEnd => {
                     // label
                     // Advance the save pointer to the next message and jump back to Label.
-                    // debug_assert_eq!(ins.args.len(), 1);
 
                     process.local_data_mut().mailbox.advance();
 
@@ -930,7 +932,6 @@ impl Machine {
                 Opcode::Wait => {
                     // label
                     // jump to label, set wait flag on process
-                    // debug_assert_eq!(ins.args.len(), 1);
 
                     let label = ins.args[0].to_u32();
                     op_jump!(context, label);
@@ -1033,8 +1034,10 @@ impl Machine {
                         context.cp = Some(context.ip);
                         op_jump!(context, *i);
 
-                        // let (mfa, _) = context.ip.lookup_func_info().unwrap();
-                        // info!("pid={} action=call mfa={}", process.pid, mfa);
+                        // if process.pid > 70 {
+                        //     let (mfa, _) = context.ip.lookup_func_info().unwrap();
+                        //     info!("pid={} action=call mfa={}", process.pid, mfa);
+                        // }
                     } else {
                         unreachable!()
                     }
@@ -1050,8 +1053,10 @@ impl Machine {
 
                         op_jump!(context, *i);
 
+                        // if process.pid > 70 {
                         // let (mfa, _) = context.ip.lookup_func_info().unwrap();
                         // info!("pid={} action=call_last mfa={}", process.pid, mfa);
+                        // }
                     } else {
                         unreachable!()
                     }
@@ -1064,8 +1069,10 @@ impl Machine {
                     if let [LValue::Literal(_a), LValue::Label(l)] = &ins.args[..] {
                         op_jump!(context, *l);
 
+                        // if process.pid > 70 {
                         // let (mfa, _) = context.ip.lookup_func_info().unwrap();
                         // info!("pid={} action=call_only mfa={}", process.pid, mfa);
+                        // }
                     } else {
                         unreachable!()
                     }
@@ -1199,7 +1206,6 @@ impl Machine {
                     // println!("TODO: TestHeap unimplemented!");
                 }
                 Opcode::Init => {
-                    // debug_assert_eq!(ins.args.len(), 1);
                     context.set_register(&ins.args[0], Term::nil())
                 }
                 Opcode::Deallocate => {
@@ -1211,8 +1217,6 @@ impl Machine {
                     }
                 }
                 Opcode::IsGe => {
-                    // debug_assert_eq!(ins.args.len(), 3);
-
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
 
@@ -1224,8 +1228,6 @@ impl Machine {
                     }
                 }
                 Opcode::IsLt => {
-                    // debug_assert_eq!(ins.args.len(), 3);
-
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
 
@@ -1237,8 +1239,6 @@ impl Machine {
                     }
                 }
                 Opcode::IsEq => {
-                    // debug_assert_eq!(ins.args.len(), 3);
-
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
 
@@ -1250,8 +1250,6 @@ impl Machine {
                     }
                 }
                 Opcode::IsNe => {
-                    // debug_assert_eq!(ins.args.len(), 3);
-
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
 
@@ -1261,8 +1259,6 @@ impl Machine {
                     }
                 }
                 Opcode::IsEqExact => {
-                    // debug_assert_eq!(ins.args.len(), 3);
-
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
 
@@ -1274,8 +1270,6 @@ impl Machine {
                     }
                 }
                 Opcode::IsNeExact => {
-                    // debug_assert_eq!(ins.args.len(), 3);
-
                     let v1 = context.expand_arg(&ins.args[1]);
                     let v2 = context.expand_arg(&ins.args[2]);
 
@@ -1387,7 +1381,6 @@ impl Machine {
                     }
                 }
                 Opcode::GetList => {
-                    // debug_assert_eq!(ins.args.len(), 3);
                     // source, head, tail
                     if let Ok(value::Cons { head, tail }) =
                         context.expand_arg(&ins.args[0]).try_into()
@@ -1399,7 +1392,6 @@ impl Machine {
                     }
                 }
                 Opcode::GetTupleElement => {
-                    // debug_assert_eq!(ins.args.len(), 3);
                     // source, element, dest
                     let source = context.expand_arg(&ins.args[0]);
                     let n = ins.args[1].to_u32() as usize;
@@ -1410,7 +1402,6 @@ impl Machine {
                     }
                 }
                 Opcode::SetTupleElement => {
-                    // debug_assert_eq!(ins.args.len(), 3);
                     // new_el tuple pos
                     let el = context.expand_arg(&ins.args[0]);
                     let tuple = context.expand_arg(&ins.args[1]);
@@ -1423,7 +1414,6 @@ impl Machine {
                     }
                 }
                 Opcode::PutList => {
-                    // debug_assert_eq!(ins.args.len(), 3);
                     // put_list H T Dst::slot()
                     // Creates a cons cell with [H|T] and places the value into Dst.
                     let head = context.expand_arg(&ins.args[0]);
@@ -1441,7 +1431,6 @@ impl Machine {
                 }
                 Opcode::Put => unreachable!("Stray Put that wasn't rewritten by the loader!"),
                 Opcode::PutTuple2 => {
-                    // debug_assert_eq!(ins.args.len(), 2);
                     // op: PutTuple2, args: [X(0), ExtendedList([Y(1), Y(0), X(0)])] }
                     if let LValue::ExtendedList(list) = &ins.args[1] {
                         let arity = list.len();
@@ -1488,7 +1477,6 @@ impl Machine {
                     );
                 }
                 Opcode::TryEnd => {
-                    // debug_assert_eq!(ins.args.len(), 1);
                     // y
                     context.catches -= 1;
                     context.set_register(&ins.args[0], Term::nil()) // TODO: make_blank macro
@@ -1528,7 +1516,6 @@ impl Machine {
                     );
                 }
                 Opcode::CatchEnd => {
-                    // debug_assert_eq!(ins.args.len(), 1);
                     // y
                     // Pops a “catch” context. Erases the label saved in the Arg0 slot. Noval in R0
                     // indicates that something is caught. If R1 contains atom throw then R0 is set
@@ -1563,7 +1550,6 @@ impl Machine {
                     }
                 }
                 Opcode::Raise => {
-                    // debug_assert_eq!(ins.args.len(), 2);
                     // Raises the exception. The instruction is garbled by backward compatibility. Arg0 is a stack trace
                     // and Arg1 is the value accompanying the exception. The reason of the raised exception is dug up
                     // from the stack trace
@@ -1767,7 +1753,6 @@ impl Machine {
                     }
                 }
                 Opcode::BsStartMatch2 => {
-                    // debug_assert_eq!(ins.args.len(), 5);
                     // fail, src, live, slots?, dst
                     // check if src is a match context with space for n slots (matches) else
                     // allocate one. if we can't, jump to fail.
@@ -1839,7 +1824,6 @@ impl Machine {
                     }
                 }
                 Opcode::BsStartMatch3 => {
-                    // debug_assert_eq!(ins.args.len(), 4);
                     // fail, src, live, dst
 
                     let cxt = context.expand_arg(&ins.args[1]);
@@ -1880,7 +1864,6 @@ impl Machine {
                     }
                 }
                 Opcode::BsGetPosition => {
-                    // debug_assert_eq!(ins.args.len(), 3);
                     // cxt dst live
                     if let Ok(ms) = context
                         .expand_arg(&ins.args[0])
@@ -1893,7 +1876,6 @@ impl Machine {
                     };
                 }
                 Opcode::BsSetPosition => {
-                    // debug_assert_eq!(ins.args.len(), 2);
                     // cxt pos
 
                     if let Ok(ms) = context
@@ -1907,7 +1889,6 @@ impl Machine {
                     };
                 }
                 Opcode::BsGetInteger2 => {
-                    // debug_assert_eq!(ins.args.len(), 7);
                     // bs_get_integer2 Fail=f Ms=xy Live=u Sz=sq Unit=u Flags=u Dst=d
 
                     let size = ins.args[3].to_u32() as usize;
@@ -2015,7 +1996,6 @@ impl Machine {
                     };
                 }
                 Opcode::BsGetFloat2 => {
-                    // debug_assert_eq!(ins.args.len(), 7);
                     // bs_get_float2 Fail=f Ms=xy Live=u Sz=sq Unit=u Flags=u Dst=d
 
                     let size = match context.expand_arg(&ins.args[3]).into_variant() {
@@ -2047,7 +2027,6 @@ impl Machine {
                     };
                 }
                 Opcode::BsGetBinary2 => {
-                    // debug_assert_eq!(ins.args.len(), 7);
 
                     let flags = ins.args[5].to_u32();
                     // let size = size * (flags as usize >> 3); TODO: this was just because flags
@@ -2076,7 +2055,6 @@ impl Machine {
                     };
                 }
                 Opcode::BsSkipBits2 => {
-                    // debug_assert_eq!(ins.args.len(), 5);
                     // fail, ms, size, unit, flags
 
                     if let Ok(ms) = context
@@ -2103,7 +2081,6 @@ impl Machine {
                     }
                 }
                 Opcode::BsTestTail2 => {
-                    // debug_assert_eq!(ins.args.len(), 3);
                     // fail, ms, bits
                     // TODO: beam specializes bits 0
                     // Checks that the matching context Arg1 has exactly Arg2 unmatched bits. Jumps
@@ -2125,7 +2102,6 @@ impl Machine {
                     }
                 }
                 Opcode::BsSave2 => {
-                    // debug_assert_eq!(ins.args.len(), 2);
                     // cxt slot
                     if let Ok(ms) = context
                         .expand_arg(&ins.args[0])
@@ -2143,7 +2119,6 @@ impl Machine {
                     }
                 }
                 Opcode::BsRestore2 => {
-                    // debug_assert_eq!(ins.args.len(), 2);
                     // cxt slot
                     if let Ok(ms) = context
                         .expand_arg(&ins.args[0])
@@ -2161,7 +2136,6 @@ impl Machine {
                     }
                 }
                 Opcode::BsContextToBinary => {
-                    // debug_assert_eq!(ins.args.len(), 1);
                     // Converts the matching context to a (sub)binary using almost the same code as
                     // i bs get binary all reuse rx f I.
 
@@ -2185,7 +2159,6 @@ impl Machine {
                     }
                 }
                 Opcode::BsTestUnit => {
-                    // debug_assert_eq!(ins.args.len(), 3);
                     // fail cxt unit
                     // Checks that the size of the remainder of the matching context is divisible
                     // by unit, else jump to fail
@@ -2205,7 +2178,6 @@ impl Machine {
                     }
                 }
                 Opcode::BsMatchString => {
-                    // debug_assert_eq!(ins.args.len(), 4);
                     // fail cxt bits str
 
                     // byte* bytes = (byte *) $Ptr;
@@ -2253,13 +2225,11 @@ impl Machine {
                     }
                 }
                 Opcode::BsInitWritable => {
-                    // debug_assert_eq!(ins.args.len(), 0);
                     context.x[0] = bitstring::init_writable(&process, context.x[0]);
                 }
                 // BsGet and BsSkip should be implemented over an Iterator inside a match context (.skip/take)
                 // maybe we can even use nom for this
                 Opcode::BsAppend => {
-                    // debug_assert_eq!(ins.args.len(), 8);
                     // append and init also sets the string as current (state.current_binary) [seems to be used to copy string literals too]
 
                     // bs_append Fail Size Extra Live Unit Bin Flags Dst => \
@@ -2281,7 +2251,6 @@ impl Machine {
                     }
                 }
                 Opcode::BsPrivateAppend => {
-                    // debug_assert_eq!(ins.args.len(), 6);
                     // bs_private_append Fail Size Unit Bin Flags Dst
 
                     let size = context.expand_arg(&ins.args[1]);
@@ -2388,12 +2357,10 @@ impl Machine {
                     }
                 }
                 Opcode::Fclearerror => {
-                    // debug_assert_eq!(ins.args.len(), 0);
                     // TODO: BEAM checks for unhandled errors
                     context.f[0] = 0.0;
                 }
                 Opcode::Fcheckerror => {
-                    // debug_assert_eq!(ins.args.len(), 1);
                     // I think it always checks register fr0
                     if !context.f[0].is_finite() {
                         return Err(Exception::new(Reason::EXC_BADARITH));
@@ -2441,7 +2408,6 @@ impl Machine {
                 Opcode::Fmul => op_float!(context, &ins.args[..], *),
                 Opcode::Fdiv => op_float!(context, &ins.args[..], /),
                 Opcode::Fnegate => {
-                    // debug_assert_eq!(ins.args.len(), 2);
                     if let [LValue::FloatReg(a), LValue::FloatReg(dest)] = ins.args[..] {
                         context.f[dest as usize] = -context.f[a as usize];
                     } else {
@@ -2544,7 +2510,6 @@ impl Machine {
                     }
                 }
                 Opcode::GetHd => {
-                    // debug_assert_eq!(ins.args.len(), 2);
                     // source head
                     if let Ok(value::Cons { head, .. }) =
                         Cons::try_from(&context.expand_arg(&ins.args[0]))
@@ -2555,7 +2520,6 @@ impl Machine {
                     }
                 }
                 Opcode::GetTl => {
-                    // debug_assert_eq!(ins.args.len(), 2);
                     // source head
                     if let Ok(value::Cons { tail, .. }) =
                         context.expand_arg(&ins.args[0]).try_into()
@@ -2566,7 +2530,6 @@ impl Machine {
                     }
                 }
                 Opcode::PutMapAssoc => {
-                    // debug_assert_eq!(ins.args.len(), 5);
                     // F Map Dst Live Rest=* (atom with module name??)
                     if let [LValue::Label(_fail), map, dest, _live, LValue::ExtendedList(list)] =
                         &ins.args[..]
@@ -2587,7 +2550,6 @@ impl Machine {
                     }
                 }
                 Opcode::HasMapFields => {
-                    // debug_assert_eq!(ins.args.len(), 3);
                     // fail src N
                     // TODO: make a macro or make the try_into() return an Exception so we can use ?
                     if let [LValue::Label(fail), map, LValue::ExtendedList(list)] = &ins.args[..] {
@@ -2612,7 +2574,6 @@ impl Machine {
                     }
                 }
                 Opcode::GetMapElements => {
-                    // debug_assert_eq!(ins.args.len(), 3);
                     // fail src N
                     // TODO: make a macro or make the try_into() return an Exception so we can use ?
                     if let [LValue::Label(fail), map, LValue::ExtendedList(list)] = &ins.args[..] {
@@ -2638,7 +2599,6 @@ impl Machine {
                     // TODO: in the future, put_map_exact is an optimization for flatmaps (tuple
                     // maps), where the keys in the tuple stay the same, since you can memcpy the
                     // key tuple (and other optimizations)
-                    // debug_assert_eq!(ins.args.len(), 5);
                     // F Map Dst Live Rest=* (atom with module name??)
                     if let [LValue::Label(_fail), map, dest, _live, LValue::ExtendedList(list)] =
                         &ins.args[..]
@@ -2657,7 +2617,6 @@ impl Machine {
                     }
                 }
                 Opcode::IsTaggedTuple => {
-                    // debug_assert_eq!(ins.args.len(), 4);
                     let reg = context.expand_arg(&ins.args[1]);
                     let n = ins.args[2].to_u32();
                     let atom = context.expand_arg(&ins.args[3]);
@@ -2713,13 +2672,6 @@ impl Machine {
                 opcode => unimplemented!("Unimplemented opcode {:?}: {:?}", opcode, ins),
             }
         }
-
-        // Terminate once the main process has finished execution.
-        if process.is_main() {
-            self.terminate();
-        }
-
-        Ok(process::State::Done)
         }
     }
 

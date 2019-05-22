@@ -78,8 +78,15 @@ pub enum LValue {
 impl std::fmt::Debug for LValue {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
+            LValue::X(i) => write!(f, "x{}", i),
+            LValue::Y(i) => write!(f, "x{}", i),
+            LValue::Label(i) => write!(f, "l({})", i),
             LValue::Integer(i) => write!(f, "int({})", i),
             LValue::Atom(i) => write!(f, "atom({})", i),
+            LValue::Character(i) => write!(f, "char({})", i),
+            LValue::Constant(i) => write!(f, "const({})", i),
+            LValue::Nil => write!(f, "nil()"),
+            LValue::Literal(i) => write!(f, "{}", i),
             _ => write!(f, "lvalue<>"),
         }
     }
