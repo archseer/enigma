@@ -797,12 +797,12 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], LValue> {
         let (rest, r) = be_u8(rest)?;
         Ok((
             rest,
-            LValue::Integer((((b as usize) & 0b1110_0000) << 3 | (r as usize)) as i32),
+            LValue::Integer((((b as isize) & 0b1110_0000) << 3 | (r as isize)) as i32),
         )) // upcasting to i64 from usize not safe
     } else {
         // Bit 4 is 1 means that bits 5-6-7 contain amount of bytes+2 to store
         // the value
-        let mut n_bytes = (b as u32 >> 5) + 2;
+        let mut n_bytes = (b as i32 >> 5) + 2;
         let mut rest = rest;
         if n_bytes == 9 {
             // bytes=9 means upper 5 bits were set to 1, special case 0b11111xxx
@@ -810,19 +810,14 @@ fn read_int(b: u8, rest: &[u8]) -> IResult<&[u8], LValue> {
             // followed by the bytes (Size+9)
             let (r, len) = be_u8(rest)?;
             let (r, size) = read_smallint(len, r)?;
-            n_bytes = size as u32 + 9; // TODO: enforce unsigned
+            n_bytes = size as i32 + 9; // TODO: enforce unsigned
             rest = r;
         }
 
         // Read the remaining big endian bytes and convert to int
         let (rest, long_bytes) = take!(rest, n_bytes)?;
-        let sign = if long_bytes[0] & 0x80 == 0x80 {
-            Sign::Minus
-        } else {
-            Sign::Plus
-        };
 
-        let r = BigInt::from_bytes_be(sign, long_bytes);
+        let r = BigInt::from_signed_bytes_be(long_bytes);
 
         if let Some(i) = r.to_i32() {
             // fits in a regular int
