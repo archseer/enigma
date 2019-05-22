@@ -203,7 +203,7 @@ pub fn list_to_iodata(list: Term) -> Result<Vec<u8>, Exception> {
         return Ok(list.to_bytes().unwrap().to_owned());
     }
 
-    let mut stack = Vec::new();
+    let mut stack = Vec::with_capacity(16);
     stack.push(list);
 
     let mut cons: &Cons;
@@ -289,6 +289,97 @@ pub fn iolist_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
     Ok(Term::binary(heap, bitstring::Binary::from(bytes)))
 }
 
+pub fn iolist_to_iovec_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let heap = &process.context_mut().heap;
+    if args[0].is_binary() {
+        return Ok(cons!(heap, args[0], Term::nil()));
+    }
+
+    // TODO: check for cons or error with badarg
+
+    let mut stack = Vec::with_capacity(16);
+    let mut iterator = args[0];
+    let mut res = Vec::with_capacity(4);
+
+    loop {
+        while let Ok(Cons { head, tail }) = Cons::try_from(&iterator) {
+            match head.into_variant() {
+                Variant::Pointer(ptr) => match unsafe { *ptr } {
+                    value::BOXED_BINARY | value::BOXED_SUBBINARY => {
+                        // append head to result
+                        res.push(*head);
+
+                        // TODO: in the future reuse writable binaries as buf
+                        iterator = *tail;
+                    }
+                    _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                },
+                Variant::Integer(i) => {
+                    // append byte to buf
+                    // TODO: this keeps doing a lookahead
+                    // if (!iol2v_append_byte_seq(state, iterator, &seq_end)) {
+                    // iterator = seq_end;
+                    let mut seq_length = 0;
+                    let mut lookahead = iterator;
+                    while let Ok(Cons { head, tail }) = Cons::try_from(&lookahead) {
+                        if !head.is_smallint() {
+                            break;
+                        }
+                        seq_length += 1;
+                    }
+                    let mut buf = Vec::with_capacity(seq_length);
+
+                    while let Ok(Cons { head, tail }) = Cons::try_from(&iterator) {
+                        let i = head.to_i32().unwrap();
+                        buf.push(i);
+                        iterator = *tail;
+                        seq_length -= 1;
+                        if seq_length == 0 {
+                            break;
+                        }
+                    }
+                }
+                Variant::Cons(..) | Variant::Nil(..) => {
+                    if !tail.is_nil() {
+                        stack.push(*tail);
+                    }
+
+                    iterator = *head;
+                }
+                _ => return Err(Exception::new(Reason::EXC_BADARG)),
+            }
+            //     } else if (is_small(head)) {
+            //         Eterm seq_end;
+
+            //         if (!iol2v_append_byte_seq(state, iterator, &seq_end)) {
+            //             goto l_badarg;
+            //         }
+
+            //         iterator = seq_end;
+        }
+
+        // Handle the list tail
+
+        if iterator.is_binary() {
+            // append binary
+            res.push(iterator);
+        } else if !iterator.is_nil() {
+            return Err(Exception::new(Reason::EXC_BADARG));
+        }
+
+        if let Some(item) = stack.pop() {
+            iterator = item;
+        } else {
+            break;
+        }
+    }
+
+    Ok(res
+        .into_iter()
+        .rev()
+        .fold(Term::nil(), |acc, item| cons!(heap, item, acc)))
+}
+
 pub fn unicode_characters_to_binary_2(
     _vm: &vm::Machine,
     process: &RcProcess,
@@ -329,11 +420,14 @@ pub fn unicode_characters_to_binary_2(
                     let cons = unsafe { &*ptr };
                     stack.push(cons.iter())
                 }
+                Variant::Nil(..) => {}
                 Variant::Pointer(..) => match elem.to_bytes() {
                     Some(data) => bytes.extend_from_slice(data),
-                    None => return Err(Exception::new(Reason::EXC_BADARG)),
+                    _ => unreachable!("got a weird pointy: {}", elem),
+                    // None => return Err(Exception::new(Reason::EXC_BADARG)),
                 },
-                _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                _ => unreachable!("got a weird ele: {}", elem),
+                // _ => return Err(Exception::new(Reason::EXC_BADARG)),
             }
         } else {
             stack.pop();
@@ -520,6 +614,33 @@ pub fn integer_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     }
 }
 
+pub fn integer_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    match args[0].into_number() {
+        Ok(value::Num::Integer(i)) => {
+            let string = lexical::to_string(i);
+            let heap = &process.context_mut().heap;
+
+            Ok(Term::binary(
+                heap,
+                bitstring::Binary::from(string.into_bytes()),
+            ))
+        }
+        Ok(value::Num::Bignum(i)) => {
+            let string = i.to_string();
+            let heap = &process.context_mut().heap;
+
+            Ok(Term::binary(
+                heap,
+                bitstring::Binary::from(string.into_bytes()),
+            ))
+        }
+        _ => {
+            println!("integer_to_list_1 called with {}", args[0]);
+            Err(Exception::new(Reason::EXC_BADARG))
+        }
+    }
+}
+
 pub fn fun_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     if args[0].get_type() != value::Type::Closure {
         return Err(Exception::new(Reason::EXC_BADARG));
@@ -540,6 +661,18 @@ pub fn ref_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
     let heap = &process.context_mut().heap;
 
     Ok(bitstring!(heap, string))
+}
+
+pub fn binary_to_integer_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
+    // list to string
+    let bytes = match args[0].to_bytes() {
+        Some(b) => b,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+    match lexical::try_parse::<i32, _>(bytes) {
+        Ok(i) => Ok(Term::int(i)),
+        Err(err) => panic!("errored with {}", err), //TODO bigint
+    }
 }
 
 pub fn list_to_integer_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {

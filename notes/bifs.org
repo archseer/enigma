@@ -481,14 +481,14 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 - [ ] bif erlang:dt_prepend_vm_tag_data/1
 - [ ] bif erlang:dt_append_vm_tag_data/1
 
-** New in R16B. [2/12]
+** New in R16B. [4/12]
 - [X] bif erlang:prepare_loading/2
 - [X] bif erlang:finish_loading/1
 - [ ] bif erlang:insert_element/3
 - [ ] bif erlang:delete_element/2
-- [ ] bif erlang:binary_to_integer/1
+- [X] bif erlang:binary_to_integer/1
 - [ ] bif erlang:binary_to_integer/2
-- [ ] bif erlang:integer_to_binary/1
+- [X] bif erlang:integer_to_binary/1
 - [ ] bif erlang:list_to_integer/2
 - [ ] bif erlang:float_to_binary/1
 - [ ] bif erlang:float_to_binary/2
@@ -539,8 +539,8 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 - [ ] bif math:fmod/2
 - [ ] bif os:set_signal/2
 
-** New in 20.1 [0/1]
-- [ ] bif erlang:iolist_to_iovec/1
+** New in 20.1 [1/1]
+- [X] bif erlang:iolist_to_iovec/1
 
 ** New in 21.0 [4/11]
 - [ ] bif erts_internal:get_dflags/0
