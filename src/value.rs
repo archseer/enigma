@@ -1032,7 +1032,10 @@ impl Ord for Variant {
             (Variant::Integer(i1), Variant::Integer(i2)) => i1.cmp(i2),
             (Variant::Float(f1), Variant::Float(f2)) => f1.partial_cmp(f2).unwrap(),
 
-            (Variant::Atom(a1), Variant::Atom(a2)) => a1.cmp(a2),
+            (Variant::Atom(a1), Variant::Atom(a2)) => {
+                // we need to use actual atom names for comparison here
+                atom::cmp(*a1, *a2)
+            }
             (Variant::Pid(p1), Variant::Pid(p2)) => p1.cmp(p2),
             (Variant::Port(p1), Variant::Port(p2)) => p1.cmp(p2),
 

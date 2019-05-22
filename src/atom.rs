@@ -86,6 +86,15 @@ impl AtomTable {
         None
     }
 
+    pub fn cmp(&self, index1: u32, index2: u32) -> std::cmp::Ordering {
+        let atoms = self.index_r.read();
+
+        let val1 = &atoms[index1 as usize];
+        let val2 = &atoms[index2 as usize];
+
+        val1.ord0.cmp(&val2.ord0)
+    }
+
     /// Allocate new atom in the atom table or find existing.
     pub fn from_str(&self, val: &str) -> u32 {
         // unfortunately, cache hits need the write lock to avoid race conditions
@@ -728,10 +737,16 @@ pub const OTP_RELEASE: u32 = 256;
 pub const BOF: u32 = 257;
 pub const CUR: u32 = 258;
 
+#[inline]
+pub fn cmp(index1: u32, index2: u32) -> std::cmp::Ordering {
+    ATOMS.cmp(index1, index2)
+}
+#[inline]
 pub fn from_str(val: &str) -> u32 {
     ATOMS.from_str(val)
 }
 
+#[inline]
 pub fn to_str(index: u32) -> Result<String, String> {
     if let Some(p) = ATOMS.to_str(index) {
         return Ok(unsafe { (*p).name.clone() });
