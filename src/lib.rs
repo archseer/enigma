@@ -19,6 +19,7 @@ pub mod ets;
 pub mod exports_table;
 mod immix;
 mod instr_ptr;
+pub mod instruction;
 pub mod loader;
 pub mod mailbox;
 pub mod module;

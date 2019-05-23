@@ -1705,7 +1705,7 @@ impl Machine {
                         if let Ok(value) = bitstring::RcBinary::try_from(&context.expand_arg(src)) {
                             match context.expand_arg(size).into_variant() {
                                 Variant::Atom(atom::ALL) => unsafe {
-                                    (*context.bs).put_binary(&value);
+                                    (*context.bs).put_binary(&value.data);
                                 },
                                 _ => unimplemented!("bs_put_binary size {:?}", size),
                             }
@@ -1744,9 +1744,9 @@ impl Machine {
                 }
                 Opcode::BsPutString => {
                     // BsPutString uses the StrT strings table! needs to be patched in loader
-                    if let LValue::Binary(str) = &ins.args[0] {
+                    if let LValue::Str(string) = &ins.args[0] {
                         unsafe {
-                            (*context.bs).put_binary(&str);
+                            (*context.bs).put_binary(string);
                         }
                     } else {
                         unreachable!()
@@ -2139,7 +2139,7 @@ impl Machine {
                     // Converts the matching context to a (sub)binary using almost the same code as
                     // i bs get binary all reuse rx f I.
 
-                    // cxt slot
+                    // cxt
                     if let Ok(ms) = context
                         .expand_arg(&ins.args[0])
                         .get_boxed_value_mut::<bitstring::MatchState>()

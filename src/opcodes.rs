@@ -4,7 +4,7 @@
 //!
 //! name can optionally be preceded by - to indicate that it has been obsoleted. The compiler is not allowed to generate BEAM files that use obsolete instructions and the loader will refuse to load BEAM files that use obsolete instructions.
 #![allow(dead_code)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Opcode {
     /// @spec label Lbl
     /// @doc Specify a module local label.

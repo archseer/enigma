@@ -92,8 +92,8 @@ impl Binary {
         }
     }
 
-    pub fn put_binary(&mut self, binary: &RcBinary) {
-        self.data.extend_from_slice(&binary.data);
+    pub fn put_binary(&mut self, binary: &[u8]) {
+        self.data.extend_from_slice(&binary);
     }
 
     pub fn put_float(&mut self, float: f64) {
