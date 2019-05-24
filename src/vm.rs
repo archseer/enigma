@@ -6,10 +6,9 @@ use crate::ets::{RcTableRegistry, TableRegistry};
 use crate::exception::{self, Exception, Reason};
 use crate::exports_table::{Export, ExportsTable, RcExportsTable};
 use crate::instr_ptr::InstrPtr;
-use crate::loader::LValue;
 use crate::module;
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
-use crate::opcodes::Opcode;
+use crate::instruction::{self, Instruction};
 use crate::process::registry::Registry as ProcessRegistry;
 use crate::process::table::Table as ProcessTable;
 use crate::port::{Table as PortTable, RcTable as RcPortTable};
@@ -122,7 +121,7 @@ impl Machine {
 macro_rules! expand_float {
     ($context:expr, $value:expr) => {{
         match &$value {
-            LValue::ExtendedLiteral(i) => unsafe {
+            FRegister::ExtendedLiteral(i) => unsafe {
                 if let Variant::Float(value::Float(f)) =
                     (*$context.ip.module).literals[*i as usize].into_variant()
                 {
@@ -131,24 +130,24 @@ macro_rules! expand_float {
                     unreachable!()
                 }
             },
-            LValue::X(reg) => {
+            FRegister::X(reg) => {
                 if let Variant::Float(value::Float(f)) = $context.x[*reg as usize].into_variant() {
                     f
                 } else {
                     unreachable!()
                 }
             }
-            LValue::Y(reg) => {
+            FRegister::Y(reg) => {
                 let len = $context.stack.len();
                 if let Variant::Float(value::Float(f)) =
-                    $context.stack[len - (*reg + 1) as usize].into_variant()
+                    $context.stack[len - (reg + 1) as usize].into_variant()
                 {
                     f
                 } else {
                     unreachable!()
                 }
             }
-            LValue::FloatReg(reg) => $context.f[*reg as usize],
+            FRegister::FloatReg(reg) => $context.f[*reg as usize],
             _ => unreachable!(),
         }
     }};
@@ -228,9 +227,11 @@ const APPLY_3: bif::Fn = bif::bif_erlang_apply_3;
 
 macro_rules! op_call_ext {
     ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr, $return: expr) => {{
-        let mfa = unsafe { &(*$context.ip.module).imports[*$dest as usize] };
+        let mfa = unsafe { &(*$context.ip.module).imports[$dest as usize] };
 
+        // if $process.pid > 70 {
         // info!("pid={} action=call_ext mfa={}", $process.pid, mfa);
+        // }
 
         let export = { $vm.exports.read().lookup(mfa) }; // drop the exports lock
 
@@ -249,7 +250,7 @@ macro_rules! op_call_ext {
                 // call_ext_only Ar=u Bif=u$is_bif => \
                 // allocate u Ar | call_bif Bif | deallocate_return u
 
-                op_call_bif!($vm, $context, $process, bif, *$arity as usize, $return)
+                op_call_bif!($vm, $context, $process, bif, $arity as usize, $return)
             }
             None => {
                 // call error_handler here
@@ -479,17 +480,15 @@ macro_rules! op_return {
 
 macro_rules! fail {
     ($context:expr, $label:expr) => {{
-        let fail = $label.to_u32();
-        op_jump!($context, fail);
+        op_jump!($context, $label);
         continue;
     }};
 }
 
 macro_rules! cond_fail {
-    ($context:expr, $label:expr, $exc: expr) => {{
-        let fail = $label.to_u32();
-        if fail != 0 {
-            op_jump!($context, fail);
+    ($context:expr, $fail:expr, $exc: expr) => {{
+        if $fail != 0 {
+            op_jump!($context, $fail);
             continue;
         } else {
             return Err($exc);
@@ -524,7 +523,8 @@ macro_rules! op_fixed_apply {
          * Note: All BIFs have export entries; thus, no special case is needed.
          */
 
-        let mfa = module::MFA(module.to_u32(), func.to_u32(), $arity);
+        // TODO: make arity a U8 on the type
+        let mfa = module::MFA(module.to_u32(), func.to_u32(), $arity as u32);
 
         let export = { $vm.exports.read().lookup(&mfa) }; // drop the exports lock
 
@@ -554,14 +554,12 @@ macro_rules! op_fixed_apply {
 }
 
 macro_rules! op_is_type {
-    ($context:expr, $args:expr, $op:ident) => {{
-        let val = $context.expand_arg(&$args[1]);
+    ($context:expr, $fail:expr, $arg:expr, $op:ident) => {{
+        let val = $context.expand_arg($arg);
 
         if !val.$op() {
             // TODO: patch the labels to point to exact offsets to avoid labels lookup
-            let fail = $args[0].to_u32();
-
-            op_jump!($context, fail);
+            op_jump!($context, $fail);
         }
     }};
 }
@@ -573,13 +571,8 @@ macro_rules! to_expr {
 }
 
 macro_rules! op_float {
-    ($context:expr, $args:expr, $op:tt) => {{
-        // TODO: I think this fail is always unused
-        if let [_fail, LValue::FloatReg(a), LValue::FloatReg(b), LValue::FloatReg(dest)] = $args {
-            $context.f[*dest as usize] = to_expr!($context.f[*a as usize] $op $context.f[*b as usize]);
-        } else {
-            unreachable!()
-        }
+    ($context:expr, $a:expr, $b:expr, $dest:expr, $op:tt) => {{
+        $context.f[$dest as usize] = to_expr!($context.f[$a as usize] $op $context.f[$b as usize]);
     }};
 }
 
@@ -847,45 +840,36 @@ impl Machine {
 
             // if process.pid > 70 {
             //     info!(
-            //         "proc pid={:?} reds={:?} mod={:?} offs={:?} ins={:?} args={:?}",
+            //         "proc pid={:?} reds={:?} mod={:?} offs={:?} ins={:?}",
             //         process.pid,
             //         context.reds,
             //         atom::to_str(module.name).unwrap(),
             //         context.ip.ptr,
-            //         ins.op,
-            //         ins.args
+            //         ins,
             //     );
             // }
 
-            match &ins.op {
-                Opcode::FuncInfo => {
-                    // Raises function clause exception. Arg1, Arg2, Arg3 are MFA. Arg0 is a mystery
-                    // coming out of nowhere, probably, needed for NIFs.
-
-                    // happens if no other clause matches
-                    // eprintln!(
-                    //     "function clause! {} {} {:?}",
+            match ins {
+                &Instruction::FuncInfo { .. } => {
+                    // Raises function clause exception.
+                    // eprintln!("function clause! {} {} {:?}",
                     //     context.expand_arg(&ins.args[0]),
                     //     context.expand_arg(&ins.args[1]),
                     //     ins.args[2]
                     // );
                     return Err(Exception::new(Reason::EXC_FUNCTION_CLAUSE));
                 }
-                Opcode::Jump => {
-                    // debug_assert_eq!(ins.args.len(), 1);
-                    let label = ins.args[0].to_u32();
+                &Instruction::Jump(label) => {
                     op_jump!(context, label)
                 }
-                Opcode::Move => {
-                    // debug_assert_eq!(ins.args.len(), 2);
-                    // arg1 can be either a value or a register
-                    let val = context.expand_arg(&ins.args[0]);
-                    context.set_register(&ins.args[1], val)
+                &Instruction::Move { source, destination } => {
+                    let val = context.expand_arg(source);
+                    context.set_register(destination, val)
                 }
-                Opcode::Return => {
+                &Instruction::Return => {
                     op_return!(process, context);
                 }
-                Opcode::Send => {
+                &Instruction::Send => {
                     // send x1 to x0, write result to x0
                     let pid = context.x[0];
                     let msg = context.x[1];
@@ -895,7 +879,7 @@ impl Machine {
                     }?;
                     context.x[0] = res;
                 }
-                Opcode::RemoveMessage => {
+                &Instruction::RemoveMessage => {
                     // Unlink the current message from the message queue. Remove any timeout.
                     process.local_data_mut().mailbox.remove();
                     // clear timeout
@@ -903,37 +887,31 @@ impl Machine {
                     // reset savepoint of the mailbox
                     process.local_data_mut().mailbox.reset();
                 }
-                Opcode::Timeout => {
+                &Instruction::Timeout => {
                     //  Reset the save point of the mailbox and clear the timeout flag.
                     process.local_data_mut().mailbox.reset();
                     // clear timeout
                     context.timeout.take();
                 }
-                Opcode::LoopRec => {
-                    // label, source
+                &Instruction::LoopRec { label: fail, source } => {
+                    // TODO: source is supposed to be the location, but it's always x0
                     // grab message from queue, put to x0, if no message, jump to fail label
                     if let Some(msg) = process.receive()? {
                         // println!("recv proc pid={:?} msg={}", process.pid, msg);
                         context.x[0] = msg
                     } else {
-                        let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
                     }
                 }
-                Opcode::LoopRecEnd => {
-                    // label
+                &Instruction::LoopRecEnd { label } => {
                     // Advance the save pointer to the next message and jump back to Label.
 
                     process.local_data_mut().mailbox.advance();
-
-                    let label = ins.args[0].to_u32();
                     op_jump!(context, label);
                 }
-                Opcode::Wait => {
-                    // label
+                &Instruction::Wait { label } => {
                     // jump to label, set wait flag on process
 
-                    let label = ins.args[0].to_u32();
                     op_jump!(context, label);
 
                     // TODO: this currently races if the process is sending us
@@ -949,10 +927,9 @@ impl Machine {
                     // println!("pid={} resumption ", process.pid);
                     process.process_incoming()?;
                 }
-                Opcode::WaitTimeout => {
-                    // @spec wait_timeout Lable Time
-                    // @doc  Sets up a timeout of Time milliseconds and saves the address of the
-                    //       following instruction as the entry point if the timeout triggers.
+                &Instruction::WaitTimeout { label, time } => {
+                    // Sets up a timeout of Time milliseconds and saves the address of the
+                    // following instruction as the entry point if the timeout triggers.
 
                     if process.context_mut().timeout.is_none() {
                         // if this is outside of loop_rec, this will be blank
@@ -963,11 +940,10 @@ impl Machine {
 
                     let cancel = process.context_mut().recv_channel.take().unwrap();
 
-                    match context.expand_arg(&ins.args[1]).into_variant() {
+                    match context.expand_arg(time).into_variant() {
                         Variant::Atom(atom::INFINITY) => {
-                            // just a normal Opcode::Wait
+                            // just a normal &Instruction::Wait
                             // println!("infinity wait");
-                            let label = ins.args[0].to_u32();
                             op_jump!(context, label);
 
                             cancel.await; // suspend process
@@ -980,7 +956,6 @@ impl Machine {
                             match cancel.into_future().boxed().compat().timeout(when).compat().await {
                                 Ok(()) =>  {
                                     // jump to success (start of recv loop)
-                                    let label = ins.args[0].to_u32();
                                     op_jump!(context, label);
                                     // println!("select! resumption pid={}", process.pid);
                                 }
@@ -1017,328 +992,259 @@ impl Machine {
                             // };
                         },
                         // TODO: bigint
-                        _ => unreachable!("{}", context.expand_arg(&ins.args[1]))
+                        _ => unreachable!("{}", context.expand_arg(time))
                     }
                     process.process_incoming()?;
                 }
-                Opcode::RecvMark => {
+                &Instruction::RecvMark => {
                     process.local_data_mut().mailbox.mark();
                 }
-                Opcode::RecvSet => {
+                &Instruction::RecvSet => {
                     process.local_data_mut().mailbox.set();
                 }
-                Opcode::Call => {
-                    //literal arity, label jmp
+                &Instruction::Call { arity, label: i } => {
                     // store arity as live
-                    if let [LValue::Literal(_a), LValue::Label(i)] = &ins.args[..] {
-                        context.cp = Some(context.ip);
-                        op_jump!(context, *i);
+                    context.cp = Some(context.ip);
+                    op_jump!(context, i);
 
-                        // if process.pid > 70 {
-                        //     let (mfa, _) = context.ip.lookup_func_info().unwrap();
-                        //     info!("pid={} action=call mfa={}", process.pid, mfa);
-                        // }
-                    } else {
-                        unreachable!()
-                    }
+                    // if process.pid > 70 {
+                    //     let (mfa, _) = context.ip.lookup_func_info().unwrap();
+                    //     info!("pid={} action=call mfa={}", process.pid, mfa);
+                    // }
                     safepoint_and_reduce!(self, process, context.reds);
                 }
-                Opcode::CallLast => {
-                    //literal arity, label jmp, nwords
+                &Instruction::CallLast { arity, label: i, words }=> {
                     // store arity as live
-                    if let [LValue::Literal(_a), LValue::Label(i), LValue::Literal(nwords)] =
-                        &ins.args[..]
-                    {
-                        op_deallocate!(context, *nwords);
+                    op_deallocate!(context, words);
 
-                        op_jump!(context, *i);
+                    op_jump!(context, i);
 
-                        // if process.pid > 70 {
-                        // let (mfa, _) = context.ip.lookup_func_info().unwrap();
-                        // info!("pid={} action=call_last mfa={}", process.pid, mfa);
-                        // }
-                    } else {
-                        unreachable!()
-                    }
+                    // if process.pid > 70 {
+                    // let (mfa, _) = context.ip.lookup_func_info().unwrap();
+                    // info!("pid={} action=call_last mfa={}", process.pid, mfa);
+                    // }
                     safepoint_and_reduce!(self, process, context.reds);
                 }
-                Opcode::CallOnly => {
-                    //literal arity, label jmp
+                &Instruction::CallOnly { arity, label: i }=> {
                     // store arity as live
-                    //
-                    if let [LValue::Literal(_a), LValue::Label(l)] = &ins.args[..] {
-                        op_jump!(context, *l);
+                    op_jump!(context, i);
 
-                        // if process.pid > 70 {
-                        // let (mfa, _) = context.ip.lookup_func_info().unwrap();
-                        // info!("pid={} action=call_only mfa={}", process.pid, mfa);
-                        // }
-                    } else {
-                        unreachable!()
-                    }
+                    // if process.pid > 70 {
+                    // let (mfa, _) = context.ip.lookup_func_info().unwrap();
+                    // info!("pid={} action=call_only mfa={}", process.pid, mfa);
+                    // }
                     safepoint_and_reduce!(self, process, context.reds);
                 }
-                Opcode::CallExt => {
-                    //literal arity, literal destination (module.imports index)
-                    if let [LValue::Literal(arity), LValue::Literal(dest)] = &ins.args[..] {
-                        // save pointer onto CP
-                        context.cp = Some(context.ip);
+                &Instruction::CallExt { arity, destination } => {
+                    // save pointer onto CP
+                    context.cp = Some(context.ip);
 
-                        op_call_ext!(self, context, &process, arity, dest, false); // don't return on call_ext
-                    } else {
-                        unreachable!()
-                    }
+                    op_call_ext!(self, context, &process, arity, destination, false); // don't return on call_ext
                     safepoint_and_reduce!(self, process, context.reds);
                 }
-                Opcode::CallExtOnly => {
-                    //literal arity, literal destination (module.imports index)
-                    if let [LValue::Literal(arity), LValue::Literal(dest)] = &ins.args[..] {
-                        op_call_ext!(self, context, &process, arity, dest, true);
-                    } else {
-                        unreachable!()
-                    }
+                &Instruction::CallExtOnly { arity, destination }=> {
+                    op_call_ext!(self, context, &process, arity, destination, true);
                     safepoint_and_reduce!(self, process, context.reds);
                 }
-                Opcode::CallExtLast => {
-                    //literal arity, literal destination (module.imports index), literal deallocate
-                    if let [LValue::Literal(arity), LValue::Literal(dest), LValue::Literal(nwords)] =
-                        &ins.args[..]
-                    {
-                        op_deallocate!(context, *nwords);
+                &Instruction::CallExtLast { arity, destination, words } => {
+                    op_deallocate!(context, words);
 
-                        op_call_ext!(self, context, &process, arity, dest, true);
-                    } else {
-                        unreachable!()
-                    }
+                    op_call_ext!(self, context, &process, arity, destination, true);
                     safepoint_and_reduce!(self, process, context.reds);
                 }
-                Opcode::Bif0 => {
-                    // literal import, x reg
-                    if let [LValue::Bif(bif), reg] = &ins.args[..] {
-                        let val = bif(self, &process, &[]).unwrap(); // bif0 can't fail
-                        context.set_register(reg, val);
-                    } else {
-                        unreachable!()
+                &Instruction::Bif0 { bif, reg } => {
+                    let val = bif(self, &process, &[]).unwrap(); // bif0 can't fail
+                    context.set_register(reg, val);
+                }
+                &Instruction::Bif1 { fail, bif, arg1, reg } => {
+                    let args = &[context.expand_arg(arg1)];
+                    match bif(self, &process, args) {
+                        Ok(val) => context.set_register(reg, val),
+                        Err(exc) => cond_fail!(context, fail, exc),
                     }
                 }
-                Opcode::Bif1 => {
-                    // literal import, arg, x reg
-                    if let [fail, LValue::Bif(bif), arg1, reg] = &ins.args[..] {
-                        let args = &[context.expand_arg(arg1)];
-                        match bif(self, &process, args) {
-                            Ok(val) => context.set_register(reg, val),
-                            Err(exc) => cond_fail!(context, fail, exc),
-                        }
-                    } else {
-                        unreachable!()
+                &Instruction::Bif2 { fail, bif, arg1, arg2, reg } => {
+                    let args = &[context.expand_arg(arg1), context.expand_arg(arg2)];
+                    match bif(self, &process, args) {
+                        Ok(val) => context.set_register(reg, val),
+                        Err(exc) => cond_fail!(context, fail, exc),
                     }
                 }
-                Opcode::Bif2 => {
-                    // literal import, arg, arg, x reg
-                    if let [fail, LValue::Bif(bif), arg1, arg2, reg] = &ins.args[..] {
-                        let args = &[context.expand_arg(arg1), context.expand_arg(arg2)];
-                        match bif(self, &process, args) {
-                            Ok(val) => context.set_register(reg, val),
-                            Err(exc) => cond_fail!(context, fail, exc),
-                        }
-                    } else {
-                        unreachable!()
-                    }
+                &Instruction::Allocate { stackneed, live } => {
+                    context
+                        .stack
+                        .resize(context.stack.len() + stackneed as usize, Term::nil());
+                    context.callstack.push((stackneed, context.cp.take()));
                 }
-                Opcode::Allocate => {
-                    // stackneed, live
-                    if let [LValue::Literal(stackneed), LValue::Literal(_live)] = &ins.args[..] {
-                        for _ in 0..*stackneed {
-                            context.stack.push(Term::nil())
-                        }
-                        context.callstack.push((*stackneed, context.cp.take()));
-                    } else {
-                        unreachable!()
-                    }
-                }
-                Opcode::AllocateHeap => {
+                &Instruction::AllocateHeap { stackneed, heapneed, live } => {
                     // TODO: this also zeroes the values, make it dynamically change the
                     // capacity/len of the Vec to bypass initing these.
 
-                    // literal stackneed, literal heapneed, literal live
                     // allocate stackneed space on stack, ensure heapneed on heap, if gc, keep live
                     // num of X regs. save cp on stack.
-                    if let [LValue::Literal(stackneed), LValue::Literal(_heapneed), LValue::Literal(_live)] =
-                        &ins.args[..]
-                    {
-                        context
-                            .stack
-                            .resize(context.stack.len() + *stackneed as usize, Term::nil());
-                        // TODO: check heap for heapneed space!
-                        context.callstack.push((*stackneed, context.cp.take()));
-                    } else {
-                        unreachable!()
-                    }
+                    context
+                        .stack
+                        .resize(context.stack.len() + stackneed as usize, Term::nil());
+                    // TODO: check heap for heapneed space!
+                    context.callstack.push((stackneed, context.cp.take()));
                 }
-                Opcode::AllocateZero => {
-                    // literal stackneed, literal live
-                    if let [LValue::Literal(need), LValue::Literal(_live)] = &ins.args[..] {
-                        context
-                            .stack
-                            .resize(context.stack.len() + *need as usize, Term::nil());
-                        context.callstack.push((*need, context.cp.take()));
-                    } else {
-                        unreachable!()
-                    }
+                &Instruction::AllocateZero { stackneed, live } => {
+                    context
+                        .stack
+                        .resize(context.stack.len() + stackneed as usize, Term::nil());
+                    context.callstack.push((stackneed, context.cp.take()));
                 }
-                Opcode::AllocateHeapZero => {
-                    // literal stackneed, literal heapneed, literal live
+                &Instruction::AllocateHeapZero { stackneed, heapneed, live } => {
                     // allocate stackneed space on stack, ensure heapneed on heap, if gc, keep live
                     // num of X regs. save cp on stack.
-                    if let [LValue::Literal(stackneed), LValue::Literal(_heapneed), LValue::Literal(_live)] =
-                        &ins.args[..]
-                    {
-                        context
-                            .stack
-                            .resize(context.stack.len() + *stackneed as usize, Term::nil());
-                        // TODO: check heap for heapneed space!
-                        context.callstack.push((*stackneed, context.cp.take()));
-                    } else {
-                        unreachable!()
-                    }
+                    context
+                        .stack
+                        .resize(context.stack.len() + stackneed as usize, Term::nil());
+                    // TODO: check heap for heapneed space!
+                    context.callstack.push((stackneed, context.cp.take()));
                 }
-                Opcode::TestHeap => {
+                &Instruction::TestHeap { .. } => {
                     // println!("TODO: TestHeap unimplemented!");
                 }
-                Opcode::Init => {
-                    context.set_register(&ins.args[0], Term::nil())
+                &Instruction::Init { n } => {
+                    context.set_register(n, Term::nil())
                 }
-                Opcode::Deallocate => {
-                    // literal nwords
-                    if let [LValue::Literal(nwords)] = &ins.args[..] {
-                        op_deallocate!(context, *nwords)
-                    } else {
-                        unreachable!()
-                    }
+                &Instruction::Deallocate { n } => {
+                    op_deallocate!(context, n)
                 }
-                Opcode::IsGe => {
-                    let v1 = context.expand_arg(&ins.args[1]);
-                    let v2 = context.expand_arg(&ins.args[2]);
+                &Instruction::IsGe { label: fail, arg1, arg2 } => {
+                    let v1 = context.expand_arg(arg1);
+                    let v2 = context.expand_arg(arg2);
 
                     if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(&v2) {
-                        let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
                     } else {
                         // ok
                     }
                 }
-                Opcode::IsLt => {
-                    let v1 = context.expand_arg(&ins.args[1]);
-                    let v2 = context.expand_arg(&ins.args[2]);
+                &Instruction::IsLt { label: fail, arg1, arg2 } => {
+                    let v1 = context.expand_arg(arg1);
+                    let v2 = context.expand_arg(arg2);
 
                     if let Some(std::cmp::Ordering::Less) = v1.partial_cmp(&v2) {
                         // ok
                     } else {
-                        let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
                     }
                 }
-                Opcode::IsEq => {
-                    let v1 = context.expand_arg(&ins.args[1]);
-                    let v2 = context.expand_arg(&ins.args[2]);
+                &Instruction::IsEq { label: fail, arg1, arg2 } => {
+                    let v1 = context.expand_arg(arg1);
+                    let v2 = context.expand_arg(arg2);
 
                     if let Some(std::cmp::Ordering::Equal) = v1.erl_partial_cmp(&v2) {
                         // ok
                     } else {
-                        let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
                     }
                 }
-                Opcode::IsNe => {
-                    let v1 = context.expand_arg(&ins.args[1]);
-                    let v2 = context.expand_arg(&ins.args[2]);
+                &Instruction::IsNe { label: fail, arg1, arg2 } => {
+                    let v1 = context.expand_arg(arg1);
+                    let v2 = context.expand_arg(arg2);
 
                     if let Some(std::cmp::Ordering::Equal) = v1.erl_partial_cmp(&v2) {
-                        let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
                     }
                 }
-                Opcode::IsEqExact => {
-                    let v1 = context.expand_arg(&ins.args[1]);
-                    let v2 = context.expand_arg(&ins.args[2]);
+                &Instruction::IsEqExact { label: fail, arg1, arg2 } => {
+                    let v1 = context.expand_arg(arg1);
+                    let v2 = context.expand_arg(arg2);
 
                     if v1.eq(&v2) {
                         // ok
                     } else {
-                        let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
                     }
                 }
-                Opcode::IsNeExact => {
-                    let v1 = context.expand_arg(&ins.args[1]);
-                    let v2 = context.expand_arg(&ins.args[2]);
+                &Instruction::IsNeExact { label: fail, arg1, arg2 } => {
+                    let v1 = context.expand_arg(arg1);
+                    let v2 = context.expand_arg(arg2);
 
                     if v1.eq(&v2) {
-                        let fail = ins.args[0].to_u32();
                         op_jump!(context, fail);
                     } else {
                         // ok
                     }
                 }
-                Opcode::IsInteger => op_is_type!(context, ins.args, is_integer),
-                Opcode::IsFloat => op_is_type!(context, ins.args, is_float),
-                Opcode::IsNumber => op_is_type!(context, ins.args, is_number),
-                Opcode::IsAtom => op_is_type!(context, ins.args, is_atom),
-                Opcode::IsPid => op_is_type!(context, ins.args, is_pid),
-                Opcode::IsReference => op_is_type!(context, ins.args, is_ref),
-                Opcode::IsPort => op_is_type!(context, ins.args, is_port),
-                Opcode::IsNil => op_is_type!(context, ins.args, is_nil),
-                Opcode::IsBinary => op_is_type!(context, ins.args, is_binary),
-                Opcode::IsBitstr => op_is_type!(context, ins.args, is_bitstring),
-                Opcode::IsList => op_is_type!(context, ins.args, is_list),
-                Opcode::IsNonemptyList => op_is_type!(context, ins.args, is_non_empty_list),
-                Opcode::IsTuple => op_is_type!(context, ins.args, is_tuple),
-                Opcode::IsFunction => op_is_type!(context, ins.args, is_function),
-                Opcode::IsBoolean => op_is_type!(context, ins.args, is_boolean),
-                Opcode::IsMap => op_is_type!(context, ins.args, is_map),
-                Opcode::IsFunction2 => {
+                &Instruction::IsInteger { label: fail, arg1 } => op_is_type!(context, fail, arg1, is_integer),
+                &Instruction::IsFloat { label: fail, arg1 } => op_is_type!(context, fail, arg1, is_float),
+                &Instruction::IsNumber { label: fail, arg1 } => op_is_type!(context, fail, arg1, is_number),
+                &Instruction::IsAtom { label: fail, arg1 } => op_is_type!(context, fail, arg1, is_atom),
+                &Instruction::IsPid { label: fail, arg1 } => op_is_type!(context, fail, arg1, is_pid),
+                &Instruction::IsReference { label: fail, arg1 } => op_is_type!(context, fail, arg1, is_ref),
+                &Instruction::IsPort { label: fail, arg1 } => op_is_type!(context, fail, arg1, is_port),
+                &Instruction::IsNil { label: fail, arg1 } => op_is_type!(context, fail, arg1, is_nil),
+                &Instruction::IsBinary { label: fail, arg1 } => op_is_type!(context, fail, arg1, is_binary),
+                &Instruction::IsBitstr { label: fail, arg1 } => op_is_type!(context, fail, arg1, is_bitstring),
+                &Instruction::IsList { label: fail, arg1 } => op_is_type!(context, fail, arg1, is_list),
+                &Instruction::IsNonemptyList { label: fail, arg1 } => op_is_type!(context, fail, arg1, is_non_empty_list),
+                &Instruction::IsTuple { label: fail, arg1 } => op_is_type!(context, fail, arg1, is_tuple),
+                &Instruction::IsFunction { label: fail, arg1 } => op_is_type!(context, fail, arg1, is_function),
+                &Instruction::IsBoolean { label: fail, arg1 } => op_is_type!(context, fail, arg1, is_boolean),
+                &Instruction::IsMap { label: fail, arg1 } => op_is_type!(context, fail, arg1, is_map),
+                &Instruction::IsFunction2 { label: fail, arg1, arity } => {
                     // TODO: needs to verify exports too
-                    let arity = ins.args[2].to_u32();
-                    let value = &context.expand_arg(&ins.args[1]);
-                    if let Ok(closure) = value::Closure::try_from(value) {
+                    let value = context.expand_arg(arg1);
+                    let arity = context.expand_arg(arity).to_u32();
+                    if let Ok(closure) = value::Closure::try_from(&value) {
                         if closure.mfa.2 == arity {
                             continue;
                         }
                     }
-                    if let Ok(mfa) = module::MFA::try_from(value) {
+                    if let Ok(mfa) = module::MFA::try_from(&value) {
                         if mfa.2 == arity {
                             continue;
                         }
                     }
-                    let fail = ins.args[0].to_u32();
                     op_jump!(context, fail);
                 }
-                Opcode::TestArity => {
+                &Instruction::TestArity { label: fail, arg1, arity } => {
                     // check tuple arity
-                    if let [LValue::Label(fail), arg, LValue::Literal(arity)] = &ins.args[..] {
-                        if let Ok(t) = Tuple::try_from(&context.expand_arg(arg)) {
-                            if t.len != *arity {
-                                op_jump!(context, *fail);
-                            }
-                        } else {
-                            panic!("Bad argument to {:?}", ins.op)
+                    if let Ok(t) = Tuple::try_from(&context.expand_arg(arg1)) {
+                        if t.len != arity {
+                            op_jump!(context, fail);
                         }
                     } else {
-                        unreachable!()
+                        panic!("Bad argument to TestArity")
                     }
                 }
-                Opcode::SelectVal => {
-                    // arg, fail, dests
+                Instruction::SelectVal { arg, fail, destinations: vec } => {
                     // loop over dests
-                    if let [arg, LValue::Label(fail), LValue::ExtendedList(vec)] = &ins.args[..] {
-                        let arg = context.expand_arg(arg).into_variant();
+                    let arg = context.expand_arg(*arg).into_variant();
+                    let mut i = 0;
+                    loop {
+                        // if key matches, jump to the following label
+                        if context.expand_arg(vec[i].into_value()).into_variant() == arg {
+                            let label = vec[i + 1].to_label();
+                            op_jump!(context, label);
+                            break;
+                        }
+
+                        i += 2;
+
+                        // if we ran out of options, jump to fail
+                        if i >= vec.len() {
+                            op_jump!(context, *fail);
+                            break;
+                        }
+                    }
+                }
+                Instruction::SelectTupleArity { arg, fail, arities: vec } => {
+                    if let Ok(tup) = Tuple::try_from(&context.expand_arg(*arg)) {
+                        let len = tup.len;
                         let mut i = 0;
                         loop {
                             // if key matches, jump to the following label
-                            if vec[i].into_value() == arg {
-                                let label = vec[i + 1].to_u32();
-                                op_jump!(context, label);
-                                break;
+                            if let instruction::Entry::Literal(n) = vec[i] {
+                                if n == len {
+                                    let label = vec[i + 1].to_label();
+                                    op_jump!(context, label);
+                                    break;
+                                }
                             }
 
                             i += 2;
@@ -1349,63 +1255,31 @@ impl Machine {
                                 break;
                             }
                         }
+                    } else {
+                        op_jump!(context, *fail);
                     }
                 }
-                Opcode::SelectTupleArity => {
-                    // tuple fail dests
-                    if let [arg, LValue::Label(fail), LValue::ExtendedList(vec)] = &ins.args[..] {
-                        if let Ok(tup) = Tuple::try_from(&context.expand_arg(arg)) {
-                            let len = tup.len;
-                            let mut i = 0;
-                            loop {
-                                // if key matches, jump to the following label
-                                if let LValue::Literal(n) = vec[i] {
-                                    if n == len {
-                                        let label = vec[i + 1].to_u32();
-                                        op_jump!(context, label);
-                                        break;
-                                    }
-                                }
-
-                                i += 2;
-
-                                // if we ran out of options, jump to fail
-                                if i >= vec.len() {
-                                    op_jump!(context, *fail);
-                                    break;
-                                }
-                            }
-                        } else {
-                            op_jump!(context, *fail);
-                        }
-                    }
-                }
-                Opcode::GetList => {
-                    // source, head, tail
-                    if let Ok(value::Cons { head, tail }) =
-                        context.expand_arg(&ins.args[0]).try_into()
-                    {
-                        context.set_register(&ins.args[1], *head);
-                        context.set_register(&ins.args[2], *tail);
+                &Instruction::GetList { source, head: h, tail: t } => {
+                    if let Ok(value::Cons { head, tail }) = context.fetch_register(source).try_into() {
+                        context.set_register(h, *head);
+                        context.set_register(t, *tail);
                     } else {
                         panic!("badarg to GetList")
                     }
                 }
-                Opcode::GetTupleElement => {
-                    // source, element, dest
-                    let source = context.expand_arg(&ins.args[0]);
-                    let n = ins.args[1].to_u32() as usize;
+                &Instruction::GetTupleElement { source, element, destination } => {
+                    let source = context.fetch_register(source);
+                    let n = element as usize;
                     if let Ok(t) = Tuple::try_from(&source) {
-                        context.set_register(&ins.args[2], t[n])
+                        context.set_register(destination, t[n])
                     } else {
                         panic!("GetTupleElement: source is of wrong type")
                     }
                 }
-                Opcode::SetTupleElement => {
-                    // new_el tuple pos
-                    let el = context.expand_arg(&ins.args[0]);
-                    let tuple = context.expand_arg(&ins.args[1]);
-                    let pos = ins.args[2].to_u32() as usize;
+                &Instruction::SetTupleElement { new_element, tuple, position } => {
+                    let el = context.expand_arg(new_element);
+                    let tuple = context.expand_arg(tuple);
+                    let pos = position as usize;
                     if let Ok(t) = tuple.try_into_mut() {
                         let tuple: &mut value::Tuple = t; // annoying, need type annotation
                         tuple[pos] = el;
@@ -1413,60 +1287,48 @@ impl Machine {
                         panic!("GetTupleElement: source is of wrong type")
                     }
                 }
-                Opcode::PutList => {
-                    // put_list H T Dst::slot()
+                &Instruction::PutList { head, tail, destination } => {
                     // Creates a cons cell with [H|T] and places the value into Dst.
-                    let head = context.expand_arg(&ins.args[0]);
-                    let tail = context.expand_arg(&ins.args[1]);
+                    let head = context.expand_arg(head);
+                    let tail = context.expand_arg(tail);
                     let cons = cons!(&context.heap, head, tail);
-                    context.set_register(&ins.args[2], cons)
+                    context.set_register(destination, cons)
                 }
-                Opcode::PutTuple => {
-                    // put_tuple dest size
-                    // followed by multiple put() ops (put val [potentially regX/Y])
-                    unreachable!("Stray PutTuple that wasn't rewritten by the loader!")
-
-                    // Code compiled with OTP 22 and later uses put_tuple2 to to construct a tuple.
-                    // PutTuple + Put is before OTP 22 and we should transform in loader to put_tuple2
-                }
-                Opcode::Put => unreachable!("Stray Put that wasn't rewritten by the loader!"),
-                Opcode::PutTuple2 => {
+                Instruction::PutTuple2 { source, list } => {
                     // op: PutTuple2, args: [X(0), ExtendedList([Y(1), Y(0), X(0)])] }
-                    if let LValue::ExtendedList(list) = &ins.args[1] {
-                        let arity = list.len();
+                    let arity = list.len();
 
-                        let tuple = value::tuple(&context.heap, arity as u32);
-                        for i in 0..arity {
-                            unsafe {
-                                std::ptr::write(&mut tuple[i], context.expand_arg(&list[i]));
-                            }
+                    let tuple = value::tuple(&context.heap, arity as u32);
+                    for i in 0..arity {
+                        unsafe {
+                            std::ptr::write(&mut tuple[i], context.expand_entry(&list[i]));
                         }
-                        context.set_register(&ins.args[0], Term::from(tuple))
                     }
+                    let tuple = Term::from(tuple);
+                    context.set_register(*source, tuple);
                 }
-                Opcode::Badmatch => {
-                    let value = context.expand_arg(&ins.args[0]);
-                    // println!("Badmatch: {}", value);
+                &Instruction::Badmatch { value } => {
+                    let value = context.expand_arg(value);
+                    println!("Badmatch: {}", value);
                     return Err(Exception::with_value(Reason::EXC_BADMATCH, value));
                 }
-                Opcode::IfEnd => {
+                &Instruction::IfEnd => {
                     // Raises the if_clause exception.
                     return Err(Exception::new(Reason::EXC_IF_CLAUSE));
                 }
-                Opcode::CaseEnd => {
+                &Instruction::CaseEnd { value } => {
                     // Raises the case_clause exception with the value of Arg0
-                    let value = context.expand_arg(&ins.args[0]);
-                    // println!("err=case_clause val={}", value);
+                    let value = context.expand_arg(value);
+                    println!("err=case_clause val={}", value);
+                    // err=case_clause val={{820515101, #Ref<0.0.0.105>}, :timeout, {:gen_server, :cast, [#Pid<61>, :repeated_filesync]}}
                     return Err(Exception::with_value(Reason::EXC_CASE_CLAUSE, value));
                 }
-                Opcode::Try => {
+                &Instruction::Try { fail, register } => {
                     // TODO: try is identical to catch, and is remapped in the OTP loader
-                    // y f
                     // create a catch context that wraps f - fail label, and stores to y - reg.
                     context.catches += 1;
-                    let fail = ins.args[1].to_u32();
                     context.set_register(
-                        &ins.args[0],
+                        register,
                         Term::catch(
                             &context.heap,
                             InstrPtr {
@@ -1476,36 +1338,34 @@ impl Machine {
                         )
                     );
                 }
-                Opcode::TryEnd => {
-                    // y
+                &Instruction::TryEnd { register } => {
                     context.catches -= 1;
-                    context.set_register(&ins.args[0], Term::nil()) // TODO: make_blank macro
+                    context.set_register(register, Term::nil()) // TODO: make_blank macro
                 }
-                Opcode::TryCase => {
+                &Instruction::TryCase { register } => {
                     // pops a catch context in y  Erases the label saved in the Arg0 slot. Noval in R0 indicate that something is caught. If so, R0 is set to R1, R1 — to R2, R2 — to R3.
 
                     // TODO: this initial part is identical to TryEnd
                     context.catches -= 1;
-                    context.set_register(&ins.args[0], Term::nil()); // TODO: make_blank macro
+                    context.set_register(register, Term::nil()); // TODO: make_blank macro
 
                     assert!(context.x[0].is_none());
                     // TODO: c_p->fvalue = NIL;
-                    // TODO: make more efficient
+                    // TODO: make more efficient via memmove
                     context.x[0] = context.x[1];
                     context.x[1] = context.x[2];
                     context.x[2] = context.x[3];
                 }
-                Opcode::TryCaseEnd => {
+                &Instruction::TryCaseEnd { value } => {
                     // Raises a try_clause exception with the value read from Arg0.
-                    let value = context.expand_arg(&ins.args[0]);
+                    let value = context.expand_arg(value);
                     return Err(Exception::with_value(Reason::EXC_TRY_CLAUSE, value));
                 }
-                Opcode::Catch => {
+                &Instruction::Catch { fail, register } => {
                     // create a catch context that wraps f - fail label, and stores to y - reg.
                     context.catches += 1;
-                    let fail = ins.args[1].to_u32();
                     context.set_register(
-                        &ins.args[0],
+                        register,
                         Term::catch(
                             &context.heap,
                             InstrPtr {
@@ -1515,8 +1375,7 @@ impl Machine {
                         )
                     );
                 }
-                Opcode::CatchEnd => {
-                    // y
+                &Instruction::CatchEnd { register } => {
                     // Pops a “catch” context. Erases the label saved in the Arg0 slot. Noval in R0
                     // indicates that something is caught. If R1 contains atom throw then R0 is set
                     // to R2. If R1 contains atom error than a stack trace is added to R2. R0 is
@@ -1524,11 +1383,10 @@ impl Machine {
                     //
                     // difference fron try is, try will exhaust all the options then fail, whereas
                     // catch will keep going upwards.
-                    //
 
                     // TODO: this initial part is identical to TryEnd
                     context.catches -= 1; // TODO: this is overflowing
-                    context.set_register(&ins.args[0], Term::nil()); // TODO: make_blank macro
+                    context.set_register(register, Term::nil()); // TODO: make_blank macro
 
                     if context.x[0].is_none() {
                         // c_p->fvalue = NIL;
@@ -1549,12 +1407,12 @@ impl Machine {
                         }
                     }
                 }
-                Opcode::Raise => {
+                &Instruction::Raise { trace, value } => {
                     // Raises the exception. The instruction is garbled by backward compatibility. Arg0 is a stack trace
                     // and Arg1 is the value accompanying the exception. The reason of the raised exception is dug up
                     // from the stack trace
-                    let trace = context.expand_arg(&ins.args[0]);
-                    let value = context.expand_arg(&ins.args[1]);
+                    let trace = context.fetch_register(trace);
+                    let value = context.expand_arg(value);
 
                     let reason = if let Some(s) = exception::get_trace_from_exc(&trace) {
                         primary_exception!(s.reason)
@@ -1567,45 +1425,29 @@ impl Machine {
                         trace,
                     });
                 }
-                Opcode::Apply => {
-                    //literal arity
+                &Instruction::Apply { arity } => {
+                    context.cp = Some(context.ip);
 
-                    if let [LValue::Literal(arity)] = &ins.args[..] {
-                        context.cp = Some(context.ip);
-
-                        op_fixed_apply!(self, context, &process, *arity, false)
+                    op_fixed_apply!(self, context, &process, arity, false);
                     // call this fixed_apply, used for ops (apply, apply_last).
                     // apply is the func that's equivalent to erlang:apply/3 (and instrs)
-                    } else {
-                        unreachable!()
-                    }
                     safepoint_and_reduce!(self, process, context.reds);
                 }
-                Opcode::ApplyLast => {
-                    //literal arity, nwords (dealloc)
-                    if let [LValue::Literal(arity), LValue::Literal(nwords)] = &ins.args[..] {
-                        op_deallocate!(context, *nwords);
+                &Instruction::ApplyLast { arity, nwords } => {
+                    op_deallocate!(context, nwords);
 
-                        op_fixed_apply!(self, context, &process, *arity, true)
-                    } else {
-                        unreachable!()
-                    }
+                    op_fixed_apply!(self, context, &process, arity, true);
                     safepoint_and_reduce!(self, process, context.reds);
                 }
-                Opcode::GcBif1 => {
-                    // fail label, live, bif, arg1, dest
-                    if let LValue::Bif(bif) = &ins.args[2] {
-                        // TODO: GcBif needs to handle GC as necessary
-                        let args = &[context.expand_arg(&ins.args[3])];
-                        match bif(self, &process, args) {
-                            Ok(val) => context.set_register(&ins.args[4], val),
-                            Err(exc) => cond_fail!(context, ins.args[0], exc),
-                        }
-                    } else {
-                        unreachable!()
+                &Instruction::GcBif1 { label: fail, bif, arg1, live, reg } => {
+                    // TODO: GcBif needs to handle GC as necessary
+                    let args = &[context.expand_arg(arg1)];
+                    match bif(self, &process, args) {
+                        Ok(val) => context.set_register(reg, val),
+                        Err(exc) => cond_fail!(context, fail, exc),
                     }
                 }
-                Opcode::BsAdd => {
+                &Instruction::BsAdd { fail, size1, size2, unit, destination: dest} => {
                     // Calculates the total of the number of bits in Src1 and the number of units in Src2. Stores the result to Dst.
                     // bs_add(Fail, Src1, Src2, Unit, Dst)
                     // dst = (src1 + src2) * unit
@@ -1616,20 +1458,14 @@ impl Machine {
                     // optimize when one append is 0 and unit is 1, it's just a move
                     // bs_add Fail S1=i==0 S2 Unit=u==1 D => move S2 D
 
-                    if let [LValue::Label(_fail), s1, s2, LValue::Literal(unit), dest] =
-                        &ins.args[..]
-                    {
-                        // TODO use fail label
-                        let s1 = context.expand_arg(s1).to_u32();
-                        let s2 = context.expand_arg(s2).to_u32();
+                    // TODO use fail label
+                    let s1 = context.expand_arg(size1).to_u32();
+                    let s2 = context.expand_arg(size2).to_u32();
 
-                        let res = Term::int(((s1 + s2) * (*unit)) as i32);
-                        context.set_register(dest, res)
-                    } else {
-                        unreachable!()
-                    }
+                    let res = Term::uint(&context.heap, ((s1 + s2) * unit as u32) as u32);
+                    context.set_register(dest, res)
                 }
-                Opcode::BsInit2 => {
+                &Instruction::BsInit2 { fail, size, words, regs, flags, destination: dest } => {
                     // optimize when init is with empty size
                     // bs_init2 Fail Sz=u Words=u==0 Regs Flags Dst => i_bs_init Sz Regs Dst
 
@@ -1644,198 +1480,164 @@ impl Machine {
                     //   allocate binary + procbin
                     //   set as non writable initially??
 
-                    if let [LValue::Label(_fail), s1, LValue::Literal(_words), LValue::Literal(_live), _flags, dest] =
-                        &ins.args[..]
+                    // TODO: use a current_string ptr to be able to write to the Arc wrapped str
+                    // alternatively, loop through the instrs until we hit a non bs_ instr.
+                    // that way, no unsafe ptrs!
+                    let size = size.to_val(context).to_int().unwrap() as usize;
+                    let mut binary = bitstring::Binary::with_capacity(size);
+                    binary.is_writable = false;
+                    let term = Term::binary(&context.heap, binary);
+                    // TODO ^ ensure this pointer stays valid after heap alloc
+                    context.bs = &**term.get_boxed_value::<bitstring::RcBinary>().unwrap() as *const bitstring::Binary as *mut bitstring::Binary;
+                    context.set_register(dest, term);
+                }
+                &Instruction::BsPutInteger { fail, size, unit, flags, source: src } => {
+                    // Size can be atom all
+                    // TODO: fail label
+                    let size = match context.expand_arg(size).into_variant() {
+                        Variant::Integer(i) => i as usize,
+                        // LValue::Literal(i) => i as usize, // TODO: unsure if correct
+                        Variant::Atom(atom::START) => 0,
+                        _ => unreachable!("{:?}", size),
+                    };
+
+                    let size = size * (unit as usize);
+
+                    // ins: &Instruction { op: BsPutInteger, args: [Label(0), Integer(1024), Literal(1), Literal(0), Integer(0)] }
+                    println!("put_integer src is {}", context.expand_arg(src));
+                    if size != 8 { // 1024, unit 1
+                        unimplemented!("bs_put_integer size * unit != 8, actual: {} from unit {}", size, unit);
+                        //fail!(context, fail);
+                    }
+
+                    unsafe {
+                        (*context.bs).put_integer(size as usize, context.expand_arg(src));
+                    }
+                }
+                &Instruction::BsPutBinary { fail, size, unit, flags, source: src } => {
+                    // TODO: fail label
+                    if unit != 8 {
+                        unimplemented!("bs_put_binary unit != 8");
+                        //fail!(context, fail);
+                    }
+
+                    if let Ok(value) = bitstring::RcBinary::try_from(&context.expand_arg(src)) {
+                        match context.expand_arg(size).into_variant() {
+                            Variant::Atom(atom::ALL) => unsafe {
+                                (*context.bs).put_binary(&value.data);
+                            },
+                            _ => unimplemented!("bs_put_binary size {:?}", size),
+                        }
+                    } else {
+                        panic!("Bad argument to BsPutBinary")
+                    }
+                }
+                &Instruction::BsPutFloat { fail, size, unit, flags, source: src } => {
+                    // Size can be atom all
+                    // TODO: fail label
+                    if unit != 8 {
+                        unimplemented!("bs_put_float unit != 8");
+                        //fail!(context, fail);
+                    }
+
+                    if let Variant::Float(value::Float(f)) =
+                        context.expand_arg(src).into_variant()
                     {
-                        // TODO: use a current_string ptr to be able to write to the Arc wrapped str
-                        // alternatively, loop through the instrs until we hit a non bs_ instr.
-                        // that way, no unsafe ptrs!
-                        let size = match s1 {
-                            LValue::Literal(i) => *i as u32,
-                            _ => context.expand_arg(s1).to_int().unwrap()
-                        };
-                        let mut binary = bitstring::Binary::with_capacity(size as usize);
-                        binary.is_writable = false;
-                        let term = Term::binary(&context.heap, binary);
-                        // TODO ^ ensure this pointer stays valid after heap alloc
-                        context.bs = &**term.get_boxed_value::<bitstring::RcBinary>().unwrap() as *const bitstring::Binary as *mut bitstring::Binary;
-                        context.set_register(dest, term);
-                    } else {
-                        unreachable!()
-                    }
-                }
-                Opcode::BsPutInteger => {
-                    // gen_put_integer(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
-                    // [Label(0), Integer(8), Literal(1), Literal(0), Y(0)]'
-                    // Size can be atom all
-                    if let [_fail, size, LValue::Literal(unit), _flags, src] = &ins.args[..] {
-                        // TODO: fail label
-                        let size = match context.expand_arg(size).into_variant() {
-                            Variant::Integer(i) => i as usize,
-                            // LValue::Literal(i) => i as usize, // TODO: unsure if correct
-                            Variant::Atom(atom::START) => 0,
-                            _ => unreachable!("{:?}", ins.args[1]),
-                        };
-
-                        let size = size * (*unit as usize);
-
-                        // ins: Instruction { op: BsPutInteger, args: [Label(0), Integer(1024), Literal(1), Literal(0), Integer(0)] }
-                        println!("put_integer src is {}", context.expand_arg(src));
-                        if size != 8 { // 1024, unit 1
-                            println!("ins: {:?}", ins);
-                            unimplemented!("bs_put_integer size * unit != 8, actual: {} from unit {}", size, unit);
-                            //fail!(context, fail);
-                        }
-
-                        unsafe {
-                            (*context.bs).put_integer(size as usize, context.expand_arg(src));
+                        match context.expand_arg(size).into_variant() {
+                            Variant::Atom(atom::ALL) => unsafe {
+                                (*context.bs).put_float(f);
+                            },
+                            _ => unimplemented!("bs_put_float size {:?}", size),
                         }
                     } else {
-                        unreachable!()
+                        panic!("Bad argument to BsPutFloat")
                     }
                 }
-                Opcode::BsPutBinary => {
-                    if let [_fail, size, LValue::Literal(unit), _flags, src] = &ins.args[..] {
-                        // TODO: fail label
-                        if *unit != 8 {
-                            unimplemented!("bs_put_binary unit != 8");
-                            //fail!(context, fail);
-                        }
-
-                        if let Ok(value) = bitstring::RcBinary::try_from(&context.expand_arg(src)) {
-                            match context.expand_arg(size).into_variant() {
-                                Variant::Atom(atom::ALL) => unsafe {
-                                    (*context.bs).put_binary(&value.data);
-                                },
-                                _ => unimplemented!("bs_put_binary size {:?}", size),
-                            }
-                        } else {
-                            panic!("Bad argument to {:?}", ins.op)
-                        }
-                    } else {
-                        unreachable!()
-                    }
-                }
-                Opcode::BsPutFloat => {
-                    // gen_put_float(GenOpArg Fail,GenOpArg Size, GenOpArg Unit, GenOpArg Flags, GenOpArg Src)
-                    // Size can be atom all
-                    if let [_fail, size, LValue::Literal(unit), _flags, src] = &ins.args[..] {
-                        // TODO: fail label
-                        if *unit != 8 {
-                            unimplemented!("bs_put_float unit != 8");
-                            //fail!(context, fail);
-                        }
-
-                        if let Variant::Float(value::Float(f)) =
-                            context.expand_arg(src).into_variant()
-                        {
-                            match context.expand_arg(size).into_variant() {
-                                Variant::Atom(atom::ALL) => unsafe {
-                                    (*context.bs).put_float(f);
-                                },
-                                _ => unimplemented!("bs_put_float size {:?}", size),
-                            }
-                        } else {
-                            panic!("Bad argument to {:?}", ins.op)
-                        }
-                    } else {
-                        unreachable!()
-                    }
-                }
-                Opcode::BsPutString => {
+                Instruction::BsPutString { binary } => {
                     // BsPutString uses the StrT strings table! needs to be patched in loader
-                    if let LValue::Str(string) = &ins.args[0] {
-                        unsafe {
-                            (*context.bs).put_binary(string);
-                        }
-                    } else {
-                        unreachable!()
-                    }
+                    unsafe { (*context.bs).put_binary(binary); }
                 }
-                Opcode::BsStartMatch2 => {
-                    // fail, src, live, slots?, dst
-                    // check if src is a match context with space for n slots (matches) else
-                    // allocate one. if we can't, jump to fail.
-                    // ibsstartmatch2 rxy f I I d
-                    // Checks that Arg0 is the matching context with enough slots for saved
-                    // offsets. The number of slots needed is given by Arg3. If there not enough
-                    // slots of if Arg0 is a regular binary then recreates the matching context and
-                    // saves it to Arg4. If something does not work jumps to Arg1. Arg2 is Live.
+                // &Instruction::BsStartMatch2 => {
+                //     // fail, src, live, slots?, dst
+                //     // check if src is a match context with space for n slots (matches) else
+                //     // allocate one. if we can't, jump to fail.
+                //     // ibsstartmatch2 rxy f I I d
+                //     // Checks that Arg0 is the matching context with enough slots for saved
+                //     // offsets. The number of slots needed is given by Arg3. If there not enough
+                //     // slots of if Arg0 is a regular binary then recreates the matching context and
+                //     // saves it to Arg4. If something does not work jumps to Arg1. Arg2 is Live.
 
-                    // Uint slots;
-                    // Uint live;
-                    // Eterm header;
+                //     // Uint slots;
+                //     // Uint live;
+                //     // Eterm header;
 
-                    let cxt = context.expand_arg(&ins.args[1]);
+                //     let cxt = context.expand_arg(&ins.args[1]);
+
+                //     if !cxt.is_pointer() {
+                //         fail!(context, ins.args[0]);
+                //     }
+
+                //     let header = cxt.get_boxed_header().unwrap();
+
+                //     // Reserve a slot for the start position.
+                //     let slots = ins.args[3].to_u32() + 1;
+                //     let _live = ins.args[2].to_u32();
+
+                //     match header {
+                //         value::BOXED_MATCHSTATE => {
+                //             if let Ok(ms) = cxt.get_boxed_value_mut::<bitstring::MatchState>() {
+                //                 // Uint actual_slots = HEADER_NUM_SLOTS(header);
+                //                 let actual_slots = ms.saved_offsets.len();
+
+                //                 // We're not compatible with contexts created by bs_start_match3.
+                //                 assert!(actual_slots >= 2);
+
+                //                 ms.saved_offsets[0] = ms.mb.offset;
+                //                 // TODO: we don't need realloc since Vec handles it for us
+                //                 // if (ERTS_UNLIKELY(actual_slots < slots)) {
+                //                 //     ErlBinMatchState* expanded;
+                //                 //     Uint live = $Live;
+                //                 //     Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
+                //                 //     $GC_TEST_PRESERVE(wordsneeded, live, context);
+                //                 //     ms = (ErlBinMatchState *) boxed_val(context);
+                //                 //     expanded = (ErlBinMatchState *) HTOP;
+                //                 //     *expanded = *ms;
+                //                 //     *HTOP = HEADER_BIN_MATCHSTATE(slots);
+                //                 //     HTOP += wordsneeded;
+                //                 //     HEAP_SPACE_VERIFIED(0);
+                //                 //     context = make_matchstate(expanded);
+                //                 //     $REFRESH_GEN_DEST();
+                //                 // }
+                //                 context.set_register(&ins.args[4], cxt);
+                //             }
+                //         }
+                //         value::BOXED_BINARY | value::BOXED_SUBBINARY => {
+                //             // Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
+                //             // $GC_TEST_PRESERVE(wordsneeded, live, context);
+
+                //             let result = bitstring::start_match_2(&context.heap, cxt, slots);
+
+                //             if let Some(res) = result {
+                //                 context.set_register(&ins.args[4], res)
+                //             } else {
+                //                 fail!(context, ins.args[0]);
+                //             }
+                //         }
+                //         _ => {
+                //             fail!(context, ins.args[0]);
+                //         }
+                //     }
+                // }
+                &Instruction::BsStartMatch3 { fail, source: src, live, destination: dst } => {
+                    let cxt = context.fetch_register(src);
 
                     if !cxt.is_pointer() {
-                        fail!(context, ins.args[0]);
+                        fail!(context, fail);
                     }
 
                     let header = cxt.get_boxed_header().unwrap();
 
                     // Reserve a slot for the start position.
-                    let slots = ins.args[3].to_u32() + 1;
-                    let _live = ins.args[2].to_u32();
-
-                    match header {
-                        value::BOXED_MATCHSTATE => {
-                            if let Ok(ms) = cxt.get_boxed_value_mut::<bitstring::MatchState>() {
-                                // Uint actual_slots = HEADER_NUM_SLOTS(header);
-                                let actual_slots = ms.saved_offsets.len();
-
-                                // We're not compatible with contexts created by bs_start_match3.
-                                assert!(actual_slots >= 2);
-
-                                ms.saved_offsets[0] = ms.mb.offset;
-                                // TODO: we don't need realloc since Vec handles it for us
-                                // if (ERTS_UNLIKELY(actual_slots < slots)) {
-                                //     ErlBinMatchState* expanded;
-                                //     Uint live = $Live;
-                                //     Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
-                                //     $GC_TEST_PRESERVE(wordsneeded, live, context);
-                                //     ms = (ErlBinMatchState *) boxed_val(context);
-                                //     expanded = (ErlBinMatchState *) HTOP;
-                                //     *expanded = *ms;
-                                //     *HTOP = HEADER_BIN_MATCHSTATE(slots);
-                                //     HTOP += wordsneeded;
-                                //     HEAP_SPACE_VERIFIED(0);
-                                //     context = make_matchstate(expanded);
-                                //     $REFRESH_GEN_DEST();
-                                // }
-                                context.set_register(&ins.args[4], cxt);
-                            }
-                        }
-                        value::BOXED_BINARY | value::BOXED_SUBBINARY => {
-                            // Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
-                            // $GC_TEST_PRESERVE(wordsneeded, live, context);
-
-                            let result = bitstring::start_match_2(&context.heap, cxt, slots);
-
-                            if let Some(res) = result {
-                                context.set_register(&ins.args[4], res)
-                            } else {
-                                fail!(context, ins.args[0]);
-                            }
-                        }
-                        _ => {
-                            fail!(context, ins.args[0]);
-                        }
-                    }
-                }
-                Opcode::BsStartMatch3 => {
-                    // fail, src, live, dst
-
-                    let cxt = context.expand_arg(&ins.args[1]);
-
-                    if !cxt.is_pointer() {
-                        fail!(context, ins.args[0]);
-                    }
-
-                    let header = cxt.get_boxed_header().unwrap();
-
-                    // Reserve a slot for the start position.
-                    let _live = ins.args[2].to_u32();
 
                     match header {
                         value::BOXED_MATCHSTATE => {
@@ -1843,7 +1645,7 @@ impl Machine {
                                 let actual_slots = ms.saved_offsets.len();
                                 // We're not compatible with contexts created by bs_start_match2.
                                 assert!(actual_slots == 0);
-                                context.set_register(&ins.args[3], cxt);
+                                context.set_register(dst, cxt);
                             }
                         }
                         value::BOXED_BINARY | value::BOXED_SUBBINARY => {
@@ -1853,48 +1655,42 @@ impl Machine {
                             let result = bitstring::start_match_3(&context.heap, cxt);
 
                             if let Some(res) = result {
-                                context.set_register(&ins.args[3], res)
+                                context.set_register(dst, res)
                             } else {
-                                fail!(context, ins.args[0]);
+                                fail!(context, fail);
                             }
                         }
                         _ => {
-                            fail!(context, ins.args[0]);
+                            fail!(context, fail);
                         }
                     }
                 }
-                Opcode::BsGetPosition => {
-                    // cxt dst live
+                &Instruction::BsGetPosition { context: cxt, destination, live } => {
                     if let Ok(ms) = context
-                        .expand_arg(&ins.args[0])
+                        .fetch_register(cxt)
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
                         // TODO: unsafe cast
-                        context.set_register(&ins.args[1], Term::int(ms.mb.offset as i32));
+                        context.set_register(destination, Term::uint(&context.heap, ms.mb.offset as u32));
                     } else {
                         unreachable!()
                     };
                 }
-                Opcode::BsSetPosition => {
-                    // cxt pos
-
+                &Instruction::BsSetPosition { context: cxt, position } => {
                     if let Ok(ms) = context
-                        .expand_arg(&ins.args[0])
+                        .fetch_register(cxt)
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
-                        let pos = context.expand_arg(&ins.args[1]).to_u32();
+                        let pos = context.expand_arg(position).to_u32();
                         ms.mb.offset = pos as usize;
                     } else {
                         unreachable!()
                     };
                 }
-                Opcode::BsGetInteger2 => {
-                    // bs_get_integer2 Fail=f Ms=xy Live=u Sz=sq Unit=u Flags=u Dst=d
-
-                    let size = ins.args[3].to_u32() as usize;
-                    let unit = ins.args[4].to_u32() as usize;
-                    let flags = ins.args[5].to_u32();
-                    let mut flags = bitstring::Flag::from_bits(flags as u8).unwrap();
+                &Instruction::BsGetInteger2 { fail, ms, live, size, unit, flags, destination } => {
+                    let size = context.expand_arg(size).to_int().unwrap() as usize;
+                    let unit = unit as usize;
+                    let mut flags = bitstring::Flag::from_bits(flags).unwrap();
 
                     let bits = size * unit;
 
@@ -1903,7 +1699,7 @@ impl Machine {
 
                     // TODO: this cast can fail
                     if let Ok(ms) = context
-                        .expand_arg(&ins.args[1])
+                        .fetch_register(ms)
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
                         #[cfg(target_endian = "little")]
@@ -1989,216 +1785,178 @@ impl Machine {
                         };
 
                         if let Some(res) = res {
-                            context.set_register(&ins.args[6], res)
+                            context.set_register(destination, res)
                         } else {
-                            fail!(context, ins.args[0]);
+                            fail!(context, fail);
                         }
                     };
                 }
-                Opcode::BsGetFloat2 => {
-                    // bs_get_float2 Fail=f Ms=xy Live=u Sz=sq Unit=u Flags=u Dst=d
-
-                    let size = match context.expand_arg(&ins.args[3]).into_variant() {
+                &Instruction::BsGetFloat2 { fail, ms, live, size, unit, flags, destination } => {
+                    let size = match context.expand_arg(size).into_variant() {
                         Variant::Integer(size) if size <= 64 => size as usize,
                         _ => {
-                            fail!(context, ins.args[0]);
+                            fail!(context, fail);
                         }
                     };
 
-                    let flags = ins.args[5].to_u32();
-                    // let size = size * (flags as usize >> 3); TODO: this was just because flags
-                    // & size were packed together on BEAM
-
                     // TODO: this cast can fail
-                    if let Ok(ms) = context
-                        .expand_arg(&ins.args[1])
-                        .get_boxed_value_mut::<bitstring::MatchState>()
-                    {
+                    if let Ok(ms) = context.fetch_register(ms).get_boxed_value_mut::<bitstring::MatchState>() {
                         let res = ms.mb.get_float(
                             &context.heap,
                             size as usize,
-                            bitstring::Flag::from_bits(flags as u8).unwrap(),
+                            bitstring::Flag::from_bits(flags).unwrap(),
                         );
                         if let Some(res) = res {
-                            context.set_register(&ins.args[6], res)
+                            context.set_register(destination, res)
                         } else {
-                            fail!(context, ins.args[0]);
+                            fail!(context, fail);
                         }
                     };
                 }
-                Opcode::BsGetBinary2 => {
-
-                    let flags = ins.args[5].to_u32();
-                    // let size = size * (flags as usize >> 3); TODO: this was just because flags
-                    // & size were packed together on BEAM
-
+                &Instruction::BsGetBinary2 { fail, ms, live, size, unit, flags, destination } => {
                     // TODO: this cast can fail
                     if let Ok(ms) = context
-                        .expand_arg(&ins.args[1])
+                        .fetch_register(ms)
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
                         // proc pid=37 reds=907 mod="re" offs=870 ins=BsGetBinary2 args=[Label(916), X(5), Literal(9), X(2), Literal(8), Literal(0), X(2)]
-                        let flags = bitstring::Flag::from_bits(flags as u8).unwrap();
+                        let flags = bitstring::Flag::from_bits(flags).unwrap(); // TODO: do this in loader
                         let heap = &context.heap;
-                        let unit = ins.args[4].to_u32() as usize;
-                        let res = match context.expand_arg(&ins.args[3]).into_variant() {
+                        let unit = unit as usize;
+                        let res = match context.expand_arg(size).into_variant() {
                             Variant::Integer(size) => ms.mb.get_binary(heap, size as usize * unit, flags),
                             Variant::Atom(atom::ALL) => ms.mb.get_binary_all(heap, flags),
                             arg => unreachable!("get_binary2 for {:?}", arg),
                         };
 
                         if let Some(res) = res {
-                            context.set_register(&ins.args[6], res)
+                            context.set_register(destination, res)
                         } else {
-                            fail!(context, ins.args[0]);
+                            fail!(context, fail);
                         }
                     };
                 }
-                Opcode::BsSkipBits2 => {
-                    // fail, ms, size, unit, flags
-
+                &Instruction::BsSkipBits2 { fail, ms, size, unit, flags } => {
                     if let Ok(ms) = context
-                        .expand_arg(&ins.args[1])
+                        .fetch_register(ms)
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
                         let mb = &mut ms.mb;
 
-                        let size = match &ins.args[2] {
-                            LValue::Literal(i) => *i as u32,
-                            arg => context.expand_arg(arg).to_int().unwrap()
-                        };
-                        let unit = ins.args[3].to_u32();
+                        let size = context.expand_arg(size).to_int().unwrap() as usize;
 
-                        let new_offset = mb.offset + (size * unit) as usize;
+                        let new_offset = mb.offset + (size * unit as usize);
 
                         if new_offset <= mb.size {
                             mb.offset = new_offset;
                         } else {
-                            fail!(context, ins.args[0]);
+                            fail!(context, fail);
                         }
                     } else {
                         unreachable!()
                     }
                 }
-                Opcode::BsTestTail2 => {
-                    // fail, ms, bits
+                &Instruction::BsTestTail2 { fail, ms, bits: offset } => {
                     // TODO: beam specializes bits 0
                     // Checks that the matching context Arg1 has exactly Arg2 unmatched bits. Jumps
                     // to the label Arg0 if it is not so.
                     // if size 0 == Jumps to the label in Arg0 if the matching context Arg1 still have unmatched bits.
+                    let offset = offset as usize;
 
-                    let offset = ins.args[2].to_u32() as usize;
-
-                    if let Ok(ms) =
-                        bitstring::MatchState::try_from(&context.expand_arg(&ins.args[1]))
-                    {
+                    if let Ok(ms) = bitstring::MatchState::try_from(&context.fetch_register(ms)) {
                         let mb = &ms.mb;
 
                         if mb.remaining() != offset {
-                            fail!(context, ins.args[0]);
+                            fail!(context, fail);
                         }
                     } else {
                         unreachable!()
                     }
                 }
-                Opcode::BsSave2 => {
-                    // cxt slot
-                    if let Ok(ms) = context
-                        .expand_arg(&ins.args[0])
-                        .get_boxed_value_mut::<bitstring::MatchState>()
-                    {
-                        let slot = match context.expand_arg(&ins.args[1]).into_variant() {
-                            Variant::Integer(i) => i as usize,
-                            // LValue::Literal(i) => i as usize, // TODO: unsure if correct
-                            Variant::Atom(atom::START) => 0,
-                            _ => unreachable!("{:?}", ins.args[1]),
-                        };
-                        ms.saved_offsets[slot] = ms.mb.offset;
-                    } else {
-                        unreachable!()
-                    }
-                }
-                Opcode::BsRestore2 => {
-                    // cxt slot
-                    if let Ok(ms) = context
-                        .expand_arg(&ins.args[0])
-                        .get_boxed_value_mut::<bitstring::MatchState>()
-                    {
-                        let slot = match context.expand_arg(&ins.args[1]).into_variant() {
-                            Variant::Integer(i) => i as usize,
-                            // LValue::Literal(i) => i as usize,
-                            Variant::Atom(atom::START) => 0,
-                            _ => unreachable!(),
-                        };
-                        ms.mb.offset = ms.saved_offsets[slot];
-                    } else {
-                        unreachable!()
-                    }
-                }
-                Opcode::BsContextToBinary => {
-                    // Converts the matching context to a (sub)binary using almost the same code as
-                    // i bs get binary all reuse rx f I.
+                // &Instruction::BsSave2 => {
+                //     // cxt slot
+                //     if let Ok(ms) = context
+                //         .expand_arg(&ins.args[0])
+                //         .get_boxed_value_mut::<bitstring::MatchState>()
+                //     {
+                //         let slot = match context.expand_arg(&ins.args[1]).into_variant() {
+                //             Variant::Integer(i) => i as usize,
+                //             // LValue::Literal(i) => i as usize, // TODO: unsure if correct
+                //             Variant::Atom(atom::START) => 0,
+                //             _ => unreachable!("{:?}", ins.args[1]),
+                //         };
+                //         ms.saved_offsets[slot] = ms.mb.offset;
+                //     } else {
+                //         unreachable!()
+                //     }
+                // }
+                // &Instruction::BsRestore2 => {
+                //     // cxt slot
+                //     if let Ok(ms) = context
+                //         .expand_arg(&ins.args[0])
+                //         .get_boxed_value_mut::<bitstring::MatchState>()
+                //     {
+                //         let slot = match context.expand_arg(&ins.args[1]).into_variant() {
+                //             Variant::Integer(i) => i as usize,
+                //             // LValue::Literal(i) => i as usize,
+                //             Variant::Atom(atom::START) => 0,
+                //             _ => unreachable!(),
+                //         };
+                //         ms.mb.offset = ms.saved_offsets[slot];
+                //     } else {
+                //         unreachable!()
+                //     }
+                // }
+                // &Instruction::BsContextToBinary => {
+                //     // Converts the matching context to a (sub)binary using almost the same code as
+                //     // i bs get binary all reuse rx f I.
 
-                    // cxt
-                    if let Ok(ms) = context
-                        .expand_arg(&ins.args[0])
-                        .get_boxed_value_mut::<bitstring::MatchState>()
-                    {
-                        let offs = ms.saved_offsets[0];
-                        let size = ms.mb.size - offs;
-                        // TODO; original calculated the hole size and overwrote MatchState mem in
-                        // place.
-                        let res = Term::subbinary(
-                            &context.heap,
-                            bitstring::SubBinary::new(ms.mb.original.clone(), size, offs, false),
-                        );
-                        context.set_register(&ins.args[0], res);
-                    } else {
-                        // next0
-                        unreachable!()
-                    }
-                }
-                Opcode::BsTestUnit => {
-                    // fail cxt unit
+                //     // cxt
+                //     if let Ok(ms) = context
+                //         .expand_arg(&ins.args[0])
+                //         .get_boxed_value_mut::<bitstring::MatchState>()
+                //     {
+                //         let offs = ms.saved_offsets[0];
+                //         let size = ms.mb.size - offs;
+                //         // TODO; original calculated the hole size and overwrote MatchState mem in
+                //         // place.
+                //         let res = Term::subbinary(
+                //             &context.heap,
+                //             bitstring::SubBinary::new(ms.mb.original.clone(), size, offs, false),
+                //         );
+                //         context.set_register(&ins.args[0], res);
+                //     } else {
+                //         // next0
+                //         unreachable!()
+                //     }
+                // }
+                &Instruction::BsTestUnit { fail, context: cxt, unit } => {
                     // Checks that the size of the remainder of the matching context is divisible
                     // by unit, else jump to fail
 
-                    if let Ok(ms) =
-                        bitstring::MatchState::try_from(&context.expand_arg(&ins.args[1]))
-                    {
+                    if let Ok(ms) = bitstring::MatchState::try_from(&context.fetch_register(cxt)) {
                         let mb = &ms.mb;
 
-                        let unit = ins.args[2].to_u32() as usize;
-
-                        if mb.remaining() % unit != 0 {
-                            fail!(context, ins.args[0]);
+                        if mb.remaining() % (unit as usize) != 0 {
+                            fail!(context, fail);
                         }
                     } else {
                         unreachable!()
                     }
                 }
-                Opcode::BsMatchString => {
-                    // fail cxt bits str
-
+                Instruction::BsMatchString { fail, context: cxt, bits, string } => {
                     // byte* bytes = (byte *) $Ptr;
                     // Uint bits = $Bits;
                     // ErlBinMatchBuffer* mb;
                     // Uint offs;
 
-                    if let Ok(ms) = context
-                        .expand_arg(&ins.args[1])
-                        .get_boxed_value_mut::<bitstring::MatchState>()
-                    {
+                    if let Ok(ms) = context.fetch_register(*cxt).get_boxed_value_mut::<bitstring::MatchState>() {
                         let mb = &mut ms.mb;
 
-                        let bits = ins.args[2].to_u32() as usize;
-                        let string = match &ins.args[3] {
-                            LValue::Str(string) => string,
-                            _ => unreachable!(),
-                        };
+                        let bits = *bits as usize;
 
                         if mb.remaining() < bits {
-                            fail!(context, ins.args[0]);
+                            fail!(context, *fail);
                         }
                         // offs = mb->offset & 7;
                         // if (offs == 0 && (bits & 7) == 0) {
@@ -2216,7 +1974,7 @@ impl Machine {
                                 bits,
                             ) != std::cmp::Ordering::Equal
                             {
-                                fail!(context, ins.args[0]);
+                                fail!(context, *fail);
                             }
                         }
                         mb.offset += bits;
@@ -2224,50 +1982,50 @@ impl Machine {
                         unreachable!()
                     }
                 }
-                Opcode::BsInitWritable => {
+                &Instruction::BsInitWritable => {
                     context.x[0] = bitstring::init_writable(&process, context.x[0]);
                 }
                 // BsGet and BsSkip should be implemented over an Iterator inside a match context (.skip/take)
                 // maybe we can even use nom for this
-                Opcode::BsAppend => {
+                &Instruction::BsAppend { fail ,size, extra, live, unit, bin, destination } => {
                     // append and init also sets the string as current (state.current_binary) [seems to be used to copy string literals too]
 
                     // bs_append Fail Size Extra Live Unit Bin Flags Dst => \
                     //   move Bin x | i_bs_append Fail Extra Live Unit Size Dst
 
-                    let size = context.expand_arg(&ins.args[1]);
-                    let extra_words = ins.args[2].to_u32() as usize;
-                    let unit = ins.args[2].to_u32() as usize;
-                    let src = context.expand_arg(&ins.args[4]);
+                    let size = context.expand_arg(size);
+                    let extra_words = extra as usize;
+                    let unit = unit as usize;
+                    let src = context.expand_arg(bin);
 
                     let res = bitstring::append(&process, src, size, extra_words, unit);
 
                     if let Some(res) = res {
-                        context.set_register(&ins.args[5], res)
+                        context.set_register(destination, res)
                     } else {
                         // TODO: execute fail only if non zero, else raise
                         /* TODO not yet: c_p->freason is already set (to BADARG or SYSTEM_LIMIT). */
-                        fail!(context, ins.args[0]);
+                        fail!(context, fail);
                     }
                 }
-                Opcode::BsPrivateAppend => {
+                &Instruction::BsPrivateAppend { fail, size, unit, bin, destination } => {
                     // bs_private_append Fail Size Unit Bin Flags Dst
 
-                    let size = context.expand_arg(&ins.args[1]);
-                    let unit = ins.args[2].to_u32() as usize;
-                    let src = context.expand_arg(&ins.args[3]);
+                    let size = context.expand_arg(size);
+                    let unit = unit as usize;
+                    let src = context.expand_arg(bin);
 
                     let res = bitstring::private_append(&process, src, size, unit);
 
                     if let Some(res) = res {
-                        context.set_register(&ins.args[5], res)
+                        context.set_register(destination, res)
                     } else {
                         /* TODO not yet: c_p->freason is already set (to BADARG or SYSTEM_LIMIT). */
-                        fail!(context, ins.args[0]);
+                        fail!(context, fail);
                     }
                     unimplemented!("bs_private_append") // TODO
                 }
-                Opcode::BsInitBits => {
+                &Instruction::BsInitBits { fail ,size, words, regs, flags, destination } => {
                     // bs_init_bits Fail Sz=u Words=u==0 Regs Flags Dst => i_bs_init Sz Regs Dst
 
                     // Words is heap alloc size
@@ -2280,116 +2038,109 @@ impl Machine {
                     // context.x[0] = bitstring::init_bits(&process, context.x[0], ..);
                     unimplemented!("bs_init_bits") // TODO
                 }
-                Opcode::BsGetUtf8 => {
-                    // debug_assert_eq!(ins.args.len(), 5);
-                    // fail ms u u dest
-
+                &Instruction::BsGetUtf8 { fail, ms, size, flags, destination } => {
                     // TODO: this cast can fail
-                    if let Ok(ms) = context
-                        .expand_arg(&ins.args[1])
-                        .get_boxed_value_mut::<bitstring::MatchState>()
-                    {
+                    if let Ok(ms) = context.fetch_register(ms).get_boxed_value_mut::<bitstring::MatchState>() {
                         let res = ms.mb.get_utf8();
                         if let Some(res) = res {
-                            context.set_register(&ins.args[4], res)
+                            context.set_register(destination, res)
                         } else {
-                            fail!(context, ins.args[0]);
+                            fail!(context, fail);
                         }
                     };
                 }
-                Opcode::BsGetUtf16 => {
-                    // debug_assert_eq!(ins.args.len(), 5);
-                    // fail ms u flags dest
-
-                    let flags = ins.args[5].to_u32();
-
+                &Instruction::BsGetUtf16 { fail, ms, size, flags, destination } => {
                     // TODO: this cast can fail
                     if let Ok(ms) = context
-                        .expand_arg(&ins.args[1])
+                        .fetch_register(ms)
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
                         let res = ms
                             .mb
-                            .get_utf16(bitstring::Flag::from_bits(flags as u8).unwrap());
+                            .get_utf16(bitstring::Flag::from_bits(flags).unwrap());
                         if let Some(res) = res {
-                            context.set_register(&ins.args[4], res)
+                            context.set_register(destination, res)
                         } else {
-                            fail!(context, ins.args[0]);
+                            fail!(context, fail);
                         }
                     };
                 }
-                Opcode::BsSkipUtf8 => {
-                    // debug_assert_eq!(ins.args.len(), 4);
-                    // fail ms u u
-
+                &Instruction::BsSkipUtf8 { fail, ms, size, flags } => {
                     // TODO: this cast can fail
                     if let Ok(ms) = context
-                        .expand_arg(&ins.args[1])
+                        .fetch_register(ms)
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
                         let res = ms.mb.get_utf8();
                         if res.is_none() {
-                            fail!(context, ins.args[0]);
+                            fail!(context, fail);
                         }
                     } else {
                         unreachable!()
                     }
                 }
-                Opcode::BsSkipUtf16 => {
-                    // debug_assert_eq!(ins.args.len(), 4);
-                    // fail ms u flags
-
-                    let flags = ins.args[5].to_u32();
-
+                &Instruction::BsSkipUtf16 { fail, ms, size, flags } => {
                     // TODO: this cast can fail
                     if let Ok(ms) = context
-                        .expand_arg(&ins.args[1])
+                        .fetch_register(ms)
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
                         let res = ms
                             .mb
-                            .get_utf16(bitstring::Flag::from_bits(flags as u8).unwrap());
+                            .get_utf16(bitstring::Flag::from_bits(flags).unwrap());
                         if res.is_none() {
-                            fail!(context, ins.args[0]);
+                            fail!(context, fail);
                         }
                     } else {
                         unreachable!()
                     }
                 }
-                Opcode::Fclearerror => {
+                &Instruction::Fclearerror => {
                     // TODO: BEAM checks for unhandled errors
                     context.f[0] = 0.0;
                 }
-                Opcode::Fcheckerror => {
+                &Instruction::Fcheckerror => {
                     // I think it always checks register fr0
                     if !context.f[0].is_finite() {
                         return Err(Exception::new(Reason::EXC_BADARITH));
                     }
                 }
-                Opcode::Fmove => {
-                    // src, dest
+                &Instruction::Fmove { source, destination } => {
+                    use crate::instruction::FRegister;
 
                     // basically a normal move, except if we're moving out of floats we make a Val
                     // otherwise we keep as a float
-                    let f = expand_float!(context, &ins.args[0]);
+                    let f = expand_float!(context, source);
 
-                    match &ins.args[1] {
-                        &LValue::X(reg) => {
+                    match destination {
+                        FRegister::X(reg) => {
                             context.x[reg as usize] = Term::from(f);
                         }
-                        &LValue::Y(reg) => {
+                        FRegister::Y(reg) => {
                             let len = context.stack.len();
                             context.stack[len - (reg + 1) as usize] = Term::from(f);
                         }
-                        &LValue::FloatReg(reg) => {
+                        FRegister::FloatReg(reg) => {
                             context.f[reg as usize] = f;
                         }
                         _reg => unimplemented!(),
                     }
                 }
-                Opcode::Fconv => {
+                &Instruction::Fconv { source, destination } => {
                     // reg (x), dest (float reg)
-                    let val: f64 = match context.expand_arg(&ins.args[0]).into_number() {
+                    use crate::instruction::FRegister;
+                    let value = match source {
+                        FRegister::ExtendedLiteral(i) => unsafe { (*context.ip.module).literals[i as usize] },
+                        FRegister::X(reg) => context.x[reg as usize],
+                        FRegister::Y(reg) => {
+                            let len = context.stack.len();
+                            context.stack[len - (reg + 1) as usize]
+                        }
+                        FRegister::FloatReg(reg) => Term::from(context.f[reg as usize]),
+                        _ => unreachable!(),
+                    };
+
+                    let val: f64 = match value.into_number() {
                         Ok(value::Num::Float(f)) => f,
                         Ok(value::Num::Integer(i)) => f64::from(i),
                         Ok(_) => unimplemented!(),
@@ -2397,72 +2148,52 @@ impl Machine {
                         Err(_) => return Err(Exception::new(Reason::EXC_BADARITH)),
                     };
 
-                    if let LValue::FloatReg(dest) = ins.args[1] {
-                        context.f[dest as usize] = val;
-                    } else {
-                        unreachable!()
-                    }
+                    context.f[destination as usize] = val;
                 }
-                Opcode::Fadd => op_float!(context, &ins.args[..], +),
-                Opcode::Fsub => op_float!(context, &ins.args[..], -),
-                Opcode::Fmul => op_float!(context, &ins.args[..], *),
-                Opcode::Fdiv => op_float!(context, &ins.args[..], /),
-                Opcode::Fnegate => {
-                    if let [LValue::FloatReg(a), LValue::FloatReg(dest)] = ins.args[..] {
-                        context.f[dest as usize] = -context.f[a as usize];
-                    } else {
-                        unreachable!()
-                    }
+                // fail is unused
+                &Instruction::Fadd { fail: _, a, b, destination } => op_float!(context, a, b, destination, +),
+                &Instruction::Fsub { fail: _, a, b, destination } => op_float!(context, a, b, destination, -),
+                &Instruction::Fmul { fail: _, a, b, destination } => op_float!(context, a, b, destination, *),
+                &Instruction::Fdiv { fail: _, a, b, destination } => op_float!(context, a, b, destination, /),
+                &Instruction::Fnegate { source, destination } => {
+                    context.f[destination as usize] = -context.f[source as usize];
                 }
-                Opcode::GcBif2 => {
-                    // fail label, live, bif, arg1, arg2, dest
-                    if let LValue::Bif(bif) = &ins.args[2] {
-                        // TODO: GcBif needs to handle GC as necessary
-                        let args = &[
-                            context.expand_arg(&ins.args[3]),
-                            context.expand_arg(&ins.args[4]),
-                        ];
+                &Instruction::GcBif2 { label: fail, bif, arg1, arg2, live, reg } => {
+                    // TODO: GcBif needs to handle GC as necessary
+                    let args = &[
+                        context.expand_arg(arg1),
+                        context.expand_arg(arg2),
+                    ];
 
-                        match bif(self, &process, args) {
-                            Ok(val) => context.set_register(&ins.args[5], val),
-                            Err(exc) => cond_fail!(context, ins.args[0], exc),
-                        }
-                    } else {
-                        unreachable!()
+                    match bif(self, &process, args) {
+                        Ok(val) => context.set_register(reg, val),
+                        Err(exc) => cond_fail!(context, fail, exc),
                     }
                 }
-                Opcode::GcBif3 => {
-                    // fail label, live, bif, arg1, arg2, arg3, dest
-                    if let LValue::Bif(bif) = &ins.args[2] {
-                        // TODO: GcBif needs to handle GC as necessary
-                        let args = &[
-                            context.expand_arg(&ins.args[3]),
-                            context.expand_arg(&ins.args[4]),
-                            context.expand_arg(&ins.args[5]),
-                        ];
+                &Instruction::GcBif3 { label: fail, bif, arg1, arg2, arg3, live, reg } => {
+                    // TODO: GcBif needs to handle GC as necessary
+                    let args = &[
+                        context.expand_arg(arg1),
+                        context.expand_arg(arg2),
+                        context.expand_arg(arg3),
+                    ];
 
-                        match bif(self, &process, args) {
-                            Ok(val) => context.set_register(&ins.args[6], val),
-                            Err(exc) => cond_fail!(context, ins.args[0], exc),
-                        }
-                    } else {
-                        unreachable!()
+                    match bif(self, &process, args) {
+                        Ok(val) => context.set_register(reg, val),
+                        Err(exc) => cond_fail!(context, fail, exc),
                     }
                 }
-                Opcode::Trim => {
+                &Instruction::Trim { n: nwords, remaining }=> {
                     // trim N, _remain
                     // drop N words from stack, (but keeping the cp). Second arg unused?
-                    let nwords = ins.args[0].to_u32();
                     // let cp = context.stack.pop().unwrap();
                     context
                         .stack
                         .truncate(context.stack.len() - nwords as usize);
                     // context.stack.push(cp);
                 }
-                Opcode::MakeFun2 => {
-                    // literal n -> points to lambda
+                &Instruction::MakeFun2 { i } => {
                     // nfree means capture N x-registers into the closure
-                    let i = ins.args[0].to_u32();
                     let lambda = &module.lambdas[i as usize];
 
                     let binding = if lambda.nfree != 0 {
@@ -2482,12 +2213,9 @@ impl Machine {
                         },
                     );
                 }
-                Opcode::CallFun => {
-                    // literal arity
-                    let arity = ins.args[0].to_u32();
+                &Instruction::CallFun { arity } => {
                     let value = context.x[arity as usize];
                     context.cp = Some(context.ip);
-                    // TODO: this clone is bad but the borrow checker complains (but doesn't on GetTl/GetHd)
                     if let Ok(closure) = value::Closure::try_from(&value) {
                         op_call_fun!(self, context, closure, arity)
                     } else if let Ok(mfa) = module::MFA::try_from(&value) {
@@ -2509,131 +2237,106 @@ impl Machine {
                         unreachable!()
                     }
                 }
-                Opcode::GetHd => {
-                    // source head
+                &Instruction::GetHd { source, head: reg } => {
                     if let Ok(value::Cons { head, .. }) =
-                        Cons::try_from(&context.expand_arg(&ins.args[0]))
+                        Cons::try_from(&context.fetch_register(source))
                     {
-                        context.set_register(&ins.args[1], *head);
+                        context.set_register(reg, *head);
                     } else {
                         unreachable!()
                     }
                 }
-                Opcode::GetTl => {
-                    // source head
+                &Instruction::GetTl { source, tail: reg } => {
                     if let Ok(value::Cons { tail, .. }) =
-                        context.expand_arg(&ins.args[0]).try_into()
+                        context.fetch_register(source).try_into()
                     {
-                        context.set_register(&ins.args[1], *tail);
+                        context.set_register(reg, *tail);
                     } else {
                         unreachable!()
                     }
                 }
-                Opcode::PutMapAssoc => {
-                    // F Map Dst Live Rest=* (atom with module name??)
-                    if let [LValue::Label(_fail), map, dest, _live, LValue::ExtendedList(list)] =
-                        &ins.args[..]
-                    {
-                        let mut map = match context.expand_arg(map).try_into() {
-                            Ok(value::Map(map)) => map.clone(),
-                            _ => unreachable!(),
-                        };
+                Instruction::PutMapAssoc { map, destination, live, rest: list } => {
+                    let mut map = match context.expand_arg(*map).try_into() {
+                        Ok(value::Map(map)) => map.clone(),
+                        _ => unreachable!(),
+                    };
 
-                        let mut iter = list.chunks_exact(2);
-                        while let Some([key, value]) = iter.next() {
-                            // TODO: optimize by having the ExtendedList store Term instead of LValue
-                            map.insert(context.expand_arg(key), context.expand_arg(value));
-                        }
-                        context.set_register(dest, Term::map(&context.heap, map))
-                    } else {
-                        unreachable!()
+                    let mut iter = list.chunks_exact(2);
+                    while let Some([key, value]) = iter.next() {
+                        // TODO: optimize by having the ExtendedList store Term instead of LValue
+                        map.insert(context.expand_entry(key), context.expand_entry(value));
                     }
+                    context.set_register(*destination, Term::map(&context.heap, map))
                 }
-                Opcode::HasMapFields => {
-                    // fail src N
-                    // TODO: make a macro or make the try_into() return an Exception so we can use ?
-                    if let [LValue::Label(fail), map, LValue::ExtendedList(list)] = &ins.args[..] {
-                        let map = match context.expand_arg(map).try_into() {
-                            Ok(value::Map(map)) => map.clone(),
-                            _ => unreachable!(),
-                        };
+                Instruction::HasMapFields { label: fail, source, rest: list } => {
+                    let map = match context.fetch_register(*source).try_into() {
+                        Ok(value::Map(map)) => map.clone(),
+                        _ => unreachable!(),
+                    };
 
-                        // N is a list of the type [key => dest_reg], if any of these fields don't
-                        // exist, jump to fail label.
-                        let mut iter = list.iter();
-                        while let Some(key) = iter.next() {
-                            if map.contains_key(&context.expand_arg(key)) {
-                                // ok
-                            } else {
-                                op_jump!(context, *fail);
-                                break;
-                            }
-                        }
-                    } else {
-                        unreachable!()
-                    }
-                }
-                Opcode::GetMapElements => {
-                    // fail src N
-                    // TODO: make a macro or make the try_into() return an Exception so we can use ?
-                    if let [LValue::Label(fail), map, LValue::ExtendedList(list)] = &ins.args[..] {
-                        let map = match context.expand_arg(map).try_into() {
-                            Ok(value::Map(map)) => map.clone(),
-                            _ => unreachable!(),
-                        };
-
-                        // N is a list of the type [key => dest_reg], if any of these fields don't
-                        // exist, jump to fail label.
-                        let mut iter = list.chunks_exact(2);
-                        while let Some([key, dest]) = iter.next() {
-                            if let Some(&val) = map.get(&context.expand_arg(key)) {
-                                context.set_register(dest, val)
-                            } else {
-                                op_jump!(context, *fail);
-                                break; // TODO: original impl loops over everything
-                            }
+                    // N is a list of the type [key => dest_reg], if any of these fields don't
+                    // exist, jump to fail label.
+                    let mut iter = list.iter();
+                    while let Some(key) = iter.next() {
+                        if map.contains_key(&context.expand_entry(key)) {
+                            // ok
+                        } else {
+                            op_jump!(context, *fail);
+                            break;
                         }
                     }
                 }
-                Opcode::PutMapExact => {
+                Instruction::GetMapElements { label: fail, source, rest: list } => {
+                    let map = match context.fetch_register(*source).try_into() {
+                        Ok(value::Map(map)) => map.clone(),
+                        _ => unreachable!(),
+                    };
+
+                    // N is a list of the type [key => dest_reg], if any of these fields don't
+                    // exist, jump to fail label.
+                    let mut iter = list.chunks_exact(2);
+                    while let Some([key, dest]) = iter.next() {
+                        if let Some(&val) = map.get(&context.expand_entry(key)) {
+                            context.set_register(dest.into_register(), val)
+                        } else {
+                            op_jump!(context, *fail);
+                            break; // TODO: original impl loops over everything
+                        }
+                    }
+                }
+                Instruction::PutMapExact { map, destination, live, rest: list } => {
                     // TODO: in the future, put_map_exact is an optimization for flatmaps (tuple
                     // maps), where the keys in the tuple stay the same, since you can memcpy the
                     // key tuple (and other optimizations)
-                    // F Map Dst Live Rest=* (atom with module name??)
-                    if let [LValue::Label(_fail), map, dest, _live, LValue::ExtendedList(list)] =
-                        &ins.args[..]
-                    {
-                        let mut map = match context.expand_arg(map).try_into() {
-                            Ok(value::Map(map)) => map.clone(),
-                            _ => unreachable!(),
-                        };
+                    let mut map = match context.expand_arg(*map).try_into() {
+                        Ok(value::Map(map)) => map.clone(),
+                        _ => unreachable!(),
+                    };
 
-                        let mut iter = list.chunks_exact(2);
-                        while let Some([key, value]) = iter.next() {
-                            // TODO: optimize by having the ExtendedList store Term instead of LValue
-                            map.insert(context.expand_arg(key), context.expand_arg(value));
-                        }
-                        context.set_register(dest, Term::map(&context.heap, map))
+                    let mut iter = list.chunks_exact(2);
+                    while let Some([key, value]) = iter.next() {
+                        // TODO: optimize by having the ExtendedList store Term instead of LValue
+                        map.insert(context.expand_entry(key), context.expand_entry(value));
                     }
+                    context.set_register(*destination, Term::map(&context.heap, map))
                 }
-                Opcode::IsTaggedTuple => {
-                    let reg = context.expand_arg(&ins.args[1]);
-                    let n = ins.args[2].to_u32();
-                    let atom = context.expand_arg(&ins.args[3]);
+                &Instruction::IsTaggedTuple { fail, source, arity, atom } => {
+                    let reg = context.fetch_register(source);
+                    let atom = context.expand_arg(atom);
                     if let Ok(tuple) = Tuple::try_from(&reg) {
-                        if tuple.len == 0 || tuple.len != n || !tuple[0].eq(&atom) {
-                            fail!(context, ins.args[0]);
+                        if tuple.len == 0 || tuple.len != arity || !tuple[0].eq(&atom) {
+                            fail!(context, fail);
                         } else {
                             // ok
                         }
                     } else {
-                        fail!(context, ins.args[0]);
+                        fail!(context, fail);
                     }
                 }
-                Opcode::BuildStacktrace => {
+                &Instruction::BuildStacktrace => {
                     context.x[0] = exception::build_stacktrace(&process, context.x[0]);
                 }
-                Opcode::RawRaise => {
+                &Instruction::RawRaise => {
                     let class = &context.x[0];
                     let value = context.x[1];
                     let trace = context.x[2];
@@ -2669,7 +2372,7 @@ impl Machine {
                         _ => context.x[0] = Term::atom(atom::BADARG),
                     }
                 }
-                opcode => unimplemented!("Unimplemented opcode {:?}: {:?}", opcode, ins),
+                ins => unimplemented!("opcode unimplemented: {:?}", ins)
             }
         }
         }

@@ -921,6 +921,7 @@ impl Term {
 }
 
 impl PartialEq for Term {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.into_variant().eq(&other.into_variant())
     }
@@ -990,6 +991,7 @@ impl PartialEq for Variant {
 }
 
 impl PartialOrd for Term {
+    #[inline]
     fn partial_cmp(&self, other: &Term) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -1020,6 +1022,7 @@ impl Ord for Term {
 }
 
 impl PartialOrd for Variant {
+    #[inline]
     fn partial_cmp(&self, other: &Variant) -> Option<Ordering> {
         Some(self.cmp(other))
     }

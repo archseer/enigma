@@ -4,7 +4,7 @@ use crate::bitstring;
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
 use crate::instr_ptr::InstrPtr;
-use crate::loader::LValue;
+use crate::instruction;
 use crate::mailbox::Mailbox;
 use crate::module::{Module, MFA};
 // use crate::servo_arc::Arc; can't do receiver self
@@ -57,7 +57,7 @@ pub struct ExecutionContext {
     /// Stack (accessible through Y registers).
     pub stack: Vec<Term>,
     /// Stores continuation pointers
-    pub callstack: Vec<(u32, Option<InstrPtr>)>,
+    pub callstack: Vec<(instruction::Regs, Option<InstrPtr>)>,
     pub heap: Heap,
     /// Number of catches on stack.
     pub catches: usize,
@@ -82,32 +82,52 @@ pub struct ExecutionContext {
 
 impl ExecutionContext {
     #[inline(always)]
-    pub fn expand_arg(&self, arg: &LValue) -> Term {
+    pub fn expand_arg(&self, arg: instruction::Source) -> Term {
+        use instruction::Source;
         match arg {
             // TODO: optimize away into a reference somehow at load time
-            LValue::ExtendedLiteral(i) => unsafe { (*self.ip.module).literals[*i as usize] },
-            LValue::X(i) => self.x[*i as usize],
-            LValue::Y(i) => self.stack[self.stack.len() - (*i + 1) as usize],
-            LValue::Constant(i) => *i,
-            // LValue::Integer(i) => Term::int(*i),
-            // LValue::Atom(i) => Term::atom(*i),
-            // LValue::Nil => Term::nil(),
-            LValue::BigInt(i) => Term::bigint(&self.heap, i.clone()), // TODO: very unperformant, make int term hold up to i48
-            value => unreachable!("expand unimplemented for {:?}", value),
+            Source::ExtendedLiteral(i) => unsafe { (*self.ip.module).literals[i as usize] },
+            Source::X(i) => self.x[i as usize],
+            Source::Y(i) => self.stack[self.stack.len() - (i + 1) as usize],
+            // Source::Constant(i) => self.i,
+            Source::Constant(i) => unsafe { (*self.ip.module).constants[i as usize] },
+            // value => unreachable!("expand unimplemented for {:?}", value),
+        }
+    }
+
+    // TODO: hoping to remove Entry in the future
+    #[inline]
+    pub fn expand_entry(&self, arg: &instruction::Entry) -> Term {
+        use instruction::Entry;
+        match *arg {
+            // TODO: optimize away into a reference somehow at load time
+            Entry::ExtendedLiteral(i) => unsafe { (*self.ip.module).literals[i as usize] },
+            Entry::Value(src) => self.expand_arg(src),
+            _ => unreachable!(),
+        }
+    }
+
+    /// Optimization over expand_arg: only fetches X or Y.
+    #[inline]
+    pub fn fetch_register(&mut self, register: instruction::Register) -> Term {
+        use instruction::Register;
+        match register {
+            Register::X(reg) => self.x[reg as usize],
+            Register::Y(reg) => self.stack[self.stack.len() - (reg + 1) as usize],
         }
     }
 
     #[inline]
-    pub fn set_register(&mut self, register: &LValue, value: Term) {
+    pub fn set_register(&mut self, register: instruction::Register, value: Term) {
+        use instruction::Register;
         match register {
-            &LValue::X(reg) => {
+            Register::X(reg) => {
                 self.x[reg as usize] = value;
             }
-            &LValue::Y(reg) => {
+            Register::Y(reg) => {
                 let len = self.stack.len();
                 self.stack[(len - (reg + 1) as usize)] = value;
             }
-            _reg => unreachable!("set_reg"),
         }
     }
 }

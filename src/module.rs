@@ -3,7 +3,8 @@ use crate::bif;
 use crate::exports_table::ExportsTable;
 use crate::immix::Heap;
 use crate::instr_ptr::InstrPtr;
-use crate::loader::{FuncInfo, Instruction, Line};
+use crate::instruction::Instruction;
+use crate::loader::{FuncInfo, Line};
 use crate::value::{self, Term, TryFrom, Variant};
 use crate::vm::Machine;
 use hashbrown::HashMap;
@@ -54,8 +55,9 @@ pub struct Lambda {
 // TODO: add new, remove pub for all these fields
 #[derive(Debug)]
 pub struct Module {
-    pub imports: Vec<MFA>, // mod,  func, arity
-    pub exports: Vec<MFA>, // func, arity, label
+    pub imports: Vec<MFA>,    // mod,  func, arity
+    pub exports: Vec<MFA>,    // func, arity, label
+    pub constants: Vec<Term>, // basically same as literals... but immediates
     pub literals: Vec<Term>,
     pub literal_heap: Heap,
     pub lambdas: Vec<Lambda>,
@@ -89,15 +91,22 @@ impl Module {
     }
 
     pub fn load_nifs(&mut self, vm: &Machine, nifs: &[(u32, u32, bif::Fn)]) {
-        use crate::loader::LValue;
+        use std::convert::TryInto;
         let mut exports = vm.exports.write();
 
         for (name, arity, fun) in nifs {
             // find func_info
             if let Some(i) = self.instructions.iter().position(|ins| {
-                ins.op == crate::opcodes::Opcode::FuncInfo
-                    && ins.args[1].to_u32() == *name
-                    && ins.args[2].to_u32() == *arity
+                if let crate::instruction::Instruction::FuncInfo {
+                    function: crate::instruction::Source::Constant(n),
+                    arity: a,
+                    ..
+                } = ins
+                {
+                    self.constants[*n as usize].to_u32() == *name && *a == (*arity as u8)
+                } else {
+                    false
+                }
             }) {
                 let mfa = MFA(self.name, *name, *arity);
                 exports.insert(mfa, crate::exports_table::Export::Bif(*fun));
@@ -105,9 +114,9 @@ impl Module {
                 let pos = self.imports.len();
                 self.imports.push(mfa);
                 // replace instruction immediately after with call_nif
-                self.instructions[i + 1] = Instruction {
-                    op: crate::opcodes::Opcode::CallExtOnly,
-                    args: vec![LValue::Literal(*arity), LValue::Literal(pos as u32)],
+                self.instructions[i + 1] = Instruction::CallExtOnly {
+                    arity: (*arity).try_into().unwrap(),
+                    destination: pos,
                 };
             // println!("NIF replaced {}", mfa);
             } else {

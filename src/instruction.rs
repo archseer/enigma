@@ -1,12 +1,9 @@
 // Label could be Option<NonZerou32> in some places?
-use crate::bif;
+use crate::bif::Fn as BifFn;
+//pub type BifFn = fn() -> usize;
 //use crate::loader::Source;
 
-// bs_start_match2, bs_save2, bs_restore2, bs_context_to_binary are deprecated on OTP22
-
-// 184 bytes
 // 56 bytes with shrunken Source, 48 with flags removed on BsInit
-// 88 bytes with Term consts embedded
 
 pub type Arity = u8;
 pub type Label = u32;
@@ -26,6 +23,32 @@ pub enum Entry {
     Label(u32),
     ExtendedLiteral(u32),
     Value(Source),
+}
+
+impl Entry {
+    pub fn to_label(&self) -> u32 {
+        match *self {
+            Entry::Label(i) => i,
+            _ => panic!(),
+        }
+    }
+    pub fn into_register(&self) -> Register {
+        match self {
+            Entry::Value(s) => match *s {
+                Source::X(i) => Register::X(i),
+                Source::Y(i) => Register::Y(i),
+                _ => panic!(),
+            },
+            _ => panic!(),
+        }
+    }
+    pub fn into_value(&self) -> Source {
+        match *self {
+            Entry::ExtendedLiteral(i) => Source::ExtendedLiteral(i),
+            Entry::Value(s) => s,
+            _ => panic!(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -59,13 +82,28 @@ pub enum Size {
     Y(RegisterY),
 }
 
+impl Size {
+    // FIXME: try to eliminate Size
+    pub fn to_val(self, context: &crate::process::ExecutionContext) -> crate::value::Term {
+        match self {
+            Size::Literal(i) => crate::value::Term::uint(&context.heap, i),
+            Size::Constant(i) => context.expand_arg(Source::Constant(i)),
+            Size::X(i) => context.expand_arg(Source::X(i)),
+            Size::Y(i) => context.expand_arg(Source::Y(i)),
+        }
+    }
+}
+
 // TODO: can't derive Copy yet since we have extended list which needs cloning
+// TODO: is_ instructions can probably be coerced into Register instead of Source
 
 // TUPLE ELEMENTS: u24
 
 // we could bitmask Source. In which case it would fit current loader size.
 // type can be either const, x or y (needs two bits). Meaning we'd get a u30 for the payload.
-// pub type Source = u32;
+// We could also embed it into Term, by abusing the Special type -- anything that would make
+// Constant fit into the instruction and not require a separate table would be good.
+// represent Vec<u8> string buffers as pointers into the string table (a slice would work?).
 
 #[derive(Clone)]
 pub enum Instruction {
@@ -102,18 +140,18 @@ pub enum Instruction {
         words: Regs, // TODO: register count
     },
     Bif0 {
-        bif: bif::Fn,
+        bif: BifFn,
         reg: Register,
     },
     Bif1 {
         fail: Label,
-        bif: bif::Fn,
+        bif: BifFn,
         arg1: Source, // const or reg
         reg: Register,
     },
     Bif2 {
         fail: Label,
-        bif: bif::Fn,
+        bif: BifFn,
         arg1: Source, // const or reg
         arg2: Source,
         reg: Register,
@@ -260,8 +298,15 @@ pub enum Instruction {
         arities: ExtendedList,
     },
     Jump(Label),
-    Catch,
-    CatchEnd,
+    Catch {
+        // TODO: always y
+        register: Register,
+        fail: Label,
+    },
+    CatchEnd {
+        // TODO: always y
+        register: Register,
+    },
     Move {
         source: Source, // register or constant
         destination: Register,
@@ -344,22 +389,26 @@ pub enum Instruction {
     },
     Fadd {
         fail: Label,
-        source: FloatRegs,
+        a: FloatRegs,
+        b: FloatRegs,
         destination: FloatRegs,
     },
     Fsub {
         fail: Label,
-        source: FloatRegs,
+        a: FloatRegs,
+        b: FloatRegs,
         destination: FloatRegs,
     },
     Fmul {
         fail: Label,
-        source: FloatRegs,
+        a: FloatRegs,
+        b: FloatRegs,
         destination: FloatRegs,
     },
     Fdiv {
         fail: Label,
-        source: FloatRegs,
+        a: FloatRegs,
+        b: FloatRegs,
         destination: FloatRegs,
     },
     Fnegate {
@@ -482,14 +531,14 @@ pub enum Instruction {
     GcBif1 {
         label: Label,
         live: Regs,
-        bif: bif::Fn,
+        bif: BifFn,
         arg1: Source,
         reg: Register,
     },
     GcBif2 {
         label: Label,
         live: Regs,
-        bif: bif::Fn,
+        bif: BifFn,
         arg1: Source,
         arg2: Source,
         reg: Register,
@@ -552,7 +601,7 @@ pub enum Instruction {
         fail: Label,
         ms: Register,
         size: Size,
-        unit: u16,
+        flags: u8,
         destination: Register,
     },
     BsGetUtf16 {
@@ -560,7 +609,7 @@ pub enum Instruction {
         fail: Label,
         ms: Register,
         size: Size,
-        unit: u16,
+        flags: u8,
         destination: Register,
     },
     BsGetUtf32 {
@@ -568,7 +617,7 @@ pub enum Instruction {
         fail: Label,
         ms: Register,
         size: Size,
-        unit: u16,
+        flags: u8,
         destination: Register,
     },
     // gets rewritten onto gets
@@ -576,19 +625,19 @@ pub enum Instruction {
         fail: Label,
         ms: Register,
         size: Size,
-        unit: u16,
+        flags: u8,
     },
     BsSkipUtf16 {
         fail: Label,
         ms: Register,
         size: Size,
-        unit: u16,
+        flags: u8,
     },
     BsSkipUtf32 {
         fail: Label,
         ms: Register,
         size: Size,
-        unit: u16,
+        flags: u8,
     },
     BsUtf8Size {
         fail: Label,
@@ -617,16 +666,14 @@ pub enum Instruction {
         source: Register,
     },
     OnLoad,
-    RecvMark {
-        label: Label,
-    },
-    RecvSet {
-        label: Label,
-    },
+    // Modified in OTP 21 because it turns out that we don't need the label after all.
+    RecvMark,
+    // Modified in OTP 21 because it turns out that we don't need the label after all.
+    RecvSet,
     GcBif3 {
         label: Label,
         live: Regs,
-        bif: bif::Fn,
+        bif: BifFn,
         arg1: Source,
         arg2: Source,
         arg3: Source,
@@ -696,4 +743,10 @@ pub enum Instruction {
         context: Register,
         position: Source,
     },
+}
+
+impl std::fmt::Debug for Instruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "<instruction>")
+    }
 }
