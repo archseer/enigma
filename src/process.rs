@@ -69,7 +69,7 @@ pub struct ExecutionContext {
     pub current: MFA,
     pub live: usize,
     /// binary construction state
-    pub bs: *mut bitstring::Binary,
+    pub bs: bitstring::Builder,
     ///
     pub exc: Option<Exception>,
     /// Reductions left

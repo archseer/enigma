@@ -1488,11 +1488,11 @@ impl Machine {
                     // alternatively, loop through the instrs until we hit a non bs_ instr.
                     // that way, no unsafe ptrs!
                     let size = size.to_val(context).to_int().unwrap() as usize;
-                    let mut binary = bitstring::Binary::with_capacity(size);
+                    let mut binary = bitstring::Binary::with_size(size);
                     binary.is_writable = false;
                     let term = Term::binary(&context.heap, binary);
                     // TODO ^ ensure this pointer stays valid after heap alloc
-                    context.bs = &**term.get_boxed_value::<bitstring::RcBinary>().unwrap() as *const bitstring::Binary as *mut bitstring::Binary;
+                    context.bs = bitstring::Builder::new(term.get_boxed_value::<bitstring::RcBinary>().unwrap());
                     context.set_register(dest, term);
                 }
                 &Instruction::BsPutInteger { fail, size, unit, flags, source: src } => {
@@ -1507,16 +1507,12 @@ impl Machine {
 
                     let size = size * (unit as usize);
 
+                    let flags = bitstring::Flag::from_bits(flags).unwrap();
+
                     // ins: &Instruction { op: BsPutInteger, args: [Label(0), Integer(1024), Literal(1), Literal(0), Integer(0)] }
                     println!("put_integer src is {}", context.expand_arg(src));
-                    if size != 8 { // 1024, unit 1
-                        unimplemented!("bs_put_integer size * unit != 8, actual: {} from unit {}", size, unit);
-                        //fail!(context, fail);
-                    }
 
-                    unsafe {
-                        (*context.bs).put_integer(size as usize, context.expand_arg(src));
-                    }
+                    context.bs.put_integer(size as usize, flags, context.expand_arg(src));
                 }
                 &Instruction::BsPutBinary { fail, size, unit, flags, source: src } => {
                     // TODO: fail label
@@ -1527,9 +1523,7 @@ impl Machine {
 
                     if let Ok(value) = bitstring::RcBinary::try_from(&context.expand_arg(src)) {
                         match context.expand_arg(size).into_variant() {
-                            Variant::Atom(atom::ALL) => unsafe {
-                                (*context.bs).put_binary(&value.data);
-                            },
+                            Variant::Atom(atom::ALL) => context.bs.put_binary(&value.data),
                             _ => unimplemented!("bs_put_binary size {:?}", size),
                         }
                     } else {
@@ -1548,9 +1542,7 @@ impl Machine {
                         context.expand_arg(src).into_variant()
                     {
                         match context.expand_arg(size).into_variant() {
-                            Variant::Atom(atom::ALL) => unsafe {
-                                (*context.bs).put_float(f);
-                            },
+                            Variant::Atom(atom::ALL) => context.bs.put_float(f),
                             _ => unimplemented!("bs_put_float size {:?}", size),
                         }
                     } else {
@@ -1559,7 +1551,7 @@ impl Machine {
                 }
                 Instruction::BsPutString { binary } => {
                     // BsPutString uses the StrT strings table! needs to be patched in loader
-                    unsafe { (*context.bs).put_binary(binary); }
+                    context.bs.put_binary(binary);
                 }
                 // &Instruction::BsStartMatch2 => {
                 //     // fail, src, live, slots?, dst

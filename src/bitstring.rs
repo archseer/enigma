@@ -4,7 +4,6 @@ use crate::servo_arc::Arc;
 use crate::value::{self, Term, TryFrom};
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
-use std::pin::Pin;
 // use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 // use std::cell::UnsafeCell;
 
@@ -75,32 +74,19 @@ impl Binary {
         }
     }
 
+    pub fn with_size(size: usize) -> Self {
+        Binary {
+            // flags: AtomicUsize::new(0),
+            // WRITABLE | ACTIVE_WRITER
+            is_writable: true,
+            data: vec![0; size],
+        }
+    }
+
     #[allow(clippy::mut_from_ref)]
     pub fn get_mut(&self) -> &mut Vec<u8> {
         // :( we want to avoid locks so this method is for specifically when we know we're the only writer.
         unsafe { &mut *(&self.data as *const Vec<u8> as *mut Vec<u8>) }
-    }
-
-    pub fn put_integer(&mut self, size: usize, int: Term) {
-        if let value::Variant::Integer(value) = int.into_variant() {
-            match size {
-                8 => self.data.push(value as u8),
-                _ => unimplemented!("bs_put_binary size {:?}", size),
-            }
-        } else {
-            panic!("Bad argument to put_integer")
-        }
-    }
-
-    pub fn put_binary(&mut self, binary: &[u8]) {
-        self.data.extend_from_slice(&binary);
-    }
-
-    pub fn put_float(&mut self, float: f64) {
-        unsafe {
-            let bytes: [u8; 8] = std::mem::transmute(float);
-            self.data.extend_from_slice(&bytes);
-        }
     }
 }
 
@@ -1177,10 +1163,10 @@ pub fn append(
 
         // Reserve extra capacity if needed.
         let data = pb.get_mut();
-        if data.capacity() < size {
+        if data.len() < size {
             data.reserve(2 * size); // why 2*?
         }
-        process.context_mut().bs = &**pb as *const Binary as *mut Binary;
+        process.context_mut().bs = Builder::new(pb);
 
         // Allocate heap space and build a new sub binary.
 
@@ -1245,10 +1231,10 @@ pub fn append(
 
         // Allocate the binary data struct itself.
         // TODO: the RcBinary alloc needs to be sorted out so we don't leak
-        let new_binary = heap.alloc(Arc::new(Binary::with_capacity(size))).clone();
+        let new_binary = heap.alloc(Arc::new(Binary::with_size(size))).clone();
         // ACTIVE_WRITER
 
-        process.context_mut().bs = &*new_binary as *const Binary as *mut Binary;
+        process.context_mut().bs = Builder::new(&new_binary);
 
         // Now copy the data into the binary.
         copy_binary!(
@@ -1303,9 +1289,9 @@ pub fn private_append(
     // Reserve extra capacity if needed.
     let data = pb.get_mut();
     if data.capacity() < size {
-        data.reserve(2 * size); // why 2*?
+        data.resize(2 * size, 0); // why 2*?
     }
-    process.context_mut().bs = &**pb as *const Binary as *mut Binary;
+    process.context_mut().bs = Builder::new(pb);
 
     sb.size = size_in_bits_after_build >> 3;
     sb.bitsize = size_in_bits_after_build & 7;
@@ -1322,7 +1308,7 @@ pub fn init_writable(process: &RcProcess, size: Term) -> Term {
     let heap = &process.context_mut().heap;
 
     // TODO: the RcBinary alloc needs to be sorted out so we don't leak
-    let binary = heap.alloc(Arc::new(Binary::with_capacity(size))).clone();
+    let binary = heap.alloc(Arc::new(Binary::with_size(size))).clone();
 
     Term::subbinary(
         heap,
@@ -1591,6 +1577,109 @@ pub unsafe fn copy_bits(
     }
 }
 
+#[derive(Debug)]
+pub struct Builder {
+    /// Pointer to the underlying binary storage
+    binary: *mut Vec<u8>,
+    /// Offset in bits
+    pub offset: usize,
+}
+
+fn fmt_int(buf: &mut Vec<u8>, offset: usize, val: i32, bit_size: usize, flags: Flag) {
+    let offs = bit_offset!(bit_size);
+    let mut size = byte_offset!(bit_size);
+
+    if offs > 0 {
+        panic!("can't do bitaligned put yet");
+    }
+
+    let v = if flags.contains(Flag::BSF_LITTLE) {
+        // Little endian
+        // copy start to end, fixing up the last bit
+        val.to_le_bytes()
+    } else {
+        /* Big endian */
+        // copy end to start, fixing up the first bit?
+        val.to_be_bytes()
+    };
+    let mut start = byte_offset!(offset);
+    if size > v.len() {
+        // pad it out if we have less bytes
+        start = size - v.len();
+        size = v.len();
+    }
+    // println!("start: {}, size: {}", start, size);
+    buf[start..start + size].copy_from_slice(&v[..size]);
+}
+
+impl Builder {
+    pub fn new(binary: &RcBinary) -> Self {
+        Self {
+            // :( we want to avoid locks so this method is for specifically when we know we're the only writer.
+            binary: unsafe { &mut *(&binary.data as *const Vec<u8> as *mut Vec<u8>) },
+            offset: 0,
+        }
+    }
+
+    #[inline]
+    pub fn data(&self) -> &mut Vec<u8> {
+        unsafe { &mut *self.binary }
+    }
+
+    pub fn put_integer(&mut self, size: usize, mut flags: Flag, int: Term) {
+        let bit_offset = bit_offset!(self.offset);
+
+        // TODO: preprocess flags for native endian in loader(remove native_endian and set bsf_little off or on)
+        native_endian!(flags);
+
+        if let value::Variant::Integer(value) = int.into_variant() {
+            match size {
+                0 => (), // skip
+                8 => self.data().push(value as u8),
+                _ => {
+                    let rbits = 8 - bit_offset;
+                    if bit_offset + size <= 8 {
+                        // All bits are in the same byte
+                        // iptr = erts_current_bin + byte_offset!(self.offset);
+                        // b = *iptr & (0xff << rbits);
+                        // b |= (signed_val(arg) & ((1 << num_bits)-1)) << (8-bit_offset-num_bits);
+                        // *iptr = b;
+                        unimplemented!()
+                    } else if bit_offset == 0 {
+                        // More than one bit, starting at a byte boundary
+                        let bits = bit_offset!(size);
+                        fmt_int(self.data(), self.offset, value, size, flags);
+                    } else if flags.contains(Flag::BSF_LITTLE) {
+                        // special handling for little endian
+                        unimplemented!()
+                    } else {
+                        // big endian
+                        unimplemented!()
+                    }
+                }
+            }
+            self.offset += size;
+        } else {
+            panic!("Bad argument to put_integer")
+        }
+    }
+
+    pub fn put_binary(&mut self, binary: &[u8]) {
+        let start = byte_offset!(self.offset);
+        self.data()[start..start + binary.len()].copy_from_slice(&binary);
+        self.offset += binary.len() * 8;
+    }
+
+    pub fn put_float(&mut self, float: f64) {
+        let start = byte_offset!(self.offset);
+        unsafe {
+            let bytes: [u8; 8] = std::mem::transmute(float);
+            self.data()[start..start + 8].copy_from_slice(&bytes);
+        }
+        self.offset += 8 * 8;
+    }
+}
+
 pub fn bytes_to_list(
     heap: &Heap,
     mut previous: Term,
@@ -1712,5 +1801,14 @@ mod tests {
 
         assert_eq!(&[114, 111], res.as_ref());
         assert_eq!(24, mb.offset);
+    }
+
+    #[test]
+    fn test_builder() {
+        let binary = Arc::new(Binary::from(vec![1, 2, 0, 0, 0, 0, 0, 0]));
+        let mut builder = Builder::new(&binary);
+        builder.offset = 16; // two bytes
+        builder.put_integer(64, Flag::BSF_NONE, Term::int(257));
+        assert_eq!(&[1, 2, 0, 0, 0, 0, 1, 1], builder.data().as_slice());
     }
 }
