@@ -1367,7 +1367,9 @@ fn phash_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
     let hash = hasher.finish();
 
     match args[1].into_number() {
-        Ok(value::Num::Integer(i)) => Ok(Term::uint64(heap, hash % i as u64)),
+        Ok(value::Num::Integer(i)) => {
+            Ok(Term::uint64(heap, (hash % i as u64) + 1)) // range needs to be 1..num
+        }
         Ok(_) => unimplemented!(),
         Err(_) => Err(Exception::new(Reason::EXC_BADARG)),
     }

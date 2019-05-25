@@ -210,8 +210,8 @@ fn call_error_handler(
         };
 
     // Create a list with all arguments in the x registers.
-    // TODO: I don't like from_iter requiring cloned
-    let args = Cons::from_iter(context.x[0..mfa.2 as usize].iter().cloned(), &context.heap);
+    // TODO: I don't like from_iter requiring copied
+    let args = Cons::from_iter(context.x[0..mfa.2 as usize].iter().copied(), &context.heap);
 
     // Set up registers for call to error_handler:<func>/3.
     context.x[0] = Term::atom(mfa.0); // module
@@ -237,6 +237,7 @@ macro_rules! op_call_ext {
         match export {
             Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
             Some(Export::Bif(APPLY_2)) => {
+                // TODO: rewrite these two into Apply instruction calls
                 // I'm cheating here, *shrug*
                 op_apply_fun!($vm, $context, $process)
             }
@@ -682,6 +683,10 @@ impl Machine {
         }
 
         vm
+    }
+
+    pub fn elapsed_time(&self) -> time::Duration {
+        self.start_time.elapsed()
     }
 
     pub fn preload_modules(&self) {
@@ -2375,9 +2380,5 @@ impl Machine {
             }
         }
         }
-    }
-
-    pub fn elapsed_time(&self) -> time::Duration {
-        self.start_time.elapsed()
     }
 }
