@@ -549,6 +549,17 @@ pub fn binary_to_term_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
+pub fn term_to_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    // TODO: needs to yield mid parsing...
+    match crate::etf::encode(args[0]) {
+        Ok(term) => Ok(Term::binary(
+            &process.context_mut().heap,
+            bitstring::Binary::from(term),
+        )),
+        Err::<_, std::io::Error>(error) => panic!("binary_to_term error: {:?}", error),
+    }
+}
+
 pub fn binary_to_atom_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     match args[1].into_variant() {
         Variant::Atom(atom::LATIN1) => (),

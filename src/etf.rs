@@ -2,7 +2,7 @@ use crate::atom;
 use crate::bitstring;
 use crate::immix::Heap;
 use crate::module;
-use crate::value::{self, Term, HAMT};
+use crate::value::{self, Term, Variant, HAMT};
 use nom::*;
 use num_bigint::{BigInt, Sign};
 use num_traits::ToPrimitive;
@@ -300,4 +300,78 @@ pub fn decode_bignum<'a>(rest: &'a [u8], size: u32, heap: &Heap) -> IResult<&'a 
     }
 
     Ok((rest, Term::bigint(heap, big)))
+}
+
+// ----
+use byteorder::{BigEndian, WriteBytesExt};
+use std::io::Write;
+
+pub fn encode(term: Term) -> std::io::Result<Vec<u8>> {
+    let mut res = vec![131]; // version number
+    encode_term(&mut res, term)?;
+    // :debug_info_v1, :erl_abstract_code, {:none, []}}
+    Ok(res)
+}
+
+pub fn encode_term(res: &mut Vec<u8>, term: Term) -> std::io::Result<()> {
+    use value::{TryFrom, Tuple};
+
+    match term.into_variant() {
+        Variant::Integer(i) => {
+            if 0 <= i && i <= std::u8::MAX as i32 {
+                res.write_u8(Tag::SmallInteger as u8)?;
+                res.write_u8(i as u8)?;
+            } else {
+                res.write_u8(Tag::Integer as u8)?;
+                res.write_i32::<BigEndian>(i)?;
+            }
+        }
+        Variant::Nil(..) => {
+            res.write_u8(Tag::Nil as u8)?;
+        }
+        Variant::Atom(i) => {
+            let atom = atom::to_str(i).unwrap();
+            encode_atom(res, atom)?;
+        }
+        Variant::Float(value::Float(f)) => encode_float(res, f)?,
+        // encode list
+        // encode improper list
+        Variant::Pointer(ptr) => match term.get_boxed_header().unwrap() {
+            value::BOXED_TUPLE => encode_tuple(res, Tuple::try_from(&term).unwrap())?,
+            i => unimplemented!("etf::encode for boxed {}", i),
+        },
+        _ => unimplemented!("etf::encode for: {}", term),
+    }
+    Ok(())
+}
+
+fn encode_tuple(res: &mut Vec<u8>, tuple: &value::Tuple) -> std::io::Result<()> {
+    if tuple.len() < 0x100 {
+        res.write_u8(Tag::SmallTuple as u8)?;
+        res.write_u8(tuple.len() as u8)?;
+    } else {
+        res.write_u8(Tag::LargeTuple as u8)?;
+        res.write_u32::<BigEndian>(tuple.len() as u32);
+    }
+    for e in tuple.iter().copied() {
+        encode_term(res, e)?;
+    }
+    Ok(())
+}
+
+fn encode_atom(res: &mut Vec<u8>, atom: String) -> std::io::Result<()> {
+    if atom.len() > 0xFFFF {
+        // return Err(EncodeError::TooLongAtomName(atom));
+        panic!("Atom name too long!");
+    }
+    res.write_u8(Tag::AtomU8 as u8)?;
+    res.write_u16::<BigEndian>(atom.len() as u16)?;
+    res.write_all(atom.as_bytes())?;
+    Ok(())
+}
+
+fn encode_float(res: &mut Vec<u8>, float: f64) -> std::io::Result<()> {
+    res.write_u8(Tag::NewFloat as u8)?;
+    res.write_f64::<BigEndian>(float)?;
+    Ok(())
 }

@@ -53,7 +53,6 @@ pub struct Machine {
     /// PID pointing to the process handling system-wide logging.
     pub system_logger: AtomicUsize,
 
-    // pub exit:
     pub process_pool: tokio::runtime::Runtime,
     pub runtime: tokio::runtime::Runtime,
 
