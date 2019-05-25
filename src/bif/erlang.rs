@@ -551,6 +551,7 @@ pub fn binary_to_term_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
 
 pub fn term_to_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // TODO: needs to yield mid parsing...
+    // TODO: args[1]
     match crate::etf::encode(args[0]) {
         Ok(term) => Ok(Term::binary(
             &process.context_mut().heap,
@@ -587,6 +588,28 @@ pub fn atom_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
             let heap = &process.context_mut().heap;
 
             Ok(bitstring!(heap, string))
+        }
+        _ => Err(Exception::new(Reason::EXC_BADARG)),
+    }
+}
+
+pub fn atom_to_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    match args[1].into_variant() {
+        Variant::Atom(atom::LATIN1) => (),
+        Variant::Atom(atom::UNICODE) => (),
+        Variant::Atom(atom::UTF8) => (),
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    match args[0].into_variant() {
+        Variant::Atom(i) => {
+            let string = atom::to_str(i).unwrap();
+            let heap = &process.context_mut().heap;
+
+            Ok(Term::binary(
+                heap,
+                bitstring::Binary::from(string.into_bytes()),
+            ))
         }
         _ => Err(Exception::new(Reason::EXC_BADARG)),
     }

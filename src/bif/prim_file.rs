@@ -550,7 +550,7 @@ pub fn altname_nif_1(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) ->
     unimplemented!()
 }
 
-//
+// gzip
 
 pub fn compress_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     use libflate::gzip;
@@ -583,6 +583,21 @@ pub fn uncompress_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
         .unwrap();
 
     Ok(Term::binary(heap, Binary::from(data)))
+}
+
+// Override zlib:compress/1, zlib:uncompress/1
+
+pub fn zlib_compress_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    use libflate::zlib;
+    let heap = &process.context_mut().heap;
+    let string = crate::bif::erlang::list_to_iodata(args[0]).unwrap(); // TODO: error handling
+    let mut cursor = std::io::Cursor::new(string);
+
+    let mut encoder = zlib::Encoder::new(Vec::new()).unwrap();
+    std::io::copy(&mut cursor, &mut encoder).unwrap();
+    let encoded_data = encoder.finish().into_result().unwrap();
+
+    Ok(Term::binary(heap, Binary::from(encoded_data)))
 }
 
 #[cfg(test)]

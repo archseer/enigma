@@ -154,6 +154,7 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "iolist_to_binary", 1 => erlang::iolist_to_binary_1,
             "iolist_to_iovec", 1 => erlang::iolist_to_iovec_1,
             "atom_to_list", 1 => erlang::atom_to_list_1,
+            "atom_to_binary", 2 => erlang::atom_to_binary_2,
             "pid_to_list", 1 => erlang::pid_to_list_1,
             "integer_to_list", 1 => erlang::integer_to_list_1,
             "integer_to_binary", 1 => erlang::integer_to_binary_1,
@@ -356,6 +357,10 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
         },
         "file" => {
             "native_name_encoding", 0 => prim_file::native_name_encoding_0,
+        },
+        "zlib" => {
+            // override like we did for beam_file
+            "compress", 1 => prim_file::zlib_compress_1,
         },
     ]
 });

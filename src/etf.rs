@@ -314,7 +314,7 @@ pub fn encode(term: Term) -> std::io::Result<Vec<u8>> {
 }
 
 pub fn encode_term(res: &mut Vec<u8>, term: Term) -> std::io::Result<()> {
-    use value::{TryFrom, Tuple};
+    use value::{Cons, TryFrom, Tuple};
 
     match term.into_variant() {
         Variant::Integer(i) => {
@@ -334,15 +334,23 @@ pub fn encode_term(res: &mut Vec<u8>, term: Term) -> std::io::Result<()> {
             encode_atom(res, atom)?;
         }
         Variant::Float(value::Float(f)) => encode_float(res, f)?,
+        Variant::Cons(..) => encode_list(res, Cons::try_from(&term).unwrap())?,
         // encode list
         // encode improper list
         Variant::Pointer(ptr) => match term.get_boxed_header().unwrap() {
             value::BOXED_TUPLE => encode_tuple(res, Tuple::try_from(&term).unwrap())?,
+            value::BOXED_BINARY => {
+                encode_binary(res, bitstring::RcBinary::try_from(&term).unwrap())?
+            }
             i => unimplemented!("etf::encode for boxed {}", i),
         },
         _ => unimplemented!("etf::encode for: {}", term),
     }
     Ok(())
+}
+
+fn encode_nil(res: &mut Vec<u8>) -> std::io::Result<()> {
+    res.write_u8(Tag::Nil as u8)
 }
 
 fn encode_tuple(res: &mut Vec<u8>, tuple: &value::Tuple) -> std::io::Result<()> {
@@ -373,5 +381,37 @@ fn encode_atom(res: &mut Vec<u8>, atom: String) -> std::io::Result<()> {
 fn encode_float(res: &mut Vec<u8>, float: f64) -> std::io::Result<()> {
     res.write_u8(Tag::NewFloat as u8)?;
     res.write_f64::<BigEndian>(float)?;
+    Ok(())
+}
+
+fn encode_binary(res: &mut Vec<u8>, binary: &bitstring::RcBinary) -> std::io::Result<()> {
+    unimplemented!()
+}
+
+fn encode_list(res: &mut Vec<u8>, list: &value::Cons) -> std::io::Result<()> {
+    let len = list.iter().count();
+
+    // TODO FIXME: handle improper lists
+
+    if len > 0
+        && len <= std::u16::MAX as usize
+        && list.iter().all(|e| match e.to_int() {
+            Some(i) if i <= 0x100 => true,
+            _ => false,
+        })
+    {
+        res.write_u8(Tag::String as u8)?;
+        res.write_u16::<BigEndian>(len as u16)?;
+        for b in list.iter().map(|e| e.to_i32().unwrap()) {
+            res.write_u8(b as u8)?;
+        }
+    } else {
+        res.write_u8(Tag::List as u8)?;
+        res.write_u32::<BigEndian>(len as u32)?;
+        for e in list.iter().copied() {
+            encode_term(res, e)?;
+        }
+        encode_nil(res)?;
+    }
     Ok(())
 }

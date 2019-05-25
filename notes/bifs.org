@@ -410,8 +410,8 @@
 - [X] bif unicode:characters_to_list/2
 - [ ] bif unicode:bin_is_7bit/1
 
-** New Bifs in R13A. [1/4]
-- [ ] bif erlang:atom_to_binary/2
+** New Bifs in R13A. [2/4]
+- [X] bif erlang:atom_to_binary/2
 - [X] bif erlang:binary_to_atom/2
 - [ ] bif erlang:binary_to_existing_atom/2
 - [ ] bif net_kernel:dflag_unicode_io/1

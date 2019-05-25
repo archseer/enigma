@@ -1510,7 +1510,7 @@ impl Machine {
                     let flags = bitstring::Flag::from_bits(flags).unwrap();
 
                     // ins: &Instruction { op: BsPutInteger, args: [Label(0), Integer(1024), Literal(1), Literal(0), Integer(0)] }
-                    println!("put_integer src is {}", context.expand_arg(src));
+                    println!("put_integer src is {}\r", context.expand_arg(src));
 
                     context.bs.put_integer(size as usize, flags, context.expand_arg(src));
                 }
