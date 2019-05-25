@@ -6,9 +6,12 @@ Enigma VM
 [![Build status](https://api.travis-ci.org/archseer/enigma.svg?branch=master)](https://travis-ci.org/archseer/enigma)
 [![Windows build status](https://ci.appveyor.com/api/projects/status/github/archseer/enigma?svg=true)](https://ci.appveyor.com/project/archseer/enigma)
 
-An implementation of the Erlang VM in Rust. We aim to be complete, correct and fast (in that order of importance). However my TotallySerious™ fibonacci microbenchmarks are currently on-par with OTP (but I'm missing 99% of the runtime :)
+An implementation of the Erlang VM in Rust. We aim to be complete, correct and
+fast, in that order of importance.
 
-OTP 22+ compatible (sans the distributed bits for now) &mdash; all your code should eventually run on Enigma unchanged. Deprecated opcodes won't be supported.
+OTP 22+ compatible (sans the distributed bits for now) &mdash; all your code
+should eventually run on Enigma unchanged. Deprecated opcodes won't be
+supported.
 
 ## Why?
 
@@ -17,19 +20,15 @@ they're massive (~300k SLOC). A small implementation makes it easier for new
 people to learn Erlang internals. We also get a platform to quickly iterate on
 ideas for inclusion into BEAM.
 
-##### Why Rust?
-
-I read the BEAM book followed by the Rust book. Two birds with one stone?
-
 ## Installation
 
 Only prerequisite to building Enigma is Rust. Use [rustup](https://rustup.rs/)
 to install the latest nightly rust. At this time we don't support stable / beta
 anymore, because we're relying on async/await, which is scheduled to run in
-stable some time in 2019.
+stable some time in Q3 2019.
 
-To boot up OTP you will also need to compile the standard library first. At the
-moment, that relies on the regular BEAM build system:
+To boot up OTP you will also need to compile the standard library. At the
+moment, that relies on the BEAM build system:
 
 ```bash
 git submodule update --init --depth 1
@@ -43,13 +42,65 @@ make local_setup
 We hope to simplify this step in the future (once enigma can run the compiler).
 
 Run `cargo run` to install dependencies, build and run the VM. By default, it
-will try to boot up the erl shell ([which boots, but its currently semi-functional](https://asciinema.org/a/yVKI5dAdDXGq11azUSjbQV42y)).
+will boot up the erlang shell ([which works, but has some rendering bugs](https://asciinema.org/a/yVKI5dAdDXGq11azUSjbQV42y)).
 
 Expect crashes, but a lot of the functionality is already available.
 
-We will distribute binaries for various platforms, once we reach a certain level of usability.
+Pre-built binaries for various platforms will be available, once we reach a certain level of stability.
 
-## Goals, ideas & experiments
+## Feature status
+
+We implement most of the opcodes, and about half of all BIFs. You can view
+a detailed progress breakdown on [opcodes](/notes/opcodes.org) or [BIFs](/notes/bifs.org).
+
+#### Roadmap
+
+- [x] Get the full OTP kernel/stdlib to boot (`init:start`).
+- [x] Get the Eshell to run.
+- [x] Get OTP tests to run (works with a custom runner currently).
+- [ ] Get the erlang compiler to work.
+- [ ] Get IEx to run.
+- [ ] Get OTP tests to pass.
+
+#### Features
+
+- [x] Floating point math
+- [x] Spawn & message sending
+- [x] Lambdas / anonymous functions
+- [x] Exceptions & stack traces
+- [x] Process dictionary
+- [x] Signal queue
+- [x] Links & monitors
+- [ ] Timers
+- [x] Maps
+- [ ] Binaries
+  - [x] Basic type implementation
+  - [ ] Binary building
+  - [x] Binary matching
+  - [x] Bitstring (bit-level) matching
+  - [ ] Binary searching
+    - multi pattern via [aho-corasick](https://github.com/BurntSushi/aho-corasick)
+    - single pattern via [boyer-moore](https://github.com/killerswan/boyer-moore-search) | [needle booyer-moore](https://docs.rs/needle/0.1.1/needle/) | [regex - booyer-moore](https://github.com/ethanpailes/regex/commit/d2e28f959ac384db62f7cbeba1576cf39a75b294)
+- [ ] File IO
+    - [x] open/read/close/read_file
+    - [ ] write
+    - [ ] Filesystem interaction
+- [ ] [External NIFs](http://erlang.org/doc/man/erl_nif.html)
+- [ ] Ports (might never be fully supported, we provide a few boot-critical ones as builtins: tty, fd)
+- [ ] External Term representation
+  - [x] Decoding
+  - [ ] Encoding
+- [ ] ETS
+  - [x] PAM implementation
+  - [x] All table types partially, but we do not provide any concurrency guarantees
+- [ ] Regex (some support exists for basic matching)
+- [ ] Garbage Collection (arena-based per-process at the moment)
+- [ ] inet via socket nifs
+- [ ] Code reloading
+- [ ] Tracing/debugging support
+- [ ] Load-time instruction transform and specialization engine
+
+### Goals, ideas & experiments
 
 Process scheduling is implemented on top of rust futures:
 - A process is simply a long running future, scheduled on top of
@@ -61,16 +112,16 @@ Process scheduling is implemented on top of rust futures:
     (allows a much simpler yielding implementation)
 
 Future possibilities:
-- Be able to run Elixir
-- Write more documentation about more sparsely documented BEAM aspects (binary matching, time wheel, process monitors, etc).
-- Feature parity with OTP
+- Write more documentation about more sparsely documented BEAM aspects (binary matching, time wheel, process monitors, ...)
 - Explore using immix as a GC for Erlang
+- Eir runtime
+- JIT via Eir
 - BIF as a generator function (yield to suspend/on reduce)
 - Provide built-in adapter modules for [hyper](https://github.com/hyperium/hyper) as a Plug Adapter / HTTP client.
-- Cross-compile to WebAssembly ([threading](https://rustwasm.github.io/2018/10/24/multithreading-rust-and-wasm.html) is coming)
+- Cross-compile to WebAssembly ([runtime](https://github.com/rustasync/runtime/))
 - Use Commentz-Walter for binary matching. ["Commentz-Walter is an algorithm that combines Aho-Corasick with Boyer-Moore. (Only implementation I know of is in GNU grep.)"](https://github.com/rust-lang/regex/issues/197))
 
-### Initial non-goals
+#### Initial non-goals
 
 Until the VM doesn't reach a certain level of completeness, it doesn't make sense to consider these.
 
@@ -82,76 +133,19 @@ Note: NIF/FFI ABI compatibility with OTP is going to be quite some work. But,
 a rust-style NIF interface will be available. It would also probably be possible
 to make an adapter compatible with [rustler](https://github.com/rusterlium/rustler).
 
-## Feature status
-
-You can view a detailed progress breakdown on [opcodes](/notes/opcodes.org) or [BIFs](/notes/bifs.org).
-
-#### Roadmap
-
-- [x] Implement enough instructions and BIFs to get the preloads to load.
-- [x] Get the full OTP kernel/stdlib to boot (`init:start`).
-- [x] Get the Eshell to run.
-- [ ] Get IEx to run.
-- [ ] Get OTP tests to run.
-
-#### Features
-
-- [x] Floating point math ([float registers](https://pdfs.semanticscholar.org/7347/354eaaad96d40e12ea4373178b784fc39bfc.pdf))
-- [x] Spawn & message sending
-- [x] Lambdas / anonymous functions
-- [x] Stack traces
-- [x] Exceptions
-- [x] Process dictionary
-- [x] Signal queue
-- [x] Links & monitors
-- [x] error_handler system hooks (export stubs)
-- [x] Deep term comparison (lists, tuples, maps)
-- [ ] Timers
-- [x] Maps
-- [ ] Binaries
-  - [x] Basic type implementation
-  - [ ] Binary building
-  - [x] Binary matching
-  - [x] Bitstring (bit-level) matching
-    - [ ] Combine repeated utf8 matches?
-  - [ ] Binary searching
-    - multi pattern via [aho-corasick](https://github.com/BurntSushi/aho-corasick)
-    - single pattern via [boyer-moore](https://github.com/killerswan/boyer-moore-search) | [needle booyer-moore](https://docs.rs/needle/0.1.1/needle/) | [regex - booyer-moore](https://github.com/ethanpailes/regex/commit/d2e28f959ac384db62f7cbeba1576cf39a75b294)
-- [ ] File IO
-    - [x] Basic read_file
-    - [x] File open/read/close
-    - [ ] Filesystem interaction
-- [ ] [Externally loaded NIFs](http://erlang.org/doc/man/erl_nif.html)
-- [ ] Ports
-    - [x] ttysl_drv
-    - [ ] spawn_drv
-    - [ ] fd_drv
-    - [ ] vanilla_driver ?
-    - [ ] forker_driver
-    - [ ] inet_drv
-    - [ ] ram_file_drv (we currently override the few functions to use rust based NIFs)
-- [ ] External Term representation
-  - [x] Decoding
-  - [ ] Encoding
-- [ ] ETS
-  - [x] PAM implementation
-  - [x] All table types partially, but we do not provide any concurrency guarantees
-- [ ] Regex (some support exists for basic matching)
-- [ ] GC!
-- [ ] Code reloading
-- [ ] Tracing/debugging support
-- [ ] beam_makeops compatible load-time opcode transformer
-
 ## Contributing
 
 Contributors are very welcome!
 
-The easiest way to get started is to look at the `notes` folder and pick a BIF or an opcode to implement. Take a look at `src/bif.rs` and the `bif` folder on how other BIFs are implemented. There's also a few issues open with the `good first issue` tag, which would be a good introduction to the codebase.
+The easiest way to get started is to look at the `notes` folder and pick a BIF
+or an opcode to implement. Take a look at `src/bif.rs` and the `bif` folder on
+how other BIFs are implemented. There's also a few issues open with the `good
+first issue` tag, which would also be a good introduction to the internals.
 
 Alternatively, search the codebase for `TODO`, `FIXME` or `unimplemented!`,
 those mark various places where a partial implementation exists, but a bit more
 work needs to be done.
 
-Test coverage is currently lacking, and there's varying levels of documentation; I will be addressing these as soon as I solidify the core data structures.
+Test coverage is currently lacking, and there's varying levels of documentation; I will be addressing these soon.
 
 We also have a #enigma channel on the [Elixir Slack](https://elixir-slackin.herokuapp.com/).
