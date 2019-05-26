@@ -6,7 +6,6 @@ use crate::bitstring;
 use crate::exception;
 use crate::immix::Heap;
 use crate::instr_ptr::InstrPtr;
-use crate::loader;
 use crate::module;
 use crate::nanbox::TypedNanBox;
 use crate::process;
@@ -815,7 +814,7 @@ impl Term {
                 }
 
                 let offset = value.offset; // byte_offset!
-                                           // TODO: handle bitstring
+                                           // TODO: handle bitstring by using binary_size!()
                 Some(&value.original.data[offset..offset + value.size])
             }
             _ => None,

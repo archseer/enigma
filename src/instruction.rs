@@ -665,7 +665,7 @@ pub enum Instruction {
         flags: u8,
         source: Register,
     },
-    OnLoad,
+    // OnLoad, load time instr!
     // Modified in OTP 21 because it turns out that we don't need the label after all.
     RecvMark,
     // Modified in OTP 21 because it turns out that we don't need the label after all.

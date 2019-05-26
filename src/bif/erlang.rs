@@ -7,6 +7,14 @@ use crate::value::{self, Cons, Term, TryFrom, TryInto, Tuple, Variant};
 use crate::vm;
 use lexical;
 
+pub fn md5_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let bytes = list_to_iodata(args[0])?;
+
+    let heap = &process.context_mut().heap;
+    let digest = md5::compute(bytes);
+    Ok(Term::binary(heap, bitstring::Binary::from(digest.to_vec())))
+}
+
 pub fn make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let num = match args[0].into_number() {
         Ok(value::Num::Integer(i)) if !i < 0 => i,
@@ -289,7 +297,7 @@ pub fn iolist_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
     Ok(Term::binary(heap, bitstring::Binary::from(bytes)))
 }
 
-pub fn iolist_to_iovec_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn iolist_to_iovec_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
     if args[0].is_binary() {
         return Ok(cons!(heap, args[0], Term::nil()));
@@ -549,9 +557,21 @@ pub fn binary_to_term_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
     Err(Exception::new(Reason::EXC_BADARG))
 }
 
-pub fn term_to_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn term_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // TODO: needs to yield mid parsing...
     // TODO: args[1]
+    match crate::etf::encode(args[0]) {
+        Ok(term) => Ok(Term::binary(
+            &process.context_mut().heap,
+            bitstring::Binary::from(term),
+        )),
+        Err::<_, std::io::Error>(error) => panic!("binary_to_term error: {:?}", error),
+    }
+}
+
+pub fn term_to_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    // TODO: needs to yield mid parsing...
+    // TODO: args[1] for compression settings
     match crate::etf::encode(args[0]) {
         Ok(term) => Ok(Term::binary(
             &process.context_mut().heap,

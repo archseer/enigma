@@ -1281,7 +1281,7 @@ fn transform_instruction(
             flags: ins.args[1].to_u32().try_into().unwrap(),
             source: ins.args[2].to_reg(),
         },
-        Opcode::OnLoad => Instruction::OnLoad,
+        Opcode::OnLoad => unimplemented!("on_load instruction!"),
         Opcode::RecvMark => Instruction::RecvMark,
         Opcode::RecvSet => Instruction::RecvSet,
         Opcode::GcBif3 => Instruction::GcBif3 {

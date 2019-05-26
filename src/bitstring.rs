@@ -175,7 +175,7 @@ pub struct SubBinary {
     // TODO: wrap into value
     /// Binary size in bytes
     pub size: usize,
-    /// Offset into binary
+    /// Offset into binary in bytes
     pub offset: usize,
     /// Bit size
     pub bitsize: usize,
@@ -356,47 +356,47 @@ macro_rules! binary_size {
     };
 }
 
-pub fn start_match_2(heap: &Heap, binary: Term, _max: u32) -> Option<Term> {
-    assert!(binary.is_bitstring());
+// pub fn start_match_2(heap: &Heap, binary: Term, _max: u32) -> Option<Term> {
+//     assert!(binary.is_bitstring());
 
-    // TODO: BEAM allocates size on all binary types right after the header so we can grab it
-    // without needing the binary subtype.
-    let total_bin_size = binary_size!(binary);
+//     // TODO: BEAM allocates size on all binary types right after the header so we can grab it
+//     // without needing the binary subtype.
+//     let total_bin_size = binary_size!(binary);
 
-    if (total_bin_size >> (8 * std::mem::size_of::<usize>() - 3)) != 0 {
-        // Uint => maybe u8??
-        return None;
-    }
+//     if (total_bin_size >> (8 * std::mem::size_of::<usize>() - 3)) != 0 {
+//         // Uint => maybe u8??
+//         return None;
+//     }
 
-    // TODO: this is not nice
-    let mb = match binary.get_boxed_header() {
-        Ok(value::BOXED_BINARY) => {
-            // TODO use ok_or to cast to some, then use ?
-            let value = binary.get_boxed_value::<RcBinary>().unwrap().clone();
-            MatchBuffer::from(value)
-        }
-        Ok(value::BOXED_SUBBINARY) => {
-            // TODO use ok_or to cast to some, then use ?
-            let value = binary.get_boxed_value::<SubBinary>().unwrap().clone();
-            MatchBuffer::from(value)
-        }
-        _ => unreachable!(),
-    };
+//     // TODO: this is not nice
+//     let mb = match binary.get_boxed_header() {
+//         Ok(value::BOXED_BINARY) => {
+//             // TODO use ok_or to cast to some, then use ?
+//             let value = binary.get_boxed_value::<RcBinary>().unwrap().clone();
+//             MatchBuffer::from(value)
+//         }
+//         Ok(value::BOXED_SUBBINARY) => {
+//             // TODO use ok_or to cast to some, then use ?
+//             let value = binary.get_boxed_value::<SubBinary>().unwrap().clone();
+//             MatchBuffer::from(value)
+//         }
+//         _ => unreachable!(),
+//     };
 
-    // TODO: toggle is_writable to false for rcbinary!
-    // pb = (ProcBin *) boxed_val(Orig);
-    // if (pb->thing_word == HEADER_PROC_BIN && pb->flags != 0) {
-    //  erts_emasculate_writable_binary(pb);
-    // }
+//     // TODO: toggle is_writable to false for rcbinary!
+//     // pb = (ProcBin *) boxed_val(Orig);
+//     // if (pb->thing_word == HEADER_PROC_BIN && pb->flags != 0) {
+//     //  erts_emasculate_writable_binary(pb);
+//     // }
 
-    Some(Term::matchstate(
-        heap,
-        MatchState {
-            saved_offsets: vec![mb.offset],
-            mb,
-        },
-    ))
-}
+//     Some(Term::matchstate(
+//         heap,
+//         MatchState {
+//             saved_offsets: vec![mb.offset],
+//             mb,
+//         },
+//     ))
+// }
 
 pub fn start_match_3(heap: &Heap, binary: Term) -> Option<Term> {
     assert!(binary.is_bitstring());
@@ -1664,10 +1664,54 @@ impl Builder {
         }
     }
 
-    pub fn put_binary(&mut self, binary: &[u8]) {
+    pub fn put_bytes(&mut self, binary: &[u8]) {
         let start = byte_offset!(self.offset);
         self.data()[start..start + binary.len()].copy_from_slice(&binary);
         self.offset += binary.len() * 8;
+    }
+
+    // pub fn put_binary(&mut self, binary: &[u8]) {
+    //     let start = byte_offset!(self.offset);
+    //     self.data()[start..start + binary.len()].copy_from_slice(&binary);
+    //     self.offset += binary.len() * 8;
+    // }
+
+    pub fn put_binary_all(&mut self, binary: Term) {
+        // convert binary to string
+        let (bin, offs, bitoffs, size, bitsize) = match binary.get_boxed_header() {
+            Ok(value::BOXED_BINARY) => {
+                // TODO use ok_or to cast to some, then use ?
+                let value = &binary.get_boxed_value::<RcBinary>().unwrap();
+                (*value, 0, 0, value.data.len(), 0)
+            }
+            Ok(value::BOXED_SUBBINARY) => {
+                // TODO use ok_or to cast to some, then use ?
+                let value = &binary.get_boxed_value::<SubBinary>().unwrap();
+                (
+                    &value.original,
+                    value.offset,
+                    value.bit_offset,
+                    value.size,
+                    value.bitsize,
+                )
+            }
+            _ => unreachable!(),
+        };
+        if bitoffs > 0 {
+            unimplemented!("Unaligned bitoffs not implemented");
+        }
+        // TODO: all this math should be generalized
+        // in bytes
+        let total_bin_size = binary_size!(binary);
+        let slice = &bin.data[offs..offs + total_bin_size];
+
+        println!(
+            "put_binary with slice: {:?}, tot: {}, whole: {:?}",
+            slice, total_bin_size, bin.data
+        );
+        let start = byte_offset!(self.offset);
+        self.data()[start..start + total_bin_size].copy_from_slice(&slice);
+        self.offset += size * 8 + bitsize;
     }
 
     pub fn put_float(&mut self, float: f64) {

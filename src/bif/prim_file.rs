@@ -349,7 +349,7 @@ pub fn open_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
     for value in Cons::try_from(&args[1])?.iter() {
         match value.into_variant() {
             Variant::Atom(atom::READ) => opts.read(true),
-            Variant::Atom(atom::WRITE) => opts.write(true),
+            Variant::Atom(atom::WRITE) => opts.write(true).create(true),
             Variant::Atom(atom::EXCLUSIVE) => unimplemented!(),
             Variant::Atom(atom::APPEND) => opts.append(true),
             Variant::Atom(atom::SYNC) => unimplemented!(),
@@ -417,8 +417,15 @@ pub fn read_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
     }
 }
 
-pub fn write_nif_2(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> bif::Result {
-    unimplemented!()
+pub fn write_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let heap = &process.context_mut().heap;
+    let file = File::try_from_mut(&args[0])?;
+
+    let bytes = crate::bif::erlang::list_to_iodata(args[1])?;
+    match file.write_all(&bytes) {
+        Ok(()) => Ok(atom!(OK)),
+        Err(err) => Ok(error_to_tuple(heap, err)),
+    }
 }
 
 pub fn pread_nif_3(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> bif::Result {
@@ -489,8 +496,20 @@ pub fn make_soft_link_nif_2(
     unimplemented!()
 }
 
-pub fn rename_nif_2(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> bif::Result {
-    unimplemented!()
+pub fn rename_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let heap = &process.context_mut().heap;
+    let from = Cons::try_from(&args[0])?;
+    let from = value::cons::unicode_list_to_buf(from, 2048).unwrap();
+
+    let to = Cons::try_from(&args[1])?;
+    let to = value::cons::unicode_list_to_buf(to, 2048).unwrap();
+
+    println!("renaming {} to {}", from, to);
+
+    match fs::rename(from, to) {
+        Ok(()) => Ok(atom!(OK)),
+        Err(err) => Ok(error_to_tuple(heap, err)),
+    }
 }
 
 pub fn set_permissions_nif_2(

@@ -1521,13 +1521,17 @@ impl Machine {
                         //fail!(context, fail);
                     }
 
-                    if let Ok(value) = bitstring::RcBinary::try_from(&context.expand_arg(src)) {
-                        match context.expand_arg(size).into_variant() {
-                            Variant::Atom(atom::ALL) => context.bs.put_binary(&value.data),
-                            _ => unimplemented!("bs_put_binary size {:?}", size),
+                    let source = context.expand_arg(src);
+
+                    let header = source.get_boxed_header().unwrap();
+                    match header {
+                        value::BOXED_BINARY | value::BOXED_SUBBINARY => {
+                            match context.expand_arg(size).into_variant() {
+                                Variant::Atom(atom::ALL) => context.bs.put_binary_all(source),
+                                _ => unimplemented!("bs_put_binary size {:?}", size),
+                            }
                         }
-                    } else {
-                        panic!("Bad argument to BsPutBinary")
+                        _ => panic!("Bad argument to BsPutBinary: {}", context.expand_arg(src))
                     }
                 }
                 &Instruction::BsPutFloat { fail, size, unit, flags, source: src } => {
@@ -1551,7 +1555,7 @@ impl Machine {
                 }
                 Instruction::BsPutString { binary } => {
                     // BsPutString uses the StrT strings table! needs to be patched in loader
-                    context.bs.put_binary(binary);
+                    context.bs.put_bytes(binary);
                 }
                 // &Instruction::BsStartMatch2 => {
                 //     // fail, src, live, slots?, dst
@@ -1624,6 +1628,28 @@ impl Machine {
                 //         }
                 //     }
                 // }
+                &Instruction::BsGetTail { context: cxt, destination, live } => {
+                    // very similar to the old BsContextToBinary
+                     if let Ok(ms) = context
+                         .fetch_register(cxt)
+                         .get_boxed_value_mut::<bitstring::MatchState>()
+                         {
+                           // TODO; original calculated the hole size and overwrote MatchState mem in place?
+                           let mb = &mut ms.mb;
+                   
+                           let offs = mb.offset;
+                           let size = mb.size - offs;
+
+                           let res = Term::subbinary(
+                               &context.heap,
+                               bitstring::SubBinary::new(mb.original.clone(), size, offs, false),
+                           );
+                           context.set_register(destination, res);
+                     } else {
+                         // next0
+                         unreachable!()
+                     }
+                }
                 &Instruction::BsStartMatch3 { fail, source: src, live, destination: dst } => {
                     let cxt = context.fetch_register(src);
 
@@ -1769,7 +1795,24 @@ impl Machine {
                                 // big endian unsigned
                                 ms.mb.get_bytes(4).map(|b| Term::uint(&context.heap, u32::from_be_bytes((*b).try_into().unwrap())))
                             },
-                            // TODO: 64 bits
+                            (64, false, true) => {
+                                // big endian signed
+                                ms.mb.get_bytes(8).map(|b| Term::int64(&context.heap, i64::from_be_bytes((*b).try_into().unwrap())))
+                            },
+                            (64, false, false) => {
+                                // big endian unsigned
+                                ms.mb.get_bytes(8).map(|b| Term::uint64(&context.heap, u64::from_be_bytes((*b).try_into().unwrap())))
+                            },
+                            (128, false, true) => {
+                                use num_bigint::ToBigInt;
+                                // big endian signed
+                                ms.mb.get_bytes(16).map(|b| Term::bigint(&context.heap, i128::from_be_bytes((*b).try_into().unwrap()).to_bigint().unwrap()))
+                            },
+                            (128, false, false) => {
+                                use num_bigint::ToBigInt;
+                                // big endian unsigned
+                                ms.mb.get_bytes(16).map(|b| Term::bigint(&context.heap, u128::from_be_bytes((*b).try_into().unwrap()).to_bigint().unwrap()))
+                            },
                             // slow fallback
                             _ => {
                                 ms.mb.get_integer(
@@ -2061,6 +2104,9 @@ impl Machine {
                         }
                     };
                 }
+                &Instruction::BsGetUtf32 { fail, ms, size, flags, destination } => {
+                    unimplemented!()
+                }
                 &Instruction::BsSkipUtf8 { fail, ms, size, flags } => {
                     // TODO: this cast can fail
                     if let Ok(ms) = context
@@ -2090,6 +2136,24 @@ impl Machine {
                     } else {
                         unreachable!()
                     }
+                }
+                &Instruction::BsSkipUtf32 { fail, ms, size, flags } => {
+                    unimplemented!()
+                }
+                &Instruction::BsUtf8Size { fail, source, destination } => {
+                    unimplemented!()
+                }
+                &Instruction::BsUtf16Size { fail, source, destination } => {
+                    unimplemented!()
+                }
+                &Instruction::BsPutUtf8 { fail, source, flags } => {
+                    unimplemented!()
+                }
+                &Instruction::BsPutUtf16 { fail, source, flags } => {
+                    unimplemented!()
+                }
+                &Instruction::BsPutUtf32 { fail, source, flags } => {
+                    unimplemented!()
                 }
                 &Instruction::Fclearerror => {
                     // TODO: BEAM checks for unhandled errors
@@ -2368,7 +2432,7 @@ impl Machine {
                         _ => context.x[0] = Term::atom(atom::BADARG),
                     }
                 }
-                ins => unimplemented!("opcode unimplemented: {:?}", ins)
+                // ins => unimplemented!("opcode unimplemented: {:?}", ins)
             }
         }
         }

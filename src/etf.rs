@@ -342,6 +342,10 @@ pub fn encode_term(res: &mut Vec<u8>, term: Term) -> std::io::Result<()> {
             value::BOXED_BINARY => {
                 encode_binary(res, bitstring::RcBinary::try_from(&term).unwrap())?
             }
+            value::BOXED_BIGINT => {
+                let value = &term.get_boxed_value::<BigInt>().unwrap();
+                encode_bigint(res, value)?
+            }
             i => unimplemented!("etf::encode for boxed {}", i),
         },
         _ => unimplemented!("etf::encode for: {}", term),
@@ -413,5 +417,22 @@ fn encode_list(res: &mut Vec<u8>, list: &value::Cons) -> std::io::Result<()> {
         }
         encode_nil(res)?;
     }
+    Ok(())
+}
+
+fn encode_bigint(res: &mut Vec<u8>, bigint: &BigInt) -> std::io::Result<()> {
+    let (sign, bytes) = bigint.to_bytes_le();
+    if bytes.len() <= std::u8::MAX as usize {
+        res.write_u8(Tag::SmallBig as u8)?;
+        res.write_u8(bytes.len() as u8)?;
+    } else if bytes.len() <= std::u32::MAX as usize {
+        res.write_u8(Tag::LargeBig as u8)?;
+        res.write_u32::<BigEndian>(bytes.len() as u32)?;
+    } else {
+        panic!("BigInt too large!");
+    }
+    let sign = if sign == Sign::Plus { 0 } else { 1 };
+    res.write_u8(sign)?;
+    res.write_all(&bytes)?;
     Ok(())
 }
