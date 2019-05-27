@@ -225,7 +225,7 @@ mod tests {
     fn to_vec(value: Term) -> Vec<Term> {
         let mut vec = Vec::new();
         let mut cons = &value;
-        while let Ok(value::Cons { head, tail }) = cons.try_into() {
+        while let Ok(value::Cons { head, tail }) = cons.cast_into() {
             vec.push(*head);
             cons = &tail;
         }

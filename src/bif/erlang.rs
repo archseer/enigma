@@ -3,7 +3,7 @@ use crate::bif;
 use crate::bitstring;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, TryFrom, TryInto, Tuple, Variant};
+use crate::value::{self, Cons, Term, CastFrom, CastInto, Tuple, Variant};
 use crate::vm;
 use lexical;
 
@@ -42,10 +42,10 @@ pub fn make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
             std::ptr::write(&mut tuple[i as usize], args[1]);
         }
     }
-    let init = Cons::try_from(&args[2])?;
+    let init = Cons::cast_from(&args[2])?;
 
     for item in init.iter() {
-        let t = Tuple::try_from(&item)?;
+        let t = Tuple::cast_from(&item)?;
         if t.len != 2 {
             return Err(Exception::new(Reason::EXC_BADARG));
         }
@@ -61,7 +61,7 @@ pub fn make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
 }
 
 pub fn append_element_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    let t = Tuple::try_from(&args[0])?;
+    let t = Tuple::cast_from(&args[0])?;
     let heap = &process.context_mut().heap;
     let new_tuple = value::tuple(heap, (t.len() + 1) as u32);
     new_tuple[..t.len()].copy_from_slice(&t[..]);
@@ -76,7 +76,7 @@ pub fn setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
         Ok(value::Num::Integer(i)) if !i < 1 => i - 1,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
-    let t = Tuple::try_from(&args[1])?;
+    let t = Tuple::cast_from(&args[1])?;
     if number >= t.len() as i32 {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
@@ -95,7 +95,7 @@ pub fn element_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif:
         Ok(value::Num::Integer(i)) if !i < 1 => (i - 1) as usize,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
-    let t = Tuple::try_from(&args[1])?;
+    let t = Tuple::cast_from(&args[1])?;
     if number >= t.len() {
         return Err(Exception::new(Reason::EXC_BADARG));
     }
@@ -103,7 +103,7 @@ pub fn element_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif:
 }
 
 pub fn tuple_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    let t = Tuple::try_from(&args[0])?;
+    let t = Tuple::cast_from(&args[0])?;
     let mut n = t.len();
     let mut list = Term::nil();
     let heap = &process.context_mut().heap;
@@ -165,7 +165,7 @@ pub fn list_to_atom_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) ->
     // ASSERT(is_atom(res));
     // erts_free(ERTS_ALC_T_TMP, (void *) buf);
     // BIF_RET(res);
-    let list = Cons::try_from(&args[0])?;
+    let list = Cons::cast_from(&args[0])?;
     let string = value::cons::unicode_list_to_buf(list, atom::MAX_ATOM_CHARS)?;
     let atom = atom::from_str(string.as_str());
     Ok(Term::atom(atom))
@@ -310,7 +310,7 @@ pub fn iolist_to_iovec_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     let mut res = Vec::with_capacity(4);
 
     loop {
-        while let Ok(Cons { head, tail }) = Cons::try_from(&iterator) {
+        while let Ok(Cons { head, tail }) = Cons::cast_from(&iterator) {
             match head.into_variant() {
                 Variant::Pointer(ptr) => match unsafe { *ptr } {
                     value::BOXED_BINARY | value::BOXED_SUBBINARY => {
@@ -329,7 +329,7 @@ pub fn iolist_to_iovec_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
                     // iterator = seq_end;
                     let mut seq_length = 0;
                     let mut lookahead = iterator;
-                    while let Ok(Cons { head, tail }) = Cons::try_from(&lookahead) {
+                    while let Ok(Cons { head, tail }) = Cons::cast_from(&lookahead) {
                         if !head.is_smallint() {
                             break;
                         }
@@ -337,7 +337,7 @@ pub fn iolist_to_iovec_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
                     }
                     let mut buf = Vec::with_capacity(seq_length);
 
-                    while let Ok(Cons { head, tail }) = Cons::try_from(&iterator) {
+                    while let Ok(Cons { head, tail }) = Cons::cast_from(&iterator) {
                         let i = head.to_int().unwrap();
                         buf.push(i);
                         iterator = *tail;
@@ -412,7 +412,7 @@ pub fn unicode_characters_to_binary_2(
     }
 
     let mut stack = Vec::new();
-    let cons = Cons::try_from(&args[0])?;
+    let cons = Cons::cast_from(&args[0])?;
     stack.push(cons.iter());
 
     // TODO fastpath for if [binary]
@@ -731,7 +731,7 @@ pub fn binary_to_integer_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term
 
 pub fn list_to_integer_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     // list to string
-    let cons = Cons::try_from(&args[0])?;
+    let cons = Cons::cast_from(&args[0])?;
     let string = value::cons::unicode_list_to_buf(cons, 2048)?;
     match lexical::try_parse::<i32, _>(string) {
         Ok(i) => Ok(Term::int(i)),
@@ -741,7 +741,7 @@ pub fn list_to_integer_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term])
 
 pub fn list_to_float_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     // list to string
-    let cons = Cons::try_from(&args[0])?;
+    let cons = Cons::cast_from(&args[0])?;
     let string = value::cons::unicode_list_to_buf(cons, 2048)?;
     match lexical::try_parse::<f64, _>(string) {
         Ok(f) => Ok(Term::from(f)),
@@ -756,7 +756,7 @@ pub fn list_to_tuple_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     let mut tmp = args[0];
     let mut arity = 0;
 
-    while let Ok(value::Cons { tail, .. }) = tmp.try_into() {
+    while let Ok(value::Cons { tail, .. }) = tmp.cast_into() {
         arity += 1;
         tmp = *tail
     }
@@ -771,7 +771,7 @@ pub fn list_to_tuple_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     let mut i = 0;
     let mut tmp = args[0];
 
-    while let Ok(value::Cons { head, tail }) = tmp.try_into() {
+    while let Ok(value::Cons { head, tail }) = tmp.cast_into() {
         unsafe {
             std::ptr::write(&mut tuple[i], *head);
         }
@@ -787,7 +787,7 @@ pub fn display_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif:
 }
 
 pub fn display_string_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
-    let cons = Cons::try_from(&args[0])?;
+    let cons = Cons::cast_from(&args[0])?;
     let string = value::cons::unicode_list_to_buf(cons, 2048)?;
     print!("{}", string);
     Ok(atom!(TRUE))
@@ -818,7 +818,7 @@ pub fn append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
     // TODO: use into_variant match?
 
     // TODO: this same type of logic appears a lot, need to abstract it out, too much unsafe use
-    if let Ok(value::Cons { head, tail }) = lhs.try_into() {
+    if let Ok(value::Cons { head, tail }) = lhs.cast_into() {
         // keep copying lhs until we reach the tail, point it to rhs
         let mut iter = tail;
 
@@ -829,7 +829,7 @@ pub fn append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
 
         let mut ptr = c as *mut value::Cons;
 
-        while let Ok(value::Cons { head, tail }) = iter.try_into() {
+        while let Ok(value::Cons { head, tail }) = iter.cast_into() {
             let new_cons = heap.alloc(value::Cons {
                 head: *head,
                 tail: Term::nil(),
@@ -873,8 +873,8 @@ pub fn subtract_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
         return Ok(args[0]);
     }
 
-    let mut a: Vec<Term> = Cons::try_from(&args[0])?.into_iter().copied().collect();
-    let b = Cons::try_from(&args[1])?;
+    let mut a: Vec<Term> = Cons::cast_from(&args[0])?.into_iter().copied().collect();
+    let b = Cons::cast_from(&args[1])?;
 
     for item in b {
         a.iter().position(|x| *x == *item).map(|i| a.remove(i));
@@ -1172,7 +1172,7 @@ mod tests {
         let res = make_tuple_2(&vm, &process, &args);
         let x = res.unwrap();
         assert!(x.is_tuple());
-        if let Ok(tuple) = x.try_into() {
+        if let Ok(tuple) = x.cast_into() {
             let tuple: &Tuple = tuple;
             tuple
                 .iter()
@@ -1240,7 +1240,7 @@ mod tests {
         let res = make_tuple_3(&vm, &process, &args);
         let x = res.unwrap();
         assert!(x.is_tuple());
-        if let Ok(tuple) = x.try_into() {
+        if let Ok(tuple) = x.cast_into() {
             let tuple: &Tuple = tuple;
             assert_eq!(tuple.len, 5);
             assert_eq!(tuple[0], Term::from(1));
@@ -1407,7 +1407,7 @@ mod tests {
         let res = append_element_2(&vm, &process, &args);
         let x = res.unwrap();
         assert!(x.is_tuple());
-        if let Ok(tuple) = x.try_into() {
+        if let Ok(tuple) = x.cast_into() {
             let tuple: &Tuple = tuple;
             assert_eq!(tuple.len, 3);
             for (i, x) in tuple.iter().enumerate() {
@@ -1449,7 +1449,7 @@ mod tests {
         let res = setelement_3(&vm, &process, &args);
         let x = res.unwrap();
         assert!(x.is_tuple());
-        if let Ok(tuple) = x.try_into() {
+        if let Ok(tuple) = x.cast_into() {
             let tuple: &Tuple = tuple;
             assert_eq!(tuple.len, 3);
             assert_eq!(tuple[0], str_to_atom!("test"));
@@ -1533,7 +1533,7 @@ mod tests {
         let res = tuple_to_list_1(&vm, &process, &args);
         let x = res.unwrap();
         assert!(x.is_list());
-        if let Ok(cons) = x.try_into() {
+        if let Ok(cons) = x.cast_into() {
             let cons: &value::Cons = cons;
             assert_eq!(cons.iter().count(), 2);
             let mut iter = cons.iter();

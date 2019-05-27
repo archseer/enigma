@@ -1,4 +1,4 @@
-use super::{Boxed, Term, TryFrom, TryFromMut, Variant, WrongBoxError, BOXED_MAP};
+use super::{Boxed, CastFrom, CastFromMut, Term, Variant, WrongBoxError, BOXED_MAP};
 // use hamt_rs::HamtMap;
 use im::hashmap::HashMap;
 use std::cmp::Ordering;
@@ -10,12 +10,11 @@ pub type HAMT = HashMap<Term, Term>;
 #[derive(Eq, Clone)]
 pub struct Map(pub HAMT);
 
-// TODO: to be TryFrom once rust stabilizes the trait
-impl TryFrom<Term> for Map {
+impl CastFrom<Term> for Map {
     type Error = WrongBoxError;
 
     #[inline]
-    fn try_from(value: &Term) -> Result<&Self, WrongBoxError> {
+    fn cast_from(value: &Term) -> Result<&Self, WrongBoxError> {
         if let Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == BOXED_MAP {
@@ -27,11 +26,11 @@ impl TryFrom<Term> for Map {
     }
 }
 
-impl TryFromMut<Term> for Map {
+impl CastFromMut<Term> for Map {
     type Error = WrongBoxError;
 
     #[inline]
-    fn try_from_mut(value: &Term) -> Result<&mut Self, WrongBoxError> {
+    fn cast_from_mut(value: &Term) -> Result<&mut Self, WrongBoxError> {
         if let Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == BOXED_MAP {

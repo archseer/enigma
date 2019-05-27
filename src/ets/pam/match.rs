@@ -189,7 +189,7 @@ pub fn run(
                     // *ep is a tuple of arity n
                     e = ep.next().unwrap();
 
-                    if let Ok(tup) = Tuple::try_from(&e) {
+                    if let Ok(tup) = Tuple::cast_from(&e) {
                         if tup.len() != n {
                             fail!();
                         }
@@ -201,7 +201,7 @@ pub fn run(
                 Opcode::PushT(n) => {
                     // *ep is a tuple of arity n, push ptr to first element
                     e = ep.next().unwrap();
-                    if let Ok(tup) = Tuple::try_from(&e) {
+                    if let Ok(tup) = Tuple::cast_from(&e) {
                         if tup.len() != n {
                             fail!();
                         }

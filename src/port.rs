@@ -1,4 +1,4 @@
-use crate::value::{Term, Variant, Tuple, TryFrom};
+use crate::value::{Term, Variant, Tuple, CastFrom};
 use crate::process::{PID, Ref};
 use crate::exception::{Exception, Reason};
 use crate::atom;
@@ -112,7 +112,7 @@ pub fn spawn(
     args: Term,
     _opts: Term
 ) -> Result<ID, Exception> {
-    let tup = Tuple::try_from(&args)?;
+    let tup = Tuple::cast_from(&args)?;
 
     // TODO: opts
     let (port, input) = mpsc::unbounded::<Signal>();
@@ -124,7 +124,7 @@ pub fn spawn(
             match tup[1].into_variant() {
                 Variant::Atom(atom::TTY_SL) => vm.runtime.executor().spawn(tty(pid, owner, input).unit_error().boxed().compat()),
                 Variant::Cons(..) => {
-                    let cons = value::Cons::try_from(&tup[1]).unwrap();
+                    let cons = value::Cons::cast_from(&tup[1]).unwrap();
                     match value::cons::unicode_list_to_buf(cons, 2048).unwrap().as_ref() {
                         "tty_sl -c -e" => vm.runtime.executor().spawn(tty(pid, owner, input).unit_error().boxed().compat()),
                         _ => unimplemented!("port::spawn for {}", args),
@@ -156,11 +156,11 @@ pub fn send_message(
     let res = vm.port_table.read().lookup(port).map(|port| port.chan.clone());
     if let Some(mut chan) = res {
         // TODO: error unhandled
-        let tup = Tuple::try_from(&msg)?;
+        let tup = Tuple::cast_from(&msg)?;
         if !tup.len() == 2 || !tup[0].is_pid() {
             return Err(Exception::new(Reason::EXC_BADARG));
         }
-        match Tuple::try_from(&tup[1]) {
+        match Tuple::cast_from(&tup[1]) {
             Ok(cmd) => {
                 match cmd[0].into_variant() {
                     // TODO: some commands are [id | binary]

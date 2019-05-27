@@ -4,7 +4,7 @@ use crate::exception::{Exception, Reason};
 use crate::loader::Loader;
 use crate::module::{self, Module};
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, TryFrom, TryInto, Variant};
+use crate::value::{self, Cons, Term, CastFrom, CastInto, Variant};
 use crate::vm;
 
 pub fn pre_loaded_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
@@ -63,7 +63,7 @@ pub fn has_prepared_code_on_load_1(
     _process: &RcProcess,
     args: &[Term],
 ) -> bif::Result {
-    match args[0].try_into() {
+    match args[0].cast_into() {
         Ok(value) => {
             let value: &*mut Module = value;
             unsafe { Ok(Term::boolean((**value).on_load.is_some())) }
@@ -73,10 +73,10 @@ pub fn has_prepared_code_on_load_1(
 }
 
 pub fn finish_loading_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
-    value::Cons::try_from(&args[0])?
+    value::Cons::cast_from(&args[0])?
         .iter()
         .map(|v| {
-            v.try_into()
+            v.cast_into()
                 .map(|value: &*mut Module| unsafe { Box::from_raw(*value) })
         })
         .collect::<Result<Vec<Box<Module>>, _>>()

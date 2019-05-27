@@ -15,7 +15,7 @@ use crate::port::{Table as PortTable, RcTable as RcPortTable};
 use crate::process::{self, RcProcess};
 use crate::persistent_term::{Table as PersistentTermTable};
 use crate::servo_arc::Arc;
-use crate::value::{self, Cons, Term, TryFrom, TryInto, TryIntoMut, Tuple, Variant};
+use crate::value::{self, Cons, Term, CastFrom, CastInto, CastIntoMut, Tuple, Variant};
 use std::cell::RefCell;
 // use log::debug;
 use parking_lot::Mutex;
@@ -56,7 +56,7 @@ pub struct Machine {
     pub process_pool: tokio::runtime::Runtime,
     pub runtime: tokio::runtime::Runtime,
 
-    pub exit: Option<futures::channel::oneshot::Sender::<()>>,
+    pub exit: Option<futures::channel::oneshot::Sender<()>>,
 
     // env config, arguments, panic handler
 
@@ -338,15 +338,15 @@ macro_rules! op_apply {
             // continually loop over args to resolve
             let a = args;
 
-            if let Ok(cons) = Cons::try_from(&a) {
+            if let Ok(cons) = Cons::cast_from(&a) {
                 let m = cons.head;
                 let a = cons.tail;
 
-                if let Ok(cons) = Cons::try_from(&a) {
+                if let Ok(cons) = Cons::cast_from(&a) {
                     let f = cons.head;
                     let a = cons.tail;
 
-                    if let Ok(cons) = Cons::try_from(&a) {
+                    if let Ok(cons) = Cons::cast_from(&a) {
                         let a = cons.head;
                         if cons.tail.is_nil() {
                             module = m;
@@ -364,7 +364,7 @@ macro_rules! op_apply {
         // Walk down the 3rd parameter of apply (the argument list) and copy
         // the parameters to the x registers (reg[]).
 
-        while let Ok(value::Cons { head, tail }) = args.try_into() {
+        while let Ok(value::Cons { head, tail }) = args.cast_into() {
             if arity < process::MAX_REG - 1 {
                 $context.x[arity] = *head;
                 arity += 1;
@@ -425,7 +425,7 @@ macro_rules! op_apply_fun {
         let mut args = $context.x[1];
         let mut arity = 0;
 
-        while let Ok(value::Cons { head, tail }) = args.try_into() {
+        while let Ok(value::Cons { head, tail }) = args.cast_into() {
             if arity < process::MAX_REG - 1 {
                 $context.x[arity] = *head;
                 arity += 1;
@@ -442,9 +442,9 @@ macro_rules! op_apply_fun {
         //context.x[arity] = fun;
 
         // TODO: this part matches CallFun, extract
-        if let Ok(closure) = value::Closure::try_from(&fun) {
+        if let Ok(closure) = value::Closure::cast_from(&fun) {
             op_call_fun!($vm, $context, closure, arity);
-        } else if let Ok(mfa) = module::MFA::try_from(&fun) {
+        } else if let Ok(mfa) = module::MFA::cast_from(&fun) {
             // TODO: deduplicate this part
             let export = { $vm.exports.read().lookup(&mfa) }; // drop the exports lock
 
@@ -1215,12 +1215,12 @@ impl Machine {
                     // TODO: needs to verify exports too
                     let value = context.expand_arg(arg1);
                     let arity = context.expand_arg(arity).to_uint().unwrap();
-                    if let Ok(closure) = value::Closure::try_from(&value) {
+                    if let Ok(closure) = value::Closure::cast_from(&value) {
                         if closure.mfa.2 == arity {
                             continue;
                         }
                     }
-                    if let Ok(mfa) = module::MFA::try_from(&value) {
+                    if let Ok(mfa) = module::MFA::cast_from(&value) {
                         if mfa.2 == arity {
                             continue;
                         }
@@ -1229,7 +1229,7 @@ impl Machine {
                 }
                 &Instruction::TestArity { label: fail, arg1, arity } => {
                     // check tuple arity
-                    if let Ok(t) = Tuple::try_from(&context.expand_arg(arg1)) {
+                    if let Ok(t) = Tuple::cast_from(&context.expand_arg(arg1)) {
                         if t.len != arity {
                             op_jump!(context, fail);
                         }
@@ -1259,7 +1259,7 @@ impl Machine {
                     }
                 }
                 Instruction::SelectTupleArity { arg, fail, arities: vec } => {
-                    if let Ok(tup) = Tuple::try_from(&context.expand_arg(*arg)) {
+                    if let Ok(tup) = Tuple::cast_from(&context.expand_arg(*arg)) {
                         let len = tup.len;
                         let mut i = 0;
                         loop {
@@ -1285,7 +1285,7 @@ impl Machine {
                     }
                 }
                 &Instruction::GetList { source, head: h, tail: t } => {
-                    if let Ok(value::Cons { head, tail }) = context.fetch_register(source).try_into() {
+                    if let Ok(value::Cons { head, tail }) = context.fetch_register(source).cast_into() {
                         context.set_register(h, *head);
                         context.set_register(t, *tail);
                     } else {
@@ -1295,7 +1295,7 @@ impl Machine {
                 &Instruction::GetTupleElement { source, element, destination } => {
                     let source = context.fetch_register(source);
                     let n = element as usize;
-                    if let Ok(t) = Tuple::try_from(&source) {
+                    if let Ok(t) = Tuple::cast_from(&source) {
                         context.set_register(destination, t[n])
                     } else {
                         panic!("GetTupleElement: source is of wrong type")
@@ -1305,7 +1305,7 @@ impl Machine {
                     let el = context.expand_arg(new_element);
                     let tuple = context.expand_arg(tuple);
                     let pos = position as usize;
-                    if let Ok(t) = tuple.try_into_mut() {
+                    if let Ok(t) = tuple.cast_into_mut() {
                         let tuple: &mut value::Tuple = t; // annoying, need type annotation
                         tuple[pos] = el;
                     } else {
@@ -1811,7 +1811,7 @@ impl Machine {
                     // if size 0 == Jumps to the label in Arg0 if the matching context Arg1 still have unmatched bits.
                     let offset = offset as usize;
 
-                    if let Ok(mb) = bitstring::MatchBuffer::try_from(&context.fetch_register(ms)) {
+                    if let Ok(mb) = bitstring::MatchBuffer::cast_from(&context.fetch_register(ms)) {
                         if mb.remaining() != offset {
                             fail!(context, fail);
                         }
@@ -1823,7 +1823,7 @@ impl Machine {
                     // Checks that the size of the remainder of the matching context is divisible
                     // by unit, else jump to fail
 
-                    if let Ok(mb) = bitstring::MatchBuffer::try_from(&context.fetch_register(cxt)) {
+                    if let Ok(mb) = bitstring::MatchBuffer::cast_from(&context.fetch_register(cxt)) {
                         if mb.remaining() % (unit as usize) != 0 {
                             fail!(context, fail);
                         }
@@ -2118,9 +2118,9 @@ impl Machine {
                 &Instruction::CallFun { arity } => {
                     let value = context.x[arity as usize];
                     context.cp = Some(context.ip);
-                    if let Ok(closure) = value::Closure::try_from(&value) {
+                    if let Ok(closure) = value::Closure::cast_from(&value) {
                         op_call_fun!(self, context, closure, arity)
-                    } else if let Ok(mfa) = module::MFA::try_from(&value) {
+                    } else if let Ok(mfa) = module::MFA::cast_from(&value) {
                         // TODO: deduplicate this part
                         let export = { self.exports.read().lookup(&mfa) }; // drop the exports lock
 
@@ -2141,7 +2141,7 @@ impl Machine {
                 }
                 &Instruction::GetHd { source, head: reg } => {
                     if let Ok(value::Cons { head, .. }) =
-                        Cons::try_from(&context.fetch_register(source))
+                        Cons::cast_from(&context.fetch_register(source))
                     {
                         context.set_register(reg, *head);
                     } else {
@@ -2150,7 +2150,7 @@ impl Machine {
                 }
                 &Instruction::GetTl { source, tail: reg } => {
                     if let Ok(value::Cons { tail, .. }) =
-                        context.fetch_register(source).try_into()
+                        context.fetch_register(source).cast_into()
                     {
                         context.set_register(reg, *tail);
                     } else {
@@ -2158,7 +2158,7 @@ impl Machine {
                     }
                 }
                 Instruction::PutMapAssoc { map, destination, live, rest: list } => {
-                    let mut map = match context.expand_arg(*map).try_into() {
+                    let mut map = match context.expand_arg(*map).cast_into() {
                         Ok(value::Map(map)) => map.clone(),
                         _ => unreachable!(),
                     };
@@ -2171,7 +2171,7 @@ impl Machine {
                     context.set_register(*destination, Term::map(&context.heap, map))
                 }
                 Instruction::HasMapFields { label: fail, source, rest: list } => {
-                    let map = match context.fetch_register(*source).try_into() {
+                    let map = match context.fetch_register(*source).cast_into() {
                         Ok(value::Map(map)) => map.clone(),
                         _ => unreachable!(),
                     };
@@ -2189,7 +2189,7 @@ impl Machine {
                     }
                 }
                 Instruction::GetMapElements { label: fail, source, rest: list } => {
-                    let map = match context.fetch_register(*source).try_into() {
+                    let map = match context.fetch_register(*source).cast_into() {
                         Ok(value::Map(map)) => map.clone(),
                         _ => unreachable!(),
                     };
@@ -2210,7 +2210,7 @@ impl Machine {
                     // TODO: in the future, put_map_exact is an optimization for flatmaps (tuple
                     // maps), where the keys in the tuple stay the same, since you can memcpy the
                     // key tuple (and other optimizations)
-                    let mut map = match context.expand_arg(*map).try_into() {
+                    let mut map = match context.expand_arg(*map).cast_into() {
                         Ok(value::Map(map)) => map.clone(),
                         _ => unreachable!(),
                     };
@@ -2225,7 +2225,7 @@ impl Machine {
                 &Instruction::IsTaggedTuple { fail, source, arity, atom } => {
                     let reg = context.fetch_register(source);
                     let atom = context.expand_arg(atom);
-                    if let Ok(tuple) = Tuple::try_from(&reg) {
+                    if let Ok(tuple) = Tuple::cast_from(&reg) {
                         if tuple.len == 0 || tuple.len != arity || !tuple[0].eq(&atom) {
                             fail!(context, fail);
                         } else {

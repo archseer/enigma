@@ -1,6 +1,6 @@
 use super::*;
 use crate::immix::Heap;
-use crate::value::{Cons, Term, TryFrom, TryInto, TryIntoMut, Tuple, Variant};
+use crate::value::{Cons, Term, CastFrom, CastInto, CastIntoMut, Tuple, Variant};
 use error::*;
 use parking_lot::RwLock;
 use std::collections::HashSet;
@@ -25,7 +25,7 @@ impl Bag {
 }
 
 fn get_key(pos: usize, value: Term) -> Term {
-    let tuple = Tuple::try_from(&value).unwrap();
+    let tuple = Tuple::cast_from(&value).unwrap();
     tuple[pos]
 }
 
@@ -80,7 +80,7 @@ impl Table for Bag {
             Some(set) => Ok(set
                 .iter()
                 .map(|v| {
-                    let tup = Tuple::try_from(&*v).unwrap();
+                    let tup = Tuple::cast_from(&*v).unwrap();
                     assert!(tup.len() > index);
                     tup[index]
                 })

@@ -1,4 +1,4 @@
-use super::{Term, TryFrom, TryInto, Variant, WrongBoxError};
+use super::{CastFrom, CastInto, Term, Variant, WrongBoxError};
 use crate::exception;
 use crate::immix::Heap;
 use core::marker::PhantomData;
@@ -33,12 +33,11 @@ impl Ord for Cons {
     }
 }
 
-// TODO: to be TryFrom once rust stabilizes the trait
-impl TryFrom<Term> for Cons {
+impl CastFrom<Term> for Cons {
     type Error = WrongBoxError;
 
     #[inline]
-    fn try_from(value: &Term) -> Result<&Self, WrongBoxError> {
+    fn cast_from(value: &Term) -> Result<&Self, WrongBoxError> {
         if let Variant::Cons(ptr) = value.into_variant() {
             unsafe { return Ok(&*(ptr as *const Cons)) }
         }
@@ -60,7 +59,7 @@ impl<'a> Iterator for Iter<'a> {
         self.head.map(|node| unsafe {
             // Need an unbound lifetime to get 'a
             let node = &*node.as_ptr();
-            if let Ok(cons) = node.tail.try_into() {
+            if let Ok(cons) = node.tail.cast_into() {
                 self.head = Some(NonNull::new_unchecked(cons as *const Cons as *mut Cons));
             } else {
                 // TODO match badly formed lists
@@ -159,10 +158,10 @@ mod tests {
         let heap = Heap::new();
 
         let tup = tup3!(&heap, Term::int(1), Term::int(2), Term::int(3));
-        let t: &value::Tuple = tup.try_into().expect("wasn't a tuple");
+        let t: &value::Tuple = tup.cast_into().expect("wasn't a tuple");
 
         let res = Cons::from_iter(t.into_iter().cloned(), &heap);
-        let cons: &Cons = res.try_into().expect("wasn't a cons");
+        let cons: &Cons = res.cast_into().expect("wasn't a cons");
 
         let mut iter = cons.iter();
         assert_eq!(Some(&Term::int(1)), iter.next());

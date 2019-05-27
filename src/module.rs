@@ -5,7 +5,7 @@ use crate::immix::Heap;
 use crate::instr_ptr::InstrPtr;
 use crate::instruction::Instruction;
 use crate::loader::{FuncInfo, Line};
-use crate::value::{self, Term, TryFrom, Variant};
+use crate::value::{self, CastFrom, Term, Variant};
 use crate::vm::Machine;
 use hashbrown::HashMap;
 
@@ -24,13 +24,12 @@ impl std::fmt::Display for MFA {
     }
 }
 
-// TODO: to be TryFrom once rust stabilizes the trait
 use crate::value::{Boxed, WrongBoxError, BOXED_EXPORT};
-impl TryFrom<Term> for MFA {
+impl CastFrom<Term> for MFA {
     type Error = WrongBoxError;
 
     #[inline]
-    fn try_from(value: &Term) -> Result<&Self, WrongBoxError> {
+    fn cast_from(value: &Term) -> Result<&Self, WrongBoxError> {
         if let Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == BOXED_EXPORT {
@@ -166,13 +165,11 @@ pub fn finish_loading_modules(vm: &Machine, modules: Vec<Box<Module>>) {
     }
 }
 
-// Ugh
-// TODO: to be TryFrom once rust stabilizes the trait
-impl TryFrom<Term> for *mut Module {
+impl CastFrom<Term> for *mut Module {
     type Error = value::WrongBoxError;
 
     #[inline]
-    fn try_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
+    fn cast_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
         if let Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_MODULE {

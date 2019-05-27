@@ -3,7 +3,7 @@ use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
 use crate::value;
-use crate::value::{Cons, Term, TryFrom, Tuple, Type, Variant};
+use crate::value::{Cons, Term, CastFrom, Tuple, Type, Variant};
 use crate::vm;
 
 use std::pin::Pin;
@@ -36,7 +36,7 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
     // is_compressed = erts_ets_always_compress;
     let mut is_compressed = false;
 
-    if let Ok(cons) = Cons::try_from(&args[1]) {
+    if let Ok(cons) = Cons::cast_from(&args[1]) {
         for val in cons.iter() {
             match val.into_variant() {
                 Variant::Atom(atom::BAG) => {
@@ -67,7 +67,7 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
                     );
                 }
                 Variant::Pointer(_ptr) => {
-                    let tup = Tuple::try_from(val)?;
+                    let tup = Tuple::cast_from(val)?;
                     if tup.len() == 2 {
                         match tup[0].into_variant() {
                             Variant::Atom(atom::KEYPOS) => {
@@ -288,9 +288,9 @@ pub fn insert_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
 
     let keypos = table.meta().keypos;
 
-    let validate = |val: &Term| val.is_tuple() && Tuple::try_from(val).unwrap().len() > keypos;
+    let validate = |val: &Term| val.is_tuple() && Tuple::cast_from(val).unwrap().len() > keypos;
 
-    let res: Result<()> = if let Ok(cons) = Cons::try_from(&args[1]) {
+    let res: Result<()> = if let Ok(cons) = Cons::cast_from(&args[1]) {
         let valid = cons.iter().all(validate);
         // TODO if bad list
         // if (lst != NIL) { goto badarg; }
@@ -332,9 +332,9 @@ pub fn insert_new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif
 
     let keypos = table.meta().keypos;
 
-    let validate = |val: &Term| val.is_tuple() && Tuple::try_from(val).unwrap().len() > keypos;
+    let validate = |val: &Term| val.is_tuple() && Tuple::cast_from(val).unwrap().len() > keypos;
 
-    let res: Result<()> = if let Ok(cons) = Cons::try_from(&args[1]) {
+    let res: Result<()> = if let Ok(cons) = Cons::cast_from(&args[1]) {
         let valid = cons.iter().all(validate);
         // TODO if bad list
         // if (lst != NIL) { goto badarg; }
@@ -532,7 +532,7 @@ fn analyze_pattern(
 
     // println!("compiling PAM {}", pattern);
 
-    let pattern = Cons::try_from(&pattern)?;
+    let pattern = Cons::cast_from(&pattern)?;
 
     let lst = pattern.iter();
     let num_heads = lst.count();
@@ -562,7 +562,7 @@ fn analyze_pattern(
         // Eterm guard;
         // Eterm body;
 
-        let ptpl = Tuple::try_from(&tup)?;
+        let ptpl = Tuple::cast_from(&tup)?;
         if ptpl.len() != 3 {
             return Err(new_error(ErrorKind::BadParameter));
         }
@@ -590,7 +590,7 @@ fn analyze_pattern(
         //     mpi.key_given = false;
         //     mpi.something_can_match = true;
         // } else {
-        //     if let Ok(tuple) = Tuple::try_from(&tpl) {
+        //     if let Ok(tuple) = Tuple::cast_from(&tpl) {
         //         if let Some(key) = tuple.get(table.meta().keypos) {
         //             if !pam::has_variable(*key) {
         //                 // Bound key

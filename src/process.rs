@@ -10,7 +10,7 @@ use crate::module::{Module, MFA};
 // use crate::servo_arc::Arc; can't do receiver self
 use crate::signal_queue::SignalQueue;
 pub use crate::signal_queue::{ExitKind, Signal};
-use crate::value::{self, Term, TryInto};
+use crate::value::{self, Term, CastInto};
 use crate::vm::Machine;
 use hashbrown::{HashMap, HashSet};
 use std::cell::UnsafeCell;
@@ -611,7 +611,7 @@ pub fn spawn(
     // TODO: it also needs to deep clone all the vals (for example lists etc)
     let mut i = 0;
     let mut cons = &args;
-    while let Ok(value::Cons { head, tail }) = cons.try_into() {
+    while let Ok(value::Cons { head, tail }) = cons.cast_into() {
         context.x[i] = *head;
         i += 1;
         cons = tail;

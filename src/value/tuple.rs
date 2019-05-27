@@ -1,7 +1,6 @@
-use super::{Header, Term, TryFrom, TryIntoMut, Variant, WrongBoxError, BOXED_TUPLE};
+use super::{CastFrom, CastIntoMut, Header, Term, Variant, WrongBoxError, BOXED_TUPLE};
 use std::cmp::Ordering;
 use std::ops::{Deref, DerefMut};
-// use std::convert::TryFrom;
 
 #[derive(Debug, Eq)]
 #[repr(C)]
@@ -65,12 +64,11 @@ impl Ord for Tuple {
     }
 }
 
-// TODO: to be TryFrom once rust stabilizes the trait
-impl TryFrom<Term> for Tuple {
+impl CastFrom<Term> for Tuple {
     type Error = WrongBoxError;
 
     #[inline]
-    fn try_from(value: &Term) -> Result<&Self, WrongBoxError> {
+    fn cast_from(value: &Term) -> Result<&Self, WrongBoxError> {
         if let Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == BOXED_TUPLE {
@@ -82,11 +80,11 @@ impl TryFrom<Term> for Tuple {
     }
 }
 
-impl TryIntoMut<Tuple> for Term {
+impl CastIntoMut<Tuple> for Term {
     type Error = WrongBoxError;
 
     #[inline]
-    fn try_into_mut(&self) -> Result<&mut Tuple, WrongBoxError> {
+    fn cast_into_mut(&self) -> Result<&mut Tuple, WrongBoxError> {
         if let Variant::Pointer(ptr) = self.into_variant() {
             unsafe {
                 if *ptr == BOXED_TUPLE {

@@ -1,6 +1,6 @@
 use crate::loader::{FuncInfo, LINE_INVALID_LOCATION};
 use crate::module::{Module, MFA};
-use crate::value::{self, Term, TryFrom};
+use crate::value::{self, CastFrom, Term};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Hash, Debug)]
 pub struct InstrPtr {
@@ -87,12 +87,11 @@ impl InstrPtr {
     }
 }
 
-// TODO: to be TryFrom once rust stabilizes the trait
-impl TryFrom<Term> for value::Boxed<InstrPtr> {
+impl CastFrom<Term> for value::Boxed<InstrPtr> {
     type Error = value::WrongBoxError;
 
     #[inline]
-    fn try_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
+    fn cast_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
         if let value::Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_CATCH {

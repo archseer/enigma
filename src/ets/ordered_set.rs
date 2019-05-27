@@ -1,6 +1,6 @@
 use super::*;
 use crate::immix::Heap;
-use crate::value::{Cons, Term, TryFrom, TryInto, TryIntoMut, Tuple, Variant};
+use crate::value::{Cons, Term, CastFrom, CastInto, CastIntoMut, Tuple, Variant};
 use error::*;
 use parking_lot::RwLock;
 
@@ -24,7 +24,7 @@ impl OrderedSet {
 }
 
 fn get_key(pos: usize, value: Term) -> Term {
-    let tuple = Tuple::try_from(&value).unwrap();
+    let tuple = Tuple::cast_from(&value).unwrap();
     tuple[pos]
 }
 
@@ -84,7 +84,7 @@ impl Table for OrderedSet {
 
         match self.hashmap.read().get(&key) {
             Some(value) => {
-                let tup = Tuple::try_from(&*value).unwrap();
+                let tup = Tuple::cast_from(&*value).unwrap();
                 assert!(tup.len() > index);
                 Ok(tup[index].deep_clone(heap))
             }

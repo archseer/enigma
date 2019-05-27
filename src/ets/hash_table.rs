@@ -1,6 +1,6 @@
 use super::*;
 use crate::immix::Heap;
-use crate::value::{Cons, Term, TryFrom, TryInto, TryIntoMut, Tuple, Variant};
+use crate::value::{Cons, Term, CastFrom, CastInto, CastIntoMut, Tuple, Variant};
 use error::*;
 use hashbrown::HashMap;
 use parking_lot::RwLock;
@@ -25,7 +25,7 @@ impl HashTable {
 }
 
 fn get_key(pos: usize, value: Term) -> Term {
-    let tuple = Tuple::try_from(&value).unwrap();
+    let tuple = Tuple::cast_from(&value).unwrap();
     tuple[pos]
 }
 
@@ -81,7 +81,7 @@ impl Table for HashTable {
 
         match self.hashmap.read().get(&key) {
             Some(value) => {
-                let tup = Tuple::try_from(&*value).unwrap();
+                let tup = Tuple::cast_from(&*value).unwrap();
                 assert!(tup.len() > index);
                 Ok(tup[index].deep_clone(heap))
             }
@@ -103,13 +103,13 @@ impl Table for HashTable {
         // println!("item! {}", *item);
         // println!("values {}", list);
         // TODO verify that items are always tuples
-        let item: &mut Tuple = match item.try_into_mut() {
+        let item: &mut Tuple = match item.cast_into_mut() {
             Ok(t) => t,
             Err(_) => unreachable!(),
         };
 
         // First verify that list is ok to avoid nasty rollback scenarios
-        let list = Cons::try_from(&list).unwrap();
+        let list = Cons::cast_from(&list).unwrap();
         let res: std::result::Result<Vec<_>, _> = list
             .iter()
             .map(|val| {
@@ -117,7 +117,7 @@ impl Table for HashTable {
                 // tuple is arity 2 {pos, val}
                 // and has pos as integer, >= 1 and isn't == to keypos and is in the db term tuple
                 // arity range
-                if let Ok(tup) = Tuple::try_from(&val) {
+                if let Ok(tup) = Tuple::cast_from(&val) {
                     if tup.len() == 2 && tup[0].is_smallint() {
                         let pos = (tup[0].to_int().unwrap() - 1) as usize; // 1 indexed
                         if pos != self.meta().keypos && pos < item.len() {

@@ -2,7 +2,7 @@ use crate::atom;
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, TryFrom, TryInto, Tuple};
+use crate::value::{self, Cons, Term, CastFrom, CastInto, Tuple};
 use crate::vm;
 
 pub fn member_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
@@ -21,7 +21,7 @@ pub fn member_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::
     // non_immed_key = is_not_immed(term);
     let mut list = &args[1];
 
-    while let Ok(Cons { head, tail }) = list.try_into() {
+    while let Ok(Cons { head, tail }) = list.cast_into() {
         max_iter -= 1;
         if max_iter < 0 {
             // BUMP_ALL_REDS(BIF_P);
@@ -96,7 +96,7 @@ pub fn reverse_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::
         return Ok(args[1]);
     }
 
-    let cons = Cons::try_from(&args[0])?;
+    let cons = Cons::cast_from(&args[0])?;
 
     let heap = &process.context_mut().heap;
     // TODO: finish up the reduction counting implementation
@@ -152,7 +152,7 @@ fn keyfind(_func: bif::Fn, _process: &RcProcess, args: &[Term]) -> bif::Result {
     // OTP does 3 different loops based on key type (simple, immed, boxed), but luckily in rust we
     // just rely on Eq/PartialEq.
 
-    while let Ok(Cons { head, tail }) = list.try_into() {
+    while let Ok(Cons { head, tail }) = list.cast_into() {
         max_iter -= 1;
         if max_iter < 0 {
             // BUMP_ALL_REDS(p);
@@ -161,7 +161,7 @@ fn keyfind(_func: bif::Fn, _process: &RcProcess, args: &[Term]) -> bif::Result {
 
         let term = head;
         list = tail;
-        if let Ok(tuple) = Tuple::try_from(&term) {
+        if let Ok(tuple) = Tuple::cast_from(&term) {
             if pos <= (tuple.len as usize) && key == tuple[pos] {
                 return Ok(*term);
             }
@@ -185,7 +185,7 @@ mod tests {
     fn to_vec(value: Term) -> Vec<Term> {
         let mut vec = Vec::new();
         let mut cons = &value;
-        while let Ok(Cons { head, tail }) = cons.try_into() {
+        while let Ok(Cons { head, tail }) = cons.cast_into() {
             vec.push(*head);
             cons = &tail;
         }

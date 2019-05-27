@@ -6,7 +6,7 @@ pub mod r#match;
 
 use once_cell::sync::Lazy;
 
-use crate::value::{self, Variant, Cons, Tuple, Map, TryFrom, TryInto};
+use crate::value::{self, Variant, Cons, Tuple, Map, CastFrom, CastInto};
 use crate::immix::Heap;
 use crate::atom;
 use crate::bif::{self};
@@ -291,7 +291,7 @@ pub fn has_variable(node: Term) -> bool {
         match node.tag() {
             value::TERM_CONS => {
                 let mut list = node;
-                while let Ok(Cons { head, tail }) = list.try_into() {
+                while let Ok(Cons { head, tail }) = list.cast_into() {
                     s.push(*head);
                     list = *tail;
                 }
@@ -299,12 +299,12 @@ pub fn has_variable(node: Term) -> bool {
             }
             value::TERM_POINTER => {
                 if node.is_tuple() {
-                    let tuple = Tuple::try_from(&node).unwrap();
+                    let tuple = Tuple::cast_from(&node).unwrap();
                     for val in tuple.iter() {
                         s.push(*val);
                     }
                 } else if node.is_map() { // other map-nodes or map-heads
-                    let map = Map::try_from(&node).unwrap();
+                    let map = Map::cast_from(&node).unwrap();
                     // TODO: check both keys and vals? is that correct
                     for (key, val) in map.0.iter() {
                         s.push(*key);
@@ -400,7 +400,7 @@ impl Compiler {
                     Variant::Pointer(..) => {
                         match t.get_boxed_header().unwrap() {
                             value::BOXED_MAP => {
-                                let map = Map::try_from(&t).unwrap();
+                                let map = Map::cast_from(&t).unwrap();
                                 let num_iters = map.0.len();
                                 if !structure_checked {
                                     self.text.push(Opcode::Map(num_iters));
@@ -431,7 +431,7 @@ impl Compiler {
                                 }
                             }
                             value::BOXED_TUPLE => {
-                                let p = Tuple::try_from(&t).unwrap();
+                                let p = Tuple::cast_from(&t).unwrap();
                                 if !structure_checked { // i.e. we did not pop it
                                     self.text.push(Opcode::Tuple(p.len()));
                                 }
@@ -452,7 +452,7 @@ impl Compiler {
                             self.text.push(Opcode::List());
                         }
                         structure_checked = false; // Whatever it is, we did not pop it
-                        let cons = Cons::try_from(&t).unwrap();
+                        let cons = Cons::cast_from(&t).unwrap();
                         self.one_term(cons.head)?;
                         t = cons.tail;
                         continue;
@@ -624,13 +624,13 @@ impl Compiler {
             value::TERM_POINTER => {
                 match c.get_boxed_header().unwrap() { // inefficient, cast directly
                     value::BOXED_TUPLE => {
-                        let n = Tuple::try_from(&c).unwrap().len();
+                        let n = Tuple::cast_from(&c).unwrap().len();
                         self.text.push(Opcode::PushT(n));
                         self.stack_used += 1;
                         self.stack.push(c);
                     }
                     value::BOXED_MAP => {
-                        let n = Map::try_from(&c).unwrap().0.len();
+                        let n = Map::cast_from(&c).unwrap().0.len();
                         self.text.push(Opcode::PushM(n));
                         self.stack_used += 1;
                         self.stack.push(c);
@@ -663,7 +663,7 @@ impl Compiler {
             if !self.is_guard {
                 self.text.push(Opcode::Catch());
             }
-            while let Ok(Cons { head: t, tail }) = l.try_into() {
+            while let Ok(Cons { head: t, tail }) = l.cast_into() {
                 let constant = self.expr(*t)?;
                 if constant {
                     self.do_emit_constant(*t);
@@ -705,7 +705,7 @@ impl Compiler {
     }
 
     fn list(&mut self, t: Term) -> DMCRet {
-        let cons = Cons::try_from(&t).unwrap();
+        let cons = Cons::cast_from(&t).unwrap();
         let c1 = self.expr(cons.head)?;
         let c2 = self.expr(cons.tail)?;
 
@@ -774,7 +774,7 @@ impl Compiler {
     }
 
     fn tuple(&mut self, t: Term) -> DMCRet {
-        let t = Tuple::try_from(&t).unwrap();
+        let t = Tuple::cast_from(&t).unwrap();
         let nelems = t.len();
 
         let all_constant = self.array(&t[..])?;
@@ -789,7 +789,7 @@ impl Compiler {
     fn map(&mut self, t: Term) -> DMCRet {
         assert!(t.is_map());
 
-        let map = Map::try_from(&t).unwrap();
+        let map = Map::cast_from(&t).unwrap();
         let mut constant_values = true;
         let nelems = map.0.len();
 
@@ -888,7 +888,7 @@ impl Compiler {
     }
 
     fn constant(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
 
         if a != 2 {
@@ -898,7 +898,7 @@ impl Compiler {
     }
 
     fn and(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
 
         if a < 2 {
@@ -916,7 +916,7 @@ impl Compiler {
     }
 
     fn or(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
 
         if a < 2 {
@@ -935,7 +935,7 @@ impl Compiler {
 
 
     fn andalso(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
 
         if a < 2 {
@@ -983,7 +983,7 @@ impl Compiler {
     }
 
     fn orelse(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
 
         if a < 2 {
@@ -1029,7 +1029,7 @@ impl Compiler {
     }
 
     fn message(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
 
         if !self.cflags.contains(Flag::DCOMP_TRACE) {
@@ -1053,7 +1053,7 @@ impl Compiler {
     }
 
     fn selff(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
 
         if a != 1 {
@@ -1068,7 +1068,7 @@ impl Compiler {
     }
 
     fn return_trace(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
 
         if !self.cflags.contains(Flag::DCOMP_TRACE) {
@@ -1090,7 +1090,7 @@ impl Compiler {
     }
 
     fn exception_trace(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
 
         if !self.cflags.contains(Flag::DCOMP_TRACE) {
@@ -1125,7 +1125,7 @@ impl Compiler {
     }
 
     fn is_seq_trace(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
 
         self.check_trace("is_seq_trace", Flag::DCOMP_ALLOW_TRACE_OPS, true)?;
@@ -1143,7 +1143,7 @@ impl Compiler {
     }
 
     fn set_seq_token(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
 
         self.check_trace("set_seq_trace", Flag::DCOMP_ALLOW_TRACE_OPS, false)?;
@@ -1169,7 +1169,7 @@ impl Compiler {
     }
 
     fn get_seq_token(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
 
         self.check_trace("get_seq_token", Flag::DCOMP_ALLOW_TRACE_OPS, false)?;
@@ -1187,7 +1187,7 @@ impl Compiler {
     }
 
     fn display(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
 
         if !self.cflags.contains(Flag::DCOMP_TRACE) {
@@ -1210,7 +1210,7 @@ impl Compiler {
     }
 
     fn process_dump(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
 
         self.check_trace("process_dump", Flag::DCOMP_ALLOW_TRACE_OPS, false)?;
@@ -1227,7 +1227,7 @@ impl Compiler {
     }
 
     fn enable_trace(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let arity = p.len();
 
         self.check_trace("enable_trace", Flag::DCOMP_ALLOW_TRACE_OPS, false)?;
@@ -1259,7 +1259,7 @@ impl Compiler {
     }
 
     fn disable_trace(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let arity = p.len();
 
         self.check_trace("disable_trace", Flag::DCOMP_ALLOW_TRACE_OPS, false)?;
@@ -1291,7 +1291,7 @@ impl Compiler {
     }
 
     fn trace(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let arity = p.len();
 
         self.check_trace("trace", Flag::DCOMP_ALLOW_TRACE_OPS, false)?;
@@ -1331,7 +1331,7 @@ impl Compiler {
     }
 
     fn caller(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
 
         self.check_trace("caller", Flag::DCOMP_CALL_TRACE | Flag::DCOMP_ALLOW_TRACE_OPS, false)?;
@@ -1348,7 +1348,7 @@ impl Compiler {
     }
 
     fn silent(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
 
         self.check_trace("silent", Flag::DCOMP_ALLOW_TRACE_OPS, false)?;
@@ -1367,7 +1367,7 @@ impl Compiler {
     }
 
     fn fun(&mut self, t: Term) -> DMCRet {
-        let p = Tuple::try_from(&t).unwrap();
+        let p = Tuple::cast_from(&t).unwrap();
         let a = p.len();
         let arity = a - 1;
 
@@ -1454,7 +1454,7 @@ impl Compiler {
                     return self.map(t);
                 }
                 if t.is_tuple() {
-                    let p = Tuple::try_from(&t).unwrap();
+                    let p = Tuple::cast_from(&t).unwrap();
                     // #ifdef HARDDEBUG
                     //                 erts_fprintf(stderr,"%d %d %d %d\n",arityval(*p),is_tuple(tmp = p[1]),
                     //                 is_atom(p[1]),db_is_variable(p[1]));

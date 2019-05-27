@@ -321,7 +321,7 @@ pub fn encode(term: Term) -> std::io::Result<Vec<u8>> {
 }
 
 pub fn encode_term(res: &mut Vec<u8>, term: Term) -> std::io::Result<()> {
-    use value::{Cons, TryFrom, Tuple};
+    use value::{Cons, CastFrom, Tuple};
 
     match term.into_variant() {
         Variant::Integer(i) => {
@@ -341,13 +341,13 @@ pub fn encode_term(res: &mut Vec<u8>, term: Term) -> std::io::Result<()> {
             encode_atom(res, atom)?;
         }
         Variant::Float(value::Float(f)) => encode_float(res, f)?,
-        Variant::Cons(..) => encode_list(res, Cons::try_from(&term).unwrap())?,
+        Variant::Cons(..) => encode_list(res, Cons::cast_from(&term).unwrap())?,
         // encode list
         // encode improper list
         Variant::Pointer(ptr) => match term.get_boxed_header().unwrap() {
-            value::BOXED_TUPLE => encode_tuple(res, Tuple::try_from(&term).unwrap())?,
+            value::BOXED_TUPLE => encode_tuple(res, Tuple::cast_from(&term).unwrap())?,
             value::BOXED_BINARY => {
-                encode_binary(res, bitstring::RcBinary::try_from(&term).unwrap())?
+                encode_binary(res, bitstring::RcBinary::cast_from(&term).unwrap())?
             }
             value::BOXED_BIGINT => {
                 let value = &term.get_boxed_value::<BigInt>().unwrap();

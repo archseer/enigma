@@ -23,47 +23,51 @@ pub use self::cons::Cons;
 pub use self::map::{Map, HAMT};
 pub use self::tuple::Tuple;
 
-pub trait TryFrom<T>: Sized {
+/// Equivalent to TryFrom, but will cast into a reference on heap.
+pub trait CastFrom<T>: Sized {
     /// The type returned in the event of a conversion error.
     type Error;
 
     /// Performs the conversion.
-    fn try_from(value: &T) -> Result<&Self, Self::Error>;
+    fn cast_from(value: &T) -> Result<&Self, Self::Error>;
 }
 
-pub trait TryFromMut<T>: Sized {
+/// Equivalent to TryFrom, but will cast into a mutable reference on heap.
+pub trait CastFromMut<T>: Sized {
     /// The type returned in the event of a conversion error.
     type Error;
 
     /// Performs the conversion.
-    fn try_from_mut(value: &T) -> Result<&mut Self, Self::Error>;
+    fn cast_from_mut(value: &T) -> Result<&mut Self, Self::Error>;
 }
 
-pub trait TryInto<T>: Sized {
+/// Equivalent to TryInto, but will cast into a reference on heap.
+pub trait CastInto<T>: Sized {
     /// The type returned in the event of a conversion error.
     type Error;
 
     /// Performs the conversion.
-    fn try_into(&self) -> Result<&T, Self::Error>;
+    fn cast_into(&self) -> Result<&T, Self::Error>;
 }
 
-pub trait TryIntoMut<T>: Sized {
+/// Equivalent to TryInto, but will cast into a mutable reference on heap.
+pub trait CastIntoMut<T>: Sized {
     /// The type returned in the event of a conversion error.
     type Error;
 
     /// Performs the conversion.
-    fn try_into_mut(&self) -> Result<&mut T, Self::Error>;
+    fn cast_into_mut(&self) -> Result<&mut T, Self::Error>;
 }
 
-// TryFrom implies TryInto
-impl<T, U> TryInto<U> for T
+// CastFrom implies CastInto
+impl<T, U> CastInto<U> for T
 where
-    U: TryFrom<T>,
+    U: CastFrom<T>,
 {
     type Error = U::Error;
 
-    fn try_into(&self) -> Result<&U, U::Error> {
-        U::try_from(self)
+    fn cast_into(&self) -> Result<&U, U::Error> {
+        U::cast_from(self)
     }
 }
 
@@ -148,7 +152,7 @@ impl Hash for Term {
                 let mut list = self;
 
                 // hash all values, including the tal.
-                while let Ok(Cons { head, tail }) = list.try_into() {
+                while let Ok(Cons { head, tail }) = list.cast_into() {
                     head.hash(state);
                     list = tail;
                 }

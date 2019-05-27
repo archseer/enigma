@@ -3,7 +3,7 @@ use crate::bitstring::{Binary, RcBinary};
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, TryFrom, TryFromMut, Variant};
+use crate::value::{self, CastFrom, CastFromMut, Cons, Term, Variant};
 use crate::vm;
 use std::fs;
 use std::pin::Pin;
@@ -84,12 +84,11 @@ impl Buffer {
     }
 }
 
-// TODO: to be TryFrom once rust stabilizes the trait
-impl TryFrom<Term> for Buffer {
+impl CastFrom<Term> for Buffer {
     type Error = value::WrongBoxError;
 
     #[inline]
-    fn try_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
+    fn cast_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
         if let Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_BUFFER {
@@ -101,11 +100,11 @@ impl TryFrom<Term> for Buffer {
     }
 }
 
-impl TryFromMut<Term> for Buffer {
+impl CastFromMut<Term> for Buffer {
     type Error = value::WrongBoxError;
 
     #[inline]
-    fn try_from_mut(value: &Term) -> Result<&mut Buffer, value::WrongBoxError> {
+    fn cast_from_mut(value: &Term) -> Result<&mut Buffer, value::WrongBoxError> {
         if let Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_BUFFER {
@@ -129,30 +128,41 @@ pub mod bif {
 
     pub fn size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
         let heap = &process.context_mut().heap;
-        let buf = Buffer::try_from(&args[0])?;
+        let buf = Buffer::cast_from(&args[0])?;
         Ok(Term::uint64(heap, buf.size() as u64))
     }
 
     pub fn peek_head_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-        let buf = Buffer::try_from(&args[0])?;
+        let buf = Buffer::cast_from(&args[0])?;
         unimplemented!()
     }
 
     pub fn copying_read_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-        let buf = Buffer::try_from(&args[0])?;
+        let buf = Buffer::cast_from(&args[0])?;
         unimplemented!()
     }
 
     pub fn write_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-        // let buf = Buffer::try_from(&args[0])?;
+        let buf = Buffer::cast_from(&args[0])?;
         // parse into iovec
+        // let iovec = Vec::new();
+        // let iter = args[1];
+        // while let Ok(Cons { head, tail }) = Cons::cast_from(&iter) {
+        //     if !head.is_binary() {
+        //         panic!();
+        //     }
+        //     buf.push(*head);
+        // }
+        // if tail.is_binary {}
+        println!("write/2 {}\r", args[1]);
         // buf.write(iovec);
-        unimplemented!()
+        // unimplemented!()
+        Ok(atom!(OK))
     }
 
     // a skip 0 makes no sense
     pub fn skip_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
-        let buf = Buffer::try_from_mut(&args[0])?;
+        let buf = Buffer::cast_from_mut(&args[0])?;
         let cnt = match args[1].into_variant() {
             Variant::Integer(i) if i >= 0 => i as usize,
             _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -165,12 +175,12 @@ pub mod bif {
     }
 
     pub fn find_byte_index_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-        let buf = Buffer::try_from(&args[0])?;
+        let buf = Buffer::cast_from(&args[0])?;
         unimplemented!()
     }
 
     pub fn try_lock_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-        let buf = Buffer::try_from(&args[0])?;
+        let buf = Buffer::cast_from(&args[0])?;
         if !buf.try_lock() {
             return Ok(atom!(BUSY));
         }
@@ -178,7 +188,7 @@ pub mod bif {
     }
 
     pub fn unlock_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-        let buf = Buffer::try_from(&args[0])?;
+        let buf = Buffer::cast_from(&args[0])?;
         if !buf.unlock() {
             return Err(Exception::with_value(
                 Reason::EXC_ERROR,

@@ -4,17 +4,17 @@ use crate::bitstring::Binary;
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, TryFrom, TryFromMut, Variant};
+use crate::value::{self, CastFrom, CastFromMut, Cons, Term, Variant};
 use crate::vm;
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::io::{Read, Write};
 
-impl TryFrom<Term> for std::fs::File {
+impl CastFrom<Term> for std::fs::File {
     type Error = value::WrongBoxError;
 
     #[inline]
-    fn try_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
+    fn cast_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
         if let value::Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_FILE {
@@ -26,11 +26,11 @@ impl TryFrom<Term> for std::fs::File {
     }
 }
 
-impl TryFromMut<Term> for std::fs::File {
+impl CastFromMut<Term> for std::fs::File {
     type Error = value::WrongBoxError;
 
     #[inline]
-    fn try_from_mut(value: &Term) -> Result<&mut Self, value::WrongBoxError> {
+    fn cast_from_mut(value: &Term) -> Result<&mut Self, value::WrongBoxError> {
         if let value::Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_FILE {
@@ -80,7 +80,7 @@ pub fn get_cwd_nif_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> 
 
 pub fn set_cwd_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
-    let cons = Cons::try_from(&args[0])?;
+    let cons = Cons::cast_from(&args[0])?;
     let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
 
     match std::env::set_current_dir(path) {
@@ -96,7 +96,7 @@ pub fn read_file_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
     let heap = &process.context_mut().heap;
 
     // TODO bitstrings or non zero offsets can fail ...
-    let cons = Cons::try_from(&args[0])?;
+    let cons = Cons::cast_from(&args[0])?;
     let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
 
     let bytes = match std::fs::read(path) {
@@ -293,7 +293,7 @@ pub fn read_info_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
         None => return Err(Exception::new(Reason::EXC_BADARG)),
     };
 
-    let cons = Cons::try_from(&args[0])?;
+    let cons = Cons::cast_from(&args[0])?;
     // TODO: maybe do these casts in the native2name/name2native
     let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
 
@@ -318,7 +318,7 @@ pub fn list_dir_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
 
     // TODO: needs to work with binary and list based strings
     // TODO bitstrings or non zero offsets can fail ...
-    let cons = Cons::try_from(&args[0])?;
+    let cons = Cons::cast_from(&args[0])?;
     let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
 
     let res = match std::fs::read_dir(path) {
@@ -345,8 +345,10 @@ pub fn open_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
     use std::fs::OpenOptions;
     let heap = &process.context_mut().heap;
 
+    // println!("opening.. {} opts: {}\r", args[0], args[1]);
+
     let mut opts = OpenOptions::new();
-    for value in Cons::try_from(&args[1])?.iter() {
+    for value in Cons::cast_from(&args[1])?.iter() {
         match value.into_variant() {
             Variant::Atom(atom::READ) => opts.read(true),
             Variant::Atom(atom::WRITE) => opts.write(true).create(true),
@@ -368,7 +370,7 @@ pub fn open_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
     //      * tested against in file_SUITE. */
     //     modes |= EFILE_MODE_READ;
     // }
-    let cons = Cons::try_from(&args[0])?;
+    let cons = Cons::cast_from(&args[0])?;
     let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
 
     let file = match opts.open(path) {
@@ -382,7 +384,7 @@ pub fn open_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
 }
 
 pub fn close_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    let file = File::try_from_mut(&args[0])?;
+    let file = File::cast_from_mut(&args[0])?;
     unsafe { std::ptr::drop_in_place(file) }
     // FIXME: ^
     Ok(atom!(OK))
@@ -390,7 +392,7 @@ pub fn close_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif
 
 pub fn read_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
-    let file = File::try_from_mut(&args[0])?;
+    let file = File::cast_from_mut(&args[0])?;
 
     let size = match args[1].into_variant() {
         Variant::Integer(i) => i as usize,
@@ -419,7 +421,7 @@ pub fn read_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
 
 pub fn write_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
-    let file = File::try_from_mut(&args[0])?;
+    let file = File::cast_from_mut(&args[0])?;
 
     let bytes = crate::bif::erlang::list_to_iodata(args[1])?;
     match file.write_all(&bytes) {
@@ -440,7 +442,7 @@ pub fn seek_nif_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
     use std::io::SeekFrom;
     let heap = &process.context_mut().heap;
     // file, :bof->set/:cur->cur/:eof->end, 0
-    let file = File::try_from_mut(&args[0])?;
+    let file = File::cast_from_mut(&args[0])?;
     let pos = match args[2].into_variant() {
         Variant::Integer(i) if i >= 0 => i as usize,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -498,10 +500,10 @@ pub fn make_soft_link_nif_2(
 
 pub fn rename_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
-    let from = Cons::try_from(&args[0])?;
+    let from = Cons::cast_from(&args[0])?;
     let from = value::cons::unicode_list_to_buf(from, 2048).unwrap();
 
-    let to = Cons::try_from(&args[1])?;
+    let to = Cons::cast_from(&args[1])?;
     let to = value::cons::unicode_list_to_buf(to, 2048).unwrap();
 
     println!("renaming {} to {}", from, to);
@@ -542,7 +544,7 @@ pub fn del_file_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
 
     // TODO: needs to work with binary and list based strings
     // TODO bitstrings or non zero offsets can fail ...
-    let cons = Cons::try_from(&args[0])?;
+    let cons = Cons::cast_from(&args[0])?;
     let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
 
     match fs::remove_file(path) {

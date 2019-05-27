@@ -2,7 +2,7 @@ use crate::atom;
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::{Process, RcProcess};
-use crate::value::{self, Cons, Term, TryFrom, Variant};
+use crate::value::{self, Cons, Term, CastFrom, Variant};
 use crate::vm;
 use crate::Itertools;
 
@@ -167,7 +167,7 @@ pub fn process_info_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
     };
 
     if let Some(proc) = proc {
-        match Cons::try_from(&args[1]) {
+        match Cons::cast_from(&args[1]) {
             Ok(cons) => {
                 let heap = &process.context_mut().heap;
                 cons.iter()
@@ -183,7 +183,7 @@ pub fn process_info_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
 
 pub fn fun_info_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
-    if let Ok(closure) = value::Closure::try_from(&args[0]) {
+    if let Ok(closure) = value::Closure::cast_from(&args[0]) {
         match args[1].into_variant() {
             Variant::Atom(atom::TYPE) => Ok(atom!(LOCAL)),
             Variant::Atom(atom::PID) => unimplemented!(),
@@ -204,7 +204,7 @@ pub fn fun_info_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
             Variant::Atom(atom::NAME) => unimplemented!(),
             _ => unimplemented!(),
         }
-    } else if let Ok(mfa) = crate::module::MFA::try_from(&args[0]) {
+    } else if let Ok(mfa) = crate::module::MFA::cast_from(&args[0]) {
         match args[1].into_variant() {
             Variant::Atom(atom::TYPE) => Ok(atom!(EXTERNAL)),
             Variant::Atom(atom::PID) => Ok(atom!(UNDEFINED)),
@@ -255,7 +255,7 @@ pub fn system_info_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
         // }
         // thread 'tokio-runtime-worker-7' panicked at 'not yet implemented: system_info for :start_time', src/bif/info.rs:174:14
         Variant::Pointer(..) => {
-            if let Ok(tup) = value::Tuple::try_from(&args[0]) {
+            if let Ok(tup) = value::Tuple::cast_from(&args[0]) {
                match tup[0].into_variant() {
                    Variant::Atom(atom::PURIFY) => return Err(Exception::new(Reason::EXC_BADARG)),
                    _ => unimplemented!("system_info for {}", args[0])

@@ -4,7 +4,7 @@ use crate::instr_ptr::InstrPtr;
 use crate::loader::FuncInfo;
 use crate::module::MFA;
 use crate::process::RcProcess;
-use crate::value::{self, Term, TryFrom, TryInto, Variant};
+use crate::value::{self, CastFrom, CastInto, Term, Variant};
 
 /// http://erlang.org/doc/reference_manual/errors.html#exceptions
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -263,12 +263,11 @@ pub struct StackTrace {
     pub complete: bool,
 } // TODO: make all fields private with a constructor
 
-// TODO: to be TryFrom once rust stabilizes the trait
-impl TryFrom<Term> for StackTrace {
+impl CastFrom<Term> for StackTrace {
     type Error = value::WrongBoxError;
 
     #[inline]
-    fn try_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
+    fn cast_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
         if let Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
                 if *ptr == value::BOXED_STACKTRACE {
@@ -682,7 +681,7 @@ pub fn get_trace_from_exc(trace: &Term) -> Option<&StackTrace> {
     match trace.into_variant() {
         Variant::Nil(..) => None,
         Variant::Cons(cons) => unsafe {
-            if let Ok(value) = (*cons).tail.try_into() {
+            if let Ok(value) = (*cons).tail.cast_into() {
                 Some(value)
             } else {
                 unreachable!()
@@ -705,7 +704,7 @@ fn is_raised_exc(exc: Term) -> bool {
         Variant::Nil(value::Special::Nil) => false,
         Variant::Cons(cons) => unsafe {
             //return bignum_header_is_neg(*big_val(CDR(list_val(exc))));
-            if let Ok(StackTrace { complete: true, .. }) = (*cons).tail.try_into() {
+            if let Ok(StackTrace { complete: true, .. }) = (*cons).tail.cast_into() {
                 return true;
             }
             false

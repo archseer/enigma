@@ -8,7 +8,7 @@ use crate::persistent_term;
 use crate::port;
 use crate::process::{self, RcProcess};
 use crate::regex;
-use crate::value::{self, BigInt, Cons, Term, TryFrom, TryInto, Tuple, Variant};
+use crate::value::{self, BigInt, Cons, Term, CastFrom, CastInto, Tuple, Variant};
 use crate::vm;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
@@ -514,7 +514,7 @@ fn bif_erlang_spawn_opt_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     use process::SpawnFlag;
 
     // arg 0 is a 4 value tuple
-    let tup: &Tuple = match Tuple::try_from(&args[0]) {
+    let tup: &Tuple = match Tuple::cast_from(&args[0]) {
         Ok(tup) => {
             if tup.len() != 4 {
                 return Err(Exception::new(Reason::EXC_BADARG));
@@ -535,14 +535,14 @@ fn bif_erlang_spawn_opt_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     };
     let arglist = tup[2];
 
-    let opts = Cons::try_from(&tup[3])?;
+    let opts = Cons::cast_from(&tup[3])?;
 
     let flag = opts.iter().fold(SpawnFlag::NONE, |acc, val| {
         match val.into_variant() {
             Variant::Atom(atom::LINK) => acc | SpawnFlag::LINK,
             Variant::Atom(atom::MONITOR) => acc | SpawnFlag::MONITOR,
             _ => {
-                if let Ok(tup) = Tuple::try_from(&val) {
+                if let Ok(tup) = Tuple::cast_from(&val) {
                     if tup.len() != 2 {
                         unimplemented!("error!");
                         // return Err(Exception::new(Reason::EXC_BADARG));
@@ -734,7 +734,7 @@ fn bif_erlang_demonitor_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     let mut flush = false;
     let mut info = false;
 
-    for val in Cons::try_from(&args[1])? {
+    for val in Cons::cast_from(&args[1])? {
         match val.into_variant() {
             Variant::Atom(atom::INFO) => info = true,
             Variant::Atom(atom::FLUSH) => flush = true,
@@ -846,7 +846,7 @@ pub fn bif_erlang_is_map_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term
 pub fn bif_erlang_is_map_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     let key = &args[0];
     let map = &args[1];
-    if let Ok(value::Map(map)) = map.try_into() {
+    if let Ok(value::Map(map)) = map.cast_into() {
         return Ok(Term::boolean(map.contains_key(key)));
     }
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
@@ -855,7 +855,7 @@ pub fn bif_erlang_is_map_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[
 pub fn bif_erlang_map_get_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     let key = &args[0];
     let map = &args[1];
-    if let Ok(value::Map(map)) = map.try_into() {
+    if let Ok(value::Map(map)) = map.cast_into() {
         match map.get(key) {
             Some(value) => {
                 return Ok(*value);
@@ -869,7 +869,7 @@ pub fn bif_erlang_map_get_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Ter
 }
 
 fn bif_erlang_tuple_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-    let tuple = Tuple::try_from(&args[0])?;
+    let tuple = Tuple::cast_from(&args[0])?;
     Ok(Term::uint(&process.context_mut().heap, tuple.len))
 }
 
@@ -924,7 +924,7 @@ fn bif_erlang_bit_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
 }
 
 pub fn bif_erlang_map_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-    let val = value::Map::try_from(&args[0])?;
+    let val = value::Map::cast_from(&args[0])?;
     let heap = &process.context_mut().heap;
 
     Ok(Term::uint(heap, val.0.len() as u32))
@@ -934,7 +934,7 @@ pub fn bif_erlang_length_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]
     if args[0].is_nil() {
         return Ok(Term::int(0));
     }
-    let cons = Cons::try_from(&args[0])?;
+    let cons = Cons::cast_from(&args[0])?;
     let heap = &process.context_mut().heap;
 
     Ok(Term::uint(heap, cons.iter().count() as u32))
@@ -945,7 +945,7 @@ pub fn bif_erlang_size_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
         return Ok(Term::int(0));
     }
     // TODO: binary
-    if let Ok(tup) = Tuple::try_from(&args[0]) {
+    if let Ok(tup) = Tuple::cast_from(&args[0]) {
         let heap = &process.context_mut().heap;
 
         return Ok(Term::uint64(heap, tup.len() as u64));
@@ -1082,7 +1082,7 @@ fn bif_erlang_nif_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
 pub fn bif_erlang_load_nif_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
     // println!("Tried loading nif: {} with args {}", args[0], args[1]);
 
-    if let Ok(cons) = args[0].try_into() {
+    if let Ok(cons) = args[0].cast_into() {
         let name = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
         let atom = atom::from_str(&name);
         let nifs = match NIFS.get(&atom) {
@@ -1247,13 +1247,13 @@ fn bif_erlang_loaded_0(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
 /* returns the head of a list - this function is unecessary
 and is only here to keep Robert happy (Even more, since it's OP as well) */
 pub fn bif_erlang_hd_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
-    let cons = Cons::try_from(&args[0])?;
+    let cons = Cons::cast_from(&args[0])?;
     Ok(cons.head)
 }
 
 /* returns the tails of a list - same comment as above */
 pub fn bif_erlang_tl_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
-    let cons = Cons::try_from(&args[0])?;
+    let cons = Cons::cast_from(&args[0])?;
     Ok(cons.tail)
 }
 
@@ -1351,7 +1351,7 @@ fn erts_internal_map_next_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term
 
     // {k, v, i} where i is also {k, v, i} or none
 
-    let map = value::Map::try_from(&args[1])?;
+    let map = value::Map::cast_from(&args[1])?;
 
     let res = map
         .0
@@ -1421,7 +1421,7 @@ mod tests {
     fn to_vec(value: Term) -> Vec<Term> {
         let mut vec = Vec::new();
         let mut cons = &value;
-        while let Ok(Cons { head, tail }) = cons.try_into() {
+        while let Ok(Cons { head, tail }) = cons.cast_into() {
             vec.push(*head);
             cons = &tail;
         }
