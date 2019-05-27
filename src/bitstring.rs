@@ -262,22 +262,15 @@ impl From<SubBinary> for MatchBuffer {
     }
 }
 
-pub struct MatchState {
-    // TODO: wrap into value
-    pub mb: MatchBuffer,
-    /// Saved offsets, only valid for contexts created through bs_start_match2.
-    pub saved_offsets: Vec<usize>,
-} // TODO: Dump start_match_2 support. use MatchBuffer directly
-
 // TODO: to be TryFrom once rust stabilizes the trait
-impl TryFrom<Term> for MatchState {
+impl TryFrom<Term> for MatchBuffer {
     type Error = value::WrongBoxError;
 
     #[inline]
     fn try_from(value: &Term) -> Result<&Self, value::WrongBoxError> {
         if let value::Variant::Pointer(ptr) = value.into_variant() {
             unsafe {
-                if *ptr == value::BOXED_MATCHSTATE {
+                if *ptr == value::BOXED_MATCHBUFFER {
                     return Ok(&(*(ptr as *const value::Boxed<Self>)).value);
                 }
             }
@@ -356,48 +349,6 @@ macro_rules! binary_size {
     };
 }
 
-// pub fn start_match_2(heap: &Heap, binary: Term, _max: u32) -> Option<Term> {
-//     assert!(binary.is_bitstring());
-
-//     // TODO: BEAM allocates size on all binary types right after the header so we can grab it
-//     // without needing the binary subtype.
-//     let total_bin_size = binary_size!(binary);
-
-//     if (total_bin_size >> (8 * std::mem::size_of::<usize>() - 3)) != 0 {
-//         // Uint => maybe u8??
-//         return None;
-//     }
-
-//     // TODO: this is not nice
-//     let mb = match binary.get_boxed_header() {
-//         Ok(value::BOXED_BINARY) => {
-//             // TODO use ok_or to cast to some, then use ?
-//             let value = binary.get_boxed_value::<RcBinary>().unwrap().clone();
-//             MatchBuffer::from(value)
-//         }
-//         Ok(value::BOXED_SUBBINARY) => {
-//             // TODO use ok_or to cast to some, then use ?
-//             let value = binary.get_boxed_value::<SubBinary>().unwrap().clone();
-//             MatchBuffer::from(value)
-//         }
-//         _ => unreachable!(),
-//     };
-
-//     // TODO: toggle is_writable to false for rcbinary!
-//     // pb = (ProcBin *) boxed_val(Orig);
-//     // if (pb->thing_word == HEADER_PROC_BIN && pb->flags != 0) {
-//     //  erts_emasculate_writable_binary(pb);
-//     // }
-
-//     Some(Term::matchstate(
-//         heap,
-//         MatchState {
-//             saved_offsets: vec![mb.offset],
-//             mb,
-//         },
-//     ))
-// }
-
 pub fn start_match_3(heap: &Heap, binary: Term) -> Option<Term> {
     assert!(binary.is_bitstring());
 
@@ -431,13 +382,7 @@ pub fn start_match_3(heap: &Heap, binary: Term) -> Option<Term> {
     //  erts_emasculate_writable_binary(pb);
     // }
 
-    Some(Term::matchstate(
-        heap,
-        MatchState {
-            saved_offsets: vec![],
-            mb,
-        },
-    ))
+    Some(Term::matchbuffer(heap, mb))
 }
 
 // #ifdef DEBUG
@@ -1197,6 +1142,7 @@ pub fn append(
             }
             _ => unreachable!(),
         };
+        // TODO: do in one step
         let bin_size = 8 * binary_size!(binary) + bitsize;
         if unit > 1 {
             if (unit == 8 && (bin_size & 7) != 0) || (bin_size % unit) != 0 {

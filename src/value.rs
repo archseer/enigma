@@ -303,7 +303,7 @@ pub const BOXED_CLOSURE: u8 = 5;
 pub const BOXED_CATCH: u8 = 7;
 pub const BOXED_STACKTRACE: u8 = 8;
 
-pub const BOXED_MATCHSTATE: u8 = 9;
+pub const BOXED_MATCHBUFFER: u8 = 9;
 pub const BOXED_SUBBINARY: u8 = 10;
 
 pub const BOXED_MODULE: u8 = 20;
@@ -337,7 +337,7 @@ pub enum Type {
     // runtime values
     // CP,
     Catch,
-    MatchState,
+    MatchBuffer,
 }
 
 pub enum Num {
@@ -486,9 +486,9 @@ impl Term {
         }))
     }
 
-    pub fn matchstate(heap: &Heap, value: bitstring::MatchState) -> Self {
+    pub fn matchbuffer(heap: &Heap, value: bitstring::MatchBuffer) -> Self {
         Term::from(heap.alloc(Boxed {
-            header: BOXED_MATCHSTATE,
+            header: BOXED_MATCHBUFFER,
             value,
         }))
     }
@@ -606,7 +606,7 @@ impl Term {
                 BOXED_CLOSURE => Type::Closure,
                 // BOXED_CP => Type::CP,
                 BOXED_CATCH => Type::Catch,
-                BOXED_MATCHSTATE => Type::MatchState,
+                BOXED_MATCHBUFFER => Type::MatchBuffer,
                 BOXED_SUBBINARY => Type::Binary,
                 BOXED_MODULE => Type::Ref, // init expects a module in progress as a ref
                 BOXED_EXPORT => Type::Closure, // exports are a type of function
@@ -1184,7 +1184,7 @@ impl std::fmt::Display for Variant {
                         // write!(f, "#Binary<>")
                     }
                     BOXED_SUBBINARY => write!(f, "#SubBinary<>"),
-                    BOXED_MATCHSTATE => write!(f, "#MatchState<>"),
+                    BOXED_MATCHBUFFER => write!(f, "#MatchBuffer<>"),
                     BOXED_MAP => {
                         let map = &(*(*ptr as *const Boxed<map::Map>)).value;
                         write!(f, "%{{")?;

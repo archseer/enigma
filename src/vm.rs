@@ -1576,86 +1576,13 @@ impl Machine {
                     // BsPutString uses the StrT strings table! needs to be patched in loader
                     context.bs.put_bytes(binary);
                 }
-                // &Instruction::BsStartMatch2 => {
-                //     // fail, src, live, slots?, dst
-                //     // check if src is a match context with space for n slots (matches) else
-                //     // allocate one. if we can't, jump to fail.
-                //     // ibsstartmatch2 rxy f I I d
-                //     // Checks that Arg0 is the matching context with enough slots for saved
-                //     // offsets. The number of slots needed is given by Arg3. If there not enough
-                //     // slots of if Arg0 is a regular binary then recreates the matching context and
-                //     // saves it to Arg4. If something does not work jumps to Arg1. Arg2 is Live.
-
-                //     // Uint slots;
-                //     // Uint live;
-                //     // Eterm header;
-
-                //     let cxt = context.expand_arg(&ins.args[1]);
-
-                //     if !cxt.is_pointer() {
-                //         fail!(context, ins.args[0]);
-                //     }
-
-                //     let header = cxt.get_boxed_header().unwrap();
-
-                //     // Reserve a slot for the start position.
-                //     let slots = ins.args[3].to_u32() + 1;
-                //     let _live = ins.args[2].to_u32();
-
-                //     match header {
-                //         value::BOXED_MATCHSTATE => {
-                //             if let Ok(ms) = cxt.get_boxed_value_mut::<bitstring::MatchState>() {
-                //                 // Uint actual_slots = HEADER_NUM_SLOTS(header);
-                //                 let actual_slots = ms.saved_offsets.len();
-
-                //                 // We're not compatible with contexts created by bs_start_match3.
-                //                 assert!(actual_slots >= 2);
-
-                //                 ms.saved_offsets[0] = ms.mb.offset;
-                //                 // TODO: we don't need realloc since Vec handles it for us
-                //                 // if (ERTS_UNLIKELY(actual_slots < slots)) {
-                //                 //     ErlBinMatchState* expanded;
-                //                 //     Uint live = $Live;
-                //                 //     Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
-                //                 //     $GC_TEST_PRESERVE(wordsneeded, live, context);
-                //                 //     ms = (ErlBinMatchState *) boxed_val(context);
-                //                 //     expanded = (ErlBinMatchState *) HTOP;
-                //                 //     *expanded = *ms;
-                //                 //     *HTOP = HEADER_BIN_MATCHSTATE(slots);
-                //                 //     HTOP += wordsneeded;
-                //                 //     HEAP_SPACE_VERIFIED(0);
-                //                 //     context = make_matchstate(expanded);
-                //                 //     $REFRESH_GEN_DEST();
-                //                 // }
-                //                 context.set_register(&ins.args[4], cxt);
-                //             }
-                //         }
-                //         value::BOXED_BINARY | value::BOXED_SUBBINARY => {
-                //             // Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
-                //             // $GC_TEST_PRESERVE(wordsneeded, live, context);
-
-                //             let result = bitstring::start_match_2(&context.heap, cxt, slots);
-
-                //             if let Some(res) = result {
-                //                 context.set_register(&ins.args[4], res)
-                //             } else {
-                //                 fail!(context, ins.args[0]);
-                //             }
-                //         }
-                //         _ => {
-                //             fail!(context, ins.args[0]);
-                //         }
-                //     }
-                // }
                 &Instruction::BsGetTail { context: cxt, destination, live } => {
                     // very similar to the old BsContextToBinary
-                     if let Ok(ms) = context
+                     if let Ok(mb) = context
                          .fetch_register(cxt)
-                         .get_boxed_value_mut::<bitstring::MatchState>()
+                         .get_boxed_value_mut::<bitstring::MatchBuffer>()
                          {
-                           // TODO; original calculated the hole size and overwrote MatchState mem in place?
-                           let mb = &mut ms.mb;
-                   
+                           // TODO; original calculated the hole size and overwrote MatchBuffer mem in place?
                            let offs = mb.offset;
                            let size = mb.size - offs;
 
@@ -1681,16 +1608,11 @@ impl Machine {
                     // Reserve a slot for the start position.
 
                     match header {
-                        value::BOXED_MATCHSTATE => {
-                            if let Ok(ms) = cxt.get_boxed_value_mut::<bitstring::MatchState>() {
-                                let actual_slots = ms.saved_offsets.len();
-                                // We're not compatible with contexts created by bs_start_match2.
-                                assert!(actual_slots == 0);
-                                context.set_register(dst, cxt);
-                            }
+                        value::BOXED_MATCHBUFFER => {
+                            context.set_register(dst, cxt);
                         }
                         value::BOXED_BINARY | value::BOXED_SUBBINARY => {
-                            // Uint wordsneeded = ERL_BIN_MATCHSTATE_SIZE(slots);
+                            // Uint wordsneeded = ERL_BIN_MATCHBUFFER_SIZE(slots);
                             // $GC_TEST_PRESERVE(wordsneeded, live, context);
 
                             let result = bitstring::start_match_3(&context.heap, cxt);
@@ -1707,23 +1629,23 @@ impl Machine {
                     }
                 }
                 &Instruction::BsGetPosition { context: cxt, destination, live } => {
-                    if let Ok(ms) = context
+                    if let Ok(mb) = context
                         .fetch_register(cxt)
-                        .get_boxed_value_mut::<bitstring::MatchState>()
+                        .get_boxed_value_mut::<bitstring::MatchBuffer>()
                     {
                         // TODO: unsafe cast
-                        context.set_register(destination, Term::uint(&context.heap, ms.mb.offset as u32));
+                        context.set_register(destination, Term::uint(&context.heap, mb.offset as u32));
                     } else {
                         unreachable!()
                     };
                 }
                 &Instruction::BsSetPosition { context: cxt, position } => {
-                    if let Ok(ms) = context
+                    if let Ok(mb) = context
                         .fetch_register(cxt)
-                        .get_boxed_value_mut::<bitstring::MatchState>()
+                        .get_boxed_value_mut::<bitstring::MatchBuffer>()
                     {
                         let pos = context.expand_arg(position).to_int().unwrap();
-                        ms.mb.offset = pos as usize;
+                        mb.offset = pos as usize;
                     } else {
                         unreachable!()
                     };
@@ -1738,82 +1660,82 @@ impl Machine {
                     // & size were packed together on BEAM
 
                     // TODO: this cast can fail
-                    if let Ok(ms) = context
+                    if let Ok(mb) = context
                         .fetch_register(ms)
-                        .get_boxed_value_mut::<bitstring::MatchState>()
+                        .get_boxed_value_mut::<bitstring::MatchBuffer>()
                     {
                         use std::convert::TryInto;
                         // fast path for common ops
                         let res = match (bits, flags.contains(bitstring::Flag::BSF_LITTLE), flags.contains(bitstring::Flag::BSF_SIGNED)) {
                             (8, true, true) => {
                                 // little endian, signed
-                                ms.mb.get_bytes(1).map(|b| Term::int(i32::from(i8::from_le_bytes((*b).try_into().unwrap()))))
+                                mb.get_bytes(1).map(|b| Term::int(i32::from(i8::from_le_bytes((*b).try_into().unwrap()))))
                             },
                             (8, true, false) => {
                                 // little endian unsigned
-                                ms.mb.get_bytes(1).map(|b| Term::uint(&context.heap, u32::from(u8::from_le_bytes((*b).try_into().unwrap()))))
+                                mb.get_bytes(1).map(|b| Term::uint(&context.heap, u32::from(u8::from_le_bytes((*b).try_into().unwrap()))))
                             },
                             (8, false, true) => {
                                 // big endian signed
-                                ms.mb.get_bytes(1).map(|b| Term::int(i32::from(i8::from_be_bytes((*b).try_into().unwrap()))))
+                                mb.get_bytes(1).map(|b| Term::int(i32::from(i8::from_be_bytes((*b).try_into().unwrap()))))
                             },
                             (8, false, false) => {
                                 // big endian unsigned
-                                ms.mb.get_bytes(1).map(|b| Term::uint(&context.heap, u32::from(u8::from_be_bytes((*b).try_into().unwrap()))))
+                                mb.get_bytes(1).map(|b| Term::uint(&context.heap, u32::from(u8::from_be_bytes((*b).try_into().unwrap()))))
                             },
                             (16, true, true) => {
                                 // little endian, signed
-                                ms.mb.get_bytes(2).map(|b| Term::int(i32::from(i16::from_le_bytes((*b).try_into().unwrap()))))
+                                mb.get_bytes(2).map(|b| Term::int(i32::from(i16::from_le_bytes((*b).try_into().unwrap()))))
                             },
                             (16, true, false) => {
                                 // little endian unsigned
-                                ms.mb.get_bytes(2).map(|b| Term::uint(&context.heap, u32::from(u16::from_le_bytes((*b).try_into().unwrap()))))
+                                mb.get_bytes(2).map(|b| Term::uint(&context.heap, u32::from(u16::from_le_bytes((*b).try_into().unwrap()))))
                             },
                             (16, false, true) => {
                                 // big endian signed
-                                ms.mb.get_bytes(2).map(|b| Term::int(i32::from(i16::from_be_bytes((*b).try_into().unwrap()))))
+                                mb.get_bytes(2).map(|b| Term::int(i32::from(i16::from_be_bytes((*b).try_into().unwrap()))))
                             },
                             (16, false, false) => {
                                 // big endian unsigned
-                                ms.mb.get_bytes(2).map(|b| Term::uint(&context.heap, u32::from(u16::from_be_bytes((*b).try_into().unwrap()))))
+                                mb.get_bytes(2).map(|b| Term::uint(&context.heap, u32::from(u16::from_be_bytes((*b).try_into().unwrap()))))
                             },
                             (32, true, true) => {
                                 // little endian, signed
-                                ms.mb.get_bytes(4).map(|b| Term::int(i32::from_le_bytes((*b).try_into().unwrap())))
+                                mb.get_bytes(4).map(|b| Term::int(i32::from_le_bytes((*b).try_into().unwrap())))
                             },
                             (32, true, false) => {
                                 // little endian unsigned
-                                ms.mb.get_bytes(4).map(|b| Term::uint(&context.heap, u32::from_le_bytes((*b).try_into().unwrap())))
+                                mb.get_bytes(4).map(|b| Term::uint(&context.heap, u32::from_le_bytes((*b).try_into().unwrap())))
                             },
                             (32, false, true) => {
                                 // big endian signed
-                                ms.mb.get_bytes(4).map(|b| Term::int(i32::from_be_bytes((*b).try_into().unwrap())))
+                                mb.get_bytes(4).map(|b| Term::int(i32::from_be_bytes((*b).try_into().unwrap())))
                             },
                             (32, false, false) => {
                                 // big endian unsigned
-                                ms.mb.get_bytes(4).map(|b| Term::uint(&context.heap, u32::from_be_bytes((*b).try_into().unwrap())))
+                                mb.get_bytes(4).map(|b| Term::uint(&context.heap, u32::from_be_bytes((*b).try_into().unwrap())))
                             },
                             (64, false, true) => {
                                 // big endian signed
-                                ms.mb.get_bytes(8).map(|b| Term::int64(&context.heap, i64::from_be_bytes((*b).try_into().unwrap())))
+                                mb.get_bytes(8).map(|b| Term::int64(&context.heap, i64::from_be_bytes((*b).try_into().unwrap())))
                             },
                             (64, false, false) => {
                                 // big endian unsigned
-                                ms.mb.get_bytes(8).map(|b| Term::uint64(&context.heap, u64::from_be_bytes((*b).try_into().unwrap())))
+                                mb.get_bytes(8).map(|b| Term::uint64(&context.heap, u64::from_be_bytes((*b).try_into().unwrap())))
                             },
                             (128, false, true) => {
                                 use num_bigint::ToBigInt;
                                 // big endian signed
-                                ms.mb.get_bytes(16).map(|b| Term::bigint(&context.heap, i128::from_be_bytes((*b).try_into().unwrap()).to_bigint().unwrap()))
+                                mb.get_bytes(16).map(|b| Term::bigint(&context.heap, i128::from_be_bytes((*b).try_into().unwrap()).to_bigint().unwrap()))
                             },
                             (128, false, false) => {
                                 use num_bigint::ToBigInt;
                                 // big endian unsigned
-                                ms.mb.get_bytes(16).map(|b| Term::bigint(&context.heap, u128::from_be_bytes((*b).try_into().unwrap()).to_bigint().unwrap()))
+                                mb.get_bytes(16).map(|b| Term::bigint(&context.heap, u128::from_be_bytes((*b).try_into().unwrap()).to_bigint().unwrap()))
                             },
                             // slow fallback
                             _ => {
-                                ms.mb.get_integer(&context.heap, bits, flags)
+                                mb.get_integer(&context.heap, bits, flags)
                             }
                         };
 
@@ -1833,8 +1755,8 @@ impl Machine {
                     };
 
                     // TODO: this cast can fail
-                    if let Ok(ms) = context.fetch_register(ms).get_boxed_value_mut::<bitstring::MatchState>() {
-                        let res = ms.mb.get_float(&context.heap, size as usize, flags);
+                    if let Ok(mb) = context.fetch_register(ms).get_boxed_value_mut::<bitstring::MatchBuffer>() {
+                        let res = mb.get_float(&context.heap, size as usize, flags);
                         if let Some(res) = res {
                             context.set_register(destination, res)
                         } else {
@@ -1844,16 +1766,16 @@ impl Machine {
                 }
                 &Instruction::BsGetBinary2 { fail, ms, live, size, unit, flags, destination } => {
                     // TODO: this cast can fail
-                    if let Ok(ms) = context
+                    if let Ok(mb) = context
                         .fetch_register(ms)
-                        .get_boxed_value_mut::<bitstring::MatchState>()
+                        .get_boxed_value_mut::<bitstring::MatchBuffer>()
                     {
                         // proc pid=37 reds=907 mod="re" offs=870 ins=BsGetBinary2 args=[Label(916), X(5), Literal(9), X(2), Literal(8), Literal(0), X(2)]
                         let heap = &context.heap;
                         let unit = unit as usize;
                         let res = match context.expand_arg(size).into_variant() {
-                            Variant::Integer(size) => ms.mb.get_binary(heap, size as usize * unit, flags),
-                            Variant::Atom(atom::ALL) => ms.mb.get_binary_all(heap, flags),
+                            Variant::Integer(size) => mb.get_binary(heap, size as usize * unit, flags),
+                            Variant::Atom(atom::ALL) => mb.get_binary_all(heap, flags),
                             arg => unreachable!("get_binary2 for {:?}", arg),
                         };
 
@@ -1865,12 +1787,10 @@ impl Machine {
                     };
                 }
                 &Instruction::BsSkipBits2 { fail, ms, size, unit, flags } => {
-                    if let Ok(ms) = context
+                    if let Ok(mb) = context
                         .fetch_register(ms)
-                        .get_boxed_value_mut::<bitstring::MatchState>()
+                        .get_boxed_value_mut::<bitstring::MatchBuffer>()
                     {
-                        let mb = &mut ms.mb;
-
                         let size = context.expand_arg(size).to_int().unwrap() as usize;
 
                         let new_offset = mb.offset + (size * unit as usize);
@@ -1891,9 +1811,7 @@ impl Machine {
                     // if size 0 == Jumps to the label in Arg0 if the matching context Arg1 still have unmatched bits.
                     let offset = offset as usize;
 
-                    if let Ok(ms) = bitstring::MatchState::try_from(&context.fetch_register(ms)) {
-                        let mb = &ms.mb;
-
+                    if let Ok(mb) = bitstring::MatchBuffer::try_from(&context.fetch_register(ms)) {
                         if mb.remaining() != offset {
                             fail!(context, fail);
                         }
@@ -1901,70 +1819,11 @@ impl Machine {
                         unreachable!()
                     }
                 }
-                // &Instruction::BsSave2 => {
-                //     // cxt slot
-                //     if let Ok(ms) = context
-                //         .expand_arg(&ins.args[0])
-                //         .get_boxed_value_mut::<bitstring::MatchState>()
-                //     {
-                //         let slot = match context.expand_arg(&ins.args[1]).into_variant() {
-                //             Variant::Integer(i) => i as usize,
-                //             // LValue::Literal(i) => i as usize, // TODO: unsure if correct
-                //             Variant::Atom(atom::START) => 0,
-                //             _ => unreachable!("{:?}", ins.args[1]),
-                //         };
-                //         ms.saved_offsets[slot] = ms.mb.offset;
-                //     } else {
-                //         unreachable!()
-                //     }
-                // }
-                // &Instruction::BsRestore2 => {
-                //     // cxt slot
-                //     if let Ok(ms) = context
-                //         .expand_arg(&ins.args[0])
-                //         .get_boxed_value_mut::<bitstring::MatchState>()
-                //     {
-                //         let slot = match context.expand_arg(&ins.args[1]).into_variant() {
-                //             Variant::Integer(i) => i as usize,
-                //             // LValue::Literal(i) => i as usize,
-                //             Variant::Atom(atom::START) => 0,
-                //             _ => unreachable!(),
-                //         };
-                //         ms.mb.offset = ms.saved_offsets[slot];
-                //     } else {
-                //         unreachable!()
-                //     }
-                // }
-                // &Instruction::BsContextToBinary => {
-                //     // Converts the matching context to a (sub)binary using almost the same code as
-                //     // i bs get binary all reuse rx f I.
-
-                //     // cxt
-                //     if let Ok(ms) = context
-                //         .expand_arg(&ins.args[0])
-                //         .get_boxed_value_mut::<bitstring::MatchState>()
-                //     {
-                //         let offs = ms.saved_offsets[0];
-                //         let size = ms.mb.size - offs;
-                //         // TODO; original calculated the hole size and overwrote MatchState mem in
-                //         // place.
-                //         let res = Term::subbinary(
-                //             &context.heap,
-                //             bitstring::SubBinary::new(ms.mb.original.clone(), size, offs, false),
-                //         );
-                //         context.set_register(&ins.args[0], res);
-                //     } else {
-                //         // next0
-                //         unreachable!()
-                //     }
-                // }
                 &Instruction::BsTestUnit { fail, context: cxt, unit } => {
                     // Checks that the size of the remainder of the matching context is divisible
                     // by unit, else jump to fail
 
-                    if let Ok(ms) = bitstring::MatchState::try_from(&context.fetch_register(cxt)) {
-                        let mb = &ms.mb;
-
+                    if let Ok(mb) = bitstring::MatchBuffer::try_from(&context.fetch_register(cxt)) {
                         if mb.remaining() % (unit as usize) != 0 {
                             fail!(context, fail);
                         }
@@ -1978,9 +1837,7 @@ impl Machine {
                     // ErlBinMatchBuffer* mb;
                     // Uint offs;
 
-                    if let Ok(ms) = context.fetch_register(*cxt).get_boxed_value_mut::<bitstring::MatchState>() {
-                        let mb = &mut ms.mb;
-
+                    if let Ok(mb) = context.fetch_register(*cxt).get_boxed_value_mut::<bitstring::MatchBuffer>() {
                         let bits = *bits as usize;
 
                         if mb.remaining() < bits {
@@ -2068,8 +1925,8 @@ impl Machine {
                 }
                 &Instruction::BsGetUtf8 { fail, ms, size, flags, destination } => {
                     // TODO: this cast can fail
-                    if let Ok(ms) = context.fetch_register(ms).get_boxed_value_mut::<bitstring::MatchState>() {
-                        let res = ms.mb.get_utf8();
+                    if let Ok(mb) = context.fetch_register(ms).get_boxed_value_mut::<bitstring::MatchBuffer>() {
+                        let res = mb.get_utf8();
                         if let Some(res) = res {
                             context.set_register(destination, res)
                         } else {
@@ -2079,11 +1936,11 @@ impl Machine {
                 }
                 &Instruction::BsGetUtf16 { fail, ms, size, flags, destination } => {
                     // TODO: this cast can fail
-                    if let Ok(ms) = context
+                    if let Ok(mb) = context
                         .fetch_register(ms)
-                        .get_boxed_value_mut::<bitstring::MatchState>()
+                        .get_boxed_value_mut::<bitstring::MatchBuffer>()
                     {
-                        let res = ms.mb.get_utf16(flags);
+                        let res = mb.get_utf16(flags);
                         if let Some(res) = res {
                             context.set_register(destination, res)
                         } else {
@@ -2096,11 +1953,11 @@ impl Machine {
                 }
                 &Instruction::BsSkipUtf8 { fail, ms, size, flags } => {
                     // TODO: this cast can fail
-                    if let Ok(ms) = context
+                    if let Ok(mb) = context
                         .fetch_register(ms)
-                        .get_boxed_value_mut::<bitstring::MatchState>()
+                        .get_boxed_value_mut::<bitstring::MatchBuffer>()
                     {
-                        let res = ms.mb.get_utf8();
+                        let res = mb.get_utf8();
                         if res.is_none() {
                             fail!(context, fail);
                         }
@@ -2110,11 +1967,11 @@ impl Machine {
                 }
                 &Instruction::BsSkipUtf16 { fail, ms, size, flags } => {
                     // TODO: this cast can fail
-                    if let Ok(ms) = context
+                    if let Ok(mb) = context
                         .fetch_register(ms)
-                        .get_boxed_value_mut::<bitstring::MatchState>()
+                        .get_boxed_value_mut::<bitstring::MatchBuffer>()
                     {
-                        let res = ms.mb.get_utf16(flags);
+                        let res = mb.get_utf16(flags);
                         if res.is_none() {
                             fail!(context, fail);
                         }
