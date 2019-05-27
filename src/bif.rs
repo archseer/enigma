@@ -1206,8 +1206,12 @@ fn bif_erlang_function_exported_3(vm: &vm::Machine, _process: &RcProcess, args: 
         return Err(Exception::new(Reason::EXC_BADARG));
     }
 
-    let arity = args[2].to_u32();
-    let mfa = module::MFA(args[0].to_u32(), args[1].to_u32(), arity);
+    let arity = args[2].to_uint().unwrap();
+    let mfa = module::MFA(
+        args[0].to_atom().unwrap(),
+        args[1].to_atom().unwrap(),
+        arity,
+    );
 
     if vm.exports.read().lookup(&mfa).is_some() || bif::is_bif(&mfa) {
         return Ok(atom!(TRUE));
@@ -1220,7 +1224,7 @@ fn bif_erlang_module_loaded_1(vm: &vm::Machine, _process: &RcProcess, args: &[Te
         return Err(Exception::new(Reason::EXC_BADARG));
     }
 
-    let module = args[0].to_u32();
+    let module = args[0].to_atom().unwrap();
 
     if vm.modules.lock().lookup(module).is_some() {
         return Ok(atom!(TRUE));

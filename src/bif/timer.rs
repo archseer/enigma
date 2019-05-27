@@ -10,8 +10,8 @@ use tokio::timer::Delay;
 
 pub fn send_after_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // time, dest, msg
-    let delay = match args[0].to_int() {
-        Some(i) if i >= 0 => i,
+    let delay = match args[0].to_uint() {
+        Some(i) => i,
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
 

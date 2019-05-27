@@ -516,9 +516,6 @@ impl MatchBuffer {
         //    int sgn = 0;
         //    Eterm res = THE_NON_VALUE;
 
-        // TODO: preprocess flags for native endian in loader(remove native_endian and set bsf_little off or on)
-        native_endian!(flags);
-
         if num_bits == 0 {
             return Some(Term::from(0));
         }
@@ -764,9 +761,6 @@ impl MatchBuffer {
     pub fn get_float(&mut self, _heap: &Heap, num_bits: usize, mut flags: Flag) -> Option<Term> {
         let mut fl32: f32 = 0.0;
         let mut fl64: f64 = 0.0;
-
-        // TODO: preprocess flags for native endian in loader(remove native_endian and set bsf_little off or on)
-        native_endian!(flags);
 
         // CHECK_MATCH_BUFFER(mb);
 
@@ -1164,9 +1158,11 @@ pub fn append(
         // Reserve extra capacity if needed.
         let data = pb.get_mut();
         if data.len() < size {
-            data.reserve(2 * size); // why 2*?
+            data.resize(2 * size, 0); // why 2*?
         }
-        process.context_mut().bs = Builder::new(pb);
+        let mut bs = Builder::new(pb);
+        bs.offset = bin_size;
+        process.context_mut().bs = bs;
 
         // Allocate heap space and build a new sub binary.
 
@@ -1234,7 +1230,9 @@ pub fn append(
         let new_binary = heap.alloc(Arc::new(Binary::with_size(size))).clone();
         // ACTIVE_WRITER
 
-        process.context_mut().bs = Builder::new(&new_binary);
+        let mut bs = Builder::new(&new_binary);
+        bs.offset = bin_size;
+        process.context_mut().bs = bs;
 
         // Now copy the data into the binary.
         copy_binary!(
@@ -1291,7 +1289,9 @@ pub fn private_append(
     if data.capacity() < size {
         data.resize(2 * size, 0); // why 2*?
     }
-    process.context_mut().bs = Builder::new(pb);
+    let mut bs = Builder::new(pb);
+    bs.offset = bin_size;
+    process.context_mut().bs = bs;
 
     sb.size = size_in_bits_after_build >> 3;
     sb.bitsize = size_in_bits_after_build & 7;
@@ -1629,9 +1629,6 @@ impl Builder {
     pub fn put_integer(&mut self, size: usize, mut flags: Flag, int: Term) {
         let bit_offset = bit_offset!(self.offset);
 
-        // TODO: preprocess flags for native endian in loader(remove native_endian and set bsf_little off or on)
-        native_endian!(flags);
-
         if let value::Variant::Integer(value) = int.into_variant() {
             match size {
                 0 => (), // skip
@@ -1705,10 +1702,6 @@ impl Builder {
         let total_bin_size = binary_size!(binary);
         let slice = &bin.data[offs..offs + total_bin_size];
 
-        println!(
-            "put_binary with slice: {:?}, tot: {}, whole: {:?}",
-            slice, total_bin_size, bin.data
-        );
         let start = byte_offset!(self.offset);
         self.data()[start..start + total_bin_size].copy_from_slice(&slice);
         self.offset += size * 8 + bitsize;

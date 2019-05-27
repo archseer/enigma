@@ -561,6 +561,10 @@ pub enum Opcode {
     /// @spec bs_set_positon Ctx Pos
     /// @doc  Sets the current position of Ctx to Pos
     BsSetPosition = 168,
+
+    /// @spec swap Register1 Register2
+    /// @doc  Swaps the contents of two registers.
+    Swap = 169,
 }
 
 pub static ARITY_MAP: &'static [usize] = &[
@@ -733,6 +737,7 @@ pub static ARITY_MAP: &'static [usize] = &[
     4, // opcode: 166 (bs_start_match_3)
     3, // opcode: 167 (bs_get_position)
     2, // opcode: 168 (bs_set_position)
+    2, // opcode: 169 (swap)
 ];
 
 #[inline]

@@ -142,7 +142,7 @@ pub fn unicode_list_to_buf(list: &Cons, _max_len: usize) -> Result<String, excep
     // TODO: handle max_len
     list.iter()
         .map(|v| {
-            v.to_int()
+            v.to_uint()
                 .and_then(std::char::from_u32)
                 .ok_or_else(|| exception::Exception::new(exception::Reason::EXC_BADARG))
         })

@@ -329,7 +329,7 @@ macro_rules! op_apply {
                 return Err(Exception::new(Reason::EXC_BADARG));
             }
 
-            if module.to_u32() != atom::ERLANG || func.to_u32() != atom::APPLY {
+            if module.to_atom().unwrap() != atom::ERLANG || func.to_atom().unwrap() != atom::APPLY {
                 break;
             }
 
@@ -386,7 +386,7 @@ macro_rules! op_apply {
          * Note: All BIFs have export entries; thus, no special case is needed.
          */
 
-        let mfa = module::MFA(module.to_u32(), func.to_u32(), arity as u32);
+        let mfa = module::MFA(module.to_atom().unwrap(), func.to_atom().unwrap(), arity as u32);
 
         // println!("pid={} applying/3... {}", $process.pid, mfa);
 
@@ -510,8 +510,11 @@ macro_rules! op_fixed_apply {
             return Err(Exception::new(Reason::EXC_BADARG));
         }
 
+        let module = module.to_atom().unwrap();
+        let func = func.to_atom().unwrap();
+
         // Handle apply of apply/3...
-        if module.to_u32() == atom::ERLANG && func.to_u32() == atom::APPLY && $arity == 3 {
+        if module == atom::ERLANG && func == atom::APPLY && $arity == 3 {
             op_apply!($vm, $context, $process, $return);
             continue;
         }
@@ -524,7 +527,7 @@ macro_rules! op_fixed_apply {
          */
 
         // TODO: make arity a U8 on the type
-        let mfa = module::MFA(module.to_u32(), func.to_u32(), $arity as u32);
+        let mfa = module::MFA(module, func, $arity as u32);
 
         let export = { $vm.exports.read().lookup(&mfa) }; // drop the exports lock
 
@@ -870,6 +873,24 @@ impl Machine {
                     let val = context.expand_arg(source);
                     context.set_register(destination, val)
                 }
+                &Instruction::Swap { a, b } => {
+                    use instruction::Register;
+                    let a: *mut Term = match a {
+                        Register::X(i) => &mut context.x[i as usize],
+                        Register::Y(i) => {
+                            let len = context.stack.len();
+                            &mut context.stack[len - (i + 1) as usize]
+                        }
+                    };
+                    let b: *mut Term = match b {
+                        Register::X(i) => &mut context.x[i as usize],
+                        Register::Y(i) => {
+                            let len = context.stack.len();
+                            &mut context.stack[len - (i + 1) as usize]
+                        }
+                    };
+                    unsafe { std::ptr::swap(a, b); }
+                }
                 &Instruction::Return => {
                     op_return!(process, context);
                 }
@@ -1193,7 +1214,7 @@ impl Machine {
                 &Instruction::IsFunction2 { label: fail, arg1, arity } => {
                     // TODO: needs to verify exports too
                     let value = context.expand_arg(arg1);
-                    let arity = context.expand_arg(arity).to_u32();
+                    let arity = context.expand_arg(arity).to_uint().unwrap();
                     if let Ok(closure) = value::Closure::try_from(&value) {
                         if closure.mfa.2 == arity {
                             continue;
@@ -1463,10 +1484,10 @@ impl Machine {
                     // bs_add Fail S1=i==0 S2 Unit=u==1 D => move S2 D
 
                     // TODO use fail label
-                    let s1 = context.expand_arg(size1).to_u32();
-                    let s2 = context.expand_arg(size2).to_u32();
+                    let s1 = context.expand_arg(size1).to_uint().unwrap();
+                    let s2 = context.expand_arg(size2).to_uint().unwrap();
 
-                    let res = Term::uint(&context.heap, ((s1 + s2) * unit as u32) as u32);
+                    let res = Term::uint(&context.heap, (s1 + s2) * unit as u32);
                     context.set_register(dest, res)
                 }
                 &Instruction::BsInit2 { fail, size, words, regs, flags, destination: dest } => {
@@ -1506,8 +1527,6 @@ impl Machine {
                     };
 
                     let size = size * (unit as usize);
-
-                    let flags = bitstring::Flag::from_bits(flags).unwrap();
 
                     // ins: &Instruction { op: BsPutInteger, args: [Label(0), Integer(1024), Literal(1), Literal(0), Integer(0)] }
                     println!("put_integer src is {}\r", context.expand_arg(src));
@@ -1703,7 +1722,7 @@ impl Machine {
                         .fetch_register(cxt)
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
-                        let pos = context.expand_arg(position).to_u32();
+                        let pos = context.expand_arg(position).to_int().unwrap();
                         ms.mb.offset = pos as usize;
                     } else {
                         unreachable!()
@@ -1712,7 +1731,6 @@ impl Machine {
                 &Instruction::BsGetInteger2 { fail, ms, live, size, unit, flags, destination } => {
                     let size = context.expand_arg(size).to_int().unwrap() as usize;
                     let unit = unit as usize;
-                    let mut flags = bitstring::Flag::from_bits(flags).unwrap();
 
                     let bits = size * unit;
 
@@ -1724,27 +1742,7 @@ impl Machine {
                         .fetch_register(ms)
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
-                        #[cfg(target_endian = "little")]
-                        macro_rules! native_endian {
-                            ($x:expr) => {
-                                if $x.contains(bitstring::Flag::BSF_NATIVE) {
-                                    $x.remove(bitstring::Flag::BSF_NATIVE);
-                                    $x.insert(bitstring::Flag::BSF_LITTLE);
-                                }
-                            };
-                        }
-
-                        #[cfg(target_endian = "big")]
-                        macro_rules! native_endian {
-                            ($x:expr) => {
-                                if $x.contains(bitstring::Flag::BSF_NATIVE) {
-                                    $x.remove(bitstring::Flag::BSF_NATIVE);
-                                    $x.remove(bitstring::Flag::BSF_LITTLE);
-                                }
-                            };
-                        }
                         use std::convert::TryInto;
-                        native_endian!(flags);
                         // fast path for common ops
                         let res = match (bits, flags.contains(bitstring::Flag::BSF_LITTLE), flags.contains(bitstring::Flag::BSF_SIGNED)) {
                             (8, true, true) => {
@@ -1815,11 +1813,7 @@ impl Machine {
                             },
                             // slow fallback
                             _ => {
-                                ms.mb.get_integer(
-                                    &context.heap,
-                                    bits,
-                                    flags,
-                                  )
+                                ms.mb.get_integer(&context.heap, bits, flags)
                             }
                         };
 
@@ -1840,11 +1834,7 @@ impl Machine {
 
                     // TODO: this cast can fail
                     if let Ok(ms) = context.fetch_register(ms).get_boxed_value_mut::<bitstring::MatchState>() {
-                        let res = ms.mb.get_float(
-                            &context.heap,
-                            size as usize,
-                            bitstring::Flag::from_bits(flags).unwrap(),
-                        );
+                        let res = ms.mb.get_float(&context.heap, size as usize, flags);
                         if let Some(res) = res {
                             context.set_register(destination, res)
                         } else {
@@ -1859,7 +1849,6 @@ impl Machine {
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
                         // proc pid=37 reds=907 mod="re" offs=870 ins=BsGetBinary2 args=[Label(916), X(5), Literal(9), X(2), Literal(8), Literal(0), X(2)]
-                        let flags = bitstring::Flag::from_bits(flags).unwrap(); // TODO: do this in loader
                         let heap = &context.heap;
                         let unit = unit as usize;
                         let res = match context.expand_arg(size).into_variant() {
@@ -2094,9 +2083,7 @@ impl Machine {
                         .fetch_register(ms)
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
-                        let res = ms
-                            .mb
-                            .get_utf16(bitstring::Flag::from_bits(flags).unwrap());
+                        let res = ms.mb.get_utf16(flags);
                         if let Some(res) = res {
                             context.set_register(destination, res)
                         } else {
@@ -2127,9 +2114,7 @@ impl Machine {
                         .fetch_register(ms)
                         .get_boxed_value_mut::<bitstring::MatchState>()
                     {
-                        let res = ms
-                            .mb
-                            .get_utf16(bitstring::Flag::from_bits(flags).unwrap());
+                        let res = ms.mb.get_utf16(flags);
                         if res.is_none() {
                             fail!(context, fail);
                         }

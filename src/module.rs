@@ -103,7 +103,7 @@ impl Module {
                     ..
                 } = ins
                 {
-                    self.constants[*n as usize].to_u32() == *name && *a == (*arity as u8)
+                    self.constants[*n as usize].to_atom() == Some(*name) && *a == (*arity as u8)
                 } else {
                     false
                 }

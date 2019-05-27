@@ -9,7 +9,6 @@ use crate::instr_ptr::InstrPtr;
 use crate::module;
 use crate::nanbox::TypedNanBox;
 use crate::process;
-use crate::servo_arc::Arc;
 use allocator_api::Layout;
 pub use num_bigint::BigInt;
 use std::cmp::Ordering;
@@ -476,7 +475,7 @@ impl Term {
     pub fn binary(heap: &Heap, value: bitstring::Binary) -> Self {
         Term::from(heap.alloc(Boxed {
             header: BOXED_BINARY,
-            value: Arc::new(value),
+            value: crate::servo_arc::Arc::new(value),
         }))
     }
 
@@ -754,26 +753,32 @@ impl Term {
     //     self.get_type() == Type::CP
     // }
 
-    pub fn to_u32(self) -> u32 {
+    pub fn to_atom(self) -> Option<u32> {
         match self.into_variant() {
-            Variant::Atom(i) => i,
-            Variant::Pid(i) => i,
-            Variant::Integer(i) => i as u32,
-            _ => unimplemented!("to_u32 for {:?}", self),
-        }
-    }
-
-    // TODO: had to add this for the list_to_atom
-    pub fn to_int(self) -> Option<u32> {
-        match self.into_variant() {
-            Variant::Integer(i) => Some(i as u32),
+            Variant::Atom(i) => Some(i),
             _ => None,
         }
     }
 
-    pub fn to_i32(self) -> Option<i32> {
+    // TODO: had to add this for the list_to_atom
+    pub fn to_uint(self) -> Option<u32> {
+        use std::convert::TryInto;
+        match self.into_variant() {
+            Variant::Integer(i) => Some(i.try_into().unwrap()),
+            _ => None,
+        }
+    }
+
+    pub fn to_int(self) -> Option<i32> {
         match self.into_variant() {
             Variant::Integer(i) => Some(i),
+            _ => None,
+        }
+    }
+
+    pub fn to_pid(self) -> Option<process::PID> {
+        match self.into_variant() {
+            Variant::Pid(i) => Some(i),
             _ => None,
         }
     }

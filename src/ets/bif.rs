@@ -156,7 +156,7 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
     // meth: methods
     let meta = Metadata {
         tid,
-        name: Some(args[0].to_u32() as usize), // unsound conversion
+        name: Some(args[0].to_atom().unwrap() as usize), // unsound conversion
         status,
         kind: status, // Note, 'kind' is *read only* from now on...
         keypos,
@@ -201,7 +201,7 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
         if vm
             .ets_tables
             .lock()
-            .insert_named(args[0].to_u32() as usize, table)
+            .insert_named(args[0].to_atom().unwrap() as usize, table)
         {
             return Ok(args[0]);
         }
@@ -259,7 +259,7 @@ fn get_table(vm: &vm::Machine, term: Term) -> std::result::Result<RcTable, Excep
     match term.get_type() {
         // TODO: inefficient
         Type::Atom => {
-            let key = term.to_u32();
+            let key = term.to_atom().unwrap();
             let lock = vm.ets_tables.lock();
             lock.get_named(key as usize)
         }

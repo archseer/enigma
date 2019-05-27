@@ -189,9 +189,9 @@ fn time_to_parts(term: Term) -> Option<ErlDateTime> {
             }
             _ => return None,
         };
-        let year = date[0].to_i32()?;
-        let month = date[1].to_i32()?;
-        let day = date[2].to_i32()?;
+        let year = date[0].to_int()?;
+        let month = date[1].to_int()?;
+        let day = date[2].to_int()?;
 
         let time = match Tuple::try_from(&wrapper[1]) {
             Ok(time) => {
@@ -202,9 +202,9 @@ fn time_to_parts(term: Term) -> Option<ErlDateTime> {
             }
             _ => return None,
         };
-        let hour = time[0].to_i32()?;
-        let minute = time[1].to_i32()?;
-        let second = time[2].to_i32()?;
+        let hour = time[0].to_int()?;
+        let minute = time[1].to_int()?;
+        let second = time[2].to_int()?;
         return Some(((year, month, day), (hour, minute, second)));
     }
     None

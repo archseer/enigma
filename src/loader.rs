@@ -87,7 +87,6 @@ impl std::fmt::Debug for LValue {
             LValue::Character(i) => write!(f, "char({})", i),
             LValue::Constant(i) => write!(f, "const({})", i),
             LValue::Nil => write!(f, "nil()"),
-            LValue::Literal(i) => write!(f, "{}", i),
             LValue::BigInt(i) => write!(f, "bigint({})", i),
             LValue::Bif(i) => write!(f, "<bif>"),
             LValue::Str(..) => write!(f, "<str>"),
@@ -104,11 +103,20 @@ impl LValue {
     pub fn to_u32(&self) -> u32 {
         match *self {
             LValue::Literal(i) => i,
-            LValue::Atom(i) => i,
-            LValue::Label(i) => i,
             LValue::Integer(i) => i as u32,
-            LValue::Constant(i) => i.to_u32(),
+            LValue::Constant(i) => match i.into_variant() {
+                crate::value::Variant::Integer(i) => i as u32,
+                _ => unimplemented!("to_u32 for {:?}", self),
+            },
             _ => unimplemented!("to_u32 for {:?}", self),
+        }
+    }
+    #[inline]
+    pub fn to_int(&self) -> u32 {
+        match *self {
+            LValue::Integer(i) => i as u32,
+            LValue::Constant(i) => i.to_uint().unwrap(),
+            _ => unimplemented!("to_int for {:?}", self),
         }
     }
 
@@ -117,6 +125,38 @@ impl LValue {
         match *self {
             LValue::Literal(i) => i,
             _ => unreachable!(),
+        }
+    }
+
+    #[inline]
+    pub fn to_flags(&self) -> bitstring::Flag {
+        use std::convert::TryInto;
+        #[cfg(target_endian = "little")]
+        macro_rules! native_endian {
+            ($x:expr) => {
+                if $x.contains(bitstring::Flag::BSF_NATIVE) {
+                    $x.remove(bitstring::Flag::BSF_NATIVE);
+                    $x.insert(bitstring::Flag::BSF_LITTLE);
+                }
+            };
+        }
+
+        #[cfg(target_endian = "big")]
+        macro_rules! native_endian {
+            ($x:expr) => {
+                if $x.contains(bitstring::Flag::BSF_NATIVE) {
+                    $x.remove(bitstring::Flag::BSF_NATIVE);
+                    $x.remove(bitstring::Flag::BSF_LITTLE);
+                }
+            };
+        }
+        match *self {
+            LValue::Literal(l) => {
+                let mut flags = bitstring::Flag::from_bits(l.try_into().unwrap()).unwrap();
+                native_endian!(flags);
+                flags
+            }
+            _ => unimplemented!("to_flags for {:?}", self),
         }
     }
 
@@ -205,9 +245,9 @@ impl LValue {
         }
     }
 
-    pub fn to_bif(&self) -> crate::bif::Fn {
+    pub fn to_bif(&self) -> crate::instruction::Bif {
         match *self {
-            LValue::Bif(i) => i,
+            LValue::Bif(i) => crate::instruction::Bif(i),
             _ => panic!(),
         }
     }
@@ -941,7 +981,7 @@ fn transform_instruction(
         Opcode::TestArity => Instruction::TestArity {
             label: ins.args[0].to_label(),
             arg1: ins.args[1].to_val(constants, literal_heap),
-            arity: ins.args[2].to_u32(),
+            arity: ins.args[2].to_lit(),
         },
         Opcode::SelectVal => Instruction::SelectVal {
             arg: ins.args[0].to_val(constants, literal_heap),
@@ -965,6 +1005,10 @@ fn transform_instruction(
             source: ins.args[0].to_val(constants, literal_heap),
             destination: ins.args[1].to_reg(),
         },
+        Opcode::Swap => Instruction::Swap {
+            a: ins.args[0].to_reg(),
+            b: ins.args[1].to_reg(),
+        },
         Opcode::GetList => Instruction::GetList {
             source: ins.args[0].to_reg(),
             head: ins.args[1].to_reg(),
@@ -972,13 +1016,13 @@ fn transform_instruction(
         },
         Opcode::GetTupleElement => Instruction::GetTupleElement {
             source: ins.args[0].to_reg(),
-            element: ins.args[1].to_u32(), // TODO: strict to_u32
+            element: ins.args[1].to_lit(),
             destination: ins.args[2].to_reg(),
         },
         Opcode::SetTupleElement => Instruction::SetTupleElement {
             new_element: ins.args[0].to_val(constants, literal_heap),
             tuple: ins.args[1].to_val(constants, literal_heap),
-            position: ins.args[2].to_u32(), // TODO: strict to_u32
+            position: ins.args[2].to_lit(),
         },
         Opcode::PutList => Instruction::PutList {
             head: ins.args[0].to_val(constants, literal_heap),
@@ -1007,21 +1051,21 @@ fn transform_instruction(
             fail: ins.args[0].to_label(),
             size: ins.args[1].to_val(constants, literal_heap),
             unit: ins.args[2].to_u32().try_into().unwrap(),
-            flags: ins.args[3].to_u32().try_into().unwrap(),
+            flags: ins.args[3].to_flags(),
             source: ins.args[4].to_val(constants, literal_heap),
         },
         Opcode::BsPutBinary => Instruction::BsPutBinary {
             fail: ins.args[0].to_label(),
             size: ins.args[1].to_val(constants, literal_heap),
             unit: ins.args[2].to_u32().try_into().unwrap(),
-            flags: ins.args[3].to_u32().try_into().unwrap(),
+            flags: ins.args[3].to_flags(),
             source: ins.args[4].to_val(constants, literal_heap),
         },
         Opcode::BsPutFloat => Instruction::BsPutFloat {
             fail: ins.args[0].to_label(),
             size: ins.args[1].to_val(constants, literal_heap),
             unit: ins.args[2].to_u32().try_into().unwrap(),
-            flags: ins.args[3].to_u32().try_into().unwrap(),
+            flags: ins.args[3].to_flags(),
             source: ins.args[4].to_val(constants, literal_heap),
         },
         Opcode::BsPutString => Instruction::BsPutString {
@@ -1090,7 +1134,7 @@ fn transform_instruction(
             size: ins.args[1].to_size(constants),
             words: ins.args[2].to_regs(),
             regs: ins.args[3].to_regs(),
-            flags: ins.args[4].to_u32().try_into().unwrap(), // maybe skip flags?
+            flags: ins.args[4].to_flags(), // maybe skip flags?
             destination: ins.args[5].to_reg(),
         },
         Opcode::BsAdd => Instruction::BsAdd {
@@ -1122,7 +1166,7 @@ fn transform_instruction(
             live: ins.args[2].to_regs(),
             size: ins.args[3].to_val(constants, literal_heap),
             unit: ins.args[4].to_u32().try_into().unwrap(),
-            flags: ins.args[5].to_u32().try_into().unwrap(),
+            flags: ins.args[5].to_flags(),
             destination: ins.args[6].to_reg(),
         },
         Opcode::BsGetFloat2 => Instruction::BsGetFloat2 {
@@ -1131,7 +1175,7 @@ fn transform_instruction(
             live: ins.args[2].to_regs(),
             size: ins.args[3].to_val(constants, literal_heap),
             unit: ins.args[4].to_u32().try_into().unwrap(),
-            flags: ins.args[5].to_u32().try_into().unwrap(),
+            flags: ins.args[5].to_flags(),
             destination: ins.args[6].to_reg(),
         },
         Opcode::BsGetBinary2 => Instruction::BsGetBinary2 {
@@ -1140,7 +1184,7 @@ fn transform_instruction(
             live: ins.args[2].to_regs(),
             size: ins.args[3].to_val(constants, literal_heap),
             unit: ins.args[4].to_u32().try_into().unwrap(),
-            flags: ins.args[5].to_u32().try_into().unwrap(),
+            flags: ins.args[5].to_flags(),
             destination: ins.args[6].to_reg(),
         },
         Opcode::BsSkipBits2 => Instruction::BsSkipBits2 {
@@ -1148,7 +1192,7 @@ fn transform_instruction(
             ms: ins.args[1].to_reg(),
             size: ins.args[2].to_val(constants, literal_heap),
             unit: ins.args[3].to_u32().try_into().unwrap(),
-            flags: ins.args[4].to_u32().try_into().unwrap(),
+            flags: ins.args[4].to_flags(),
         },
         Opcode::BsTestTail2 => Instruction::BsTestTail2 {
             fail: ins.args[0].to_label(),
@@ -1193,7 +1237,7 @@ fn transform_instruction(
             live: ins.args[3].to_regs(),
             unit: ins.args[4].to_lit().try_into().unwrap(),
             bin: ins.args[5].to_val(constants, literal_heap),
-            // flags: ins.args[6].to_u32().try_into().unwrap(), skip flags
+            // flags: ins.args[6].to_flags(), skip flags
             destination: ins.args[7].to_reg(),
         },
         Opcode::BsPrivateAppend => Instruction::BsPrivateAppend {
@@ -1201,60 +1245,59 @@ fn transform_instruction(
             size: ins.args[1].to_val(constants, literal_heap),
             unit: ins.args[2].to_lit().try_into().unwrap(),
             bin: ins.args[3].to_val(constants, literal_heap),
-            // flags: ins.args[5].to_u32().try_into().unwrap(), skip flags
+            // flags: ins.args[5].to_flags(), skip flags
             destination: ins.args[5].to_reg(),
         },
         Opcode::Trim => Instruction::Trim {
-            // TODO: use regs sizes
-            n: ins.args[0].to_u32(),
-            remaining: ins.args[1].to_u32(),
+            n: ins.args[0].to_regs(),
+            remaining: ins.args[1].to_regs(),
         },
         Opcode::BsInitBits => Instruction::BsInitBits {
             fail: ins.args[0].to_label(),
             size: ins.args[1].to_size(constants),
             words: ins.args[2].to_regs(),
             regs: ins.args[3].to_regs(),
-            flags: ins.args[4].to_u32().try_into().unwrap(), // maybe skip flags?
+            flags: ins.args[4].to_flags(), // maybe skip flags?
             destination: ins.args[5].to_reg(),
         },
         Opcode::BsGetUtf8 => Instruction::BsGetUtf8 {
             fail: ins.args[0].to_label(),
             ms: ins.args[1].to_reg(),
             size: ins.args[2].to_size(constants),
-            flags: ins.args[3].to_lit().try_into().unwrap(),
+            flags: ins.args[3].to_flags(),
             destination: ins.args[4].to_reg(),
         },
         Opcode::BsGetUtf16 => Instruction::BsGetUtf16 {
             fail: ins.args[0].to_label(),
             ms: ins.args[1].to_reg(),
             size: ins.args[2].to_size(constants),
-            flags: ins.args[3].to_lit().try_into().unwrap(),
+            flags: ins.args[3].to_flags(),
             destination: ins.args[4].to_reg(),
         },
         Opcode::BsGetUtf32 => Instruction::BsGetUtf32 {
             fail: ins.args[0].to_label(),
             ms: ins.args[1].to_reg(),
             size: ins.args[2].to_size(constants),
-            flags: ins.args[3].to_lit().try_into().unwrap(),
+            flags: ins.args[3].to_flags(),
             destination: ins.args[4].to_reg(),
         },
         Opcode::BsSkipUtf8 => Instruction::BsSkipUtf8 {
             fail: ins.args[0].to_label(),
             ms: ins.args[1].to_reg(),
             size: ins.args[2].to_size(constants),
-            flags: ins.args[3].to_lit().try_into().unwrap(),
+            flags: ins.args[3].to_flags(),
         },
         Opcode::BsSkipUtf16 => Instruction::BsSkipUtf16 {
             fail: ins.args[0].to_label(),
             ms: ins.args[1].to_reg(),
             size: ins.args[2].to_size(constants),
-            flags: ins.args[3].to_lit().try_into().unwrap(),
+            flags: ins.args[3].to_flags(),
         },
         Opcode::BsSkipUtf32 => Instruction::BsSkipUtf32 {
             fail: ins.args[0].to_label(),
             ms: ins.args[1].to_reg(),
             size: ins.args[2].to_size(constants),
-            flags: ins.args[3].to_lit().try_into().unwrap(),
+            flags: ins.args[3].to_flags(),
         },
         Opcode::BsUtf8Size => Instruction::BsUtf8Size {
             fail: ins.args[0].to_label(),
@@ -1268,17 +1311,17 @@ fn transform_instruction(
         },
         Opcode::BsPutUtf8 => Instruction::BsPutUtf8 {
             fail: ins.args[0].to_label(),
-            flags: ins.args[1].to_u32().try_into().unwrap(),
+            flags: ins.args[1].to_flags(),
             source: ins.args[2].to_reg(),
         },
         Opcode::BsPutUtf16 => Instruction::BsPutUtf16 {
             fail: ins.args[0].to_label(),
-            flags: ins.args[1].to_u32().try_into().unwrap(),
+            flags: ins.args[1].to_flags(),
             source: ins.args[2].to_reg(),
         },
         Opcode::BsPutUtf32 => Instruction::BsPutUtf32 {
             fail: ins.args[0].to_label(),
-            flags: ins.args[1].to_u32().try_into().unwrap(),
+            flags: ins.args[1].to_flags(),
             source: ins.args[2].to_reg(),
         },
         Opcode::OnLoad => unimplemented!("on_load instruction!"),

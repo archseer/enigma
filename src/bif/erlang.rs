@@ -338,7 +338,7 @@ pub fn iolist_to_iovec_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
                     let mut buf = Vec::with_capacity(seq_length);
 
                     while let Ok(Cons { head, tail }) = Cons::try_from(&iterator) {
-                        let i = head.to_i32().unwrap();
+                        let i = head.to_int().unwrap();
                         buf.push(i);
                         iterator = *tail;
                         seq_length -= 1;

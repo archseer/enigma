@@ -158,7 +158,7 @@ pub fn process_info_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
         return Err(Exception::new(Reason::EXC_BADARG));
     }
 
-    let pid = args[0].to_u32();
+    let pid = args[0].to_pid().unwrap();
 
     // TODO optimize for if process.pid == pid
     let proc = {
@@ -289,15 +289,15 @@ pub fn group_leader_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) ->
 }
 
 pub fn group_leader_2(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
-    if !args[0].is_pid() {
-        return Err(Exception::new(Reason::EXC_BADARG));
-    }
-    let pid = args[0].to_u32();
+    let pid = match args[0].to_pid() {
+        Some(pid) => pid,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
 
-    if !args[1].is_pid() {
-        return Err(Exception::new(Reason::EXC_BADARG));
-    }
-    let _target = args[1].to_u32();
+    let _target = match args[1].to_pid() {
+        Some(pid) => pid,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
 
     // TODO optimize for if process.pid == pid
     let proc = {

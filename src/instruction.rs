@@ -1,9 +1,27 @@
 // Label could be Option<NonZerou32> in some places?
 use crate::bif::Fn as BifFn;
+use crate::bitstring;
 //pub type BifFn = fn() -> usize;
 //use crate::loader::Source;
 
 // 56 bytes with shrunken Source, 48 with flags removed on BsInit
+
+#[derive(Clone, Copy)]
+
+pub struct Bif(pub BifFn);
+
+impl std::ops::Deref for Bif {
+    type Target = BifFn;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::fmt::Debug for Bif {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "<bif>")
+    }
+}
 
 pub type Arity = u8;
 pub type Label = u32;
@@ -105,7 +123,7 @@ impl Size {
 // Constant fit into the instruction and not require a separate table would be good.
 // represent Vec<u8> string buffers as pointers into the string table (a slice would work?).
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Instruction {
     FuncInfo {
         // TODO: these are constants but could be Atom
@@ -140,18 +158,18 @@ pub enum Instruction {
         words: Regs, // TODO: register count
     },
     Bif0 {
-        bif: BifFn,
+        bif: Bif,
         reg: Register,
     },
     Bif1 {
         fail: Label,
-        bif: BifFn,
+        bif: Bif,
         arg1: Source, // const or reg
         reg: Register,
     },
     Bif2 {
         fail: Label,
-        bif: BifFn,
+        bif: Bif,
         arg1: Source, // const or reg
         arg2: Source,
         reg: Register,
@@ -357,22 +375,22 @@ pub enum Instruction {
         fail: Label,
         size: Source,
         unit: u16,
-        flags: u8,      // not used? // TODO flags as bitstring::Flag (u8)
-        source: Source, // maybe always register
+        flags: bitstring::Flag, // not used?
+        source: Source,         // maybe always register
     },
     BsPutBinary {
         fail: Label,
         size: Source,
         unit: u16,
-        flags: u8,      // not used?
-        source: Source, // maybe always register
+        flags: bitstring::Flag, // not used?
+        source: Source,         // maybe always register
     },
     BsPutFloat {
         fail: Label,
         size: Source,
         unit: u16,
-        flags: u8,      // not used?
-        source: Source, // maybe always register
+        flags: bitstring::Flag, // not used?
+        source: Source,         // maybe always register
     },
     BsPutString {
         binary: Vec<u8>,
@@ -443,7 +461,7 @@ pub enum Instruction {
         size: Size,
         words: Regs,
         regs: Regs,
-        flags: u8,
+        flags: bitstring::Flag,
         destination: Register,
     },
     BsAdd {
@@ -495,7 +513,7 @@ pub enum Instruction {
         live: Regs,
         size: Source,
         unit: u16,
-        flags: u8,
+        flags: bitstring::Flag,
         destination: Register,
     },
     BsGetFloat2 {
@@ -504,7 +522,7 @@ pub enum Instruction {
         live: Regs,
         size: Source,
         unit: u16,
-        flags: u8,
+        flags: bitstring::Flag,
         destination: Register,
     },
     BsGetBinary2 {
@@ -513,7 +531,7 @@ pub enum Instruction {
         live: Regs,
         size: Source,
         unit: u16,
-        flags: u8,
+        flags: bitstring::Flag,
         destination: Register,
     },
     BsSkipBits2 {
@@ -521,7 +539,7 @@ pub enum Instruction {
         ms: Register,
         size: Source,
         unit: u16,
-        flags: u8,
+        flags: bitstring::Flag,
     },
     BsTestTail2 {
         fail: Label,
@@ -531,14 +549,14 @@ pub enum Instruction {
     GcBif1 {
         label: Label,
         live: Regs,
-        bif: BifFn,
+        bif: Bif,
         arg1: Source,
         reg: Register,
     },
     GcBif2 {
         label: Label,
         live: Regs,
-        bif: BifFn,
+        bif: Bif,
         arg1: Source,
         arg2: Source,
         reg: Register,
@@ -570,7 +588,7 @@ pub enum Instruction {
         // untagged integer (12 bits) -- can be packed
         unit: u16,
         bin: Source,
-        // flags: u8,
+        // flags: bitstring::Flag,
         destination: Register,
     },
     BsPrivateAppend {
@@ -580,12 +598,12 @@ pub enum Instruction {
         // untagged integer (12 bits) -- can be packed
         unit: u16,
         bin: Source,
-        // flags: u8,
+        // flags: bitstring::Flag,
         destination: Register,
     },
     Trim {
-        n: u32,
-        remaining: u32,
+        n: Regs,
+        remaining: Regs,
     },
     BsInitBits {
         // gets rewritten into a following move
@@ -593,7 +611,7 @@ pub enum Instruction {
         size: Size,
         words: Regs,
         regs: Regs,
-        flags: u8,
+        flags: bitstring::Flag,
         destination: Register,
     },
     BsGetUtf8 {
@@ -601,7 +619,7 @@ pub enum Instruction {
         fail: Label,
         ms: Register,
         size: Size,
-        flags: u8,
+        flags: bitstring::Flag,
         destination: Register,
     },
     BsGetUtf16 {
@@ -609,7 +627,7 @@ pub enum Instruction {
         fail: Label,
         ms: Register,
         size: Size,
-        flags: u8,
+        flags: bitstring::Flag,
         destination: Register,
     },
     BsGetUtf32 {
@@ -617,7 +635,7 @@ pub enum Instruction {
         fail: Label,
         ms: Register,
         size: Size,
-        flags: u8,
+        flags: bitstring::Flag,
         destination: Register,
     },
     // gets rewritten onto gets
@@ -625,19 +643,19 @@ pub enum Instruction {
         fail: Label,
         ms: Register,
         size: Size,
-        flags: u8,
+        flags: bitstring::Flag,
     },
     BsSkipUtf16 {
         fail: Label,
         ms: Register,
         size: Size,
-        flags: u8,
+        flags: bitstring::Flag,
     },
     BsSkipUtf32 {
         fail: Label,
         ms: Register,
         size: Size,
-        flags: u8,
+        flags: bitstring::Flag,
     },
     BsUtf8Size {
         fail: Label,
@@ -651,18 +669,18 @@ pub enum Instruction {
     },
     BsPutUtf8 {
         fail: Label,
-        flags: u8,
+        flags: bitstring::Flag,
         source: Register,
     },
     BsPutUtf16 {
         fail: Label,
-        flags: u8,
+        flags: bitstring::Flag,
         source: Register,
     },
     BsPutUtf32 {
         // gets rewritten into 3 args
         fail: Label,
-        flags: u8,
+        flags: bitstring::Flag,
         source: Register,
     },
     // OnLoad, load time instr!
@@ -673,7 +691,7 @@ pub enum Instruction {
     GcBif3 {
         label: Label,
         live: Regs,
-        bif: BifFn,
+        bif: Bif,
         arg1: Source,
         arg2: Source,
         arg3: Source,
@@ -743,10 +761,8 @@ pub enum Instruction {
         context: Register,
         position: Source,
     },
-}
-
-impl std::fmt::Debug for Instruction {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "<instruction>")
-    }
+    Swap {
+        a: Register,
+        b: Register,
+    },
 }

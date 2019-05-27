@@ -276,7 +276,14 @@ pub fn decode_export<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term>
 
     Ok((
         rest,
-        Term::export(heap, module::MFA(m.to_u32(), f.to_u32(), a.to_u32())),
+        Term::export(
+            heap,
+            module::MFA(
+                m.to_atom().unwrap(),
+                f.to_atom().unwrap(),
+                a.to_uint().unwrap(),
+            ),
+        ),
     ))
 }
 
@@ -400,13 +407,13 @@ fn encode_list(res: &mut Vec<u8>, list: &value::Cons) -> std::io::Result<()> {
     if len > 0
         && len <= std::u16::MAX as usize
         && list.iter().all(|e| match e.to_int() {
-            Some(i) if i <= 0x100 => true,
+            Some(i) if i >= 0 && i <= 0x100 => true,
             _ => false,
         })
     {
         res.write_u8(Tag::String as u8)?;
         res.write_u16::<BigEndian>(len as u16)?;
-        for b in list.iter().map(|e| e.to_i32().unwrap()) {
+        for b in list.iter().map(|e| e.to_int().unwrap()) {
             res.write_u8(b as u8)?;
         }
     } else {
