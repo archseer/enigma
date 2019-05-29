@@ -233,6 +233,7 @@ impl NanBox {
         value.pack_nan_box(tag)
     }
 
+    #[inline]
     pub unsafe fn unpack<T>(self) -> T
     where
         T: NanBoxable,

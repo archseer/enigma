@@ -18,6 +18,7 @@ impl InstrPtr {
         InstrPtr { module, ptr }
     }
 
+    #[inline(always)]
     pub fn get_module<'a, 'b>(&'a self) -> &'b Module {
         unsafe { &(*self.module) }
     }

@@ -8,6 +8,7 @@ use crate::immix::Heap;
 use crate::instr_ptr::InstrPtr;
 use crate::module;
 use crate::nanbox::TypedNanBox;
+use crate::nanbox::NanBox;
 use crate::process;
 use allocator_api::Layout;
 pub use num_bigint::BigInt;
@@ -104,11 +105,11 @@ pub struct WrongBoxError;
 /// in which case it embeds the data, or a boxed pointer, that points to more data.
 #[derive(Debug, Copy, Clone, Eq)]
 pub struct Term {
-    value: TypedNanBox<Variant>,
+    value: NanBox,
 }
 
-unsafe impl Sync for Term {}
-unsafe impl Send for Term {}
+// unsafe impl Sync for Term {}
+// unsafe impl Send for Term {}
 
 impl Hash for Term {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -188,36 +189,42 @@ unsafe impl Send for Variant {}
 // unsafe impl Sync for Variant {}
 
 impl From<f64> for Term {
+    #[inline]
     fn from(value: f64) -> Term {
         Term::from(Variant::Float(self::Float(value)))
     }
 }
 
 impl From<i32> for Term {
+    #[inline]
     fn from(value: i32) -> Term {
         Term::from(Variant::Integer(value))
     }
 }
 
 impl From<process::PID> for Term {
+    #[inline]
     fn from(value: process::PID) -> Term {
         Term::from(Variant::Pid(value))
     }
 }
 
 impl From<&mut Cons> for Term {
+    #[inline]
     fn from(value: &mut Cons) -> Term {
         Term::from(Variant::Cons(value))
     }
 }
 
 impl From<&mut Tuple> for Term {
+    #[inline]
     fn from(value: &mut Tuple) -> Term {
         Term::from(Variant::Pointer(value as *const Tuple as *const Header))
     }
 }
 
 impl<T> From<&mut Boxed<T>> for Term {
+    #[inline]
     fn from(value: &mut Boxed<T>) -> Term {
         Term::from(Variant::Pointer(value as *const Boxed<T> as *const Header))
     }
@@ -228,28 +235,28 @@ impl From<Variant> for Term {
         unsafe {
             match value {
                 Variant::Float(self::Float(value)) => Term {
-                    value: TypedNanBox::new(TERM_FLOAT, value),
+                    value: NanBox::new(TERM_FLOAT, value),
                 },
                 Variant::Nil(value) => Term {
-                    value: TypedNanBox::new(TERM_NIL, value),
+                    value: NanBox::new(TERM_NIL, value),
                 },
                 Variant::Integer(value) => Term {
-                    value: TypedNanBox::new(TERM_INTEGER, value),
+                    value: NanBox::new(TERM_INTEGER, value),
                 },
                 Variant::Atom(value) => Term {
-                    value: TypedNanBox::new(TERM_ATOM, value),
+                    value: NanBox::new(TERM_ATOM, value),
                 },
                 Variant::Port(value) => Term {
-                    value: TypedNanBox::new(TERM_PORT, value),
+                    value: NanBox::new(TERM_PORT, value),
                 },
                 Variant::Pid(value) => Term {
-                    value: TypedNanBox::new(TERM_PID, value),
+                    value: NanBox::new(TERM_PID, value),
                 },
                 Variant::Cons(value) => Term {
-                    value: TypedNanBox::new(TERM_CONS, value),
+                    value: NanBox::new(TERM_CONS, value),
                 },
                 Variant::Pointer(value) => Term {
-                    value: TypedNanBox::new(TERM_POINTER, value),
+                    value: NanBox::new(TERM_POINTER, value),
                 },
             }
         }
@@ -257,13 +264,14 @@ impl From<Variant> for Term {
 }
 
 impl From<Term> for Variant {
+    #[inline]
     fn from(value: Term) -> Variant {
         value.value.into()
     }
 }
 
-impl From<TypedNanBox<Variant>> for Variant {
-    fn from(value: TypedNanBox<Variant>) -> Variant {
+impl From<NanBox> for Variant {
+    fn from(value: NanBox) -> Variant {
         #[allow(unused_assignments)]
         unsafe {
             match value.tag() as u8 {
@@ -282,6 +290,7 @@ impl From<TypedNanBox<Variant>> for Variant {
 }
 
 impl Term {
+    #[inline]
     pub fn into_variant(self) -> Variant {
         self.into()
     }
@@ -360,7 +369,7 @@ impl Term {
     pub fn nil() -> Self {
         unsafe {
             Term {
-                value: TypedNanBox::new(TERM_NIL, Special::Nil),
+                value: NanBox::new(TERM_NIL, Special::Nil),
             }
         }
     }
@@ -369,7 +378,7 @@ impl Term {
     pub fn none() -> Self {
         unsafe {
             Term {
-                value: TypedNanBox::new(TERM_NIL, Special::None),
+                value: NanBox::new(TERM_NIL, Special::None),
             }
         }
     }
@@ -378,7 +387,7 @@ impl Term {
     pub fn atom(value: u32) -> Self {
         unsafe {
             Term {
-                value: TypedNanBox::new(TERM_ATOM, value),
+                value: NanBox::new(TERM_ATOM, value),
             }
         }
     }
@@ -388,7 +397,7 @@ impl Term {
     pub fn int(value: i32) -> Self {
         unsafe {
             Term {
-                value: TypedNanBox::new(TERM_INTEGER, value),
+                value: NanBox::new(TERM_INTEGER, value),
             }
         }
     }
@@ -400,7 +409,7 @@ impl Term {
         } else {
             unsafe {
                 Term {
-                    value: TypedNanBox::new(TERM_INTEGER, value as i32),
+                    value: NanBox::new(TERM_INTEGER, value as i32),
                 }
             }
         }
@@ -413,7 +422,7 @@ impl Term {
         } else {
             unsafe {
                 Term {
-                    value: TypedNanBox::new(TERM_INTEGER, value as i32),
+                    value: NanBox::new(TERM_INTEGER, value as i32),
                 }
             }
         }
@@ -426,7 +435,7 @@ impl Term {
         } else {
             unsafe {
                 Term {
-                    value: TypedNanBox::new(TERM_INTEGER, value as i32),
+                    value: NanBox::new(TERM_INTEGER, value as i32),
                 }
             }
         }
@@ -435,7 +444,7 @@ impl Term {
     pub fn pid(value: process::PID) -> Self {
         unsafe {
             Term {
-                value: TypedNanBox::new(TERM_PID, value),
+                value: NanBox::new(TERM_PID, value),
             }
         }
     }
@@ -443,7 +452,7 @@ impl Term {
     pub fn port(value: u32) -> Self {
         unsafe {
             Term {
-                value: TypedNanBox::new(TERM_PORT, value),
+                value: NanBox::new(TERM_PORT, value),
             }
         }
     }
@@ -1242,6 +1251,7 @@ pub fn tuple(heap: &Heap, len: u32) -> &mut Tuple {
     tuple
 }
 
+#[inline]
 pub fn cons(heap: &Heap, head: Term, tail: Term) -> Term {
     Term::from(heap.alloc(self::Cons { head, tail }))
 }

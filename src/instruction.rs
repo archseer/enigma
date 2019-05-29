@@ -114,6 +114,8 @@ impl Size {
 
 // TODO: can't derive Copy yet since we have extended list which needs cloning
 // TODO: is_ instructions can probably be coerced into Register instead of Source
+// TODO: specialize bifs with f=0 as head vs body (ones jump, others don't)
+// TODO: specialize arith into ops, and sub-specialize "increments" source + const
 
 // TUPLE ELEMENTS: u24
 
@@ -252,6 +254,7 @@ pub enum Instruction {
         arg1: Source,
         arg2: Source,
     },
+    // TODO: make all type checks use Register?
     IsInteger {
         label: Label,
         arg1: Source,
@@ -603,7 +606,7 @@ pub enum Instruction {
     },
     Trim {
         n: Regs,
-        remaining: Regs,
+        // remaining: Regs, it seems unused in BEAM
     },
     BsInitBits {
         // gets rewritten into a following move

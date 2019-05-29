@@ -164,15 +164,14 @@ macro_rules! op_jump_ptr {
     }};
 }
 
-macro_rules! op_deallocate {
-    ($context:expr, $nwords:expr) => {{
-        let (_, cp) = $context.callstack.pop().unwrap();
-        $context
-            .stack
-            .truncate($context.stack.len() - $nwords as usize);
+#[inline(never)]
+fn op_deallocate(context: &mut process::ExecutionContext, nwords: u16) {
+    let (_, cp) = context.callstack.pop().unwrap();
+    context
+        .stack
+        .truncate(context.stack.len() - nwords as usize);
 
-        $context.cp = cp;
-    }};
+    context.cp = cp;
 }
 
 macro_rules! call_error_handler {
@@ -282,30 +281,48 @@ macro_rules! op_call_bif {
     }};
 }
 macro_rules! op_call_fun {
-    ($vm:expr, $context:expr, $closure:expr, $arity:expr) => {{
-        // keep X regs set based on arity
-        // set additional X regs based on lambda.binding
-        // set x from 1 + arity (x0 is func, followed by call params) onwards to binding
-        let closure = $closure;
-        if let Some(binding) = &closure.binding {
-            let arity = $arity as usize;
-            $context.x[arity..arity + binding.len()].copy_from_slice(&binding[..]);
-        }
-
-        // TODO: closure needs to jump_ptr to the correct module.
-        let ptr = {
-            // temporary HAXX
-            let registry = $vm.modules.lock();
-            // let module = module::load_module(&self.modules, path).unwrap();
-            let module = registry.lookup(closure.mfa.0).unwrap();
-
-            InstrPtr {
-                module,
-                ptr: closure.ptr,
+    ($vm:expr, $context:expr, $process:expr, $value:expr, $arity:expr) => {{
+        if let Ok(closure) = value::Closure::cast_from(&$value) {
+            // keep X regs set based on arity
+            // set additional X regs based on lambda.binding
+            // set x from 1 + arity (x0 is func, followed by call params) onwards to binding
+            if let Some(binding) = &closure.binding {
+                let arity = $arity as usize;
+                $context.x[arity..arity + binding.len()].copy_from_slice(&binding[..]);
             }
-        };
 
-        op_jump_ptr!($context, ptr);
+            // TODO: closure needs to jump_ptr to the correct module.
+            let ptr = {
+                // temporary HAXX
+                let registry = $vm.modules.lock();
+                // let module = module::load_module(&self.modules, path).unwrap();
+                let module = registry.lookup(closure.mfa.0).unwrap();
+
+                InstrPtr {
+                    module,
+                    ptr: closure.ptr,
+                }
+            };
+
+            op_jump_ptr!($context, ptr);
+        } else if let Ok(mfa) = module::MFA::cast_from(&$value) {
+            // TODO: deduplicate this part
+            let export = { $vm.exports.read().lookup(&mfa) }; // drop the exports lock
+
+            match export {
+                Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
+                Some(Export::Bif(bif)) => {
+                    op_call_bif!($vm, $context, &$process, bif, mfa.2 as usize, true) // TODO is return true ok
+                }
+                None => {
+                    // println!("apply setup_error_handler");
+                    call_error_handler!($vm, &$process, &mfa);
+                    // apply_setup_error_handler
+                }
+            }
+        } else {
+            unreachable!()
+        }
     }};
 }
 
@@ -441,36 +458,14 @@ macro_rules! op_apply_fun {
         }
         //context.x[arity] = fun;
 
-        // TODO: this part matches CallFun, extract
-        if let Ok(closure) = value::Closure::cast_from(&fun) {
-            op_call_fun!($vm, $context, closure, arity);
-        } else if let Ok(mfa) = module::MFA::cast_from(&fun) {
-            // TODO: deduplicate this part
-            let export = { $vm.exports.read().lookup(&mfa) }; // drop the exports lock
-
-            match export {
-                Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
-                Some(Export::Bif(bif)) => {
-                    op_call_bif!($vm, $context, &$process, bif, mfa.2 as usize, true) // TODO is return true ok
-                }
-                None => {
-                    // println!("apply setup_error_handler");
-                    call_error_handler!($vm, &$process, &mfa);
-                    // apply_setup_error_handler
-                }
-            }
-        } else {
-            // TODO raise error
-            unreachable!()
-        }
+        op_call_fun!($vm, $context, $process, fun, arity);
     }};
 }
 
 macro_rules! op_return {
     ($process:expr, $context:expr) => {{
-        if let Some(i) = $context.cp {
+        if let Some(i) = $context.cp.take() {
             op_jump_ptr!($context, i);
-            $context.cp = None;
         } else {
             // println!("Process pid={} exited with normal, x0: {}", $process.pid, $context.x[0]);
             return Ok(process::State::Done)
@@ -839,13 +834,16 @@ impl Machine {
         // process the incoming signal queue
         process.process_incoming()?;
 
+        // a fake constant nil
+        let NIL = Term::nil();
+
         loop {
             let module = context.ip.get_module();
             // let module = unsafe { &(*context.ip.module) };
-            let ins = &module.instructions[context.ip.ptr as usize];
+            let ins = unsafe { module.instructions.get_unchecked(context.ip.ptr as usize) };
             context.ip.ptr += 1;
 
-            // if process.pid > 70 {
+            // if process.pid > 70 && atom::to_str(module.name) == Ok("beam_asm".to_owned()) {
             //     info!(
             //         "proc pid={:?} reds={:?} mod={:?} offs={:?} ins={:?}",
             //         process.pid,
@@ -1040,7 +1038,7 @@ impl Machine {
                 }
                 &Instruction::CallLast { arity, label: i, words }=> {
                     // store arity as live
-                    op_deallocate!(context, words);
+                    op_deallocate(context, words);
 
                     op_jump!(context, i);
 
@@ -1072,7 +1070,7 @@ impl Machine {
                     safepoint_and_reduce!(self, process, context.reds);
                 }
                 &Instruction::CallExtLast { arity, destination, words } => {
-                    op_deallocate!(context, words);
+                    op_deallocate(context, words);
 
                     op_call_ext!(self, context, &process, arity, destination, true);
                     safepoint_and_reduce!(self, process, context.reds);
@@ -1098,7 +1096,7 @@ impl Machine {
                 &Instruction::Allocate { stackneed, live } => {
                     context
                         .stack
-                        .resize(context.stack.len() + stackneed as usize, Term::nil());
+                        .resize(context.stack.len() + stackneed as usize, NIL);
                     context.callstack.push((stackneed, context.cp.take()));
                 }
                 &Instruction::AllocateHeap { stackneed, heapneed, live } => {
@@ -1109,14 +1107,14 @@ impl Machine {
                     // num of X regs. save cp on stack.
                     context
                         .stack
-                        .resize(context.stack.len() + stackneed as usize, Term::nil());
+                        .resize(context.stack.len() + stackneed as usize, NIL);
                     // TODO: check heap for heapneed space!
                     context.callstack.push((stackneed, context.cp.take()));
                 }
                 &Instruction::AllocateZero { stackneed, live } => {
                     context
                         .stack
-                        .resize(context.stack.len() + stackneed as usize, Term::nil());
+                        .resize(context.stack.len() + stackneed as usize, NIL);
                     context.callstack.push((stackneed, context.cp.take()));
                 }
                 &Instruction::AllocateHeapZero { stackneed, heapneed, live } => {
@@ -1124,7 +1122,7 @@ impl Machine {
                     // num of X regs. save cp on stack.
                     context
                         .stack
-                        .resize(context.stack.len() + stackneed as usize, Term::nil());
+                        .resize(context.stack.len() + stackneed as usize, NIL);
                     // TODO: check heap for heapneed space!
                     context.callstack.push((stackneed, context.cp.take()));
                 }
@@ -1132,10 +1130,10 @@ impl Machine {
                     // println!("TODO: TestHeap unimplemented!");
                 }
                 &Instruction::Init { n } => {
-                    context.set_register(n, Term::nil())
+                    context.set_register(n, NIL)
                 }
                 &Instruction::Deallocate { n } => {
-                    op_deallocate!(context, n)
+                    op_deallocate(context, n)
                 }
                 &Instruction::IsGe { label: fail, arg1, arg2 } => {
                     let v1 = context.expand_arg(arg1);
@@ -1239,46 +1237,41 @@ impl Machine {
                 }
                 Instruction::SelectVal { arg, fail, destinations: vec } => {
                     // loop over dests
+                    // TODO: jump table if (int, label) pairs
                     let arg = context.expand_arg(*arg).into_variant();
-                    let mut i = 0;
-                    loop {
-                        // if key matches, jump to the following label
-                        if context.expand_arg(vec[i].into_value()).into_variant() == arg {
-                            let label = vec[i + 1].to_label();
+                    let mut jumped = false;
+
+                    for chunk in vec.chunks_exact(2) {
+                        if context.expand_arg(chunk[0].into_value()).into_variant() == arg {
+                            let label = chunk[1].to_label();
                             op_jump!(context, label);
+                            jumped = true;
                             break;
                         }
-
-                        i += 2;
-
-                        // if we ran out of options, jump to fail
-                        if i >= vec.len() {
-                            op_jump!(context, *fail);
-                            break;
-                        }
+                    }
+                    // if we ran out of options, jump to fail
+                    if !jumped {
+                        op_jump!(context, *fail);
                     }
                 }
                 Instruction::SelectTupleArity { arg, fail, arities: vec } => {
                     if let Ok(tup) = Tuple::cast_from(&context.expand_arg(*arg)) {
                         let len = tup.len;
-                        let mut i = 0;
-                        loop {
-                            // if key matches, jump to the following label
-                            if let instruction::Entry::Literal(n) = vec[i] {
+                        let mut jumped = false;
+
+                        for chunk in vec.chunks_exact(2) {
+                            if let instruction::Entry::Literal(n) = chunk[0] {
                                 if n == len {
-                                    let label = vec[i + 1].to_label();
+                                    let label = chunk[1].to_label();
                                     op_jump!(context, label);
-                                    break;
+                                    jumped = true;
+                                    break
                                 }
                             }
-
-                            i += 2;
-
-                            // if we ran out of options, jump to fail
-                            if i >= vec.len() {
-                                op_jump!(context, *fail);
-                                break;
-                            }
+                        }
+                        // if we ran out of options, jump to fail
+                        if !jumped {
+                            op_jump!(context, *fail);
                         }
                     } else {
                         op_jump!(context, *fail);
@@ -1365,14 +1358,14 @@ impl Machine {
                 }
                 &Instruction::TryEnd { register } => {
                     context.catches -= 1;
-                    context.set_register(register, Term::nil()) // TODO: make_blank macro
+                    context.set_register(register, NIL) // TODO: make_blank macro
                 }
                 &Instruction::TryCase { register } => {
                     // pops a catch context in y  Erases the label saved in the Arg0 slot. Noval in R0 indicate that something is caught. If so, R0 is set to R1, R1 — to R2, R2 — to R3.
 
                     // TODO: this initial part is identical to TryEnd
                     context.catches -= 1;
-                    context.set_register(register, Term::nil()); // TODO: make_blank macro
+                    context.set_register(register, NIL); // TODO: make_blank macro
 
                     assert!(context.x[0].is_none());
                     // TODO: c_p->fvalue = NIL;
@@ -1411,7 +1404,7 @@ impl Machine {
 
                     // TODO: this initial part is identical to TryEnd
                     context.catches -= 1; // TODO: this is overflowing
-                    context.set_register(register, Term::nil()); // TODO: make_blank macro
+                    context.set_register(register, NIL); // TODO: make_blank macro
 
                     if context.x[0].is_none() {
                         // c_p->fvalue = NIL;
@@ -1459,7 +1452,7 @@ impl Machine {
                     safepoint_and_reduce!(self, process, context.reds);
                 }
                 &Instruction::ApplyLast { arity, nwords } => {
-                    op_deallocate!(context, nwords);
+                    op_deallocate(context, nwords);
 
                     op_fixed_apply!(self, context, &process, arity, true);
                     safepoint_and_reduce!(self, process, context.reds);
@@ -1832,11 +1825,6 @@ impl Machine {
                     }
                 }
                 Instruction::BsMatchString { fail, context: cxt, bits, string } => {
-                    // byte* bytes = (byte *) $Ptr;
-                    // Uint bits = $Bits;
-                    // ErlBinMatchBuffer* mb;
-                    // Uint offs;
-
                     if let Ok(mb) = context.fetch_register(*cxt).get_boxed_value_mut::<bitstring::MatchBuffer>() {
                         let bits = *bits as usize;
 
@@ -1874,10 +1862,6 @@ impl Machine {
                 // maybe we can even use nom for this
                 &Instruction::BsAppend { fail ,size, extra, live, unit, bin, destination } => {
                     // append and init also sets the string as current (state.current_binary) [seems to be used to copy string literals too]
-
-                    // bs_append Fail Size Extra Live Unit Bin Flags Dst => \
-                    //   move Bin x | i_bs_append Fail Extra Live Unit Size Dst
-
                     let size = context.expand_arg(size);
                     let extra_words = extra as usize;
                     let unit = unit as usize;
@@ -1894,8 +1878,6 @@ impl Machine {
                     }
                 }
                 &Instruction::BsPrivateAppend { fail, size, unit, bin, destination } => {
-                    // bs_private_append Fail Size Unit Bin Flags Dst
-
                     let size = context.expand_arg(size);
                     let unit = unit as usize;
                     let src = context.expand_arg(bin);
@@ -2085,9 +2067,7 @@ impl Machine {
                         Err(exc) => cond_fail!(context, fail, exc),
                     }
                 }
-                &Instruction::Trim { n: nwords, remaining }=> {
-                    // trim N, _remain
-                    // drop N words from stack, (but keeping the cp). Second arg unused?
+                &Instruction::Trim { n: nwords }=> {
                     // let cp = context.stack.pop().unwrap();
                     context
                         .stack
@@ -2118,26 +2098,7 @@ impl Machine {
                 &Instruction::CallFun { arity } => {
                     let value = context.x[arity as usize];
                     context.cp = Some(context.ip);
-                    if let Ok(closure) = value::Closure::cast_from(&value) {
-                        op_call_fun!(self, context, closure, arity)
-                    } else if let Ok(mfa) = module::MFA::cast_from(&value) {
-                        // TODO: deduplicate this part
-                        let export = { self.exports.read().lookup(&mfa) }; // drop the exports lock
-
-                        match export {
-                            Some(Export::Fun(ptr)) => op_jump_ptr!(context, ptr),
-                            Some(Export::Bif(bif)) => {
-                                op_call_bif!(self, context, &process, bif, mfa.2 as usize, true) // TODO is return true ok
-                            }
-                            None => {
-                                // println!("apply setup_error_handler");
-                                call_error_handler!(self, &process, &mfa);
-                                // apply_setup_error_handler
-                            }
-                        }
-                    } else {
-                        unreachable!()
-                    }
+                    op_call_fun!(self, context, process, value, arity)
                 }
                 &Instruction::GetHd { source, head: reg } => {
                     if let Ok(value::Cons { head, .. }) =

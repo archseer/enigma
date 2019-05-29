@@ -1250,7 +1250,7 @@ fn transform_instruction(
         },
         Opcode::Trim => Instruction::Trim {
             n: ins.args[0].to_regs(),
-            remaining: ins.args[1].to_regs(),
+            // remaining: ins.args[1].to_regs(), skipped in beam
         },
         Opcode::BsInitBits => Instruction::BsInitBits {
             fail: ins.args[0].to_label(),

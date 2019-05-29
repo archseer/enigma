@@ -10,7 +10,7 @@ use crate::module::{Module, MFA};
 // use crate::servo_arc::Arc; can't do receiver self
 use crate::signal_queue::SignalQueue;
 pub use crate::signal_queue::{ExitKind, Signal};
-use crate::value::{self, Term, CastInto};
+use crate::value::{self, CastInto, Term};
 use crate::vm::Machine;
 use hashbrown::{HashMap, HashSet};
 use std::cell::UnsafeCell;
