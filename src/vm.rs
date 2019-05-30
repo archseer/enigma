@@ -164,7 +164,7 @@ macro_rules! op_jump_ptr {
     }};
 }
 
-#[inline(never)]
+#[inline]
 fn op_deallocate(context: &mut process::ExecutionContext, nwords: u16) {
     let (_, cp) = context.callstack.pop().unwrap();
     context
@@ -1271,6 +1271,21 @@ impl Machine {
                         }
                         // if we ran out of options, jump to fail
                         if !jumped {
+                            op_jump!(context, *fail);
+                        }
+                    } else {
+                        op_jump!(context, *fail);
+                    }
+                }
+                Instruction::JumpOnVal { arg, fail, table: vec, min } => {
+                    // SelectVal optimized with a jump table
+                    if let Some(i) = context.expand_arg(*arg).to_int() {
+                        // println!("Jump on Val: {}, min: {}, table: {:?}", i, min, vec);
+                        // TODO: optimize for min: 0
+                        let index = (i - min) as usize;
+                        if index < vec.len() {
+                            op_jump!(context, vec[index]);
+                        } else {
                             op_jump!(context, *fail);
                         }
                     } else {

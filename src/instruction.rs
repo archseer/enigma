@@ -34,6 +34,7 @@ pub type RegisterX = Regs;
 pub type RegisterY = Regs;
 
 pub type ExtendedList = Box<Vec<Entry>>;
+pub type JumpTable = Box<Vec<Label>>;
 
 #[derive(Debug, Clone)]
 pub enum Entry {
@@ -312,6 +313,13 @@ pub enum Instruction {
         arg: Source,
         fail: Label,
         destinations: ExtendedList,
+    },
+    JumpOnVal {
+        // SelectVal optimized with a jump table
+        arg: Source,
+        fail: Label,
+        table: JumpTable,
+        min: i32,
     },
     SelectTupleArity {
         arg: Source,

@@ -46,6 +46,8 @@ pub struct Loader<'a> {
     on_load: Option<u32>,
 }
 
+pub type ExtList = Vec<LValue>;
+
 /// Compact term encoding values. BEAM does some tricks to be able to share the memory layout with
 /// regular values, but for the most part we don't need this (it also doesn't fit nanboxed values
 /// well).
@@ -66,7 +68,7 @@ pub enum LValue {
     X(u32),
     Y(u32),
     Label(u32),
-    ExtendedList(Box<Vec<LValue>>),
+    ExtendedList(Box<ExtList>),
     FloatReg(u32),
     AllocList(Box<Vec<(u8, u32)>>),
     ExtendedLiteral(u32), // TODO; replace at load time
@@ -789,6 +791,91 @@ impl<'a> Loader<'a> {
     }
 }
 
+fn use_jump_table(list: &ExtList) -> bool {
+    if list.len() < 2 || list.len() % 2 != 0 {
+        return false;
+    }
+
+    // check types
+    match (&list[0], &list[1]) {
+        (LValue::Constant(i), LValue::Label(_)) => {
+            if i.is_smallint() { } else { return false }
+        },
+        _ => return false,
+    }
+
+
+    let i = if let LValue::Constant(i) = list[0] { i.to_int().unwrap() } else { unreachable!() };
+    let mut min = i;
+    let mut max = i;
+
+    let mut iter = list.chunks_exact(2);
+    while let Some(chunk) = iter.next() {
+        match chunk {
+            &[LValue::Constant(i), LValue::Label(_)] => {
+                match i.to_int() {
+                    Some(i) => {
+                        if i < min {
+                            min = i;
+                        }
+                        if i > max {
+                            max = i;
+                        }
+                    }
+                    None => return false,
+                }
+
+            }
+            _ => return false,
+        }
+    }
+
+    // println!("use_jump: {} {} len {}, orig: {:?}\r", max, min, list.len(), list);
+    ((max - min).abs() as usize) <= list.len()
+}
+
+use crate::instruction;
+fn gen_jump_table(list: &ExtList, fail: instruction::Label) -> (instruction::JumpTable, i32) {
+    let i = if let LValue::Constant(i) = list[0] { i.to_int().unwrap() } else { unreachable!() };
+    let mut min = i;
+    let mut max = i;
+
+    let mut iter = list.chunks_exact(2);
+    while let Some(chunk) = iter.next() {
+        match chunk {
+            &[LValue::Constant(i), _] => {
+                let i = i.to_int().unwrap();
+                if i < min {
+                    min = i;
+                }
+                if i > max {
+                    max = i;
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    let size = (max - min).abs() as usize + 1;
+
+    let mut table = vec![fail; size];
+
+    let mut iter = list.chunks_exact(2);
+    while let Some(chunk) = iter.next() {
+        match chunk {
+            &[LValue::Constant(i), LValue::Label(l)] => {
+                let i = i.to_int().unwrap();
+                let index = i - min;
+                table[index as usize] = l;
+
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    (Box::new(table), min)
+}
+
 fn transform_instruction(
     ins: self::Instruction,
     constants: &mut Vec<Term>,
@@ -983,10 +1070,27 @@ fn transform_instruction(
             arg1: ins.args[1].to_val(constants, literal_heap),
             arity: ins.args[2].to_lit(),
         },
-        Opcode::SelectVal => Instruction::SelectVal {
-            arg: ins.args[0].to_val(constants, literal_heap),
-            fail: ins.args[1].to_label(),
-            destinations: ins.args[2].to_ext_list(constants, literal_heap),
+        Opcode::SelectVal => {
+            let list = match &ins.args[2] {
+                LValue::ExtendedList(l) => &**l,
+                _ => unreachable!()
+            };
+            if use_jump_table(list) {
+                let fail = ins.args[1].to_label();
+                let (table, min) = gen_jump_table(list, fail);
+                Instruction::JumpOnVal {
+                    arg: ins.args[0].to_val(constants, literal_heap),
+                    fail: fail,
+                    table,
+                    min
+                }
+            } else {
+                Instruction::SelectVal {
+                    arg: ins.args[0].to_val(constants, literal_heap),
+                    fail: ins.args[1].to_label(),
+                    destinations: ins.args[2].to_ext_list(constants, literal_heap),
+                }
+            }
         },
         Opcode::SelectTupleArity => Instruction::SelectTupleArity {
             arg: ins.args[0].to_val(constants, literal_heap),
