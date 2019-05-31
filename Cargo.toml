@@ -28,8 +28,8 @@ futures-preview = {git = "https://github.com/rust-lang-nursery/futures-rs/", fea
 futures01 = { package = "futures", version = "0.1" }
 nom = "4.2.3"
 num-bigint = "0.2.2"
-num-traits = "0.2.6"
-num-integer = "0.1.39"
+num-traits = "0.2.7"
+num-integer = "0.1.40"
 libflate = "0.1.22"
 once_cell = "0.2.0"
 parking_lot = "0.8.0"
@@ -50,7 +50,7 @@ tokio-executor = "0.1.7"
 termion = "1.5.2"
 tokio-stdin-stdout = "0.1.5"
 regex = "1.1.6"
-im = "12.3.4"
+im = "13.0.0"
 bytes = "0.4.12"
 byteorder = "1.3.1"
 iovec = "0.1.2"
@@ -59,10 +59,13 @@ unicode-segmentation = "1.3.0"
 tokio-signal = "0.2.7"
 libc = "0.2.55"
 simplelog = "0.5.3"
+md5 = "0.6.1"
+# phf = "0.7.24"
+# backtrace = "0.3.20"
 
 [dev-dependencies]
 quickcheck = "0.8.3"
 
 [profile.release]
-# lto = true
-# debug = true
+lto = true
+debug = true

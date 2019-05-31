@@ -261,11 +261,6 @@ macro_rules! op_call_ext {
 
 macro_rules! op_call_bif {
     ($vm:expr, $context:expr, $process:expr, $bif:expr, $arity:expr, $return:expr) => {{
-        // precompute export lookup. once Pin<> is a thing we can be sure that
-        // a ptr into the hashmap will always point to a module.
-        // call_ext_only Ar=u Bif=u$is_bif => \
-        // allocate u Ar | call_bif Bif | deallocate_return u
-
         // make a slice out of arity x registers
         let args = &$context.x[0..$arity];
         match $bif($vm, $process, args) {
@@ -326,7 +321,6 @@ macro_rules! op_call_fun {
     }};
 }
 
-//TODO: need op_apply_fun, but it should use x0 as mod, x1 as fun, etc
 macro_rules! op_apply {
     ($vm:expr, $context:expr, $process:expr, $return: expr) => {{
         let mut module = $context.x[0];
@@ -836,11 +830,10 @@ impl Machine {
 
         // a fake constant nil
         let NIL = Term::nil();
+        let mut ins;
 
         loop {
-            let module = context.ip.get_module();
-            // let module = unsafe { &(*context.ip.module) };
-            let ins = unsafe { module.instructions.get_unchecked(context.ip.ptr as usize) };
+            ins = unsafe { (*context.ip.module).instructions.get_unchecked(context.ip.ptr as usize) };
             context.ip.ptr += 1;
 
             // if process.pid > 70 && atom::to_str(module.name) == Ok("beam_asm".to_owned()) {
@@ -1472,7 +1465,7 @@ impl Machine {
                     op_fixed_apply!(self, context, &process, arity, true);
                     safepoint_and_reduce!(self, process, context.reds);
                 }
-                &Instruction::GcBif1 { label: fail, bif, arg1, live, reg } => {
+                &Instruction::GcBif1 { label: fail, bif, arg1, reg } => {
                     // TODO: GcBif needs to handle GC as necessary
                     let args = &[context.expand_arg(arg1)];
                     match bif(self, &process, args) {
@@ -2057,7 +2050,7 @@ impl Machine {
                 &Instruction::Fnegate { source, destination } => {
                     context.f[destination as usize] = -context.f[source as usize];
                 }
-                &Instruction::GcBif2 { label: fail, bif, arg1, arg2, live, reg } => {
+                &Instruction::GcBif2 { label: fail, bif, arg1, arg2, reg } => {
                     // TODO: GcBif needs to handle GC as necessary
                     let args = &[
                         context.expand_arg(arg1),
@@ -2069,7 +2062,7 @@ impl Machine {
                         Err(exc) => cond_fail!(context, fail, exc),
                     }
                 }
-                &Instruction::GcBif3 { label: fail, bif, arg1, arg2, arg3, live, reg } => {
+                &Instruction::GcBif3 { label: fail, bif, arg1, arg2, arg3, reg } => {
                     // TODO: GcBif needs to handle GC as necessary
                     let args = &[
                         context.expand_arg(arg1),
@@ -2091,6 +2084,7 @@ impl Machine {
                 }
                 &Instruction::MakeFun2 { i } => {
                     // nfree means capture N x-registers into the closure
+                    let module = context.ip.get_module();
                     let lambda = &module.lambdas[i as usize];
 
                     let binding = if lambda.nfree != 0 {

@@ -275,6 +275,13 @@ impl LValue {
         }
     }
 
+    pub fn is_source(&self) -> bool {
+        match self {
+            LValue::Constant(..) | LValue::BigInt(..) | LValue::ExtendedLiteral(..) | LValue::X(..) | LValue::Y(..) => true,
+            _ => false
+        }
+    }
+
     // temporary
     pub fn to_size(&self, constants: &mut Vec<Term>) -> crate::instruction::Size {
         use crate::instruction::Size;
@@ -383,11 +390,7 @@ impl<'a> Loader<'a> {
         self.prepare();
 
         let mut constants = Vec::new();
-        let instructions: Vec<_> = self
-            .instructions
-            .iter()
-            .map(|ins| transform_instruction(ins.clone(), &mut constants, &self.literal_heap))
-            .collect();
+        let instructions = transform_engine(&self.instructions, &mut constants, &self.literal_heap);
         // println!("ins {:?}", instructions);
 
         Ok(Module {
@@ -876,6 +879,95 @@ fn gen_jump_table(list: &ExtList, fail: instruction::Label) -> (instruction::Jum
     (Box::new(table), min)
 }
 
+
+const APPLY_2: crate::bif::Fn = crate::bif::bif_erlang_apply_2;
+const APPLY_3: crate::bif::Fn = crate::bif::bif_erlang_apply_3;
+
+fn transform_engine(instrs: &[Instruction],
+    constants: &mut Vec<Term>,
+    literal_heap: &Heap,
+    ) -> Vec<instruction::Instruction> {
+    let mut res = Vec::with_capacity(instrs.len());
+    let mut iter = instrs.iter();
+
+    use instruction::Instruction as I;
+    use crate::opcodes::Opcode as O;
+    use LValue as V;
+
+//     transform!(
+//         CallExtLast(u, Bif=b, D) -> Deallocate { n: D } | CallBifOnly { bif: b }
+//     )
+    while let Some(ins) = iter.next() {
+        match (ins.op, &ins.args.as_slice()) {
+            (O::SelectVal, &[arg, LValue::Label(fail), V::ExtendedList(list)]) if use_jump_table(&*list) => {
+                // gen_jump_tab(S, Fail, Size, Rest);
+                println!("gen jump!\r");
+                let (table, min) = gen_jump_table(&*list, *fail);
+                res.push(I::JumpOnVal {
+                    arg: arg.to_val(constants, literal_heap),
+                    fail: *fail,
+                    table,
+                    min
+                });
+            }
+
+            //// apply/2 is an instruction, not a BIF.
+            //// call_ext u==2 u$func:erlang:apply/2 => i_apply_fun
+            //(O::CallExt, &[_, V::Bif(APPLY_2)]) => {
+            //    res.push(I::ApplyFun)
+            //}
+            //// call_ext_last u==2 u$func:erlang:apply/2 D => i_apply_fun_last D
+            //(O::CallExtLast, &[_, V::Bif(APPLY_2), d]) => {
+            //    res.push(I::ApplyFunLast { n: d.into() })
+            //}
+            //// call_ext_only u==2 u$func:erlang:apply/2 => i_apply_fun_only
+            //(O::CallExtOnly, &[_, V::Bif(APPLY_2)]) => {
+            //    res.push(I::ApplyFunOnly)
+            //}
+
+            //// The apply/3 BIF is an instruction.
+            //// call_ext u==3 u$bif:erlang:apply/3 => i_apply
+            //(O::CallExt, &[_, V::Bif(APPLY_2)]) => {
+            //    res.push(I::Apply)
+            //}
+            //// call_ext_last u==3 u$bif:erlang:apply/3 D => i_apply_last D
+            //(O::CallExtLast, &[_, V::Bif(APPLY_3), d]) => {
+            //    res.push(I::ApplyLast { n: d.into() })
+            //}
+            //// call_ext_only u==3 u$bif:erlang:apply/3 => i_apply_only
+            //(O::CallExtOnly, &[_, V::Bif(APPLY_3)]) => {
+            //    res.push(I::ApplyOnly)
+            //}
+
+            //// The general case for BIFs that have no special instructions. A BIF used in the tail
+            //// must be followed by a return instruction.
+            ////
+            //// To make trapping and stack backtraces work correctly, we make sure that the
+            //// continuation pointer is always stored on the stack.
+
+            //// call_ext u Bif=u$is_bif => call_bif Bif
+            //(O::CallExt, &[_, V::Bif(bif)]) => {
+            //    res.push(I::CallBif { bif })
+            //}
+
+            //// call_ext_last u Bif=u$is_bif D => deallocate D | call_bif_only Bif
+            //(O::CallExtLast, &[_, V::Bif(b), d]) => {
+            //    res.push(I::Deallocate { n: d.into() });
+            //    res.push(I::CallBifOnly { bif });
+            //}
+
+            //// call_ext_only Ar=u Bif=u$is_bif => call_bif_only Bif
+            //(O::CallExtOnly, &[_, V::Bif(bif)]) => {
+            //    res.push(I::CallBifOnly { bif });
+            //}
+
+            // fallback to the old transform
+            _ => res.push(transform_instruction(ins.clone(), constants, literal_heap))
+        }
+    }
+    res
+}
+
 fn transform_instruction(
     ins: self::Instruction,
     constants: &mut Vec<Term>,
@@ -1305,14 +1397,14 @@ fn transform_instruction(
         },
         Opcode::GcBif1 => Instruction::GcBif1 {
             label: ins.args[0].to_label(),
-            live: ins.args[1].to_regs(),
+            // live: ins.args[1].to_regs(),
             bif: ins.args[2].to_bif(),
             arg1: ins.args[3].to_val(constants, literal_heap),
             reg: ins.args[4].to_reg(),
         },
         Opcode::GcBif2 => Instruction::GcBif2 {
             label: ins.args[0].to_label(),
-            live: ins.args[1].to_regs(),
+            // live: ins.args[1].to_regs(),
             bif: ins.args[2].to_bif(),
             arg1: ins.args[3].to_val(constants, literal_heap),
             arg2: ins.args[4].to_val(constants, literal_heap),
@@ -1433,7 +1525,7 @@ fn transform_instruction(
         Opcode::RecvSet => Instruction::RecvSet,
         Opcode::GcBif3 => Instruction::GcBif3 {
             label: ins.args[0].to_label(),
-            live: ins.args[1].to_regs(),
+            // live: ins.args[1].to_regs(),
             bif: ins.args[2].to_bif(),
             arg1: ins.args[3].to_val(constants, literal_heap),
             arg2: ins.args[4].to_val(constants, literal_heap),

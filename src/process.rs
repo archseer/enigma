@@ -85,12 +85,12 @@ impl ExecutionContext {
     pub fn expand_arg(&self, arg: instruction::Source) -> Term {
         use instruction::Source;
         match arg {
+            Source::X(i) => unsafe { *self.x.get_unchecked(i as usize) },
+            Source::Y(i) => self.stack[self.stack.len() - (i + 1) as usize],
+            Source::Constant(i) => unsafe { (*self.ip.module).constants[i as usize] },
             // TODO: optimize away into a reference somehow at load time
             Source::ExtendedLiteral(i) => unsafe { (*self.ip.module).literals[i as usize] },
-            Source::X(i) => self.x[i as usize],
-            Source::Y(i) => self.stack[self.stack.len() - (i + 1) as usize],
             // Source::Constant(i) => self.i,
-            Source::Constant(i) => unsafe { (*self.ip.module).constants[i as usize] },
             // value => unreachable!("expand unimplemented for {:?}", value),
         }
     }
@@ -112,7 +112,7 @@ impl ExecutionContext {
     pub fn fetch_register(&mut self, register: instruction::Register) -> Term {
         use instruction::Register;
         match register {
-            Register::X(reg) => self.x[reg as usize],
+            Register::X(reg) => unsafe {*self.x.get_unchecked(reg as usize)},
             Register::Y(reg) => self.stack[self.stack.len() - (reg + 1) as usize],
         }
     }
@@ -121,8 +121,8 @@ impl ExecutionContext {
     pub fn set_register(&mut self, register: instruction::Register, value: Term) {
         use instruction::Register;
         match register {
-            Register::X(reg) => {
-                self.x[reg as usize] = value;
+            Register::X(reg) => unsafe {
+                *self.x.get_unchecked_mut(reg as usize) = value;
             }
             Register::Y(reg) => {
                 let len = self.stack.len();

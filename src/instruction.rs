@@ -160,6 +160,14 @@ pub enum Instruction {
         destination: usize,
         words: Regs, // TODO: register count
     },
+    // CallBif {
+    //     arity: Arity,
+    //     bif: Bif,
+    // },
+    // CallBifOnly {
+    //     arity: Arity,
+    //     bif: Bif,
+    // },
     Bif0 {
         bif: Bif,
         reg: Register,
@@ -559,14 +567,14 @@ pub enum Instruction {
     },
     GcBif1 {
         label: Label,
-        live: Regs,
+        // live: Regs, live is unused on all bifs
         bif: Bif,
         arg1: Source,
         reg: Register,
     },
     GcBif2 {
         label: Label,
-        live: Regs,
+        // live: Regs,
         bif: Bif,
         arg1: Source,
         arg2: Source,
@@ -701,7 +709,7 @@ pub enum Instruction {
     RecvSet,
     GcBif3 {
         label: Label,
-        live: Regs,
+        // live: Regs,
         bif: Bif,
         arg1: Source,
         arg2: Source,
