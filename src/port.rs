@@ -573,7 +573,7 @@ impl Renderer {
 
     pub fn move_rel(&mut self, bytes: &[u8]) {
         use std::convert::TryInto;
-        let pos = i16::from_be_bytes(bytes[1..3].try_into().unwrap());
+        let pos = i16::from_be_bytes(bytes[0..2].try_into().unwrap());
         if pos < 0 {
             self.line.move_backward(-pos as usize);
             write!(self.out, "{}", termion::cursor::Left(-pos as u16));
@@ -620,7 +620,7 @@ impl Renderer {
 
     pub fn delete_chars(&mut self, bytes: &[u8]) {
         use std::convert::TryInto;
-        let n = i16::from_be_bytes(bytes[1..3].try_into().unwrap());
+        let n = i16::from_be_bytes(bytes[0..2].try_into().unwrap());
         if n > 0 { // delete forwards
             self.line.delete(n as usize);
         } else { // delete backwards
@@ -830,19 +830,20 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
                         match bytes[0] {
                             // PUTC
                             0 => {
+                                info!("put_chars: bytes={:?}", &bytes[1..]);
                                 renderer.put_chars(&bytes[1..]);
                             }
                             // 1 MOVE
                             1 => {
-                                renderer.move_rel(&bytes);
+                                renderer.move_rel(&bytes[1..]);
                             }
                             // 2 INSC
                             2 => {
-                                renderer.insert_chars(&bytes);
+                                renderer.insert_chars(&bytes[1..]);
                             }
                             // 3 DELC
                             3 => {
-                                renderer.delete_chars(&bytes);
+                                renderer.delete_chars(&bytes[1..]);
                             }
                             // BEEP
                             4 => {
