@@ -1,0 +1,26 @@
+[package]
+name = "instruction-codegen"
+version = "0.1.0"
+authors = ["Blaž Hrastnik <blaz@mxxn.io>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[[test]]
+name = "tests"
+path = "tests/progress.rs"
+
+[dev-dependencies]
+trybuild = "1.0"
+
+[dependencies]
+syn = { version = "0.15.34", features = ["parsing", "extra-traits", "full"] }
+proc-macro2 = "0.4.30"
+proc-quote = "0.2.2"
+permutate = "0.3.2"
+heck = "0.3.1"
+# lalrpop-util = "0.17.0"
+
+# [build-dependencies]
+# lalrpop = "0.17.0"
