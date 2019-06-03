@@ -253,6 +253,7 @@ use std::iter;
 use std::ops::{Deref, Index, Range};
 use std::string::Drain;
 use unicode_segmentation::UnicodeSegmentation;
+use unicode_width::UnicodeWidthStr;
 
 /// Maximum buffer size for the line read
 pub(crate) static MAX_LINE: usize = 4096;
@@ -553,6 +554,12 @@ impl Deref for LineBuffer {
     }
 }
 
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct Position {
+    pub col: usize,
+    pub row: usize,
+}
+
 struct Renderer {
     line: LineBuffer,
     out: std::io::Stdout,
@@ -574,6 +581,7 @@ impl Renderer {
     pub fn move_rel(&mut self, bytes: &[u8]) {
         use std::convert::TryInto;
         let pos = i16::from_be_bytes(bytes[0..2].try_into().unwrap());
+        info!("move: pos={}", pos);
         if pos < 0 {
             self.line.move_backward(-pos as usize);
             write!(self.out, "{}", termion::cursor::Left(-pos as u16));
@@ -633,6 +641,71 @@ impl Renderer {
         self.out.flush().unwrap();
     }
 }
+
+fn width(s: &str, esc_seq: &mut u8) -> usize {
+    if *esc_seq == 1 {
+        if s == "[" {
+            // CSI
+            *esc_seq = 2;
+        } else {
+            // two-character sequence
+            *esc_seq = 0;
+        }
+        0
+    } else if *esc_seq == 2 {
+        if s == ";" || (s.as_bytes()[0] >= b'0' && s.as_bytes()[0] <= b'9') {
+        /*} else if s == "m" {
+            // last
+            *esc_seq = 0;*/
+        } else {
+            // not supported
+            *esc_seq = 0;
+        }
+        0
+    } else if s == "\x1b" {
+        *esc_seq = 1;
+        0
+    } else if s == "\n" {
+        0
+    } else {
+        s.width()
+    }
+}
+
+const TAB_STOP: usize = 4;
+const COLS: usize = 200;
+
+// calculate_position(line, Position::default());
+
+/// Control characters are treated as having zero width.
+/// Characters with 2 column width are correctly handled (not split).
+fn calculate_position(s: &str, orig: Position) -> Position {
+    let mut pos = orig;
+    let mut esc_seq = 0;
+    for c in s.graphemes(true) {
+        if c == "\n" {
+            pos.row += 1;
+            pos.col = 0;
+            continue;
+        }
+        let cw = if c == "\t" {
+            TAB_STOP - (pos.col % TAB_STOP)
+        } else {
+            width(c, &mut esc_seq)
+        };
+        pos.col += cw;
+        if pos.col > COLS {
+            pos.row += 1;
+            pos.col = cw;
+        }
+    }
+    if pos.col == COLS {
+        pos.col = 0;
+        pos.row += 1;
+    }
+    pos
+}
+
 
 #[cfg(test)]
 mod test {
@@ -830,6 +903,7 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
                         match bytes[0] {
                             // PUTC
                             0 => {
+
                                 info!("put_chars: bytes={:?}", &bytes[1..]);
                                 renderer.put_chars(&bytes[1..]);
                             }
@@ -839,18 +913,22 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
                             }
                             // 2 INSC
                             2 => {
+                                info!("insert_chars: bytes={:?}", &bytes[1..]);
                                 renderer.insert_chars(&bytes[1..]);
                             }
                             // 3 DELC
                             3 => {
+                                info!("delete_chars: bytes={:?}", &bytes[1..]);
                                 renderer.delete_chars(&bytes[1..]);
                             }
                             // BEEP
                             4 => {
+                                info!("beep");
                                 renderer.beep();
                             }
                             // PUTC_SYNC
                             5 => {
+                                info!("putc_sync: bytes={:?}", &bytes[1..]);
                                 renderer.put_chars(&bytes[1..]);
 
                                 crate::process::send_signal(&Machine::current(), owner, crate::process::Signal::Message {

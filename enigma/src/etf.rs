@@ -48,6 +48,11 @@ pub fn decode<'a>(bytes: &'a [u8], heap: &Heap) -> Term {
     let (rest, ver) = be_u8(bytes).unwrap();
     assert_eq!(ver, 131, "Expected ETF version number to be 131!");
 
+    // check if followed by 80+size, then decode
+    // The compressed term format is as follows:
+    // 1	1	4	N
+    // 131	80	UncompressedSize	Zlib-compressedData
+
     if rest[0] == 80 {
         use libflate::zlib;
         use std::io::Read;

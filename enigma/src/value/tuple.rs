@@ -2,6 +2,14 @@ use super::{CastFrom, CastIntoMut, Header, Term, Variant, WrongBoxError, BOXED_T
 use std::cmp::Ordering;
 use std::ops::{Deref, DerefMut};
 
+/* arityval access methods */
+/* Erlang Spec. 4.7.3 defines max arity to 65535
+ * we will however enforce max arity of 16777215 (24 bits)
+ * (checked in bifs and asserted in debug)
+ */
+// #define MAX_ARITYVAL            ((((Uint)1) << 24) - 1)
+// #define ERTS_MAX_TUPLE_SIZE     MAX_ARITYVAL
+
 #[derive(Debug, Eq)]
 #[repr(C)]
 pub struct Tuple {

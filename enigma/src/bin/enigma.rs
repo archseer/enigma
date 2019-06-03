@@ -15,6 +15,24 @@ fn run() -> i32 {
 
     let _args: Vec<String> = env::args().collect();
 
+    // std::panic::set_hook(Box::new(|panic_info| {
+    //     let backtrace = backtrace::Backtrace::new();
+    //     println!("{:?}", panic_info);
+    //     println!("{:?}", backtrace);
+    // }));
+
+    println!(
+        "size_of: {}",
+        std::mem::size_of::<libenigma::loader::Instruction>()
+    );
+    println!(
+        "size_of: new_instr {}",
+        std::mem::size_of::<libenigma::instruction::Instruction>()
+    );
+    println!(
+        "size_of: {}",
+        std::mem::size_of::<Vec<libenigma::loader::LValue>>()
+    );
     let vm = vm::Machine::new();
 
     // erlexec defaults:
@@ -23,7 +41,8 @@ fn run() -> i32 {
         "--",
         "-root",
         //"/usr/local/Cellar/erlang/21.3.2/lib/erlang",
-        "otp",
+        // "otp",
+        "/Users/speed/src/rust/enigma/otp",
         "-progname",
         "enigma",
         "--",

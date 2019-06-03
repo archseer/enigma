@@ -40,6 +40,7 @@ pub type Ref = usize;
 // also this way, regs could be a &mut [] slice with no clone?
 
 pub const MAX_REG: usize = 1024;
+// pub const MAX_REG: usize = 255;
 
 bitflags! {
     pub struct Flag: u8 {

@@ -97,10 +97,10 @@ pub fn get_module_info_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
     let module = registry.lookup(name).unwrap();
     let heap = &process.context_mut().heap;
     let keys = vec![
-        atom!(MD5),
-        atom!(NATIVE),
-        atom!(COMPILE),
-        atom!(ATTRIBUTES),
+        //atom!(MD5),
+        //atom!(NATIVE),
+        //atom!(COMPILE),
+        //atom!(ATTRIBUTES),
         atom!(EXPORTS),
         atom!(MODULE),
     ];
