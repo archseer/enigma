@@ -21,18 +21,6 @@ fn run() -> i32 {
     //     println!("{:?}", backtrace);
     // }));
 
-    println!(
-        "size_of: {}",
-        std::mem::size_of::<libenigma::loader::Instruction>()
-    );
-    println!(
-        "size_of: new_instr {}",
-        std::mem::size_of::<libenigma::instruction::Instruction>()
-    );
-    println!(
-        "size_of: {}",
-        std::mem::size_of::<Vec<libenigma::loader::LValue>>()
-    );
     let vm = vm::Machine::new();
 
     // erlexec defaults:
