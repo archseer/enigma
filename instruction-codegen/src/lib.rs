@@ -14,7 +14,8 @@ use permutate::{Permutator};
 /// Argument typing shorthands:
 /// - x: x register
 /// - y: y register
-/// - r: x or y register
+/// - r: register size
+/// - d: x or y register destination)
 /// TODO: float register, and fl+r reg
 /// - c: constant
 /// - s: source (register or constant)
@@ -22,9 +23,11 @@ use permutate::{Permutator};
 /// - f: failure label? zero meaning raise
 /// - a: atom
 /// - i: int
+/// - t: tiny unsigned int (u8)
 /// - u: unsigned int
 /// - s: small? arity? (u8) --> could do these as digits 1,2,4,8 (bytes)
-/// TODO: t, e
+/// - b: bif
+/// - m: extended list
 
 #[derive(Debug)]
 struct Arg {
@@ -147,10 +150,19 @@ fn expand_enum_variants(op: &Opcode) -> proc_macro2::TokenStream {
     } else {
         let args: Vec<proc_macro2::TokenStream> = op.args.iter().map(|(arg, t)| {
             let t = match t.as_str() {
-                "c" => Ident::new("char", Span::call_site()),
-                "x" => Ident::new("u8", Span::call_site()),
-                "y" => Ident::new("u16", Span::call_site()),
-                _ => panic!()
+                "c" => Ident::new("u32", Span::call_site()),
+                "r" => Ident::new("Regs", Span::call_site()),
+                "x" => Ident::new("RegisterX", Span::call_site()),
+                "y" => Ident::new("RegisterY", Span::call_site()),
+                "l" => Ident::new("Label", Span::call_site()),
+                "s" => Ident::new("Source", Span::call_site()),
+                "t" => Ident::new("u8", Span::call_site()),
+                "u" => Ident::new("u32", Span::call_site()),
+                "d" => Ident::new("Register", Span::call_site()),
+                "b" => Ident::new("BifFn", Span::call_site()),
+                "m" => Ident::new("ExtendedList", Span::call_site()),
+                //_ => syn::Error::new(arg.span(), format!("unexpected type `{}`", t)).to_compile_error(),
+                _ => panic!("unexpected type {}", t),
             };
 
             quote!{ #arg: #t }
@@ -164,10 +176,13 @@ fn expand_enum_variants(op: &Opcode) -> proc_macro2::TokenStream {
 
 fn expand_impls(op: &Opcode) -> proc_macro2::TokenStream {
     let variant = &op.name;
-    let args: Vec<_> = op.args.iter().map(|(n, _t)| n).collect();
+    let args: Vec<_> = op.args.iter().map(|(n, t)| match t.as_str() {
+        "m" => quote!{ ref #n },
+        _ => quote! { #n }
+    }).collect();
 
     let mut input = op.body.clone().into_iter().peekable();
-    let body =  interpolate_opcode_impls(&mut input).unwrap();
+    let body =  interpolate_opcode_impls(op, &mut input).unwrap();
 
     quote! {
         Instruction::#variant { #(#args),* } => {
@@ -177,7 +192,7 @@ fn expand_impls(op: &Opcode) -> proc_macro2::TokenStream {
 }
 
 #[proc_macro]
-pub fn ins(tokens: TokenStream) -> TokenStream {
+pub fn instruction(tokens: TokenStream) -> TokenStream {
     let input = parse_macro_input!(tokens as Instructions);
 
     eprintln!("SYN: {:#?}", input);
@@ -188,15 +203,46 @@ pub fn ins(tokens: TokenStream) -> TokenStream {
     let impls: Vec<_> = opcodes.iter().map(expand_impls).collect();
 
     let tokens = quote! {
-        enum Instruction {
+        pub enum Instruction {
             #(#enums),*
         }
 
+        pub trait Captures<'a> {}
+
+        impl<'a, T> Captures<'a> for T {}
+
         #[inline(always)]
-        fn run(ins: &Instruction) {
-           match *ins {
-               #(#impls),*
-           } 
+        pub fn run<'a: 'd, 'b: 'd, 'c: 'd, 'd>(
+            vm: &'a Machine,
+            process: &'b mut RcProcess,
+            ins: &'c Instruction
+        ) -> impl std::future::Future<Output = Result<process::State, Exception>> + Captures<'a> + Captures<'b> + Captures<'c> + 'd {
+            async move {  // workaround for https://github.com/rust-lang/rust/issues/56238
+            let context = process.context_mut();
+            context.reds = 2000; // self.config.reductions;
+
+            // process the incoming signal queue
+            process.process_incoming()?;
+
+            // a fake constant nil
+            let NIL = Term::nil();
+            // TEMP let mut ins;
+
+            loop {
+                // TEMP ins = unsafe { (*context.ip.module).instructions.get_unchecked(context.ip.ptr as usize) };
+                context.ip.ptr += 1;
+
+                match *ins {
+                    #(#impls),*
+                } 
+            }
+            }
+        }
+
+        impl Instruction {
+            fn load(ins: loader::Instruction) -> Self {
+                unimplemented!()
+            }
         }
     };
 
@@ -234,9 +280,9 @@ fn interpolation_pattern_type(
 /// Transforms a `Group` into code that appends the given `Group` into `__stream`.
 ///
 /// Inside iterator patterns, use `parse_group_in_iterator_pattern`.
-fn interpolate_group(stream: &mut proc_macro2::TokenStream, group: &Group) -> Result<()> {
+fn interpolate_group(stream: &mut proc_macro2::TokenStream, opcode: &Opcode, group: &Group) -> Result<()> {
     let mut inner = group.stream().into_iter().peekable();
-    let inner = interpolate_opcode_impls(&mut inner)?;
+    let inner = interpolate_opcode_impls(opcode, &mut inner)?;
 
     let mut new = Group::new(group.delimiter(), inner);
     new.set_span(group.span());
@@ -246,25 +292,57 @@ fn interpolate_group(stream: &mut proc_macro2::TokenStream, group: &Group) -> Re
 
 
 /// Interpolates the given variable, which should implement `ToTokens`.
-fn interpolate_to_tokens_ident(stream: &mut proc_macro2::TokenStream, ident: &Ident) {
-    // let ref_mut_stream = quote! { &mut __stream };
-    // let span = ident.span();
-    // stream.append_all(quote_spanned! { span=>
-    //     ::proc_quote::__rt::append_to_tokens(#ref_mut_stream, & #ident);
-    // });
-    stream.append_all(quote! { 1 })
+fn interpolate_to_tokens_ident(stream: &mut proc_macro2::TokenStream, opcode: &Opcode, ident: &Ident, next: Option<&proc_macro2::TokenTree>) {
+    let typ = &opcode.args.iter().find(|(name, _)| name == ident).unwrap().1;
+    let code = match next.and_then(|token| match token {
+        TokenTree::Punct(punct) => Some(punct.as_char()),
+        _ => None
+    }) {
+        // if it's an assignment, treat it specially
+        Some('=') => match typ.as_str() {
+            "c" => syn::Error::new_spanned(ident, "cannot assign to constant").to_compile_error(),
+            // TODO: assignment
+            "r" => quote_spanned!(ident.span() => context.fetch_register(#ident)),
+            "x" => quote_spanned!(ident.span() => *context.x.index_mut(#ident as usize) ),
+            "y" => quote_spanned!(ident.span() => *context.stack.index_mut(context.stack.len() - (#ident + 1) as usize)),
+            "s" => quote_spanned!(ident.span() => context.expand_arg(#ident)),
+            // TODO: needs to be assignable
+            "d" => quote_spanned!(ident.span() => 1),
+            "l" => quote_spanned!(ident.span() => #ident),
+            "t" => quote_spanned!(ident.span() => #ident),
+            "u" => quote_spanned!(ident.span() => #ident),
+            "b" => quote_spanned!(ident.span() => #ident),
+            _ => syn::Error::new_spanned(ident, format!("unexpected type `{}`", typ)).to_compile_error()
+        },
+        _ => match typ.as_str() {
+            "c" => quote_spanned!(ident.span() => unsafe { (*context.ip.module).constants[#ident as usize] }),
+            // TODO: assignment
+            "r" => quote_spanned!(ident.span() => context.fetch_register(#ident)),
+            "x" => quote_spanned!(ident.span() => *context.x.index(#ident as usize) ),
+            "y" => quote_spanned!(ident.span() => *context.stack.index(context.stack.len() - (#ident + 1) as usize)),
+            "s" => quote_spanned!(ident.span() => context.expand_arg(#ident)),
+            // TODO: needs to be assignable
+            "d" => quote_spanned!(ident.span() => 1),
+            "l" => quote_spanned!(ident.span() => #ident),
+            "t" => quote_spanned!(ident.span() => #ident),
+            "u" => quote_spanned!(ident.span() => #ident),
+            "b" => quote_spanned!(ident.span() => #ident),
+            _ => syn::Error::new_spanned(ident, format!("unexpected type `{}`", typ)).to_compile_error()
+        }
+    };
+    stream.append_all(code)
 }
 
 /// Parses the input according to `quote!` rules.
-fn interpolate_opcode_impls(input: &mut InputIter) -> Result<proc_macro2::TokenStream> {
+fn interpolate_opcode_impls(op: &Opcode, input: &mut InputIter) -> Result<proc_macro2::TokenStream> {
     let mut output = proc_macro2::TokenStream::new();
 
     while let Some(token) = input.next() {
         match &token {
-            TokenTree::Group(group) => interpolate_group(&mut output, group)?,
+            TokenTree::Group(group) => interpolate_group(&mut output, op, group)?,
             TokenTree::Punct(punct) => match interpolation_pattern_type(&punct, input) {
                 Some(ident) => {
-                    interpolate_to_tokens_ident(&mut output, &ident);
+                    interpolate_to_tokens_ident(&mut output, op, &ident, input.peek());
                 }
                 None => {
                     // pass through

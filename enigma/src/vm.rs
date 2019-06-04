@@ -152,20 +152,23 @@ macro_rules! expand_float {
     }};
 }
 
+#[macro_export]
 macro_rules! op_jump {
-    ($context:expr, $label:expr) => {{
+    ($context:expr, $label:expr) => {
         $context.ip.ptr = $label;
-    }};
+    };
 }
 
+#[macro_export]
 macro_rules! op_jump_ptr {
-    ($context:expr, $ptr:expr) => {{
+    ($context:expr, $ptr:expr) => {
         $context.ip = $ptr;
-    }};
+    };
 }
 
+#[macro_export]
 #[inline]
-fn op_deallocate(context: &mut process::ExecutionContext, nwords: u16) {
+pub fn op_deallocate(context: &mut process::ExecutionContext, nwords: u16) {
     let (_, cp) = context.callstack.pop().unwrap();
     context
         .stack
@@ -174,15 +177,16 @@ fn op_deallocate(context: &mut process::ExecutionContext, nwords: u16) {
     context.cp = cp;
 }
 
+#[macro_export]
 macro_rules! call_error_handler {
-    ($vm:expr, $process:expr, $mfa:expr) => {{
-        call_error_handler($vm, $process, $mfa, atom::UNDEFINED_FUNCTION)?;
-    }};
+    ($vm:expr, $process:expr, $mfa:expr) => {
+        crate::vm::call_error_handler($vm, $process, $mfa, atom::UNDEFINED_FUNCTION)?;
+    };
 }
 
 // func is atom
 #[inline]
-fn call_error_handler(
+pub fn call_error_handler(
     vm: &Machine,
     process: &RcProcess,
     mfa: &module::MFA,
@@ -223,8 +227,10 @@ fn call_error_handler(
 const APPLY_2: bif::Fn = bif::bif_erlang_apply_2;
 const APPLY_3: bif::Fn = bif::bif_erlang_apply_3;
 
+#[macro_export]
 macro_rules! op_call_ext {
     ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr, $return: expr) => {{
+        // TODO: precompute these
         let mfa = unsafe { &(*$context.ip.module).imports[$dest as usize] };
 
         // if $process.pid > 70 {
@@ -259,6 +265,7 @@ macro_rules! op_call_ext {
     }};
 }
 
+#[macro_export]
 macro_rules! op_call_bif {
     ($vm:expr, $context:expr, $process:expr, $bif:expr, $arity:expr, $return:expr) => {{
         // make a slice out of arity x registers
@@ -275,6 +282,7 @@ macro_rules! op_call_bif {
         }
     }};
 }
+#[macro_export]
 macro_rules! op_call_fun {
     ($vm:expr, $context:expr, $process:expr, $value:expr, $arity:expr) => {{
         if let Ok(closure) = value::Closure::cast_from(&$value) {
@@ -321,6 +329,7 @@ macro_rules! op_call_fun {
     }};
 }
 
+#[macro_export]
 macro_rules! op_apply {
     ($vm:expr, $context:expr, $process:expr, $return: expr) => {{
         let mut module = $context.x[0];
@@ -427,6 +436,7 @@ macro_rules! op_apply {
     }};
 }
 
+#[macro_export]
 macro_rules! op_apply_fun {
     ($vm:expr, $context:expr, $process:expr) => {{
         // Walk down the 3rd parameter of apply (the argument list) and copy
@@ -456,6 +466,7 @@ macro_rules! op_apply_fun {
     }};
 }
 
+#[macro_export]
 macro_rules! op_return {
     ($process:expr, $context:expr) => {{
         if let Some(i) = $context.cp.take() {
@@ -467,6 +478,7 @@ macro_rules! op_return {
     }};
 }
 
+#[macro_export]
 macro_rules! fail {
     ($context:expr, $label:expr) => {{
         op_jump!($context, $label);
@@ -474,6 +486,7 @@ macro_rules! fail {
     }};
 }
 
+#[macro_export]
 macro_rules! cond_fail {
     ($context:expr, $fail:expr, $exc: expr) => {{
         if $fail != 0 {
@@ -485,6 +498,7 @@ macro_rules! cond_fail {
     }};
 }
 
+#[macro_export]
 macro_rules! op_fixed_apply {
     ($vm:expr, $context:expr, $process:expr, $arity:expr, $return:expr) => {{
         let arity = $arity as usize;
@@ -545,29 +559,30 @@ macro_rules! op_fixed_apply {
     }};
 }
 
+#[macro_export]
 macro_rules! op_is_type {
-    ($context:expr, $fail:expr, $arg:expr, $op:ident) => {{
-        let val = $context.expand_arg($arg);
-
-        if !val.$op() {
-            // TODO: patch the labels to point to exact offsets to avoid labels lookup
+    ($context:expr, $fail:expr, $arg:expr, $op:ident) => {
+        if !$context.expand_arg($arg).$op() {
             op_jump!($context, $fail);
         }
-    }};
+    };
 }
 
+#[macro_export]
 macro_rules! to_expr {
     ($e:expr) => {
         $e
     };
 }
 
+#[macro_export]
 macro_rules! op_float {
     ($context:expr, $a:expr, $b:expr, $dest:expr, $op:tt) => {{
         $context.f[$dest as usize] = to_expr!($context.f[$a as usize] $op $context.f[$b as usize]);
     }};
 }
 
+#[macro_export]
 macro_rules! safepoint_and_reduce {
     ($vm:expr, $process:expr, $reductions:expr) => {{
         // if $vm.gc_safepoint(&$process) {
