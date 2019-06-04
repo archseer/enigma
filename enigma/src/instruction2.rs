@@ -545,5 +545,148 @@ instruction!(
         // err=case_clause val={{820515101, #Ref<0.0.0.105>}, :timeout, {:gen_server, :cast, [#Pid<61>, :repeated_filesync]}}
         return Err(Exception::with_value(Reason::EXC_CASE_CLAUSE, value));
     },
+    fn try(fail: l, register: d) {
+        // TODO: try is identical to catch, and is remapped in the OTP loader
+        // create a catch context that wraps f - fail label, and stores to y - reg.
+        context.catches += 1;
+        context.set_register(
+            register,
+            Term::catch(
+                &context.heap,
+                InstrPtr {
+                    ptr: fail,
+                    module: context.ip.module
+                }
+            )
+        );
+    },
+    fn try_end(register: d) {
+        context.catches -= 1;
+        context.set_register(register, NIL) // TODO: make_blank macro
+    },
+    fn try_case(register: d) {
+        // pops a catch context in y  Erases the label saved in the Arg0 slot. Noval in R0 indicate that something is caught. If so, R0 is set to R1, R1 — to R2, R2 — to R3.
+
+        // TODO: this initial part is identical to TryEnd
+        context.catches -= 1;
+        context.set_register(register, NIL); // TODO: make_blank macro
+
+        assert!(context.x[0].is_none());
+        // TODO: c_p->fvalue = NIL;
+        // TODO: make more efficient via memmove
+        context.x[0] = context.x[1];
+        context.x[1] = context.x[2];
+        context.x[2] = context.x[3];
+    },
+    fn try_case_end(value: s) {
+        // Raises a try_clause exception with the value read from Arg0.
+        let value = #value;
+        return Err(Exception::with_value(Reason::EXC_TRY_CLAUSE, value));
+    },
+    fn catch(fail: l, register: d) {
+        // create a catch context that wraps f - fail label, and stores to y - reg.
+        context.catches += 1;
+        context.set_register(
+            register,
+            Term::catch(
+                &context.heap,
+                InstrPtr {
+                    ptr: fail,
+                    module: context.ip.module
+                }
+            )
+        );
+    },
+    fn catch_end(register: d) {
+        // Pops a “catch” context. Erases the label saved in the Arg0 slot. Noval in R0
+        // indicates that something is caught. If R1 contains atom throw then R0 is set
+        // to R2. If R1 contains atom error than a stack trace is added to R2. R0 is
+        // set to {exit,R2}.
+        //
+        // difference fron try is, try will exhaust all the options then fail, whereas
+        // catch will keep going upwards.
+
+        // TODO: this initial part is identical to TryEnd
+        context.catches -= 1; // TODO: this is overflowing
+        context.set_register(register, NIL); // TODO: make_blank macro
+
+        if context.x[0].is_none() {
+            // c_p->fvalue = NIL;
+            if context.x[1] == Term::atom(atom::THROW) {
+                context.x[0] = context.x[2]
+            } else {
+                if context.x[1] == Term::atom(atom::ERROR) {
+                    context.x[2] =
+                        exception::add_stacktrace(&process, context.x[2], context.x[3]);
+                }
+                // only x(2) is included in the rootset here
+                // if (E - HTOP < 3) { check for heap space, otherwise garbage collect
+                // ..
+                //     FCALLS -= erts_garbage_collect_nobump(c_p, 3, reg+2, 1, FCALLS);
+                // }
+                context.x[0] =
+                    tup2!(&context.heap, Term::atom(atom::EXIT_U), context.x[2]);
+            }
+        }
+    },
+    fn raise(trace: d, value: s) {
+        // Raises the exception. The instruction is garbled by backward compatibility. Arg0 is a stack trace
+        // and Arg1 is the value accompanying the exception. The reason of the raised exception is dug up
+        // from the stack trace
+        let trace = #trace;
+        let value = #value;
+
+        let reason = if let Some(s) = exception::get_trace_from_exc(&trace) {
+            primary_exception!(s.reason)
+        } else {
+            Reason::EXC_ERROR
+        };
+        return Err(Exception {
+            reason,
+            value,
+            trace,
+        });
+    },
+    fn apply(arity: t) {
+        context.cp = Some(context.ip);
+
+        op_fixed_apply!(vm, context, &process, arity, false);
+        // call this fixed_apply, used for ops (apply, apply_last).
+        // apply is the func that's equivalent to erlang:apply/3 (and instrs)
+        safepoint_and_reduce!(vm, process, context.reds);
+    },
+    fn apply_last(arity: t, nwords: r) {
+        op_deallocate(context, nwords);
+
+        op_fixed_apply!(vm, context, &process, arity, true);
+        safepoint_and_reduce!(vm, process, context.reds);
+    },
+    fn gc_bif1(fail: l, bif: b, arg1: s, reg: d) {
+        // TODO: GcBif needs to handle GC as necessary
+        let args = &[#arg1];
+        match bif(vm, &process, args) {
+            Ok(val) => context.set_register(reg, val),
+            Err(exc) => cond_fail!(context, fail, exc),
+        }
+    },
+    // TODO unit needs to be u16
+    fn bs_add(fail: l, size1: s, size2: s, unit: r, destination: d) {
+        // Calculates the total of the number of bits in Src1 and the number of units in Src2. Stores the result to Dst.
+        // bs_add(Fail, Src1, Src2, Unit, Dst)
+        // dst = (src1 + src2) * unit
+
+        // TODO: trickier since we need to check both nums are positive and can fit
+        // into int/bigint
+
+        // optimize when one append is 0 and unit is 1, it's just a move
+        // bs_add Fail S1=i==0 S2 Unit=u==1 D => move S2 D
+
+        // TODO use fail label
+        let s1 = #size1.to_uint().unwrap();
+        let s2 = #size2.to_uint().unwrap();
+
+        let res = Term::uint(&context.heap, (s1 + s2) * unit as u32);
+        context.set_register(dest, res)
+    },
 
 );

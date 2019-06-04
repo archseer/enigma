@@ -302,12 +302,23 @@ fn interpolate_to_tokens_ident(stream: &mut proc_macro2::TokenStream, opcode: &O
         Some('=') => match typ.as_str() {
             "c" => syn::Error::new_spanned(ident, "cannot assign to constant").to_compile_error(),
             // TODO: assignment
-            "r" => quote_spanned!(ident.span() => context.fetch_register(#ident)),
             "x" => quote_spanned!(ident.span() => *context.x.index_mut(#ident as usize) ),
             "y" => quote_spanned!(ident.span() => *context.stack.index_mut(context.stack.len() - (#ident + 1) as usize)),
             "s" => quote_spanned!(ident.span() => context.expand_arg(#ident)),
             // TODO: needs to be assignable
-            "d" => quote_spanned!(ident.span() => 1),
+            "d" => quote_spanned! {ident.span()=>
+                let reg = match register {
+                    Register::X(reg) => unsafe {
+                        *self.x.get_unchecked_mut(reg as usize)
+                    }
+                    Register::Y(reg) => {
+                        let len = self.stack.len();
+                        &mut self.stack[(len - (reg + 1) as usize)]
+                    }
+                };
+                *reg = value
+            },
+            "r" => quote_spanned!(ident.span() => #ident),
             "l" => quote_spanned!(ident.span() => #ident),
             "t" => quote_spanned!(ident.span() => #ident),
             "u" => quote_spanned!(ident.span() => #ident),
@@ -317,12 +328,12 @@ fn interpolate_to_tokens_ident(stream: &mut proc_macro2::TokenStream, opcode: &O
         _ => match typ.as_str() {
             "c" => quote_spanned!(ident.span() => unsafe { (*context.ip.module).constants[#ident as usize] }),
             // TODO: assignment
-            "r" => quote_spanned!(ident.span() => context.fetch_register(#ident)),
             "x" => quote_spanned!(ident.span() => *context.x.index(#ident as usize) ),
             "y" => quote_spanned!(ident.span() => *context.stack.index(context.stack.len() - (#ident + 1) as usize)),
             "s" => quote_spanned!(ident.span() => context.expand_arg(#ident)),
             // TODO: needs to be assignable
-            "d" => quote_spanned!(ident.span() => 1),
+            "d" => quote_spanned!(ident.span() => context.fetch_register(#ident)),
+            "r" => quote_spanned!(ident.span() => #ident),
             "l" => quote_spanned!(ident.span() => #ident),
             "t" => quote_spanned!(ident.span() => #ident),
             "u" => quote_spanned!(ident.span() => #ident),
