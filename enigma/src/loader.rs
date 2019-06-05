@@ -130,38 +130,6 @@ impl LValue {
         }
     }
 
-    #[inline]
-    pub fn to_flags(&self) -> bitstring::Flag {
-        use std::convert::TryInto;
-        #[cfg(target_endian = "little")]
-        macro_rules! native_endian {
-            ($x:expr) => {
-                if $x.contains(bitstring::Flag::BSF_NATIVE) {
-                    $x.remove(bitstring::Flag::BSF_NATIVE);
-                    $x.insert(bitstring::Flag::BSF_LITTLE);
-                }
-            };
-        }
-
-        #[cfg(target_endian = "big")]
-        macro_rules! native_endian {
-            ($x:expr) => {
-                if $x.contains(bitstring::Flag::BSF_NATIVE) {
-                    $x.remove(bitstring::Flag::BSF_NATIVE);
-                    $x.remove(bitstring::Flag::BSF_LITTLE);
-                }
-            };
-        }
-        match *self {
-            LValue::Literal(l) => {
-                let mut flags = bitstring::Flag::from_bits(l.try_into().unwrap()).unwrap();
-                native_endian!(flags);
-                flags
-            }
-            _ => unimplemented!("to_flags for {:?}", self),
-        }
-    }
-
     pub fn into_term(&self) -> crate::value::Term {
         match *self {
             LValue::Constant(t) => t,
@@ -195,136 +163,10 @@ impl LValue {
         }
     }
 
-    pub fn to_label(&self) -> crate::instruction::Label {
-        match *self {
-            LValue::Label(i) => i,
-            _ => panic!("{:?} passed", self),
-        }
-    }
-
-    pub fn to_reg(&self) -> crate::instruction::Register {
-        use crate::instruction::Register;
-        use std::convert::TryInto;
-        match *self {
-            LValue::X(i) => Register::X(i.try_into().unwrap()),
-            LValue::Y(i) => Register::Y(i.try_into().unwrap()),
-            _ => panic!("{:?} passed", self),
-        }
-    }
-
-    pub fn to_lit(&self) -> u32 {
-        match *self {
-            LValue::Literal(i) => i,
-            _ => panic!("{:?} passed", self),
-        }
-    }
-
-    pub fn to_regs(&self) -> crate::instruction::Regs {
-        use std::convert::TryInto;
-        match *self {
-            LValue::Literal(i) => i.try_into().unwrap(),
-            _ => panic!("{:?} passed", self),
-        }
-    }
-
-    pub fn to_freg(&self) -> crate::instruction::FRegister {
-        use crate::instruction::FRegister;
-        use std::convert::TryInto;
-        match *self {
-            LValue::FloatReg(i) => FRegister::FloatReg(i.try_into().unwrap()),
-            LValue::ExtendedLiteral(i) => FRegister::ExtendedLiteral(i),
-            LValue::X(i) => FRegister::X(i.try_into().unwrap()),
-            LValue::Y(i) => FRegister::Y(i.try_into().unwrap()),
-            _ => panic!("{:?} passed", self),
-        }
-    }
-
-    pub fn to_fregs(&self) -> crate::instruction::FloatRegs {
-        use std::convert::TryInto;
-        match *self {
-            LValue::FloatReg(i) => i.try_into().unwrap(),
-            _ => panic!("{:?} passed", self),
-        }
-    }
-
-    pub fn to_bif(&self) -> crate::instruction::Bif {
-        match *self {
-            LValue::Bif(i) => crate::instruction::Bif(i),
-            _ => panic!(),
-        }
-    }
-    pub fn to_val(&self, constants: &mut Vec<Term>, heap: &Heap) -> crate::instruction::Source {
-        use crate::instruction::Source;
-        use std::convert::TryInto;
-        match self {
-            LValue::Constant(c) => {
-                let i = constants.len();
-                constants.push(*c);
-                Source::Constant(i.try_into().unwrap())
-            }
-            LValue::BigInt(num) => {
-                // very unperformant, double indirection
-                let i = constants.len();
-                constants.push(Term::bigint(heap, num.clone()));
-                Source::Constant(i.try_into().unwrap())
-            }
-            LValue::ExtendedLiteral(i) => Source::ExtendedLiteral(*i),
-            LValue::X(i) => Source::X((*i).try_into().unwrap()),
-            LValue::Y(i) => Source::Y((*i).try_into().unwrap()),
-            _ => panic!("{:?} passed", self),
-        }
-    }
-
     pub fn is_source(&self) -> bool {
         match self {
             LValue::Constant(..) | LValue::BigInt(..) | LValue::ExtendedLiteral(..) | LValue::X(..) | LValue::Y(..) => true,
             _ => false
-        }
-    }
-
-    // temporary
-    pub fn to_size(&self, constants: &mut Vec<Term>) -> crate::instruction::Size {
-        use crate::instruction::Size;
-        use std::convert::TryInto;
-        match self {
-            LValue::Constant(c) => {
-                let i = constants.len();
-                constants.push(*c);
-                Size::Constant(i.try_into().unwrap())
-            }
-            LValue::Literal(i) => Size::Literal(*i),
-            LValue::X(i) => Size::X((*i).try_into().unwrap()),
-            LValue::Y(i) => Size::Y((*i).try_into().unwrap()),
-            _ => panic!("{:?} passed", self),
-        }
-    }
-
-    pub fn to_ext_list(
-        &self,
-        constants: &mut Vec<Term>,
-        heap: &Heap,
-    ) -> crate::instruction::ExtendedList {
-        match self {
-            LValue::ExtendedList(l) => Box::new(
-                l.iter()
-                    .map(|i| match i {
-                        LValue::Literal(i) => crate::instruction::Entry::Literal(*i),
-                        LValue::ExtendedLiteral(i) => {
-                            crate::instruction::Entry::ExtendedLiteral(*i)
-                        }
-                        LValue::Label(i) => crate::instruction::Entry::Label(*i),
-                        _ => crate::instruction::Entry::Value(i.to_val(constants, heap)),
-                    })
-                    .collect(),
-            ),
-            _ => panic!(),
-        }
-    }
-
-    pub fn to_str(&self) -> Vec<u8> {
-        match self {
-            LValue::Str(s) => s.clone(), // TODO: clone not good
-            _ => panic!(),
         }
     }
 }
@@ -390,7 +232,7 @@ impl<'a> Loader<'a> {
         self.prepare();
 
         let mut constants = Vec::new();
-        let instructions = transform_engine(&self.instructions, &mut constants, &self.literal_heap);
+        let instructions = instruction::transform_engine(&self.instructions, &mut constants, &self.literal_heap);
         // println!("ins {:?}", instructions);
 
         Ok(Module {
@@ -883,721 +725,113 @@ fn gen_jump_table(list: &ExtList, fail: instruction::Label) -> (instruction::Jum
 const APPLY_2: crate::bif::Fn = crate::bif::bif_erlang_apply_2;
 const APPLY_3: crate::bif::Fn = crate::bif::bif_erlang_apply_3;
 
-fn transform_engine(instrs: &[Instruction],
-    constants: &mut Vec<Term>,
-    literal_heap: &Heap,
-    ) -> Vec<instruction::Instruction> {
-    let mut res = Vec::with_capacity(instrs.len());
-    let mut iter = instrs.iter();
+//fn transform_engine(instrs: &[Instruction],
+//    constants: &mut Vec<Term>,
+//    literal_heap: &Heap,
+//    ) -> Vec<instruction::Instruction> {
+//    let mut res = Vec::with_capacity(instrs.len());
+//    let mut iter = instrs.iter();
 
-    use instruction::Instruction as I;
-    use crate::opcodes::Opcode as O;
-    use LValue as V;
+//    use instruction::Instruction as I;
+//    use crate::opcodes::Opcode as O;
+//    use LValue as V;
 
-//     transform!(
-//         CallExtLast(u, Bif=b, D) -> Deallocate { n: D } | CallBifOnly { bif: b }
-//     )
-    while let Some(ins) = iter.next() {
-        match (ins.op, &ins.args.as_slice()) {
-            (O::SelectVal, &[arg, LValue::Label(fail), V::ExtendedList(list)]) if use_jump_table(&*list) => {
-                // gen_jump_tab(S, Fail, Size, Rest);
-                // println!("gen jump!\r");
-                let (table, min) = gen_jump_table(&*list, *fail);
-                res.push(I::JumpOnVal {
-                    arg: arg.to_val(constants, literal_heap),
-                    fail: *fail,
-                    table,
-                    min
-                });
-            }
+////     transform!(
+////         CallExtLast(u, Bif=b, D) -> Deallocate { n: D } | CallBifOnly { bif: b }
+////     )
+//    while let Some(ins) = iter.next() {
+//        match (ins.op, &ins.args.as_slice()) {
+//            (O::SelectVal, &[arg, LValue::Label(fail), V::ExtendedList(list)]) if use_jump_table(&*list) => {
+//                // gen_jump_tab(S, Fail, Size, Rest);
+//                // println!("gen jump!\r");
+//                let (table, min) = gen_jump_table(&*list, *fail);
+//                res.push(I::JumpOnVal {
+//                    arg: arg.to_val(constants, literal_heap),
+//                    fail: *fail,
+//                    table,
+//                    min
+//                });
+//            }
 
-            //// apply/2 is an instruction, not a BIF.
-            //// call_ext u==2 u$func:erlang:apply/2 => i_apply_fun
-            //(O::CallExt, &[_, V::Bif(APPLY_2)]) => {
-            //    res.push(I::ApplyFun)
-            //}
-            //// call_ext_last u==2 u$func:erlang:apply/2 D => i_apply_fun_last D
-            //(O::CallExtLast, &[_, V::Bif(APPLY_2), d]) => {
-            //    res.push(I::ApplyFunLast { n: d.into() })
-            //}
-            //// call_ext_only u==2 u$func:erlang:apply/2 => i_apply_fun_only
-            //(O::CallExtOnly, &[_, V::Bif(APPLY_2)]) => {
-            //    res.push(I::ApplyFunOnly)
-            //}
+//            //// apply/2 is an instruction, not a BIF.
+//            //// call_ext u==2 u$func:erlang:apply/2 => i_apply_fun
+//            //(O::CallExt, &[_, V::Bif(APPLY_2)]) => {
+//            //    res.push(I::ApplyFun)
+//            //}
+//            //// call_ext_last u==2 u$func:erlang:apply/2 D => i_apply_fun_last D
+//            //(O::CallExtLast, &[_, V::Bif(APPLY_2), d]) => {
+//            //    res.push(I::ApplyFunLast { n: d.into() })
+//            //}
+//            //// call_ext_only u==2 u$func:erlang:apply/2 => i_apply_fun_only
+//            //(O::CallExtOnly, &[_, V::Bif(APPLY_2)]) => {
+//            //    res.push(I::ApplyFunOnly)
+//            //}
 
-            //// The apply/3 BIF is an instruction.
-            //// call_ext u==3 u$bif:erlang:apply/3 => i_apply
-            //(O::CallExt, &[_, V::Bif(APPLY_2)]) => {
-            //    res.push(I::Apply)
-            //}
-            //// call_ext_last u==3 u$bif:erlang:apply/3 D => i_apply_last D
-            //(O::CallExtLast, &[_, V::Bif(APPLY_3), d]) => {
-            //    res.push(I::ApplyLast { n: d.into() })
-            //}
-            //// call_ext_only u==3 u$bif:erlang:apply/3 => i_apply_only
-            //(O::CallExtOnly, &[_, V::Bif(APPLY_3)]) => {
-            //    res.push(I::ApplyOnly)
-            //}
+//            //// The apply/3 BIF is an instruction.
+//            //// call_ext u==3 u$bif:erlang:apply/3 => i_apply
+//            //(O::CallExt, &[_, V::Bif(APPLY_2)]) => {
+//            //    res.push(I::Apply)
+//            //}
+//            //// call_ext_last u==3 u$bif:erlang:apply/3 D => i_apply_last D
+//            //(O::CallExtLast, &[_, V::Bif(APPLY_3), d]) => {
+//            //    res.push(I::ApplyLast { n: d.into() })
+//            //}
+//            //// call_ext_only u==3 u$bif:erlang:apply/3 => i_apply_only
+//            //(O::CallExtOnly, &[_, V::Bif(APPLY_3)]) => {
+//            //    res.push(I::ApplyOnly)
+//            //}
 
-            //// The general case for BIFs that have no special instructions. A BIF used in the tail
-            //// must be followed by a return instruction.
-            ////
-            //// To make trapping and stack backtraces work correctly, we make sure that the
-            //// continuation pointer is always stored on the stack.
+//            //// The general case for BIFs that have no special instructions. A BIF used in the tail
+//            //// must be followed by a return instruction.
+//            ////
+//            //// To make trapping and stack backtraces work correctly, we make sure that the
+//            //// continuation pointer is always stored on the stack.
 
-            //// call_ext u Bif=u$is_bif => call_bif Bif
-            //(O::CallExt, &[_, V::Bif(bif)]) => {
-            //    res.push(I::CallBif { bif })
-            //}
+//            //// call_ext u Bif=u$is_bif => call_bif Bif
+//            //(O::CallExt, &[_, V::Bif(bif)]) => {
+//            //    res.push(I::CallBif { bif })
+//            //}
 
-            //// call_ext_last u Bif=u$is_bif D => deallocate D | call_bif_only Bif
-            //(O::CallExtLast, &[_, V::Bif(b), d]) => {
-            //    res.push(I::Deallocate { n: d.into() });
-            //    res.push(I::CallBifOnly { bif });
-            //}
+//            //// call_ext_last u Bif=u$is_bif D => deallocate D | call_bif_only Bif
+//            //(O::CallExtLast, &[_, V::Bif(b), d]) => {
+//            //    res.push(I::Deallocate { n: d.into() });
+//            //    res.push(I::CallBifOnly { bif });
+//            //}
 
-            //// call_ext_only Ar=u Bif=u$is_bif => call_bif_only Bif
-            //(O::CallExtOnly, &[_, V::Bif(bif)]) => {
-            //    res.push(I::CallBifOnly { bif });
-            //}
+//            //// call_ext_only Ar=u Bif=u$is_bif => call_bif_only Bif
+//            //(O::CallExtOnly, &[_, V::Bif(bif)]) => {
+//            //    res.push(I::CallBifOnly { bif });
+//            //}
 
-            // fallback to the old transform
-            _ => res.push(transform_instruction(ins.clone(), constants, literal_heap))
-        }
-    }
-    res
-}
+//            // fallback to the old transform
+//            _ => res.push(transform_instruction(ins.clone(), constants, literal_heap))
+//        }
+//    }
+//    res
+//}
 
-fn transform_instruction(
-    ins: self::Instruction,
-    constants: &mut Vec<Term>,
-    literal_heap: &Heap,
-) -> crate::instruction::Instruction {
-    // use crate::opcodes::Opcode;
-    use crate::instruction::Instruction;
-    use std::convert::TryInto;
-
-    match ins.op {
-        Opcode::Label | Opcode::IntCodeEnd | Opcode::Line => unreachable!("removed at load time"),
-        Opcode::PutTuple
-        | Opcode::Put
-        | Opcode::BsStartMatch2
-        | Opcode::BsContextToBinary
-        | Opcode::BsSave2
-        | Opcode::BsRestore2 => unreachable!("compiler too old"),
-        Opcode::FuncInfo => Instruction::FuncInfo {
-            module: ins.args[0].to_val(constants, literal_heap),
-            function: ins.args[1].to_val(constants, literal_heap),
-            arity: ins.args[2].to_arity(),
-        },
-        Opcode::Call => Instruction::Call {
-            arity: ins.args[0].to_arity(),
-            label: ins.args[1].to_label(),
-        },
-        Opcode::CallLast => Instruction::CallLast {
-            arity: ins.args[0].to_arity(),
-            label: ins.args[1].to_label(),
-            words: ins.args[2].to_regs(),
-        },
-        Opcode::CallOnly => Instruction::CallOnly {
-            arity: ins.args[0].to_arity(),
-            label: ins.args[1].to_label(),
-        },
-        Opcode::CallExt => Instruction::CallExt {
-            arity: ins.args[0].to_arity(),
-            destination: ins.args[1].to_lit() as usize,
-        },
-        Opcode::CallExtOnly => Instruction::CallExtOnly {
-            arity: ins.args[0].to_arity(),
-            destination: ins.args[1].to_lit() as usize,
-        },
-        Opcode::CallExtLast => Instruction::CallExtLast {
-            arity: ins.args[0].to_arity(),
-            destination: ins.args[1].to_lit() as usize,
-            words: ins.args[2].to_regs(),
-        },
-        Opcode::Bif0 => Instruction::Bif0 {
-            bif: ins.args[0].to_bif(),
-            reg: ins.args[1].to_reg(),
-        },
-        Opcode::Bif1 => Instruction::Bif1 {
-            fail: ins.args[0].to_label(),
-            bif: ins.args[1].to_bif(),
-            arg1: ins.args[2].to_val(constants, literal_heap),
-            reg: ins.args[3].to_reg(),
-        },
-        Opcode::Bif2 => Instruction::Bif2 {
-            fail: ins.args[0].to_label(),
-            bif: ins.args[1].to_bif(),
-            arg1: ins.args[2].to_val(constants, literal_heap),
-            arg2: ins.args[3].to_val(constants, literal_heap),
-            reg: ins.args[4].to_reg(),
-        },
-        Opcode::Allocate => Instruction::Allocate {
-            stackneed: ins.args[0].to_regs(),
-            live: ins.args[1].to_regs(),
-        },
-        Opcode::AllocateHeap => Instruction::AllocateHeap {
-            stackneed: ins.args[0].to_regs(),
-            heapneed: ins.args[1].to_regs(),
-            live: ins.args[2].to_regs(),
-        },
-        Opcode::AllocateZero => Instruction::AllocateZero {
-            stackneed: ins.args[0].to_regs(),
-            live: ins.args[1].to_regs(),
-        },
-        Opcode::AllocateHeapZero => Instruction::AllocateHeapZero {
-            stackneed: ins.args[0].to_regs(),
-            heapneed: ins.args[1].to_regs(),
-            live: ins.args[2].to_regs(),
-        },
-        Opcode::TestHeap => Instruction::TestHeap {
-            // heapneed: ins.args[0].to_regs(),
-            live: ins.args[1].to_regs(),
-        },
-        Opcode::Init => Instruction::Init {
-            n: ins.args[0].to_reg(),
-        },
-        Opcode::Deallocate => Instruction::Deallocate {
-            n: ins.args[0].to_regs(),
-        },
-        Opcode::Return => Instruction::Return,
-        Opcode::Send => Instruction::Send,
-        Opcode::RemoveMessage => Instruction::RemoveMessage,
-        Opcode::Timeout => Instruction::Timeout,
-        Opcode::LoopRec => Instruction::LoopRec {
-            label: ins.args[0].to_label(),
-            source: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::LoopRecEnd => Instruction::LoopRecEnd {
-            label: ins.args[0].to_label(),
-        },
-        Opcode::Wait => Instruction::Wait {
-            label: ins.args[0].to_label(),
-        },
-        Opcode::WaitTimeout => Instruction::WaitTimeout {
-            label: ins.args[0].to_label(),
-            time: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::IsLt => Instruction::IsLt {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-            arg2: ins.args[2].to_val(constants, literal_heap),
-        },
-        Opcode::IsGe => Instruction::IsGe {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-            arg2: ins.args[2].to_val(constants, literal_heap),
-        },
-        Opcode::IsEq => Instruction::IsEq {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-            arg2: ins.args[2].to_val(constants, literal_heap),
-        },
-        Opcode::IsNe => Instruction::IsNe {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-            arg2: ins.args[2].to_val(constants, literal_heap),
-        },
-        Opcode::IsEqExact => Instruction::IsEqExact {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-            arg2: ins.args[2].to_val(constants, literal_heap),
-        },
-        Opcode::IsNeExact => Instruction::IsNeExact {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-            arg2: ins.args[2].to_val(constants, literal_heap),
-        },
-        Opcode::IsInteger => Instruction::IsInteger {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::IsFloat => Instruction::IsFloat {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::IsNumber => Instruction::IsNumber {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::IsAtom => Instruction::IsAtom {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::IsPid => Instruction::IsPid {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::IsReference => Instruction::IsReference {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::IsPort => Instruction::IsPort {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::IsNil => Instruction::IsNil {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::IsBinary => Instruction::IsBinary {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::IsList => Instruction::IsList {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::IsNonemptyList => Instruction::IsNonemptyList {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::IsTuple => Instruction::IsTuple {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::TestArity => Instruction::TestArity {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-            arity: ins.args[2].to_lit(),
-        },
-        Opcode::SelectVal => {
-            let list = match &ins.args[2] {
-                LValue::ExtendedList(l) => &**l,
-                _ => unreachable!()
-            };
-            if use_jump_table(list) {
-                let fail = ins.args[1].to_label();
-                let (table, min) = gen_jump_table(list, fail);
-                Instruction::JumpOnVal {
-                    arg: ins.args[0].to_val(constants, literal_heap),
-                    fail: fail,
-                    table,
-                    min
-                }
-            } else {
-                Instruction::SelectVal {
-                    arg: ins.args[0].to_val(constants, literal_heap),
-                    fail: ins.args[1].to_label(),
-                    destinations: ins.args[2].to_ext_list(constants, literal_heap),
-                }
-            }
-        },
-        Opcode::SelectTupleArity => Instruction::SelectTupleArity {
-            arg: ins.args[0].to_val(constants, literal_heap),
-            fail: ins.args[1].to_label(),
-            arities: ins.args[2].to_ext_list(constants, literal_heap),
-        },
-        Opcode::Jump => Instruction::Jump(ins.args[0].to_label()),
-        Opcode::Catch => Instruction::Catch {
-            register: ins.args[0].to_reg(),
-            fail: ins.args[1].to_label(),
-        },
-        Opcode::CatchEnd => Instruction::CatchEnd {
-            register: ins.args[0].to_reg(),
-        },
-        Opcode::Move => Instruction::Move {
-            source: ins.args[0].to_val(constants, literal_heap),
-            destination: ins.args[1].to_reg(),
-        },
-        Opcode::Swap => Instruction::Swap {
-            a: ins.args[0].to_reg(),
-            b: ins.args[1].to_reg(),
-        },
-        Opcode::GetList => Instruction::GetList {
-            source: ins.args[0].to_reg(),
-            head: ins.args[1].to_reg(),
-            tail: ins.args[2].to_reg(),
-        },
-        Opcode::GetTupleElement => Instruction::GetTupleElement {
-            source: ins.args[0].to_reg(),
-            element: ins.args[1].to_lit(),
-            destination: ins.args[2].to_reg(),
-        },
-        Opcode::SetTupleElement => Instruction::SetTupleElement {
-            new_element: ins.args[0].to_val(constants, literal_heap),
-            tuple: ins.args[1].to_val(constants, literal_heap),
-            position: ins.args[2].to_lit(),
-        },
-        Opcode::PutList => Instruction::PutList {
-            head: ins.args[0].to_val(constants, literal_heap),
-            tail: ins.args[1].to_val(constants, literal_heap),
-            destination: ins.args[2].to_reg(),
-        },
-        Opcode::PutTuple2 => Instruction::PutTuple2 {
-            source: ins.args[0].to_reg(),
-            list: ins.args[1].to_ext_list(constants, literal_heap),
-        },
-        Opcode::Badmatch => Instruction::Badmatch {
-            value: ins.args[0].to_val(constants, literal_heap),
-        },
-        Opcode::IfEnd => Instruction::IfEnd,
-        Opcode::CaseEnd => Instruction::CaseEnd {
-            value: ins.args[0].to_val(constants, literal_heap),
-        },
-        Opcode::CallFun => Instruction::CallFun {
-            arity: ins.args[0].to_arity(),
-        },
-        Opcode::IsFunction => Instruction::IsFunction {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::BsPutInteger => Instruction::BsPutInteger {
-            fail: ins.args[0].to_label(),
-            size: ins.args[1].to_val(constants, literal_heap),
-            unit: ins.args[2].to_u32().try_into().unwrap(),
-            flags: ins.args[3].to_flags(),
-            source: ins.args[4].to_val(constants, literal_heap),
-        },
-        Opcode::BsPutBinary => Instruction::BsPutBinary {
-            fail: ins.args[0].to_label(),
-            size: ins.args[1].to_val(constants, literal_heap),
-            unit: ins.args[2].to_u32().try_into().unwrap(),
-            flags: ins.args[3].to_flags(),
-            source: ins.args[4].to_val(constants, literal_heap),
-        },
-        Opcode::BsPutFloat => Instruction::BsPutFloat {
-            fail: ins.args[0].to_label(),
-            size: ins.args[1].to_val(constants, literal_heap),
-            unit: ins.args[2].to_u32().try_into().unwrap(),
-            flags: ins.args[3].to_flags(),
-            source: ins.args[4].to_val(constants, literal_heap),
-        },
-        Opcode::BsPutString => Instruction::BsPutString {
-            binary: ins.args[0].to_str(),
-        },
-        Opcode::Fclearerror => Instruction::Fclearerror,
-        Opcode::Fcheckerror => Instruction::Fcheckerror,
-        Opcode::Fmove => Instruction::Fmove {
-            source: ins.args[0].to_freg(),      // reg + fregs
-            destination: ins.args[1].to_freg(), // reg + fregs
-        },
-        Opcode::Fconv => Instruction::Fconv {
-            source: ins.args[0].to_freg(),
-            destination: ins.args[1].to_fregs(),
-        },
-        Opcode::Fadd => Instruction::Fadd {
-            fail: ins.args[0].to_label(),
-            a: ins.args[1].to_fregs(),
-            b: ins.args[2].to_fregs(),
-            destination: ins.args[3].to_fregs(),
-        },
-        Opcode::Fsub => Instruction::Fsub {
-            fail: ins.args[0].to_label(),
-            a: ins.args[1].to_fregs(),
-            b: ins.args[2].to_fregs(),
-            destination: ins.args[3].to_fregs(),
-        },
-        Opcode::Fmul => Instruction::Fmul {
-            fail: ins.args[0].to_label(),
-            a: ins.args[1].to_fregs(),
-            b: ins.args[2].to_fregs(),
-            destination: ins.args[3].to_fregs(),
-        },
-        Opcode::Fdiv => Instruction::Fdiv {
-            fail: ins.args[0].to_label(),
-            a: ins.args[1].to_fregs(),
-            b: ins.args[2].to_fregs(),
-            destination: ins.args[3].to_fregs(),
-        },
-        Opcode::Fnegate => Instruction::Fnegate {
-            source: ins.args[0].to_fregs(),
-            destination: ins.args[1].to_fregs(),
-        },
-        Opcode::MakeFun2 => Instruction::MakeFun2 {
-            i: ins.args[0].to_regs(),
-        },
-        Opcode::Try => Instruction::Try {
-            register: ins.args[0].to_reg(),
-            fail: ins.args[1].to_label(),
-        },
-        Opcode::TryEnd => Instruction::TryEnd {
-            register: ins.args[0].to_reg(),
-        },
-        Opcode::TryCase => Instruction::TryCase {
-            register: ins.args[0].to_reg(),
-        },
-        Opcode::TryCaseEnd => Instruction::TryCaseEnd {
-            value: ins.args[0].to_val(constants, literal_heap),
-        },
-        Opcode::Raise => Instruction::Raise {
-            trace: ins.args[0].to_reg(),
-            value: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::BsInit2 => Instruction::BsInit2 {
-            fail: ins.args[0].to_label(),
-            size: ins.args[1].to_size(constants),
-            words: ins.args[2].to_regs(),
-            regs: ins.args[3].to_regs(),
-            flags: ins.args[4].to_flags(), // maybe skip flags?
-            destination: ins.args[5].to_reg(),
-        },
-        Opcode::BsAdd => Instruction::BsAdd {
-            fail: ins.args[0].to_label(),
-            size1: ins.args[1].to_val(constants, literal_heap),
-            size2: ins.args[2].to_val(constants, literal_heap),
-            unit: ins.args[3].to_u32().try_into().unwrap(),
-            destination: ins.args[4].to_reg(),
-        },
-        Opcode::Apply => Instruction::Apply {
-            arity: ins.args[0].to_arity(),
-        },
-        Opcode::ApplyLast => Instruction::ApplyLast {
-            arity: ins.args[0].to_arity(),
-            nwords: ins.args[1].to_regs(),
-        },
-        Opcode::IsBoolean => Instruction::IsBoolean {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::IsFunction2 => Instruction::IsFunction2 {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-            arity: ins.args[2].to_val(constants, literal_heap),
-        },
-        Opcode::BsGetInteger2 => Instruction::BsGetInteger2 {
-            fail: ins.args[0].to_label(),
-            ms: ins.args[1].to_reg(),
-            live: ins.args[2].to_regs(),
-            size: ins.args[3].to_val(constants, literal_heap),
-            unit: ins.args[4].to_u32().try_into().unwrap(),
-            flags: ins.args[5].to_flags(),
-            destination: ins.args[6].to_reg(),
-        },
-        Opcode::BsGetFloat2 => Instruction::BsGetFloat2 {
-            fail: ins.args[0].to_label(),
-            ms: ins.args[1].to_reg(),
-            live: ins.args[2].to_regs(),
-            size: ins.args[3].to_val(constants, literal_heap),
-            unit: ins.args[4].to_u32().try_into().unwrap(),
-            flags: ins.args[5].to_flags(),
-            destination: ins.args[6].to_reg(),
-        },
-        Opcode::BsGetBinary2 => Instruction::BsGetBinary2 {
-            fail: ins.args[0].to_label(),
-            ms: ins.args[1].to_reg(),
-            live: ins.args[2].to_regs(),
-            size: ins.args[3].to_val(constants, literal_heap),
-            unit: ins.args[4].to_u32().try_into().unwrap(),
-            flags: ins.args[5].to_flags(),
-            destination: ins.args[6].to_reg(),
-        },
-        Opcode::BsSkipBits2 => Instruction::BsSkipBits2 {
-            fail: ins.args[0].to_label(),
-            ms: ins.args[1].to_reg(),
-            size: ins.args[2].to_val(constants, literal_heap),
-            unit: ins.args[3].to_u32().try_into().unwrap(),
-            flags: ins.args[4].to_flags(),
-        },
-        Opcode::BsTestTail2 => Instruction::BsTestTail2 {
-            fail: ins.args[0].to_label(),
-            ms: ins.args[1].to_reg(),
-            bits: ins.args[2].to_u32(),
-        },
-        Opcode::GcBif1 => Instruction::GcBif1 {
-            label: ins.args[0].to_label(),
-            // live: ins.args[1].to_regs(),
-            bif: ins.args[2].to_bif(),
-            arg1: ins.args[3].to_val(constants, literal_heap),
-            reg: ins.args[4].to_reg(),
-        },
-        Opcode::GcBif2 => Instruction::GcBif2 {
-            label: ins.args[0].to_label(),
-            // live: ins.args[1].to_regs(),
-            bif: ins.args[2].to_bif(),
-            arg1: ins.args[3].to_val(constants, literal_heap),
-            arg2: ins.args[4].to_val(constants, literal_heap),
-            reg: ins.args[5].to_reg(),
-        },
-        Opcode::IsBitstr => Instruction::IsBitstr {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::BsTestUnit => Instruction::BsTestUnit {
-            fail: ins.args[0].to_label(),
-            context: ins.args[1].to_reg(),
-            unit: ins.args[2].to_lit().try_into().unwrap(),
-        },
-        Opcode::BsMatchString => Instruction::BsMatchString {
-            fail: ins.args[0].to_label(),
-            context: ins.args[1].to_reg(),
-            bits: ins.args[2].to_u32(),
-            string: ins.args[3].to_str(),
-        },
-        Opcode::BsInitWritable => Instruction::BsInitWritable,
-        Opcode::BsAppend => Instruction::BsAppend {
-            fail: ins.args[0].to_label(),
-            size: ins.args[1].to_val(constants, literal_heap),
-            extra: ins.args[2].to_regs(),
-            live: ins.args[3].to_regs(),
-            unit: ins.args[4].to_lit().try_into().unwrap(),
-            bin: ins.args[5].to_val(constants, literal_heap),
-            // flags: ins.args[6].to_flags(), skip flags
-            destination: ins.args[7].to_reg(),
-        },
-        Opcode::BsPrivateAppend => Instruction::BsPrivateAppend {
-            fail: ins.args[0].to_label(),
-            size: ins.args[1].to_val(constants, literal_heap),
-            unit: ins.args[2].to_lit().try_into().unwrap(),
-            bin: ins.args[3].to_val(constants, literal_heap),
-            // flags: ins.args[5].to_flags(), skip flags
-            destination: ins.args[5].to_reg(),
-        },
-        Opcode::Trim => Instruction::Trim {
-            n: ins.args[0].to_regs(),
-            // remaining: ins.args[1].to_regs(), skipped in beam
-        },
-        Opcode::BsInitBits => Instruction::BsInitBits {
-            fail: ins.args[0].to_label(),
-            size: ins.args[1].to_size(constants),
-            words: ins.args[2].to_regs(),
-            regs: ins.args[3].to_regs(),
-            flags: ins.args[4].to_flags(), // maybe skip flags?
-            destination: ins.args[5].to_reg(),
-        },
-        Opcode::BsGetUtf8 => Instruction::BsGetUtf8 {
-            fail: ins.args[0].to_label(),
-            ms: ins.args[1].to_reg(),
-            size: ins.args[2].to_size(constants),
-            flags: ins.args[3].to_flags(),
-            destination: ins.args[4].to_reg(),
-        },
-        Opcode::BsGetUtf16 => Instruction::BsGetUtf16 {
-            fail: ins.args[0].to_label(),
-            ms: ins.args[1].to_reg(),
-            size: ins.args[2].to_size(constants),
-            flags: ins.args[3].to_flags(),
-            destination: ins.args[4].to_reg(),
-        },
-        Opcode::BsGetUtf32 => Instruction::BsGetUtf32 {
-            fail: ins.args[0].to_label(),
-            ms: ins.args[1].to_reg(),
-            size: ins.args[2].to_size(constants),
-            flags: ins.args[3].to_flags(),
-            destination: ins.args[4].to_reg(),
-        },
-        Opcode::BsSkipUtf8 => Instruction::BsSkipUtf8 {
-            fail: ins.args[0].to_label(),
-            ms: ins.args[1].to_reg(),
-            size: ins.args[2].to_size(constants),
-            flags: ins.args[3].to_flags(),
-        },
-        Opcode::BsSkipUtf16 => Instruction::BsSkipUtf16 {
-            fail: ins.args[0].to_label(),
-            ms: ins.args[1].to_reg(),
-            size: ins.args[2].to_size(constants),
-            flags: ins.args[3].to_flags(),
-        },
-        Opcode::BsSkipUtf32 => Instruction::BsSkipUtf32 {
-            fail: ins.args[0].to_label(),
-            ms: ins.args[1].to_reg(),
-            size: ins.args[2].to_size(constants),
-            flags: ins.args[3].to_flags(),
-        },
-        Opcode::BsUtf8Size => Instruction::BsUtf8Size {
-            fail: ins.args[0].to_label(),
-            source: ins.args[1].to_reg(),
-            destination: ins.args[2].to_reg(),
-        },
-        Opcode::BsUtf16Size => Instruction::BsUtf16Size {
-            fail: ins.args[0].to_label(),
-            source: ins.args[1].to_reg(),
-            destination: ins.args[2].to_reg(),
-        },
-        Opcode::BsPutUtf8 => Instruction::BsPutUtf8 {
-            fail: ins.args[0].to_label(),
-            flags: ins.args[1].to_flags(),
-            source: ins.args[2].to_reg(),
-        },
-        Opcode::BsPutUtf16 => Instruction::BsPutUtf16 {
-            fail: ins.args[0].to_label(),
-            flags: ins.args[1].to_flags(),
-            source: ins.args[2].to_reg(),
-        },
-        Opcode::BsPutUtf32 => Instruction::BsPutUtf32 {
-            fail: ins.args[0].to_label(),
-            flags: ins.args[1].to_flags(),
-            source: ins.args[2].to_reg(),
-        },
-        Opcode::OnLoad => unimplemented!("on_load instruction!"),
-        Opcode::RecvMark => Instruction::RecvMark,
-        Opcode::RecvSet => Instruction::RecvSet,
-        Opcode::GcBif3 => Instruction::GcBif3 {
-            label: ins.args[0].to_label(),
-            // live: ins.args[1].to_regs(),
-            bif: ins.args[2].to_bif(),
-            arg1: ins.args[3].to_val(constants, literal_heap),
-            arg2: ins.args[4].to_val(constants, literal_heap),
-            arg3: ins.args[5].to_val(constants, literal_heap),
-            reg: ins.args[6].to_reg(),
-        },
-        Opcode::PutMapAssoc => Instruction::PutMapAssoc {
-            // fail: obsolete past OTP 20 since we know it's preceeded by is_map
-            map: ins.args[1].to_val(constants, literal_heap),
-            destination: ins.args[2].to_reg(),
-            live: ins.args[3].to_regs(),
-            rest: ins.args[4].to_ext_list(constants, literal_heap),
-        },
-        Opcode::PutMapExact => Instruction::PutMapExact {
-            // fail: obsolete past OTP 20 since we know it's preceeded by is_map
-            map: ins.args[1].to_val(constants, literal_heap),
-            destination: ins.args[2].to_reg(),
-            live: ins.args[3].to_regs(),
-            rest: ins.args[4].to_ext_list(constants, literal_heap),
-        },
-        Opcode::IsMap => Instruction::IsMap {
-            label: ins.args[0].to_label(),
-            arg1: ins.args[1].to_val(constants, literal_heap),
-        },
-        Opcode::HasMapFields => Instruction::HasMapFields {
-            label: ins.args[0].to_label(),
-            source: ins.args[1].to_reg(),
-            rest: ins.args[2].to_ext_list(constants, literal_heap),
-        },
-        Opcode::GetMapElements => Instruction::GetMapElements {
-            label: ins.args[0].to_label(),
-            source: ins.args[1].to_reg(),
-            rest: ins.args[2].to_ext_list(constants, literal_heap),
-        },
-        Opcode::IsTaggedTuple => Instruction::IsTaggedTuple {
-            fail: ins.args[0].to_label(),
-            source: ins.args[1].to_reg(),
-            arity: ins.args[2].to_u32(),
-            atom: ins.args[3].to_val(constants, literal_heap),
-        },
-        Opcode::BuildStacktrace => Instruction::BuildStacktrace,
-        Opcode::RawRaise => Instruction::RawRaise,
-        Opcode::GetHd => Instruction::GetHd {
-            source: ins.args[0].to_reg(),
-            head: ins.args[1].to_reg(),
-        },
-        Opcode::GetTl => Instruction::GetTl {
-            source: ins.args[0].to_reg(),
-            tail: ins.args[1].to_reg(),
-        },
-        Opcode::BsGetTail => Instruction::BsGetTail {
-            context: ins.args[0].to_reg(),
-            destination: ins.args[1].to_reg(),
-            live: ins.args[2].to_regs(),
-        },
-        Opcode::BsStartMatch3 => Instruction::BsStartMatch3 {
-            fail: ins.args[0].to_label(),
-            source: ins.args[1].to_reg(),
-            live: ins.args[2].to_regs(),
-            destination: ins.args[3].to_reg(),
-        },
-        Opcode::BsGetPosition => Instruction::BsGetPosition {
-            context: ins.args[0].to_reg(),
-            destination: ins.args[1].to_reg(),
-            live: ins.args[2].to_regs(),
-        },
-        Opcode::BsSetPosition => Instruction::BsSetPosition {
-            context: ins.args[0].to_reg(),
-            position: ins.args[1].to_val(constants, literal_heap),
-        },
-    }
-}
+//         Opcode::SelectVal => {
+//             let list = match &ins.args[2] {
+//                 LValue::ExtendedList(l) => &**l,
+//                 _ => unreachable!()
+//             };
+//             if use_jump_table(list) {
+//                 let fail = ins.args[1].to_label();
+//                 let (table, min) = gen_jump_table(list, fail);
+//                 Instruction::JumpOnVal {
+//                     arg: ins.args[0].to_val(constants, literal_heap),
+//                     fail: fail,
+//                     table,
+//                     min
+//                 }
+//             } else {
+//                 Instruction::SelectVal {
+//                     arg: ins.args[0].to_val(constants, literal_heap),
+//                     fail: ins.args[1].to_label(),
+//                     destinations: ins.args[2].to_ext_list(constants, literal_heap),
+//                 }
+//             }
+//         },
 
 fn decode_literals<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Vec<Term>> {
     do_parse!(

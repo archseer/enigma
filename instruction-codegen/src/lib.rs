@@ -5,11 +5,13 @@ use proc_macro2::{Span, TokenTree, Punct, Group};
 use proc_quote::{quote, quote_spanned,TokenStreamExt};
 
 use syn::parse::{Parse, ParseStream};
-use syn::punctuated::{Punctuated, Pair};
+use syn::punctuated::{Punctuated};
 use syn::ext::IdentExt;
-use syn::{braced, parenthesized, parse_macro_input, token, Ident, Type, Result, Token};
+use syn::{braced, parenthesized, parse_macro_input, Ident, Result, Token};
 
 use permutate::{Permutator};
+
+// TODO: skip underscores
 
 /// Argument typing shorthands:
 /// - x: x register
@@ -28,6 +30,12 @@ use permutate::{Permutator};
 /// - s: small? arity? (u8) --> could do these as digits 1,2,4,8 (bytes)
 /// - b: bif
 /// - m: extended list
+/// - v: byte vec (Vec<u8>)
+/// - q: extended literal
+/// - S: size
+/// - F: flag
+/// - R: float register or x or y
+/// - L: float register
 
 #[derive(Debug)]
 struct Arg {
@@ -108,6 +116,7 @@ fn build_variants(ins: &Instruction) -> Vec<Opcode> {
             body: ins.body.clone(),
         }]
     } else {
+        // TODO: skip types starting with _
 	let types: Vec<Vec<String>> = ins.args.iter().map(|arg| arg.types.to_string().chars().map(|c| c.to_string()).collect()).collect();
 
         // *sigh*
@@ -129,9 +138,9 @@ fn build_variants(ins: &Instruction) -> Vec<Opcode> {
         let names = ins.args.iter().map(|arg| arg.name.clone());
 
         permutator.map(|types| {
-            let mut suffix = types.join("");
-            suffix.make_ascii_uppercase();
-            let name = Ident::new(&format!("{}{}", name, suffix), Span::call_site());
+            let suffix = types.join("");
+            // suffix.make_ascii_uppercase();
+            let name = Ident::new(&format!("{}_{}", name, suffix), Span::call_site());
 
             Opcode {
                 name,
@@ -148,24 +157,34 @@ fn expand_enum_variants(op: &Opcode) -> proc_macro2::TokenStream {
     if op.args.is_empty() {
         quote! { #name }
     } else {
-        let args: Vec<proc_macro2::TokenStream> = op.args.iter().map(|(arg, t)| {
-            let t = match t.as_str() {
-                "c" => Ident::new("u32", Span::call_site()),
-                "r" => Ident::new("Regs", Span::call_site()),
-                "x" => Ident::new("RegisterX", Span::call_site()),
-                "y" => Ident::new("RegisterY", Span::call_site()),
-                "l" => Ident::new("Label", Span::call_site()),
-                "s" => Ident::new("Source", Span::call_site()),
-                "t" => Ident::new("u8", Span::call_site()),
-                "u" => Ident::new("u32", Span::call_site()),
-                "d" => Ident::new("Register", Span::call_site()),
-                "b" => Ident::new("BifFn", Span::call_site()),
-                "m" => Ident::new("ExtendedList", Span::call_site()),
-                //_ => syn::Error::new(arg.span(), format!("unexpected type `{}`", t)).to_compile_error(),
-                _ => panic!("unexpected type {}", t),
-            };
+        let args: Vec<proc_macro2::TokenStream> = op.args.iter().filter_map(|(arg, t)| {
+            if !arg.to_string().starts_with("_") {
+                let t = match t.as_str() {
+                    "c" => Ident::new("u32", Span::call_site()),
+                    "r" => Ident::new("Regs", Span::call_site()),
+                    "x" => Ident::new("RegisterX", Span::call_site()),
+                    "y" => Ident::new("RegisterY", Span::call_site()),
+                    "q" => Ident::new("u32", Span::call_site()),
+                    "l" => Ident::new("Label", Span::call_site()),
+                    "s" => Ident::new("Source", Span::call_site()),
+                    "t" => Ident::new("u8", Span::call_site()),
+                    "u" => Ident::new("u32", Span::call_site()),
+                    "d" => Ident::new("Register", Span::call_site()),
+                    "b" => Ident::new("Bif", Span::call_site()),
+                    "m" => Ident::new("ExtendedList", Span::call_site()),
+                    "v" => Ident::new("Bytes", Span::call_site()),
+                    "F" => Ident::new("BitFlag", Span::call_site()),
+                    "S" => Ident::new("Size", Span::call_site()),
+                    "L" => Ident::new("FloatRegs", Span::call_site()),
+                    "R" => Ident::new("FRegister", Span::call_site()),
+                    //_ => syn::Error::new(arg.span(), format!("unexpected type `{}`", t)).to_compile_error(),
+                    _ => panic!("unexpected type {}", t),
+                };
 
-            quote!{ #arg: #t }
+                Some(quote!{ #arg: #t })
+            } else {
+                None
+            }
         }).collect();
 
         quote! {
@@ -176,10 +195,19 @@ fn expand_enum_variants(op: &Opcode) -> proc_macro2::TokenStream {
 
 fn expand_impls(op: &Opcode) -> proc_macro2::TokenStream {
     let variant = &op.name;
-    let args: Vec<_> = op.args.iter().map(|(n, t)| match t.as_str() {
-        "m" => quote!{ ref #n },
-        _ => quote! { #n }
-    }).collect();
+    let args: Vec<_> = op.args.iter().filter_map(|(n, t)|
+        if !n.to_string().starts_with("_") {
+            let var = match t.as_str() {
+                "m" => quote!{ ref #n },
+                "v" => quote!{ ref #n },
+                _ => quote! { #n }
+            };
+            Some(var)
+        } else {
+            // skip types starting with _
+            None
+        }
+    ).collect();
 
     let mut input = op.body.clone().into_iter().peekable();
     let body =  interpolate_opcode_impls(op, &mut input).unwrap();
@@ -191,18 +219,81 @@ fn expand_impls(op: &Opcode) -> proc_macro2::TokenStream {
     }
 }
 
+fn expand_loads(op: &Opcode) -> proc_macro2::TokenStream {
+    let variant = &op.name;
+    let genop = &op.genop;
+    let matches: Vec<_> = op.args.iter().map(|(n, t)| {
+        if n.to_string().starts_with("_") {
+            // blank match on ignored args
+            quote! { _ }
+        } else {
+            match t.as_str() {
+                "c" => quote!{ #n }, // could be BigInt, hence why we don't match
+                "x" => quote!{ V::X(#n) },
+                "y" => quote!{ V::Y(#n) },
+                "q" => quote!{ V::ExtendedLiteral(#n) },
+                "b" => quote!{ V::Bif(#n) },
+                "l" => quote!{ V::Label(#n) },
+                "L" => quote!{ V::FloatReg(#n) },
+                "u" => quote!{ #n },
+                "t" => quote!{ #n },
+                "r" => quote!{ #n },
+                _ => quote! { #n }
+            }
+        }
+    }).collect();
+    let args: Vec<_> = op.args.iter().filter_map(|(n, t)| {
+        if !n.to_string().starts_with("_") {
+            let arg = match t.as_str() {
+                "c" => quote_spanned!{n.span() => #n: to_const(#n, constants, literal_heap) },
+                "x" => quote_spanned!{n.span() => #n: RegisterX((*#n).try_into().unwrap()) },
+                "y" => quote_spanned!{n.span() => #n: RegisterY((*#n).try_into().unwrap()) },
+                "q" => quote_spanned!{n.span() => #n: *#n },
+                "b" => quote_spanned!{n.span() => #n: Bif(*#n) },
+                "l" => quote_spanned!{n.span() => #n: *#n },
+                "L" => quote_spanned!{n.span() => #n: (*#n).try_into().unwrap() },
+                "u" => quote_spanned!{n.span() => #n: #n.to_u32().try_into().unwrap() },
+                "t" => quote_spanned!{n.span() => #n: #n.to_u32().try_into().unwrap() },
+                "r" => quote_spanned!{n.span() => #n: #n.to_u32().try_into().unwrap() },
+                _ => quote_spanned! {n.span() => #n: #n.into_with_heap(constants, literal_heap) }
+            };
+            Some(arg)
+        } else {
+            // skip types starting with _
+            None
+        }
+    }).collect();
+
+    // let cond = quote!{ if use_jump_table(&*list) };
+
+    quote! {
+        (O::#genop, &[#(#matches),*]) => {
+            // let (table, min) = gen_jump_table(&*list, *fail);
+            res.push(I::#variant {
+                #(#args),*
+                // arg: arg.to_val(constants, literal_heap),
+                // fail: *fail,
+                // table,
+                // min
+            });
+        }
+    }
+}
+
 #[proc_macro]
 pub fn instruction(tokens: TokenStream) -> TokenStream {
     let input = parse_macro_input!(tokens as Instructions);
 
-    eprintln!("SYN: {:#?}", input);
+    // eprintln!("SYN: {:#?}", input);
 
     let opcodes: Vec<Opcode> = input.ins.iter().map(build_variants).flatten().collect();
 
     let enums: Vec<_> = opcodes.iter().map(expand_enum_variants).collect();
     let impls: Vec<_> = opcodes.iter().map(expand_impls).collect();
+    let loads: Vec<_> = opcodes.iter().map(expand_loads).collect();
 
     let tokens = quote! {
+        #[derive(Clone, Debug)]
         pub enum Instruction {
             #(#enums),*
         }
@@ -212,11 +303,10 @@ pub fn instruction(tokens: TokenStream) -> TokenStream {
         impl<'a, T> Captures<'a> for T {}
 
         #[inline(always)]
-        pub fn run<'a: 'd, 'b: 'd, 'c: 'd, 'd>(
+        pub fn run<'a: 'c, 'b: 'c, 'c>(
             vm: &'a Machine,
             process: &'b mut RcProcess,
-            ins: &'c Instruction
-        ) -> impl std::future::Future<Output = Result<process::State, Exception>> + Captures<'a> + Captures<'b> + Captures<'c> + 'd {
+        ) -> impl std::future::Future<Output = Result<process::State, Exception>> + Captures<'a> + Captures<'b> + 'c {
             async move {  // workaround for https://github.com/rust-lang/rust/issues/56238
             let context = process.context_mut();
             context.reds = 2000; // self.config.reductions;
@@ -226,10 +316,10 @@ pub fn instruction(tokens: TokenStream) -> TokenStream {
 
             // a fake constant nil
             let NIL = Term::nil();
-            // TEMP let mut ins;
+            let mut ins;
 
             loop {
-                // TEMP ins = unsafe { (*context.ip.module).instructions.get_unchecked(context.ip.ptr as usize) };
+                ins = unsafe { (*context.ip.module).instructions.get_unchecked(context.ip.ptr as usize) };
                 context.ip.ptr += 1;
 
                 match *ins {
@@ -239,13 +329,30 @@ pub fn instruction(tokens: TokenStream) -> TokenStream {
             }
         }
 
-        impl Instruction {
-            fn load(ins: loader::Instruction) -> Self {
-                unimplemented!()
+        pub fn transform_engine(
+            instrs: &[crate::loader::Instruction],
+            constants: &mut Vec<Term>,
+            literal_heap: &Heap,
+        ) -> Vec<instruction::Instruction> {
+            let mut res = Vec::with_capacity(instrs.len());
+            let mut iter = instrs.iter();
+
+            use instruction::Instruction as I;
+            use crate::opcodes::Opcode as O;
+            use LValue as V;
+
+            // transform!(
+            //     CallExtLast(u, Bif=b, D) -> Deallocate { n: D } | CallBifOnly { bif: b }
+            // )
+            while let Some(ins) = iter.next() {
+                match (ins.op, &ins.args.as_slice()) {
+                    #(#loads),*
+                    _ => unimplemented!("{:?}({:?})", ins.op, &ins.args.as_slice())
+                }
             }
+            res
         }
     };
-
     tokens.into()
 }
 
@@ -293,7 +400,14 @@ fn interpolate_group(stream: &mut proc_macro2::TokenStream, opcode: &Opcode, gro
 
 /// Interpolates the given variable, which should implement `ToTokens`.
 fn interpolate_to_tokens_ident(stream: &mut proc_macro2::TokenStream, opcode: &Opcode, ident: &Ident, next: Option<&proc_macro2::TokenTree>) {
-    let typ = &opcode.args.iter().find(|(name, _)| name == ident).unwrap().1;
+    let typ = match opcode.args.iter().find(|(name, _)| name == ident) {
+        Some(t) => &t.1,
+        None => {
+            stream.append_all(syn::Error::new_spanned(ident, "argument undefined").to_compile_error());
+            return;
+        }
+    };
+
     let code = match next.and_then(|token| match token {
         TokenTree::Punct(punct) => Some(punct.as_char()),
         _ => None
@@ -301,19 +415,19 @@ fn interpolate_to_tokens_ident(stream: &mut proc_macro2::TokenStream, opcode: &O
         // if it's an assignment, treat it specially
         Some('=') => match typ.as_str() {
             "c" => syn::Error::new_spanned(ident, "cannot assign to constant").to_compile_error(),
+            "q" => syn::Error::new_spanned(ident, "cannot assign to literal").to_compile_error(),
             // TODO: assignment
-            "x" => quote_spanned!(ident.span() => *context.x.index_mut(#ident as usize) ),
-            "y" => quote_spanned!(ident.span() => *context.stack.index_mut(context.stack.len() - (#ident + 1) as usize)),
-            "s" => quote_spanned!(ident.span() => context.expand_arg(#ident)),
+            "x" => quote_spanned!(ident.span() => *context.x.index_mut(#ident.0 as usize) ),
+            "y" => quote_spanned!(ident.span() => *context.stack.index_mut(context.stack.len() - (#ident.0 + 1) as usize)),
             // TODO: needs to be assignable
             "d" => quote_spanned! {ident.span()=>
                 let reg = match register {
                     Register::X(reg) => unsafe {
-                        *self.x.get_unchecked_mut(reg as usize)
+                        *self.x.get_unchecked_mut(reg.0 as usize)
                     }
                     Register::Y(reg) => {
                         let len = self.stack.len();
-                        &mut self.stack[(len - (reg + 1) as usize)]
+                        &mut self.stack[(len - (reg.0 + 1) as usize)]
                     }
                 };
                 *reg = value
@@ -327,9 +441,10 @@ fn interpolate_to_tokens_ident(stream: &mut proc_macro2::TokenStream, opcode: &O
         },
         _ => match typ.as_str() {
             "c" => quote_spanned!(ident.span() => unsafe { (*context.ip.module).constants[#ident as usize] }),
+            "q" => quote_spanned!(ident.span() => unsafe { (*context.ip.module).literals[#ident as usize] }),
             // TODO: assignment
-            "x" => quote_spanned!(ident.span() => *context.x.index(#ident as usize) ),
-            "y" => quote_spanned!(ident.span() => *context.stack.index(context.stack.len() - (#ident + 1) as usize)),
+            "x" => quote_spanned!(ident.span() => (*context.x.index(#ident.0 as usize)) ),
+            "y" => quote_spanned!(ident.span() => (*context.stack.index(context.stack.len() - (#ident.0 + 1) as usize))),
             "s" => quote_spanned!(ident.span() => context.expand_arg(#ident)),
             // TODO: needs to be assignable
             "d" => quote_spanned!(ident.span() => context.fetch_register(#ident)),

@@ -96,7 +96,7 @@ impl Module {
         for (name, arity, fun) in nifs {
             // find func_info
             if let Some(i) = self.instructions.iter().position(|ins| {
-                if let crate::instruction::Instruction::FuncInfo {
+                if let crate::instruction::Instruction::FuncInfo_sst {
                     function: crate::instruction::Source::Constant(n),
                     arity: a,
                     ..
@@ -113,9 +113,9 @@ impl Module {
                 let pos = self.imports.len();
                 self.imports.push(mfa);
                 // replace instruction immediately after with call_nif
-                self.instructions[i + 1] = Instruction::CallExtOnly {
+                self.instructions[i + 1] = Instruction::CallExtOnly_tu {
                     arity: (*arity).try_into().unwrap(),
-                    destination: pos,
+                    destination: pos as u32,
                 };
             // println!("NIF replaced {}", mfa);
             } else {
