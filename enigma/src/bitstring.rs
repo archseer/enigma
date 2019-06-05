@@ -444,7 +444,7 @@ impl MatchBuffer {
         Some(std::borrow::Cow::Owned(buf))
     }
 
-    pub fn get_integer(&mut self, heap: &Heap, num_bits: usize, mut flags: Flag) -> Option<Term> {
+    pub fn get_integer(&mut self, heap: &Heap, num_bits: usize, flags: Flag) -> Option<Term> {
         //    Uint bytes;
         //    Uint bits;
         //    Uint offs;
@@ -700,7 +700,7 @@ impl MatchBuffer {
         // <<W:32/native,H:32/native>> = list_to_binary(List),
     }
 
-    pub fn get_float(&mut self, _heap: &Heap, num_bits: usize, mut flags: Flag) -> Option<Term> {
+    pub fn get_float(&mut self, _heap: &Heap, num_bits: usize, flags: Flag) -> Option<Term> {
         let mut fl32: f32 = 0.0;
         let mut fl64: f64 = 0.0;
 
@@ -1569,7 +1569,7 @@ impl Builder {
         unsafe { &mut *self.binary }
     }
 
-    pub fn put_integer(&mut self, size: usize, mut flags: Flag, int: Term) {
+    pub fn put_integer(&mut self, size: usize, flags: Flag, int: Term) {
         let bit_offset = bit_offset!(self.offset);
 
         if let value::Variant::Integer(value) = int.into_variant() {

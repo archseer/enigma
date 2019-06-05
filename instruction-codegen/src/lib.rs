@@ -416,14 +416,15 @@ fn interpolate_to_tokens_ident(stream: &mut proc_macro2::TokenStream, opcode: &O
         Some('=') => match typ.as_str() {
             "c" => syn::Error::new_spanned(ident, "cannot assign to constant").to_compile_error(),
             "q" => syn::Error::new_spanned(ident, "cannot assign to literal").to_compile_error(),
-            // TODO: assignment
-            "x" => quote_spanned!(ident.span() => *context.x.index_mut(#ident.0 as usize) ),
-            "y" => quote_spanned!(ident.span() => *context.stack.index_mut(context.stack.len() - (#ident.0 + 1) as usize)),
-            // TODO: needs to be assignable
+            "x" => quote_spanned!(ident.span() => *unsafe { context.x.get_unchecked_mut(#ident.0 as usize) }),
+            "y" => quote_spanned!(ident.span() => *unsafe {
+                let len = context.stack.len();
+                context.stack.get_unchecked_mut(len - (#ident.0 + 1) as usize)
+            }),
             "d" => quote_spanned! {ident.span()=>
                 let reg = match register {
                     Register::X(reg) => unsafe {
-                        *self.x.get_unchecked_mut(reg.0 as usize)
+                        self.x.get_unchecked_mut(reg.0 as usize)
                     }
                     Register::Y(reg) => {
                         let len = self.stack.len();
@@ -443,8 +444,8 @@ fn interpolate_to_tokens_ident(stream: &mut proc_macro2::TokenStream, opcode: &O
             "c" => quote_spanned!(ident.span() => unsafe { (*context.ip.module).constants[#ident as usize] }),
             "q" => quote_spanned!(ident.span() => unsafe { (*context.ip.module).literals[#ident as usize] }),
             // TODO: assignment
-            "x" => quote_spanned!(ident.span() => (*context.x.index(#ident.0 as usize)) ),
-            "y" => quote_spanned!(ident.span() => (*context.stack.index(context.stack.len() - (#ident.0 + 1) as usize))),
+            "x" => quote_spanned!(ident.span() => unsafe { (*context.x.get_unchecked(#ident.0 as usize)) }),
+            "y" => quote_spanned!(ident.span() => unsafe { (*context.stack.get_unchecked(context.stack.len() - (#ident.0 + 1) as usize)) }),
             "s" => quote_spanned!(ident.span() => context.expand_arg(#ident)),
             // TODO: needs to be assignable
             "d" => quote_spanned!(ident.span() => context.fetch_register(#ident)),
