@@ -36,6 +36,7 @@ use permutate::{Permutator};
 /// - F: flag
 /// - R: float register or x or y
 /// - L: float register
+/// - T: jump table
 
 #[derive(Debug)]
 struct Arg {
@@ -164,6 +165,7 @@ fn expand_enum_variants(op: &Opcode) -> proc_macro2::TokenStream {
                     "r" => Ident::new("Regs", Span::call_site()),
                     "x" => Ident::new("RegisterX", Span::call_site()),
                     "y" => Ident::new("RegisterY", Span::call_site()),
+                    "i" => Ident::new("i32", Span::call_site()),
                     "q" => Ident::new("u32", Span::call_site()),
                     "l" => Ident::new("Label", Span::call_site()),
                     "s" => Ident::new("Source", Span::call_site()),
@@ -177,6 +179,7 @@ fn expand_enum_variants(op: &Opcode) -> proc_macro2::TokenStream {
                     "S" => Ident::new("Size", Span::call_site()),
                     "L" => Ident::new("FloatRegs", Span::call_site()),
                     "R" => Ident::new("FRegister", Span::call_site()),
+                    "T" => Ident::new("JumpTable", Span::call_site()),
                     //_ => syn::Error::new(arg.span(), format!("unexpected type `{}`", t)).to_compile_error(),
                     _ => panic!("unexpected type {}", t),
                 };
@@ -200,6 +203,7 @@ fn expand_impls(op: &Opcode) -> proc_macro2::TokenStream {
             let var = match t.as_str() {
                 "m" => quote!{ ref #n },
                 "v" => quote!{ ref #n },
+                "T" => quote!{ ref #n },
                 _ => quote! { #n }
             };
             Some(var)
@@ -231,10 +235,12 @@ fn expand_loads(op: &Opcode) -> proc_macro2::TokenStream {
                 "c" => quote!{ #n }, // could be BigInt, hence why we don't match
                 "x" => quote!{ V::X(#n) },
                 "y" => quote!{ V::Y(#n) },
+                "i" => quote!{ V::Constant(#n) }, // a bit annoying, was cast to constant before
                 "q" => quote!{ V::ExtendedLiteral(#n) },
                 "b" => quote!{ V::Bif(#n) },
                 "l" => quote!{ V::Label(#n) },
                 "L" => quote!{ V::FloatReg(#n) },
+                "T" => quote!{ V::JumpTable(#n) },
                 "u" => quote!{ #n },
                 "t" => quote!{ #n },
                 "r" => quote!{ #n },
@@ -248,10 +254,12 @@ fn expand_loads(op: &Opcode) -> proc_macro2::TokenStream {
                 "c" => quote_spanned!{n.span() => #n: to_const(#n, constants, literal_heap) },
                 "x" => quote_spanned!{n.span() => #n: RegisterX((*#n).try_into().unwrap()) },
                 "y" => quote_spanned!{n.span() => #n: RegisterY((*#n).try_into().unwrap()) },
+                "i" => quote_spanned!{n.span() => #n: #n.to_int().unwrap() },
                 "q" => quote_spanned!{n.span() => #n: *#n },
                 "b" => quote_spanned!{n.span() => #n: Bif(*#n) },
                 "l" => quote_spanned!{n.span() => #n: *#n },
                 "L" => quote_spanned!{n.span() => #n: (*#n).try_into().unwrap() },
+                "T" => quote_spanned!{n.span() => #n: #n.clone() },
                 "u" => quote_spanned!{n.span() => #n: #n.to_u32().try_into().unwrap() },
                 "t" => quote_spanned!{n.span() => #n: #n.to_u32().try_into().unwrap() },
                 "r" => quote_spanned!{n.span() => #n: #n.to_u32().try_into().unwrap() },

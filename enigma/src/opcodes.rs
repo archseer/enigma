@@ -565,6 +565,10 @@ pub enum Opcode {
     /// @spec swap Register1 Register2
     /// @doc  Swaps the contents of two registers.
     Swap = 169,
+
+    // enigma specific
+
+    JumpOnVal = 170,
 }
 
 pub static ARITY_MAP: &'static [usize] = &[
@@ -738,6 +742,8 @@ pub static ARITY_MAP: &'static [usize] = &[
     3, // opcode: 167 (bs_get_position)
     2, // opcode: 168 (bs_set_position)
     2, // opcode: 169 (swap)
+    // enigma-specific
+    4, // opcode: 170 (jump_on_val)
 ];
 
 #[inline]

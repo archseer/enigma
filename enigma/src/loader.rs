@@ -70,6 +70,9 @@ pub enum LValue {
     FloatReg(u32),
     AllocList(Box<Vec<(u8, u32)>>),
     ExtendedLiteral(u32), // TODO; replace at load time
+
+    // enigma stuff
+    JumpTable(instruction::JumpTable),
 }
 
 // LValue as { X(), Y(), Literal(), Constant(integer | atom | nil term)
@@ -93,6 +96,7 @@ impl std::fmt::Debug for LValue {
             LValue::AllocList(..) => write!(f, "<alloclist>"),
             LValue::ExtendedList(..) => write!(f, "<ext list>"),
             LValue::ExtendedLiteral(..) => write!(f, "<ext lit>"),
+            LValue::JumpTable(..) => write!(f, "<jmp tab>"),
         }
     }
 }
@@ -145,6 +149,13 @@ impl LValue {
     }
 
     // conversion funs
+    pub fn to_label(&self) -> u32 {
+        match *self {
+            LValue::Label(i) => i,
+            _ => panic!("{:?} passed", self),
+        }
+    }
+
     pub fn to_atom(&self) -> crate::instruction::Atom {
         match *self {
             LValue::Atom(i) => i,
@@ -623,6 +634,29 @@ impl<'a> Loader<'a> {
                 })
                 .collect();
         });
+
+        self.instructions.iter_mut().for_each(|instruction| {
+            match instruction.op {
+                Opcode::SelectVal => {
+                    let list = match &instruction.args[2] {
+                        LValue::ExtendedList(l) => &**l,
+                        _ => unreachable!()
+                    };
+                    if use_jump_table(list) {
+                        let fail = instruction.args[1].to_label();
+                        let (table, min) = gen_jump_table(list, fail);
+                        instruction.op = Opcode::JumpOnVal;
+                        instruction.args = vec![
+                            instruction.args[0].clone(),
+                            instruction.args[1].clone(),
+                            LValue::JumpTable(table),
+                            LValue::Constant(Term::int(min))
+                        ];
+                    }
+                }
+                _ => (),
+            }
+        });
     }
 
     fn postprocess_lambdas(&mut self) {
@@ -652,7 +686,7 @@ fn use_jump_table(list: &ExtList) -> bool {
     let mut max = i;
 
     let mut iter = list.chunks_exact(2);
-    for chunk in iter.next() {
+    while let Some(chunk) = iter.next() {
         match chunk {
             &[LValue::Constant(i), LValue::Label(_)] => {
                 match i.to_int() {
@@ -684,8 +718,8 @@ fn gen_jump_table(list: &ExtList, fail: instruction::Label) -> (instruction::Jum
 
     let mut iter = list.chunks_exact(2);
     while let Some(chunk) = iter.next() {
-        match *chunk {
-            [LValue::Constant(i), _] => {
+        match chunk {
+            &[LValue::Constant(i), _] => {
                 let i = i.to_int().unwrap();
                 if i < min {
                     min = i;
@@ -703,9 +737,9 @@ fn gen_jump_table(list: &ExtList, fail: instruction::Label) -> (instruction::Jum
     let mut table = vec![fail; size];
 
     let mut iter = list.chunks_exact(2);
-    for chunk in iter.next() {
-        match *chunk {
-            [LValue::Constant(i), LValue::Label(l)] => {
+    while let Some(chunk) = iter.next() {
+        match chunk {
+            &[LValue::Constant(i), LValue::Label(l)] => {
                 let i = i.to_int().unwrap();
                 let index = i - min;
                 table[index as usize] = l;
@@ -718,9 +752,8 @@ fn gen_jump_table(list: &ExtList, fail: instruction::Label) -> (instruction::Jum
     (Box::new(table), min)
 }
 
-
-const APPLY_2: crate::bif::Fn = crate::bif::bif_erlang_apply_2;
-const APPLY_3: crate::bif::Fn = crate::bif::bif_erlang_apply_3;
+// const APPLY_2: crate::bif::Fn = crate::bif::bif_erlang_apply_2;
+// const APPLY_3: crate::bif::Fn = crate::bif::bif_erlang_apply_3;
 
 //fn transform_engine(instrs: &[Instruction],
 //    constants: &mut Vec<Term>,
@@ -806,29 +839,6 @@ const APPLY_3: crate::bif::Fn = crate::bif::bif_erlang_apply_3;
 //    }
 //    res
 //}
-
-//         Opcode::SelectVal => {
-//             let list = match &ins.args[2] {
-//                 LValue::ExtendedList(l) => &**l,
-//                 _ => unreachable!()
-//             };
-//             if use_jump_table(list) {
-//                 let fail = ins.args[1].to_label();
-//                 let (table, min) = gen_jump_table(list, fail);
-//                 Instruction::JumpOnVal {
-//                     arg: ins.args[0].to_val(constants, literal_heap),
-//                     fail: fail,
-//                     table,
-//                     min
-//                 }
-//             } else {
-//                 Instruction::SelectVal {
-//                     arg: ins.args[0].to_val(constants, literal_heap),
-//                     fail: ins.args[1].to_label(),
-//                     destinations: ins.args[2].to_ext_list(constants, literal_heap),
-//                 }
-//             }
-//         },
 
 fn decode_literals<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Vec<Term>> {
     do_parse!(

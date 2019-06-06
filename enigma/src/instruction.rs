@@ -784,10 +784,20 @@ instruction!(
             op_jump!(context, fail);
         }
     },
-    // TODO:
-    // fn jump_on_val() {
-
-    // },
+    fn jump_on_val(arg: s, fail: l, table: T, min: i) {
+        // SelectVal optimized with a jump table
+        if let Some(i) = #arg.to_int() {
+            // TODO: optimize for min: 0
+            let index = (i - min) as usize;
+            if index < table.len() {
+                op_jump!(context, table[index]);
+            } else {
+                op_jump!(context, fail);
+            }
+        } else {
+            op_jump!(context, fail);
+        }
+    },
     fn get_list(source: xy, head: xy, tail: xy) {
         let val = #source;
         if let Ok(value::Cons { head: h, tail: t }) = val.cast_into() {
