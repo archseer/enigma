@@ -6,7 +6,6 @@ use crate::process::RcProcess;
 use crate::value::{self, CastFrom, CastFromMut, Cons, Term, Variant};
 use crate::vm;
 use std::fs;
-use std::pin::Pin;
 use std::sync::atomic::AtomicU32;
 
 // it uses a queue (vecdeq? or just a slice of iovecs) of iovecs.

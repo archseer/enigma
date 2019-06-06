@@ -1232,7 +1232,7 @@ fn bif_erlang_module_loaded_1(vm: &vm::Machine, _process: &RcProcess, args: &[Te
     Ok(atom!(FALSE))
 }
 
-fn bif_erlang_loaded_0(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_loaded_0(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> Result {
     let heap = &process.context_mut().heap;
     Ok(vm
         .modules
@@ -1360,7 +1360,7 @@ fn erts_internal_map_next_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term
     Ok(res)
 }
 
-fn erts_internal_time_unit_0(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn erts_internal_time_unit_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> Result {
     let heap = &process.context_mut().heap;
     let unit: u64 = 1000 * 1000 * 1000;
     Ok(Term::uint64(heap, unit))

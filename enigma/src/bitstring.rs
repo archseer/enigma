@@ -803,10 +803,10 @@ impl MatchBuffer {
     #[inline]
     fn align_utf8_bytes(&self, buf: *mut u8) {
         let bits = match self.remaining() {
-            0...7 => unreachable!(),
-            8...15 => 8,
-            16...23 => 24,
-            24...31 => 24,
+            0..=7 => unreachable!(),
+            8..=15 => 8,
+            16..=23 => 24,
+            24..=31 => 24,
             _ => 32,
         };
 
@@ -1577,7 +1577,7 @@ impl Builder {
                 0 => (), // skip
                 8 => self.data().push(value as u8),
                 _ => {
-                    let rbits = 8 - bit_offset;
+                    // let rbits = 8 - bit_offset;
                     if bit_offset + size <= 8 {
                         // All bits are in the same byte
                         // iptr = erts_current_bin + byte_offset!(self.offset);
@@ -1587,7 +1587,7 @@ impl Builder {
                         unimplemented!()
                     } else if bit_offset == 0 {
                         // More than one bit, starting at a byte boundary
-                        let bits = bit_offset!(size);
+                        // let bits = bit_offset!(size);
                         fmt_int(self.data(), self.offset, value, size, flags);
                     } else if flags.contains(Flag::BSF_LITTLE) {
                         // special handling for little endian

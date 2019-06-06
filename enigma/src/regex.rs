@@ -8,9 +8,9 @@ use regex::bytes::Regex;
 pub mod bif {
     use super::*;
     use crate::bif::Result;
-    use crate::exception::{self, Exception, Reason};
+    use crate::exception::{Exception, Reason};
     use crate::process::RcProcess;
-    use crate::value::{self, Term};
+    use crate::value::Term;
     use crate::vm;
 
     pub fn run_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {

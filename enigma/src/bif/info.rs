@@ -1,7 +1,7 @@
 use crate::atom;
 use crate::bif;
 use crate::exception::{Exception, Reason};
-use crate::process::{Process, RcProcess};
+use crate::process::RcProcess;
 use crate::value::{self, Cons, Term, CastFrom, Variant};
 use crate::vm;
 use crate::Itertools;

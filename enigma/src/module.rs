@@ -4,7 +4,7 @@ use crate::exports_table::ExportsTable;
 use crate::immix::Heap;
 use crate::instr_ptr::InstrPtr;
 use crate::instruction::Instruction;
-use crate::loader::{FuncInfo, Line};
+use crate::loader::Line;
 use crate::value::{self, CastFrom, Term, Variant};
 use crate::vm::Machine;
 use hashbrown::HashMap;

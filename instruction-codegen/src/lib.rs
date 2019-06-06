@@ -158,7 +158,7 @@ fn expand_enum_variants(op: &Opcode) -> proc_macro2::TokenStream {
         quote! { #name }
     } else {
         let args: Vec<proc_macro2::TokenStream> = op.args.iter().filter_map(|(arg, t)| {
-            if !arg.to_string().starts_with("_") {
+            if !arg.to_string().starts_with('_') {
                 let t = match t.as_str() {
                     "c" => Ident::new("u32", Span::call_site()),
                     "r" => Ident::new("Regs", Span::call_site()),
@@ -196,7 +196,7 @@ fn expand_enum_variants(op: &Opcode) -> proc_macro2::TokenStream {
 fn expand_impls(op: &Opcode) -> proc_macro2::TokenStream {
     let variant = &op.name;
     let args: Vec<_> = op.args.iter().filter_map(|(n, t)|
-        if !n.to_string().starts_with("_") {
+        if !n.to_string().starts_with('_') {
             let var = match t.as_str() {
                 "m" => quote!{ ref #n },
                 "v" => quote!{ ref #n },
@@ -223,7 +223,7 @@ fn expand_loads(op: &Opcode) -> proc_macro2::TokenStream {
     let variant = &op.name;
     let genop = &op.genop;
     let matches: Vec<_> = op.args.iter().map(|(n, t)| {
-        if n.to_string().starts_with("_") {
+        if n.to_string().starts_with('_') {
             // blank match on ignored args
             quote! { _ }
         } else {
@@ -243,7 +243,7 @@ fn expand_loads(op: &Opcode) -> proc_macro2::TokenStream {
         }
     }).collect();
     let args: Vec<_> = op.args.iter().filter_map(|(n, t)| {
-        if !n.to_string().starts_with("_") {
+        if !n.to_string().starts_with('_') {
             let arg = match t.as_str() {
                 "c" => quote_spanned!{n.span() => #n: to_const(#n, constants, literal_heap) },
                 "x" => quote_spanned!{n.span() => #n: RegisterX((*#n).try_into().unwrap()) },

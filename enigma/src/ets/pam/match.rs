@@ -129,10 +129,10 @@ pub fn run(
     'restart: loop {
         let mut e: &Term;
         let initial = &[term];
-        let mut ep: Box<Iterator<Item = &Term>> = Box::new(initial.iter());
+        let mut ep: Box<dyn Iterator<Item = &Term>> = Box::new(initial.iter());
         // esp = (Eterm*)((char*)mpsp->u.heap + prog->stack_offset); // seems to be estack pointer
         let mut esp = Vec::with_capacity(pat.stack_need); // TODO with some default capacity -- seems to be used as a stack for special form & guard bifs
-        let mut sp: Vec<Box<Iterator<Item = &Term>>> = Vec::with_capacity(pat.stack_need); // TODO with some default capacity -- seems to be used as a stack for special form & guard bifs
+        let mut sp: Vec<Box<dyn Iterator<Item = &Term>>> = Vec::with_capacity(pat.stack_need); // TODO with some default capacity -- seems to be used as a stack for special form & guard bifs
 
         // sp = (const Eterm **)esp; // current stack pointer
         // let mut sp = iter;

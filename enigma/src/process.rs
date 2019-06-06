@@ -347,8 +347,8 @@ impl Process {
         // TODO: will require locking
         self.waiting_for_message.store(false, Ordering::Relaxed);
         match self.context_mut().timeout.take() {
-            Some(chan) => chan.send(()),
-            None => Ok(()),
+            Some(chan) => chan.send(()).unwrap(),
+            None => (),
         };
         // TODO: pass through the chan.send result ret
     }

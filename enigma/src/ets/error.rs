@@ -85,7 +85,7 @@ impl StdError for Error {
         }
     }
 
-    fn cause(&self) -> Option<&StdError> {
+    fn cause(&self) -> Option<&dyn StdError> {
         match *self.0 {
             // ErrorKind::Io(ref err) => Some(err),
             // ErrorKind::Utf8 { ref err, .. } => Some(err),

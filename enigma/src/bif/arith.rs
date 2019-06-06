@@ -11,7 +11,7 @@ use num_traits::Signed;
 use statrs;
 use std::ops::{Add, Mul, Sub};
 
-pub fn float_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn float_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     match &args[0].into_number() {
         Ok(value::Num::Integer(i)) => Ok(Term::from(*i as f64)),
         Ok(value::Num::Float(..)) => Ok(args[0]),

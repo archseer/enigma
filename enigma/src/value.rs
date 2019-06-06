@@ -7,7 +7,6 @@ use crate::exception;
 use crate::immix::Heap;
 use crate::instr_ptr::InstrPtr;
 use crate::module;
-use crate::nanbox::TypedNanBox;
 use crate::nanbox::NanBox;
 use crate::process;
 use allocator_api::Layout;

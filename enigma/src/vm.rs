@@ -1,21 +1,18 @@
 use crate::atom;
-use crate::port;
-use crate::bif;
 use crate::bitstring;
 use crate::ets::{RcTableRegistry, TableRegistry};
 use crate::exception::{self, Exception, Reason};
 use crate::exports_table::{Export, ExportsTable, RcExportsTable};
-use crate::instr_ptr::InstrPtr;
 use crate::module; 
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
-use crate::instruction::{self, Instruction};
+use crate::instruction;
 use crate::process::registry::Registry as ProcessRegistry;
 use crate::process::table::Table as ProcessTable;
 use crate::port::{Table as PortTable, RcTable as RcPortTable};
 use crate::process::{self, RcProcess};
 use crate::persistent_term::{Table as PersistentTermTable};
 use crate::servo_arc::Arc;
-use crate::value::{self, Cons, Term, CastFrom, CastInto, CastIntoMut, Tuple, Variant};
+use crate::value::{self, Cons, Term};
 use std::cell::RefCell;
 // use log::debug;
 use parking_lot::Mutex;
@@ -28,7 +25,7 @@ use futures::{
   compat::*,
   future::{FutureExt, TryFutureExt},
   // io::AsyncWriteExt,
-  stream::StreamExt,
+  // stream::StreamExt,
   // sink::SinkExt,
 };
 // use futures::prelude::*;
@@ -148,7 +145,6 @@ macro_rules! expand_float {
                 }
             }
             FRegister::FloatReg(reg) => $context.f[*reg as usize],
-            _ => unreachable!(),
         }
     }};
 }
@@ -163,7 +159,6 @@ macro_rules! op_jump_ptr {
     ($context:expr, $ptr:expr) => ($context.ip = $ptr);
 }
 
-#[macro_export]
 #[inline]
 pub fn op_deallocate(context: &mut process::ExecutionContext, nwords: u16) {
     let (_, cp) = context.callstack.pop().unwrap();
@@ -219,9 +214,6 @@ pub fn call_error_handler(
     op_jump_ptr!(context, ptr);
     Ok(())
 }
-
-const APPLY_2: bif::Fn = bif::bif_erlang_apply_2;
-const APPLY_3: bif::Fn = bif::bif_erlang_apply_3;
 
 #[macro_export]
 macro_rules! op_call_ext {

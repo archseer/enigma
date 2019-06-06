@@ -349,7 +349,7 @@ pub fn encode_term(res: &mut Vec<u8>, term: Term) -> std::io::Result<()> {
         Variant::Cons(..) => encode_list(res, Cons::cast_from(&term).unwrap())?,
         // encode list
         // encode improper list
-        Variant::Pointer(ptr) => match term.get_boxed_header().unwrap() {
+        Variant::Pointer(_ptr) => match term.get_boxed_header().unwrap() {
             value::BOXED_TUPLE => encode_tuple(res, Tuple::cast_from(&term).unwrap())?,
             value::BOXED_BINARY => {
                 encode_binary(res, bitstring::RcBinary::cast_from(&term).unwrap())?
@@ -375,7 +375,7 @@ fn encode_tuple(res: &mut Vec<u8>, tuple: &value::Tuple) -> std::io::Result<()> 
         res.write_u8(tuple.len() as u8)?;
     } else {
         res.write_u8(Tag::LargeTuple as u8)?;
-        res.write_u32::<BigEndian>(tuple.len() as u32);
+        res.write_u32::<BigEndian>(tuple.len() as u32)?;
     }
     for e in tuple.iter().copied() {
         encode_term(res, e)?;

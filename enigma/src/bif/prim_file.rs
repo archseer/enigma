@@ -85,7 +85,7 @@ pub fn set_cwd_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
 
     match std::env::set_current_dir(path) {
         Ok(()) => Ok(atom!(OK)),
-        Err(err) => return Ok(error_to_tuple(heap, err)),
+        Err(err) => Ok(error_to_tuple(heap, err)),
     }
 }
 
@@ -448,12 +448,7 @@ pub fn seek_nif_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
         _ => return Err(Exception::new(Reason::EXC_BADARG)),
     };
     let seek = match args[1].into_variant() {
-        Variant::Atom(atom::BOF) => {
-            if pos < 0 {
-                return Err(Exception::new(Reason::EXC_BADARG));
-            }
-            SeekFrom::Start(pos as u64)
-        }
+        Variant::Atom(atom::BOF) => SeekFrom::Start(pos as u64),
         Variant::Atom(atom::CUR) => SeekFrom::Current(pos as i64),
         Variant::Atom(atom::EOF) => SeekFrom::End(pos as i64),
         _ => return Err(Exception::new(Reason::EXC_BADARG)),

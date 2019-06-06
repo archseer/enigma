@@ -2,7 +2,7 @@ use instruction_codegen::instruction;
 
 // mandatory for loop
 use crate::vm::{Machine, op_deallocate};
-use crate::{atom, loader, port, bif, bitstring, module};
+use crate::{atom, port, bif, bitstring, module};
 use crate::bitstring::Flag as BitFlag;
 use crate::exception::{self, Exception, Reason};
 use crate::exports_table::{Export};
@@ -22,8 +22,6 @@ use futures::{
 // use futures::prelude::*;
 // end mandatory for loop
 
-use std::ops::Index;
-use std::ops::IndexMut;
 use std::convert::TryInto;
 
 // for the load transform
@@ -121,7 +119,6 @@ pub enum Register {
 impl FromWithHeap<LValue> for Register {
     #[inline]
     fn from_with_heap(value: &LValue, constants: &mut Vec<Term>, heap: &Heap) -> Self {
-        use std::convert::TryInto;
         match value {
             LValue::X(i) => Register::X(RegisterX((*i).try_into().unwrap())),
             LValue::Y(i) => Register::Y(RegisterY((*i).try_into().unwrap())),
@@ -162,7 +159,6 @@ pub enum Source {
 impl FromWithHeap<LValue> for Source {
     #[inline]
     fn from_with_heap(value: &LValue, constants: &mut Vec<Term>, heap: &Heap) -> Self {
-        use std::convert::TryInto;
         match value {
             LValue::Constant(c) => {
                 let i = constants.len();
@@ -1174,7 +1170,6 @@ instruction!(
 
         // TODO: this cast can fail
         if let Ok(mb) = #ms.get_boxed_value_mut::<bitstring::MatchBuffer>() {
-            use std::convert::TryInto;
             // fast path for common ops
             let res = match (bits, flags.contains(bitstring::Flag::BSF_LITTLE), flags.contains(bitstring::Flag::BSF_SIGNED)) {
                 (8, true, true) => {
@@ -1519,7 +1514,6 @@ instruction!(
                 context.stack[len - (reg.0 + 1) as usize]
             }
             FRegister::FloatReg(reg) => Term::from(context.f[reg as usize]),
-            _ => unreachable!(),
         };
 
         let val: f64 = match value.into_number() {

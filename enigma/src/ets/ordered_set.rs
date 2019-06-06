@@ -1,6 +1,6 @@
 use super::*;
 use crate::immix::Heap;
-use crate::value::{Cons, Term, CastFrom, CastInto, CastIntoMut, Tuple, Variant};
+use crate::value::{Cons, Term, CastFrom, Tuple};
 use error::*;
 use parking_lot::RwLock;
 

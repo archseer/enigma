@@ -43,7 +43,7 @@ impl Table {
 
 pub mod bif {
     use crate::bif::Result;
-    use crate::exception::{self, Exception, Reason};
+    use crate::exception::{Exception, Reason};
     use crate::process::RcProcess;
     use crate::value::Term;
     use crate::vm;

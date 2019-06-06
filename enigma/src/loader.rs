@@ -1,15 +1,13 @@
 use crate::atom::{self, ATOMS};
-use crate::bitstring;
 use crate::etf;
 use crate::immix::Heap;
 use crate::module::{Lambda, Module, MFA};
 use crate::opcodes::*;
-use crate::servo_arc::Arc;
 use crate::value::Term;
 use hashbrown::HashMap;
 use libflate::zlib;
 use nom::*;
-use num_bigint::{BigInt, Sign};
+use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use std::io::{Cursor, Read};
 
@@ -90,12 +88,11 @@ impl std::fmt::Debug for LValue {
             LValue::Constant(i) => write!(f, "const({})", i),
             LValue::Nil => write!(f, "nil()"),
             LValue::BigInt(i) => write!(f, "bigint({})", i),
-            LValue::Bif(i) => write!(f, "<bif>"),
+            LValue::Bif(_) => write!(f, "<bif>"),
             LValue::Str(..) => write!(f, "<str>"),
             LValue::AllocList(..) => write!(f, "<alloclist>"),
             LValue::ExtendedList(..) => write!(f, "<ext list>"),
             LValue::ExtendedLiteral(..) => write!(f, "<ext lit>"),
-            _ => write!(f, "lvalue<>"),
         }
     }
 }
@@ -243,7 +240,7 @@ impl<'a> Loader<'a> {
             literal_heap: self.literal_heap,
             lambdas: self.lambdas,
             funs: self.funs,
-            instructions: instructions,
+            instructions,
             lines: self.lines,
             name: self.atom_map[&0], // atom 0 is module name
             on_load: self.on_load,
@@ -655,7 +652,7 @@ fn use_jump_table(list: &ExtList) -> bool {
     let mut max = i;
 
     let mut iter = list.chunks_exact(2);
-    while let Some(chunk) = iter.next() {
+    for chunk in iter.next() {
         match chunk {
             &[LValue::Constant(i), LValue::Label(_)] => {
                 match i.to_int() {
@@ -687,8 +684,8 @@ fn gen_jump_table(list: &ExtList, fail: instruction::Label) -> (instruction::Jum
 
     let mut iter = list.chunks_exact(2);
     while let Some(chunk) = iter.next() {
-        match chunk {
-            &[LValue::Constant(i), _] => {
+        match *chunk {
+            [LValue::Constant(i), _] => {
                 let i = i.to_int().unwrap();
                 if i < min {
                     min = i;
@@ -706,9 +703,9 @@ fn gen_jump_table(list: &ExtList, fail: instruction::Label) -> (instruction::Jum
     let mut table = vec![fail; size];
 
     let mut iter = list.chunks_exact(2);
-    while let Some(chunk) = iter.next() {
-        match chunk {
-            &[LValue::Constant(i), LValue::Label(l)] => {
+    for chunk in iter.next() {
+        match *chunk {
+            [LValue::Constant(i), LValue::Label(l)] => {
                 let i = i.to_int().unwrap();
                 let index = i - min;
                 table[index as usize] = l;

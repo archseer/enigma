@@ -227,7 +227,7 @@ pub fn list_to_iodata(list: Term) -> Result<Vec<u8>, Exception> {
                         elem = cons.head;
 
                         match elem.into_variant() {
-                            Variant::Integer(i @ 0...255) => {
+                            Variant::Integer(i @ 0..=255) => {
                                 // append int to bytes
                                 bytes.push(i as u8);
                             }
@@ -248,7 +248,7 @@ pub fn list_to_iodata(list: Term) -> Result<Vec<u8>, Exception> {
                     elem = cons.tail;
 
                     match elem.into_variant() {
-                        Variant::Integer(i @ 0...255) => {
+                        Variant::Integer(i @ 0..=255) => {
                             // append int to bytes
                             bytes.push(i as u8);
                         }
@@ -322,14 +322,14 @@ pub fn iolist_to_iovec_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
                     }
                     _ => return Err(Exception::new(Reason::EXC_BADARG)),
                 },
-                Variant::Integer(i) => {
+                Variant::Integer(_i) => {
                     // append byte to buf
                     // TODO: this keeps doing a lookahead
                     // if (!iol2v_append_byte_seq(state, iterator, &seq_end)) {
                     // iterator = seq_end;
                     let mut seq_length = 0;
                     let mut lookahead = iterator;
-                    while let Ok(Cons { head, tail }) = Cons::cast_from(&lookahead) {
+                    while let Ok(Cons { head, tail: _ }) = Cons::cast_from(&lookahead) {
                         if !head.is_smallint() {
                             break;
                         }
@@ -419,7 +419,7 @@ pub fn unicode_characters_to_binary_2(
     while let Some(iter) = stack.last_mut() {
         if let Some(elem) = iter.next() {
             match elem.into_variant() {
-                Variant::Integer(i @ 0...255) => {
+                Variant::Integer(i @ 0..=255) => {
                     // append int to bytes
                     bytes.push(i as u8);
                 }
@@ -501,7 +501,7 @@ pub fn iolist_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
                         elem = cons.head;
 
                         match elem.into_variant() {
-                            Variant::Integer(_i @ 0...255) => count += 1,
+                            Variant::Integer(_i @ 0..=255) => count += 1,
                             Variant::Pointer(..) => match elem.to_bytes() {
                                 Some(data) => count += data.len(),
                                 None => return Err(Exception::new(Reason::EXC_BADARG)),
@@ -519,7 +519,7 @@ pub fn iolist_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
                     elem = cons.tail;
 
                     match elem.into_variant() {
-                        Variant::Integer(_i @ 0...255) => count += 1,
+                        Variant::Integer(_i @ 0..=255) => count += 1,
                         Variant::Pointer(..) => match elem.to_bytes() {
                             Some(data) => count += data.len(),
                             None => return Err(Exception::new(Reason::EXC_BADARG)),

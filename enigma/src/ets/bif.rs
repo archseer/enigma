@@ -6,8 +6,6 @@ use crate::value;
 use crate::value::{Cons, Term, CastFrom, Tuple, Type, Variant};
 use crate::vm;
 
-use std::pin::Pin;
-
 use super::bag::Bag;
 use super::error::{new_error, ErrorKind};
 use super::hash_table::HashTable;
