@@ -921,6 +921,13 @@ impl Term {
                         let bigint = &(*(ptr as *const Boxed<BigInt>)).value;
                         Term::bigint(heap, bigint.clone())
                     }
+                    BOXED_SUBBINARY => {
+                        let subbin = &(*(ptr as *const Boxed<bitstring::SubBinary>)).value;
+                        Term::subbinary(heap, subbin.clone())
+                    }
+                    BOXED_BINARY => {
+                        unimplemented!()
+                    }
                     _ => unimplemented!("deep_clone for {}", self), // TODO: deep clone for Ref<>
                 }
             },

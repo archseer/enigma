@@ -521,7 +521,12 @@ impl Process {
 
         // TODO: cancel timers
 
-        // TODO: unregister process name
+        // unregister process name
+        vm.process_table.lock().release(self.pid);
+
+        if let Some(name) = self.local_data().name {
+            vm.process_registry.lock().unregister(name);
+        }
 
         // delete links
         for pid in local_data.links.drain() {
