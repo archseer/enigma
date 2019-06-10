@@ -376,7 +376,7 @@ pub fn open_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
     let file = match opts.open(path) {
         Ok(file) => file,
         Err(err) => {
-            println!("pid={} attempted open on {}, failed.", process.pid, args[0]);
+            // println!("pid={} attempted open on {}, failed.", process.pid, args[0]);
             return Ok(error_to_tuple(heap, err));
         }
     };

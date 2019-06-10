@@ -383,7 +383,7 @@ instruction!(
         // TODO: source is supposed to be the location, but it's always x0
         // grab message from queue, put to x0, if no message, jump to fail label
         if let Some(msg) = process.receive()? {
-            // println!("recv proc pid={:?} msg={}", process.pid, msg);
+            // info!("recv proc pid={:?} msg={}", process.pid, msg);
             context.x[0] = msg
         } else {
             op_jump!(context, fail);
@@ -1552,11 +1552,11 @@ instruction!(
         context.f[destination as usize] = -context.f[source as usize];
     },
     fn trim(nwords: r, _remaining: r) {
-        // let cp = context.stack.pop().unwrap();
+        let (n, cp) = context.callstack.pop().unwrap();
         context
             .stack
             .truncate(context.stack.len() - nwords as usize);
-        // context.stack.push(cp);
+        context.callstack.push((n - nwords, cp));
     },
     fn make_fun2(i: u) {
         // nfree means capture N x-registers into the closure
