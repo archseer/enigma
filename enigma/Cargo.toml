@@ -44,7 +44,7 @@ simplelog = "0.5.3"
 hashbrown = "0.4.0"
 nodrop = "0.1.13"
 statrs = "0.11.0"
-lexical = "2.1.0"
+lexical = { version = "2.1.0", features = ["radix"]}
 dirs = "2.0.1"
 termion = "1.5.2"
 tokio-stdin-stdout = "0.1.5"

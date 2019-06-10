@@ -781,7 +781,7 @@ instruction!(
             op_jump!(context, fail);
         }
     },
-    fn is_function2(fail: l, arg1: xy, arity: s) {
+    fn is_function2(fail: l, arg1: xyq, arity: s) {
         // TODO: needs to verify exports too
         let value = #arg1;
         let arity = #arity.to_uint().unwrap();

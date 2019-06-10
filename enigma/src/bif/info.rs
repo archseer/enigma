@@ -233,6 +233,12 @@ const OS_FAMILY: u32 = atom::UNIX;
 #[cfg(target_family = "windows")]
 const OS_FAMILY: u32 = atom::WIN32;
 
+#[cfg(target_endian = "little")]
+const ENDIAN: u32 = atom::LITTLE;
+
+#[cfg(target_endian = "big")]
+const ENDIAN: u32 = atom::BIG;
+
 pub fn system_info_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     use std::sync::atomic::Ordering;
     let heap = &process.context_mut().heap;
@@ -252,6 +258,9 @@ pub fn system_info_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
         }
         Variant::Atom(atom::OTP_RELEASE) => {
             Ok(bitstring!(heap, "22"))
+        }
+        Variant::Atom(atom::ENDIAN) => {
+            Ok(Term::atom(ENDIAN))
         }
         // Variant::Atom(atom::START_TIME) => {
         //     Ok(Term::int(vm.start_time))

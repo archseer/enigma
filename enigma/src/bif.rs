@@ -66,6 +66,8 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "float", 1 => arith::float_1,
             "abs", 1 => arith::abs_1,
             "round", 1 => arith::round_1,
+            "ceil", 1 => arith::ceil_1,
+            "floor", 1 => arith::floor_1,
             "date", 0 => chrono::date_0,
             "localtime", 0 => chrono::localtime_0,
             "monotonic_time", 0 => chrono::monotonic_time_0,
@@ -104,6 +106,7 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "is_binary", 1 => bif_erlang_is_binary_1,
             "is_bitstring", 1 => bif_erlang_is_bitstring_1,
             "is_function", 1 => bif_erlang_is_function_1,
+            "is_function", 2 => bif_erlang_is_function_2,
             "is_boolean", 1 => bif_erlang_is_boolean_1,
             "is_map", 1 => bif_erlang_is_map_1,
             "is_map_key", 2 => bif_erlang_is_map_key_2,
@@ -159,7 +162,9 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "atom_to_binary", 2 => erlang::atom_to_binary_2,
             "pid_to_list", 1 => erlang::pid_to_list_1,
             "integer_to_list", 1 => erlang::integer_to_list_1,
+            "integer_to_list", 2 => erlang::integer_to_list_2,
             "integer_to_binary", 1 => erlang::integer_to_binary_1,
+            "integer_to_binary", 2 => erlang::integer_to_binary_2,
             "fun_to_list", 1 => erlang::fun_to_list_1,
             "ref_to_list", 1 => erlang::ref_to_list_1,
             "binary_to_integer", 1 => erlang::binary_to_integer_1,
@@ -185,7 +190,7 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "display_string", 1 => erlang::display_string_1,
             "display_nl", 0 => erlang::display_nl_0,
             "split_binary", 2 => erlang::split_binary_2,
-
+            "binary_part", 3 => erlang::binary_part_3,
 
             // logic
             "and", 2 => erlang::and_2,
@@ -266,6 +271,8 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "sqrt", 1 => arith::math_sqrt_1,
             "atan2", 2 => arith::math_atan2_2,
             "pow", 2 => arith::math_pow_2,
+            "ceil", 1 => arith::ceil_1,
+            "floor", 1 => arith::floor_1,
         },
         "lists" => {
             "member", 2 => lists::member_2,
@@ -305,6 +312,7 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "member", 2 => ets::bif::member_2,
             "first", 1 => ets::bif::first_1,
             "last", 1 => ets::bif::last_1,
+            "info", 2 => ets::bif::info_2,
         },
         "os" => {
             "list_env_vars", 0 => os::list_env_vars_0,
@@ -328,6 +336,12 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "time_unit", 0 =>  erts_internal_time_unit_0,
             "purge_module", 2 => load::erts_internal_purge_module_2,
             "request_system_task", 3 => erts_internal_request_system_task_3,
+        },
+        "string" => {
+            "list_to_integer", 1 => erlang::string_list_to_integer_1,
+        },
+        "binary" => {
+            "part", 3 => erlang::binary_part_3,
         },
         "unicode" => {
             "characters_to_binary", 2 => erlang::unicode_characters_to_binary_2,
@@ -353,7 +367,9 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "dflag_unicode_io", 1 => dflag_unicode_io,
         },
         "re" => {
+            "version", 0 => regex::bif::version_0,
             "run", 3 => regex::bif::run_3,
+            "compile", 2 => regex::bif::compile_2,
         },
         "persistent_term" => {
             // monitor nodes is unimplemented for now
@@ -837,7 +853,26 @@ pub fn bif_erlang_is_function_1(_vm: &vm::Machine, _process: &RcProcess, args: &
     Ok(Term::boolean(args[0].is_function()))
 }
 
-// TODO: is_function_2, is_record
+pub fn bif_erlang_is_function_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+    let arity = match args[0].into_variant() {
+        Variant::Integer(i) if i >= 0 => i as u32,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    if let Ok(closure) = value::Closure::cast_from(&args[0]) {
+        if closure.mfa.2 == arity {
+            return Ok(atom!(TRUE));
+        }
+    }
+    if let Ok(mfa) = module::MFA::cast_from(&args[0]) {
+        if mfa.2 == arity {
+            return Ok(atom!(TRUE));
+        }
+    }
+    Ok(atom!(FALSE))
+}
+
+// TODO: is_record
 
 fn bif_erlang_is_boolean_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_boolean()))

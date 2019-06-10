@@ -15,6 +15,13 @@ macro_rules! table_kind {
     };
 }
 
+#[macro_export]
+macro_rules! table_protection {
+    ($x:expr) => {
+        Status::from_bits_truncate($x.bits & Status::PROTECTION_MASK.bits)
+    };
+}
+
 pub mod bag;
 pub mod bif;
 pub mod hash_table;
@@ -120,6 +127,9 @@ bitflags! {
         const DB_PRIVATE = (1 << 0);
         const DB_PROTECTED = (1 << 1);
         const DB_PUBLIC = (1 << 2);
+        const PROTECTION_OFFSET = 0;
+        const PROTECTION_BITS = 3;
+        const PROTECTION_MASK  = (((1<<(Self::PROTECTION_BITS.bits + Self::PROTECTION_OFFSET.bits))-1) & !((1<<(Self::PROTECTION_OFFSET.bits))-1));
         /// table is being deleted
         const DB_DELETE = (1 << 3);
 

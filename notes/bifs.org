@@ -1,4 +1,4 @@
-* BIFs [64/105]
+* BIFs [65/105]
 
 - [X] ubif erlang:abs/1
 - [ ] bif erlang:adler32/1
@@ -80,7 +80,7 @@
 - [ ] bif erts_internal:process_flag/3
 - [ ] bif erlang:process_info/1
 - [ ] bif erlang:process_info/2
-- [ ] bif erlang:processes/0
+- [X] bif erlang:processes/0
 - [X] bif erlang:put/2
 - [X] bif erlang:register/2
 - [ ] bif erlang:registered/0
@@ -252,7 +252,7 @@
 - [X] ubif erlang:'+'/1			splus_1
 
 
-** New operators [18/22]
+** New operators [19/22]
 - [X] bif erlang:'!'/2		ebif_bang_2
 - [X] bif erlang:send/2
 - [X] bif erlang:send/3
@@ -272,7 +272,7 @@
 - [X] ubif erlang:is_reference/1
 - [X] ubif erlang:is_binary/1
 - [X] ubif erlang:is_function/1
-- [ ] ubif erlang:is_function/2
+- [X] ubif erlang:is_function/2
 - [ ] ubif erlang:is_record/2
 - [ ] ubif erlang:is_record/3
 
@@ -337,8 +337,8 @@
 - [ ] bif erl_ddll:monitor/2
 - [ ] bif erl_ddll:demonitor/1
 
-** Bifs in the re module  [1/5]
-- [ ] bif re:version/0
+** Bifs in the re module  [2/5]
+- [X] bif re:version/0
 - [ ] bif re:compile/1
 - [ ] bif re:compile/2
 - [ ] bif re:run/2
@@ -380,11 +380,11 @@
 - [ ] bif erlang:hibernate/3
 - [ ] bif error_logger:warning_map/0
 
-** New Bifs in R10B. [6/9]
+** New Bifs in R10B. [7/9]
 - [X] bif erlang:get_module_info/1
 - [X] bif erlang:get_module_info/2
 - [X] ubif erlang:is_boolean/1
-- [ ] bif string:list_to_integer/1
+- [X] bif string:list_to_integer/1
 - [ ] bif string:list_to_float/1
 - [X] bif erlang:make_fun/3
 - [X] bif erlang:iolist_size/1
@@ -428,10 +428,10 @@
 ** New Bifs in R13B04 [0/1]
 - [ ] bif erlang:binary_to_term/2
 
-** The binary match bifs (New in R14A - EEP9) [2/24]
+** The binary match bifs (New in R14A - EEP9) [4/24]
 The searching/splitting/substituting thingies
 - [ ] ubif erlang:binary_part/2
-- [ ] ubif erlang:binary_part/3
+- [X] ubif erlang:binary_part/3
 - [ ] bif binary:compile_pattern/1
 - [ ] bif binary:match/2
 - [ ] bif binary:match/3
@@ -443,7 +443,7 @@ The searching/splitting/substituting thingies
 - [ ] bif binary:last/1
 - [ ] bif binary:at/2
 - [ ] bif binary:part/2 binary_binary_part_2
-- [ ] bif binary:part/3 binary_binary_part_3
+- [X] bif binary:part/3 binary_binary_part_3
 - [ ] bif binary:list_to_bin/1
 - [ ] bif binary:copy/1
 - [ ] bif binary:copy/2
@@ -531,11 +531,11 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 - [X] bif erlang:has_prepared_code_on_load/1
 - [X] bif maps:take/2
 
-** New in 20.0 [0/6]
-- [ ] ubif erlang:floor/1
-- [ ] ubif erlang:ceil/1
-- [ ] bif math:floor/1
-- [ ] bif math:ceil/1
+** New in 20.0 [4/6]
+- [X] ubif erlang:floor/1
+- [X] ubif erlang:ceil/1
+- [X] bif math:floor/1
+- [X] bif math:ceil/1
 - [ ] bif math:fmod/2
 - [ ] bif os:set_signal/2
 
@@ -582,7 +582,7 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 ** New in 21.2.3 [0/1]
       - [ ] bif erts_internal:spawn_system_process/3
 
-** New in 21.3 [0/3]
-      - [ ] bif erlang:integer_to_list/2
-      - [ ] bif erlang:integer_to_binary/2
+** New in 21.3 [2/3]
+      - [X] bif erlang:integer_to_list/2
+      - [X] bif erlang:integer_to_binary/2
       - [ ] bif persistent_term:get/2

@@ -71,6 +71,23 @@ where
     }
 }
 
+// move to a separate file
+impl CastFrom<Term> for regex::bytes::Regex {
+    type Error = WrongBoxError;
+
+    #[inline]
+    fn cast_from(value: &Term) -> Result<&Self, WrongBoxError> {
+        if let Variant::Pointer(ptr) = value.into_variant() {
+            unsafe {
+                if *ptr == BOXED_REGEX {
+                    return Ok(&(*(ptr as *const Boxed<Self>)).value);
+                }
+            }
+        }
+        Err(WrongBoxError)
+    }
+}
+
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 // annoying: we have to wrap Floats to be able to define hash
 pub struct Float(pub f64);
@@ -322,6 +339,7 @@ pub const BOXED_MODULE: u8 = 20;
 pub const BOXED_EXPORT: u8 = 21;
 pub const BOXED_FILE: u8 = 22;
 pub const BOXED_BUFFER: u8 = 23;
+pub const BOXED_REGEX: u8 = 24;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -540,6 +558,13 @@ impl Term {
         }))
     }
 
+    pub fn regex(heap: &Heap, value: regex::bytes::Regex) -> Self {
+        Term::from(heap.alloc(Boxed {
+            header: BOXED_REGEX,
+            value,
+        }))
+    }
+
     pub fn boxed<T>(heap: &Heap, header: u8, value: T) -> Self {
         Term::from(heap.alloc(Boxed { header, value }))
     }
@@ -624,6 +649,7 @@ impl Term {
                 BOXED_EXPORT => Type::Closure, // exports are a type of function
                 BOXED_FILE => Type::Ref,   // files are stored as magic ref pointers in beam
                 BOXED_BUFFER => Type::Ref, // files are stored as magic ref pointers in beam
+                BOXED_REGEX => Type::Ref,
                 i => unimplemented!("get_type for {}", i),
             },
             _ => unreachable!(),
@@ -926,7 +952,11 @@ impl Term {
                         Term::subbinary(heap, subbin.clone())
                     }
                     BOXED_BINARY => {
-                        unimplemented!()
+                        let bin = &(*(ptr as *const Boxed<bitstring::RcBinary>)).value;
+                        Term::from(heap.alloc(Boxed {
+                            header: BOXED_BINARY,
+                            value: bin.clone(),
+                        }))
                     }
                     _ => unimplemented!("deep_clone for {}", self), // TODO: deep clone for Ref<>
                 }
@@ -1096,6 +1126,11 @@ impl Ord for Variant {
                             let i2 = &(*(*p2 as *const Boxed<BigInt>)).value;
                             i1.cmp(i2)
                         }
+                        BOXED_BINARY => {
+                            let b1 = &*(*p1 as *const Boxed<bitstring::RcBinary>);
+                            let b2 = &*(*p2 as *const Boxed<bitstring::RcBinary>);
+                            b1.value.data.cmp(&b2.value.data)
+                        }
                         _ => unimplemented!("cmp for {}", header),
                     }
                 } else {
@@ -1239,6 +1274,7 @@ impl std::fmt::Display for Variant {
                     }
                     BOXED_FILE => write!(f, "#File<REF>"),
                     BOXED_BUFFER => write!(f, "#Buffer<REF>"),
+                    BOXED_REGEX => write!(f, "#Regex<REF>"),
                     _ => unimplemented!(),
                 }
             },

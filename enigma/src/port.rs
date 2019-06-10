@@ -581,7 +581,7 @@ impl Renderer {
     pub fn move_rel(&mut self, bytes: &[u8]) {
         use std::convert::TryInto;
         let pos = i16::from_be_bytes(bytes[0..2].try_into().unwrap());
-        info!("move: pos={}", pos);
+        // info!("move: pos={}", pos);
         if pos < 0 {
             self.line.move_backward(-pos as usize);
             write!(self.out, "{}", termion::cursor::Left(-pos as u16));
@@ -904,7 +904,7 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
                             // PUTC
                             0 => {
 
-                                info!("put_chars: bytes={:?}", &bytes[1..]);
+                                // info!("put_chars: bytes={:?}", &bytes[1..]);
                                 renderer.put_chars(&bytes[1..]);
                             }
                             // 1 MOVE
@@ -913,22 +913,22 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
                             }
                             // 2 INSC
                             2 => {
-                                info!("insert_chars: bytes={:?}", &bytes[1..]);
+                                // info!("insert_chars: bytes={:?}", &bytes[1..]);
                                 renderer.insert_chars(&bytes[1..]);
                             }
                             // 3 DELC
                             3 => {
-                                info!("delete_chars: bytes={:?}", &bytes[1..]);
+                                // info!("delete_chars: bytes={:?}", &bytes[1..]);
                                 renderer.delete_chars(&bytes[1..]);
                             }
                             // BEEP
                             4 => {
-                                info!("beep");
+                                // info!("beep");
                                 renderer.beep();
                             }
                             // PUTC_SYNC
                             5 => {
-                                info!("putc_sync: bytes={:?}", &bytes[1..]);
+                                // info!("putc_sync: bytes={:?}", &bytes[1..]);
                                 renderer.put_chars(&bytes[1..]);
 
                                 crate::process::send_signal(&Machine::current(), owner, crate::process::Signal::Message {

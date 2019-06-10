@@ -653,6 +653,25 @@ fn analyze_pattern(
     Ok(mp)
 }
 
+pub fn info_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    unimplemented!("ets:info/1")
+}
+
+pub fn info_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let table = get_table(vm, args[0])?;
+    match args[1].into_variant() {
+        Variant::Atom(atom::PROTECTION) => {
+            match table_protection!(table.meta().status) {
+                Status::DB_PRIVATE => Ok(atom!(PRIVATE)),
+                Status::DB_PROTECTED => Ok(atom!(PROTECTED)),
+                Status::DB_PUBLIC => Ok(atom!(PUBLIC)),
+                _ => unreachable!()
+            }
+        },
+        _ => unimplemented!("ets:info/2 {} {}", args[0], args[1])
+    }
+}
+
 // safe_fixtable_2
 // first_1
 // next_2

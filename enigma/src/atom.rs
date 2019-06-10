@@ -429,6 +429,14 @@ pub static ATOMS: Lazy<AtomTable> = Lazy::new(|| {
     atoms.register_atom("bof");
     atoms.register_atom("cur");
 
+    atoms.register_atom("no_integer");
+
+    atoms.register_atom("endian");
+    atoms.register_atom("little");
+    atoms.register_atom("big");
+
+    atoms.register_atom("protection");
+
     atoms
 });
 
@@ -736,6 +744,14 @@ pub const OTP_RELEASE: u32 = 256;
 
 pub const BOF: u32 = 257;
 pub const CUR: u32 = 258;
+
+pub const NO_INTEGER: u32 = 259;
+
+pub const ENDIAN: u32 = 260;
+pub const LITTLE: u32 = 261;
+pub const BIG: u32 = 262;
+
+pub const PROTECTION: u32 = 263;
 
 #[inline]
 pub fn cmp(index1: u32, index2: u32) -> std::cmp::Ordering {

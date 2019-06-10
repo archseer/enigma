@@ -25,7 +25,7 @@ fn run() -> i32 {
 
     // erlexec defaults:
     let args: Vec<String> = vec![
-        "/usr/local/Cellar/erlang/21.3.2/lib/erlang/erts-10.2.3/bin/enigma.smp",
+        // "/Users/speed/src/rust/enigma/target/debug/enigma",
         "--",
         "-root",
         //"/usr/local/Cellar/erlang/21.3.2/lib/erlang",

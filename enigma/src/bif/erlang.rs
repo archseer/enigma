@@ -668,28 +668,94 @@ pub fn integer_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     }
 }
 
-pub fn integer_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn integer_to_list_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    use lexical::ToBytes;
+
+    let radix = match args[1].into_variant() {
+        Variant::Integer(i) if i >= 2 && i <= 16 => i as u8,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
     match args[0].into_number() {
         Ok(value::Num::Integer(i)) => {
-            let string = lexical::to_string(i);
+            let string = i.to_bytes_radix(radix);
+            let heap = &process.context_mut().heap;
+
+            Ok(string.into_iter().rev().fold(Term::nil(), |acc, val| cons!(heap, Term::int(i32::from(val)), acc)))
+        }
+        Ok(value::Num::Bignum(i)) => {
+            unimplemented!("integer_to_binary_2 with radix");
+            // let string = i.to_bytes_radix(radix);
+            // let heap = &process.context_mut().heap;
+            // string.into_iter().rev().fold(Term::nil(), |acc, val| cons!(heap, Term::int(int32::from(val), acc)))
+        }
+        _ => {
+            println!("integer_to_list_2 called with {}", args[0]);
+            Err(Exception::new(Reason::EXC_BADARG))
+        }
+    }
+}
+
+
+pub fn integer_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    use lexical::ToBytes;
+    match args[0].into_number() {
+        Ok(value::Num::Integer(i)) => {
+            let string = i.to_bytes();
             let heap = &process.context_mut().heap;
 
             Ok(Term::binary(
                 heap,
-                bitstring::Binary::from(string.into_bytes()),
+                bitstring::Binary::from(string),
             ))
         }
         Ok(value::Num::Bignum(i)) => {
-            let string = i.to_string();
+            unimplemented!("integer_to_binary_1 with bignum");
+            // let string = i.to_bytes();
+            // let heap = &process.context_mut().heap;
+
+            // Ok(Term::binary(
+            //     heap,
+            //     bitstring::Binary::from(string),
+            // ))
+        }
+        _ => {
+            println!("integer_to_list_1 called with {}", args[0]);
+            Err(Exception::new(Reason::EXC_BADARG))
+        }
+    }
+}
+
+pub fn integer_to_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    use lexical::ToBytes;
+
+    let radix = match args[1].into_variant() {
+        Variant::Integer(i) if i >= 2 && i <= 16 => i as u8,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    match args[0].into_number() {
+        Ok(value::Num::Integer(i)) => {
+            let string = i.to_bytes_radix(radix);
             let heap = &process.context_mut().heap;
 
             Ok(Term::binary(
                 heap,
-                bitstring::Binary::from(string.into_bytes()),
+                bitstring::Binary::from(string),
             ))
         }
+        Ok(value::Num::Bignum(i)) => {
+            unimplemented!("integer_to_binary_2 with bignum");
+            // let string = i.to_bytes_radix(radix);
+            // let heap = &process.context_mut().heap;
+
+            // Ok(Term::binary(
+            //     heap,
+            //     bitstring::Binary::from(string),
+            // ))
+        }
         _ => {
-            println!("integer_to_list_1 called with {}", args[0]);
+            println!("integer_to_list_2 called with {}", args[0]);
             Err(Exception::new(Reason::EXC_BADARG))
         }
     }
@@ -736,6 +802,37 @@ pub fn list_to_integer_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term])
     match lexical::try_parse::<i32, _>(string) {
         Ok(i) => Ok(Term::int(i)),
         Err(err) => panic!("errored with {}", err), //TODO
+    }
+}
+
+pub fn string_list_to_integer_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    // list to string
+    let heap = &process.context_mut().heap;
+
+    // either binary or charlist
+    let string = if args[0].is_binary() {
+        args[0].to_bytes().unwrap().to_owned()
+    } else {
+        let cons = Cons::cast_from(&args[0])?;
+        value::cons::unicode_list_to_buf(cons, 2048)?.as_bytes().to_owned()
+    };
+
+    match lexical::try_parse::<i32, _>(string.clone()) { // the api is not great here, need to clone
+        Ok(i) => Ok(tup2!(heap, Term::int(i), Term::nil())),
+        Err(err) => {
+            match err.kind() {
+                lexical::ErrorKind::InvalidDigit(0) => Ok(tup2!(heap, atom!(ERROR), atom!(NO_INTEGER))),
+                lexical::ErrorKind::InvalidDigit(n) => {
+                    // TODO: tests
+                    Ok(tup2!(
+                            heap,
+                            Term::int(lexical::parse::<i32, _>(&string[..*n])),
+                            string[*n..].iter().rev().fold(Term::nil(), |acc, b| cons!(heap, Term::int(i32::from(*b)), acc))
+                    ))
+                },
+                err => panic!("errored with {:?}", err), //TODO
+            }
+        }
     }
 }
 
@@ -1156,6 +1253,65 @@ pub fn split_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
         Term::subbinary(heap, sb1),
         Term::subbinary(heap, sb2)
     ))
+}
+
+pub fn binary_part_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let (bin, offs, bitoffs, size, bitsize) = match args[0].get_boxed_header() {
+        Ok(value::BOXED_BINARY) => {
+            // TODO use ok_or to cast to some, then use ?
+            let value = &args[0].get_boxed_value::<bitstring::RcBinary>().unwrap();
+            (*value, 0, 0, value.data.len(), 0)
+        }
+        Ok(value::BOXED_SUBBINARY) => {
+            // TODO use ok_or to cast to some, then use ?
+            let value = &args[0].get_boxed_value::<bitstring::SubBinary>().unwrap();
+            (
+                &value.original,
+                value.offset,
+                value.bit_offset,
+                value.size,
+                value.bitsize,
+                )
+        }
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    let mut pos = match args[1].into_variant() {
+        Variant::Integer(i) if i >= 0 => i as usize,
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    let len = match args[2].into_variant() {
+        Variant::Integer(i) => {
+            if i < 0 {
+                let len = (-i) as usize;
+                if len > pos {
+                    return Err(Exception::new(Reason::EXC_BADARG));
+                }
+                pos -= len;
+                len
+            } else {
+                i as usize
+            }
+        },
+        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+    };
+
+    /* overflow */
+    // if ((pos + len) < pos || (len > 0 && (pos + len) == pos) {
+	// goto badarg;
+    // }
+    if size < pos || size < (pos + len) {
+        return Err(Exception::new(Reason::EXC_BADARG));
+    }
+
+    // TODO: make a constructor that doesn't need bits.
+    let offset = (offs >> 8 + bitoffs) + pos;
+    let size = len >> 8;
+
+    // TODO: tests
+    let heap = &process.context_mut().heap;
+    Ok(Term::subbinary(heap, bitstring::SubBinary::new(bin.clone(), size, offset, false)))
 }
 
 #[cfg(test)]
