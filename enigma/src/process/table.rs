@@ -104,6 +104,10 @@ impl<T: Clone> Table<T> {
         }
     }
 
+    pub fn all(&self) -> Vec<PID> {
+        self.processes.keys().copied().collect()
+    }
+
     /// Returns true if the process exists.
     pub fn contains_key(&self, pid: PID) -> bool {
         self.processes.contains_key(&pid)

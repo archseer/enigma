@@ -153,3 +153,12 @@ fn get_module_info(heap: &crate::immix::Heap, module: &Module, what: Term) -> bi
         _ => Err(Exception::new(Reason::EXC_BADARG)),
     }
 }
+
+pub fn erts_internal_purge_module_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    // prepare / prepare_on_load
+    // abort
+    // complete
+    // unimplemented!("purge_module: {} {}", args[0], args[1]);
+    Ok(atom!(TRUE))
+}
+

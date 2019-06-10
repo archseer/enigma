@@ -180,10 +180,12 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "make_fun", 3 => erlang::make_fun_3,
             "node", 0 => erlang::node_0,
             "node", 1 => erlang::node_1,
+            "processes", 0 => erlang::processes_0,
             "display", 1 => erlang::display_1,
             "display_string", 1 => erlang::display_string_1,
             "display_nl", 0 => erlang::display_nl_0,
             "split_binary", 2 => erlang::split_binary_2,
+
 
             // logic
             "and", 2 => erlang::and_2,
@@ -324,6 +326,8 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "spawn_system_process", 3 => bif_erlang_spawn_3, // TODO: aliased to normal spawn for now
             "map_next", 3 => erts_internal_map_next_3,
             "time_unit", 0 =>  erts_internal_time_unit_0,
+            "purge_module", 2 => load::erts_internal_purge_module_2,
+            "request_system_task", 3 => erts_internal_request_system_task_3,
         },
         "unicode" => {
             "characters_to_binary", 2 => erlang::unicode_characters_to_binary_2,
@@ -1364,6 +1368,10 @@ fn erts_internal_time_unit_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Te
     let heap = &process.context_mut().heap;
     let unit: u64 = 1000 * 1000 * 1000;
     Ok(Term::uint64(heap, unit))
+}
+
+fn erts_internal_request_system_task_3(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> Result {
+    unimplemented!()
 }
 
 // FIXME: phash and phash2 are the same, and they don't match the ERTS ones. And they return 64 bit

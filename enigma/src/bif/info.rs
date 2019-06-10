@@ -131,7 +131,10 @@ pub fn process_info_aux(
         atom::GARBAGE_COLLECTION_INFO => unimplemented!(),
         atom::GROUP_LEADER => unimplemented!(),
         atom::REDUCTIONS => Term::uint(heap, process.context().reds as u32),
-        atom::PRIORITY => unimplemented!(),
+        atom::PRIORITY => {
+            // TODO: temporary
+            atom!(NORMAL)
+        },
         atom::TRACE => unimplemented!(),
         atom::BINARY => unimplemented!(),
         atom::SEQUENTIAL_TRACE_TOKEN => unimplemented!(),

@@ -900,6 +900,18 @@ pub fn node_1(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> bif::R
     Ok(atom!(NO_NODE_NO_HOST))
 }
 
+pub fn processes_0(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
+    let heap = &process.context_mut().heap;
+
+    let pids = {
+        let process_table = vm.process_table.lock();
+        process_table.all()
+    };
+
+    let res = pids.into_iter().rev().fold(Term::nil(), |acc, pid| cons!(heap, Term::pid(pid), acc));
+    Ok(res)
+}
+
 pub fn and_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     match (args[0].to_bool(), args[1].to_bool()) {
         (Some(true), Some(true)) => Ok(atom!(TRUE)),
