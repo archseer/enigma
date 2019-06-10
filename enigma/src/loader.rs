@@ -46,6 +46,9 @@ pub struct Loader<'a> {
 
 pub type ExtList = Vec<LValue>;
 
+const APPLY_2: crate::bif::Fn = crate::bif::bif_erlang_apply_2;
+const APPLY_3: crate::bif::Fn = crate::bif::bif_erlang_apply_3;
+
 /// Compact term encoding values. BEAM does some tricks to be able to share the memory layout with
 /// regular values, but for the most part we don't need this (it also doesn't fit nanboxed values
 /// well).
@@ -387,6 +390,8 @@ impl<'a> Loader<'a> {
         // scan over the Code chunk bits, but we'll need to know bit length of each instruction.
         let (_, code) = scan_instructions(self.code).unwrap();
 
+        let mut instructions = Vec::with_capacity(code.len());
+
         let mut code_iter = code.into_iter();
         let mut pos = 0;
         let mut last_func_start = 0;
@@ -437,7 +442,7 @@ impl<'a> Loader<'a> {
                 Opcode::Label => {
                     // one operand, Integer
                     if let LValue::Literal(i) = instruction.args[0] {
-                        self.labels.insert(i as u32, self.instructions.len() as u32);
+                        self.labels.insert(i as u32, instructions.len() as u32);
                     } else {
                         panic!("Bad argument to {:?}", instruction.op)
                     }
@@ -450,7 +455,7 @@ impl<'a> Loader<'a> {
                         last_func_start = pos; // store pos for line number data
                         let f = self.atom_map[&(*f - 1)]; // necessary because atoms weren't remapped yet
                         self.funs
-                            .insert((f, *a as u32), (self.instructions.len() as u32) + 1); // need to point after func_info
+                            .insert((f, *a as u32), (instructions.len() as u32) + 1); // need to point after func_info
                     } else {
                         panic!("Bad argument to {:?}", instruction.op)
                     }
@@ -460,7 +465,7 @@ impl<'a> Loader<'a> {
                     // push a pointer to the end of instructions
                     self.funs.insert(
                         (LINE_INVALID_LOCATION as u32, 0),
-                        self.instructions.len() as u32,
+                        instructions.len() as u32,
                     );
                     break;
                 }
@@ -596,7 +601,7 @@ impl<'a> Loader<'a> {
             };
 
             pos += 1;
-            self.instructions.push(instruction);
+            instructions.push(instruction);
         }
 
         let atom_map = &self.atom_map;
@@ -620,7 +625,7 @@ impl<'a> Loader<'a> {
             }
         };
 
-        self.instructions.iter_mut().for_each(|instruction| {
+        instructions.iter_mut().for_each(|instruction| {
             // patch local atoms into global
             instruction.args = instruction
                 .args
@@ -635,28 +640,83 @@ impl<'a> Loader<'a> {
                 .collect();
         });
 
-        self.instructions.iter_mut().for_each(|instruction| {
-            match instruction.op {
-                Opcode::SelectVal => {
-                    let list = match &instruction.args[2] {
-                        LValue::ExtendedList(l) => &**l,
-                        _ => unreachable!()
-                    };
-                    if use_jump_table(list) {
-                        let fail = instruction.args[1].to_label();
-                        let (table, min) = gen_jump_table(list, fail);
-                        instruction.op = Opcode::JumpOnVal;
-                        instruction.args = vec![
-                            instruction.args[0].clone(),
-                            instruction.args[1].clone(),
-                            LValue::JumpTable(table),
-                            LValue::Constant(Term::int(min))
-                        ];
+        self.instructions = Vec::with_capacity(instructions.len());
+
+        let imports = &self.imports;
+        let is_bif = |i: u32| -> bool {
+            let mfa = &imports[i as usize];
+            crate::bif::BIFS.get(mfa).is_some()
+        };
+
+        for ins in instructions {
+            // use instruction::Instruction as I;
+            use crate::opcodes::Opcode as O;
+            use LValue as V;
+            match (ins.op, &ins.args.as_slice()) {
+                (O::SelectVal, &[arg, fail, V::ExtendedList(list)]) if use_jump_table(&*list) => {
+                    let l = fail.to_label();
+                    let (table, min) = gen_jump_table(&*list, l);
+                    self.instructions.push(
+                        Instruction {
+                            op: O::JumpOnVal,
+                            args: vec![
+                                arg.clone(),
+                                fail.clone(),
+                                LValue::JumpTable(table),
+                                LValue::Constant(Term::int(min))
+                            ],
+                        }
+                    )
+                }
+
+                (O::CallExt, &[arity, V::Literal(i)]) => {
+                    let mfa = &imports[*i as usize];
+                    match crate::bif::BIFS.get(mfa) {
+                        // apply/2 is an instruction, not a BIF.
+                        // call_ext u==2 u$func:erlang:apply/2 => i_apply_fun
+                        Some(&APPLY_2) => self.instructions.push(Instruction { op: O::ApplyFun, args: vec![] }),
+                        // The apply/3 BIF is an instruction.
+                        // call_ext u==3 u$bif:erlang:apply/3 => i_apply
+                        Some(&APPLY_3) => self.instructions.push(Instruction { op: O::IApply, args: vec![] }),
+                        // call_ext u Bif=u$is_bif => call_bif Bif
+                        Some(bif) => self.instructions.push(Instruction { op: O::CallBif, args: vec![arity.clone(), V::Bif(*bif)] }),
+                        None => self.instructions.push(ins)
                     }
                 }
-                _ => (),
+
+                (O::CallExtLast, &[arity, V::Literal(i), d]) => {
+                    let mfa = &imports[*i as usize];
+                    match crate::bif::BIFS.get(mfa) {
+                        // call_ext_last u==2 u$func:erlang:apply/2 D => i_apply_fun_last D
+                        Some(&APPLY_2) => self.instructions.push(Instruction { op: O::ApplyFunLast, args: vec![d.clone()] }),
+                        // call_ext_last u==3 u$bif:erlang:apply/3 D => i_apply_last D
+                        Some(&APPLY_3) => self.instructions.push(Instruction { op: O::IApplyLast, args: vec![d.clone()] }),
+                        // call_ext_last u Bif=u$is_bif D => deallocate D | call_bif_only Bif
+                        Some(bif) => {
+                            self.instructions.push(Instruction { op: O::CallBifLast, args: vec![arity.clone(), V::Bif(*bif), d.clone()] });
+                        }
+                        None => self.instructions.push(ins)
+                    }
+                }
+
+                (O::CallExtOnly, &[arity, V::Literal(i)]) => {
+                    let mfa = &imports[*i as usize];
+                    match crate::bif::BIFS.get(mfa) {
+                        // call_ext_only u==2 u$func:erlang:apply/2 => i_apply_fun_only
+                        Some(&APPLY_2) => self.instructions.push(Instruction { op: O::ApplyFunOnly, args: vec![] }),
+                        // call_ext_only u==3 u$bif:erlang:apply/3 => i_apply_only
+                        Some(&APPLY_3) => self.instructions.push(Instruction { op: O::IApplyOnly, args: vec![] }),
+                        // call_ext_only Ar=u Bif=u$is_bif => call_bif_only Bif
+                        Some(bif) => self.instructions.push(Instruction { op: O::CallBifOnly, args: vec![arity.clone(), V::Bif(*bif)] }),
+                        None => self.instructions.push(ins)
+                    }
+                }
+                (O::CallExt, _) => unreachable!(),
+                (O::CallExtOnly, _) => unreachable!(),
+                (O::CallExtLast, _) => unreachable!(),
+                _ => self.instructions.push(ins),
             }
-        });
+        }
     }
 
     fn postprocess_lambdas(&mut self) {
@@ -751,9 +811,6 @@ fn gen_jump_table(list: &ExtList, fail: instruction::Label) -> (instruction::Jum
 
     (Box::new(table), min)
 }
-
-// const APPLY_2: crate::bif::Fn = crate::bif::bif_erlang_apply_2;
-// const APPLY_3: crate::bif::Fn = crate::bif::bif_erlang_apply_3;
 
 //fn transform_engine(instrs: &[Instruction],
 //    constants: &mut Vec<Term>,

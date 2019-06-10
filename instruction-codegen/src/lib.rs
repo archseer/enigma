@@ -330,6 +330,14 @@ pub fn instruction(tokens: TokenStream) -> TokenStream {
                 ins = unsafe { (*context.ip.module).instructions.get_unchecked(context.ip.ptr as usize) };
                 context.ip.ptr += 1;
 
+              // info!(
+                // "proc pid={:?} reds={:?} mod={:?} offs={:?} ins={:?}",
+                // process.pid,
+                // context.reds,
+                // atom::to_str(unsafe { (*context.ip.module).name}).unwrap(),
+                // context.ip.ptr,
+                // ins,
+              // );
                 match *ins {
                     #(#impls),*
                 } 

@@ -217,11 +217,11 @@ pub fn call_error_handler(
 
 #[macro_export]
 macro_rules! op_call_ext {
-    ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr, $return: expr) => {{
+    ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr) => {{
         // TODO: precompute these
         let mfa = unsafe { &(*$context.ip.module).imports[$dest as usize] };
 
-        // if $process.pid > 70 {
+        // if $process.pid == 39 {
         // info!("pid={} action=call_ext mfa={}", $process.pid, mfa);
         // }
 
@@ -229,22 +229,14 @@ macro_rules! op_call_ext {
 
         match export {
             Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
-            Some(Export::Bif(APPLY_2)) => {
-                // TODO: rewrite these two into Apply instruction calls
-                // I'm cheating here, *shrug*
-                op_apply_fun!($vm, $context, $process)
-            }
-            Some(Export::Bif(APPLY_3)) => {
-                // I'm cheating here, *shrug*
-                op_apply!($vm, $context, $process, $return);
-            }
-            Some(Export::Bif(bif)) => {
-                // TODO: precompute which exports are bifs to avoid exports table reads
-                // call_ext_only Ar=u Bif=u$is_bif => \
-                // allocate u Ar | call_bif Bif | deallocate_return u
-
-                op_call_bif!($vm, $context, $process, bif, $arity as usize, $return)
-            }
+            Some(Export::Bif(APPLY_2)) => unreachable!("apply/2 called via call_ext"),
+            Some(Export::Bif(APPLY_3)) => unreachable!("apply/3 called via call_ext"),
+            Some(Export::Bif(_)) => unreachable!("bif called without call_bif: {}", mfa),
+            // Some(Export::Bif(bif)) => {
+            //     // precomputed in most cases, but not for nifs
+            //     // TODO: return needs to still be handled here then :/
+            //     op_call_bif!($vm, $context, $process, bif, $arity as usize)
+            // }
             None => {
                 // call error_handler here
                 call_error_handler!($vm, $process, mfa);
@@ -255,16 +247,12 @@ macro_rules! op_call_ext {
 
 #[macro_export]
 macro_rules! op_call_bif {
-    ($vm:expr, $context:expr, $process:expr, $bif:expr, $arity:expr, $return:expr) => {{
+    ($vm:expr, $context:expr, $process:expr, $bif:expr, $arity:expr) => {{
         // make a slice out of arity x registers
         let args = &$context.x[0..$arity];
         match $bif($vm, $process, args) {
             Ok(val) => {
                 $context.x[0] = val; // HAXX, return value emulated
-                if $return {
-                    // TODO: figure out returns
-                    op_return!($process, $context);
-                }
             }
             Err(exc) => return Err(exc),
         }
@@ -303,7 +291,7 @@ macro_rules! op_call_fun {
             match export {
                 Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
                 Some(Export::Bif(bif)) => {
-                    op_call_bif!($vm, $context, &$process, bif, mfa.2 as usize, true) // TODO is return true ok
+                    op_call_bif!($vm, $context, &$process, bif, mfa.2 as usize)
                 }
                 None => {
                     // println!("apply setup_error_handler");
@@ -319,7 +307,7 @@ macro_rules! op_call_fun {
 
 #[macro_export]
 macro_rules! op_apply {
-    ($vm:expr, $context:expr, $process:expr, $return: expr) => {{
+    ($vm:expr, $context:expr, $process:expr) => {{
         let mut module = $context.x[0];
         let mut func = $context.x[1];
         let mut args = $context.x[2];
@@ -365,6 +353,7 @@ macro_rules! op_apply {
                     }
                 }
             }
+            break; // != erlang:apply/3
         }
 
         let mut arity = 0;
@@ -402,11 +391,21 @@ macro_rules! op_apply {
 
         match export {
             Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
-            Some(Export::Bif(bif)) => {
-                // TODO: apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
-                // ^ only happens in apply/fixed_apply
-                op_call_bif!($vm, $context, $process, bif, arity, $return)
+            Some(Export::Bif(APPLY_2)) => {
+                // TODO: this clobbers the registers
+
+                // TODO: rewrite these two into Apply instruction calls
+                // I'm cheating here, *shrug*
+                op_apply_fun!($vm, $context, $process)
             }
+            Some(Export::Bif(_)) => unreachable!("op_apply: bif called without call_bif: {}", mfa),
+            // Some(Export::Bif(bif)) => {
+            //     // TODO: this would still need to return on a bif if it's i_apply_only/_last
+
+            //     // TODO: apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
+            //     // ^ only happens in apply/fixed_apply
+            //     op_call_bif!($vm, $context, $process, bif, arity)
+            // }
             None => {
                 // println!("apply setup_error_handler pid={}", $process.pid);
                 call_error_handler!($vm, $process, &mfa);
@@ -488,7 +487,7 @@ macro_rules! cond_fail {
 
 #[macro_export]
 macro_rules! op_fixed_apply {
-    ($vm:expr, $context:expr, $process:expr, $arity:expr, $return:expr) => {{
+    ($vm:expr, $context:expr, $process:expr, $arity:expr) => {{
         let arity = $arity as usize;
         let module = $context.x[arity];
         let func = $context.x[arity + 1];
@@ -506,7 +505,7 @@ macro_rules! op_fixed_apply {
 
         // Handle apply of apply/3...
         if module == atom::ERLANG && func == atom::APPLY && $arity == 3 {
-            op_apply!($vm, $context, $process, $return);
+            op_apply!($vm, $context, $process);
             continue;
         }
 
@@ -528,7 +527,7 @@ macro_rules! op_fixed_apply {
                 // TODO: apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
                 // ^ only happens in apply/fixed_apply
 
-                op_call_bif!($vm, $context, $process, bif, arity, $return)
+                op_call_bif!($vm, $context, $process, bif, arity)
             }
             None => {
                 // println!("fixed_apply setup_error_handler pid={}", $process.pid);
@@ -724,11 +723,11 @@ impl Machine {
     pub fn start_main_process(&self, args: Vec<String>) {
         // println!("Starting main process...");
         let registry = self.modules.lock();
-        //let module = unsafe { &*module::load_module(self, path).unwrap() };
+
+        // start the actual book process
         let module = registry.lookup(atom::from_str("erl_init")).unwrap();
         let process = process::allocate(&self, 0 /* itself */, 0, module).unwrap();
 
-        /* TEMP */
         let context = process.context_mut();
         let fun = atom::from_str("start");
         let arity = 2;
@@ -740,10 +739,23 @@ impl Machine {
         );
         // println!("argv {}", context.x[1]);
         op_jump!(context, module.funs[&(fun, arity)]);
-        /* TEMP */
 
         let future = run_with_error_handling(process);
         self.process_pool.executor().spawn(future.unit_error().boxed().compat());
+
+        // ------
+
+        // start system processes
+        // TODO: start as a special process and panic if it halts
+        let module = registry.lookup(atom::from_str("erts_code_purger")).unwrap();
+        let process = process::allocate(&self, 0 /* itself */, 0, module).unwrap();
+        let context = process.context_mut();
+        let fun = atom::from_str("start");
+        let arity = 0;
+        op_jump!(context, module.funs[&(fun, arity)]);
+        let future = run_with_error_handling(process);
+        self.process_pool.executor().spawn(future.unit_error().boxed().compat());
+
 
         // self.process_pool.schedule(process);
     }

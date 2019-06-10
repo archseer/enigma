@@ -526,18 +526,80 @@ instruction!(
         // save pointer onto CP
         context.cp = Some(context.ip);
 
-        op_call_ext!(vm, context, &process, arity, destination, false); // don't return on call_ext
+        op_call_ext!(vm, context, &process, arity, destination);
         safepoint_and_reduce!(vm, process, context.reds);
     },
     fn call_ext_only(arity: t, destination: u) {
-        op_call_ext!(vm, context, &process, arity, destination, true);
+        op_call_ext!(vm, context, &process, arity, destination);
         safepoint_and_reduce!(vm, process, context.reds);
     },
     fn call_ext_last(arity: t, destination: u, words: r) {
         op_deallocate(context, words);
 
-        op_call_ext!(vm, context, &process, arity, destination, true);
+        op_call_ext!(vm, context, &process, arity, destination);
         safepoint_and_reduce!(vm, process, context.reds);
+    },
+    fn call_bif(arity: t, bif: b) {
+        // call a bif, store result in x0
+
+        let args = &context.x[0..arity as usize];
+        match bif(vm, &process, args) {
+            Ok(val) => context.x[0] = val,
+            Err(exc) => return Err(exc),
+        }
+    },
+    fn call_bif_last(arity: t, bif: b, words: r) {
+        // call a bif, store result in x0, return
+        op_deallocate(context, words);
+
+        let args = &context.x[0..arity as usize];
+        match bif(vm, &process, args) {
+            Ok(val) => {
+                context.x[0]= val;
+                op_return!(process, context);
+            },
+            Err(exc) => return Err(exc),
+        }
+    },
+    fn call_bif_only(arity: t, bif: b) {
+        // call a bif, store result in x0, return
+
+        let args = &context.x[0..arity as usize];
+        match bif(vm, &process, args) {
+            Ok(val) => {
+                context.x[0]= val;
+                op_return!(process, context);
+            },
+            Err(exc) => return Err(exc),
+        }
+    },
+    fn apply_fun() {
+        // save pointer onto CP
+        context.cp = Some(context.ip);
+
+        op_apply_fun!(vm, context, process)
+    },
+    fn apply_fun_last(words: r) {
+        op_deallocate(context, words);
+
+        op_apply_fun!(vm, context, process)
+    },
+    fn apply_fun_only() {
+        op_apply_fun!(vm, context, process)
+    },
+    fn i_apply() {
+        // different from apply(), it's a bif override
+        context.cp = Some(context.ip);
+
+        op_apply!(vm, context, process);
+    },
+    fn i_apply_last(words: r) {
+        op_deallocate(context, words);
+
+        op_apply!(vm, context, process);
+    },
+    fn i_apply_only() {
+        op_apply!(vm, context, process);
     },
     fn bif0(bif: b, reg: d) {
         let val = bif(vm, &process, &[]).unwrap(); // bif0 can't fail
@@ -597,7 +659,7 @@ instruction!(
         context.set_register(n, NIL)
     },
     fn deallocate(n: r) {
-        op_deallocate(context, n)
+        op_deallocate(context, n);
     },
     fn is_ge(fail: l, arg1: s, arg2: s) {
         if let Some(std::cmp::Ordering::Less) = #arg1.erl_partial_cmp(&#arg2) {
@@ -966,7 +1028,7 @@ instruction!(
     fn apply(arity: t) {
         context.cp = Some(context.ip);
 
-        op_fixed_apply!(vm, context, &process, arity, false);
+        op_fixed_apply!(vm, context, &process, arity);
         // call this fixed_apply, used for ops (apply, apply_last).
         // apply is the func that's equivalent to erlang:apply/3 (and instrs)
         safepoint_and_reduce!(vm, process, context.reds);
@@ -974,7 +1036,7 @@ instruction!(
     fn apply_last(arity: t, nwords: r) {
         op_deallocate(context, nwords);
 
-        op_fixed_apply!(vm, context, &process, arity, true);
+        op_fixed_apply!(vm, context, &process, arity);
         safepoint_and_reduce!(vm, process, context.reds);
     },
     fn gc_bif1(fail: l, _live: r, bif: b, arg1: s, reg: d) {
@@ -1058,17 +1120,10 @@ instruction!(
 
         let size = size * (unit as usize);
 
-        // ins: &Instruction { op: BsPutInteger, args: [Label(0), Integer(1024), Literal(1), Literal(0), Integer(0)] }
-        println!("put_integer src is {}\r", #source);
-
         context.bs.put_integer(size as usize, flags, #source);
     },
     fn bs_put_binary(fail: l, size: s, unit: u, flags: F, source: s) {
         // TODO: fail label
-        if unit != 8 {
-            unimplemented!("bs_put_binary unit != 8");
-            //fail!(context, fail);
-        }
 
         let source = #source;
 

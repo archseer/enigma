@@ -108,14 +108,15 @@ impl Module {
                 }
             }) {
                 let mfa = MFA(self.name, *name, *arity);
-                exports.insert(mfa, crate::exports_table::Export::Bif(*fun));
+                // exports.insert(mfa, crate::exports_table::Export::Bif(*fun));
+                // TODO: not ideal: a NIF will jump to module, then call the nif
 
                 let pos = self.imports.len();
                 self.imports.push(mfa);
                 // replace instruction immediately after with call_nif
-                self.instructions[i + 1] = Instruction::CallExtOnly_tu {
+                self.instructions[i + 1] = Instruction::CallBifOnly_tb {
                     arity: (*arity).try_into().unwrap(),
-                    destination: pos as u32,
+                    bif: crate::instruction::Bif(*fun),
                 };
             // println!("NIF replaced {}", mfa);
             } else {

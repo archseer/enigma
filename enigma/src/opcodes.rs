@@ -569,6 +569,15 @@ pub enum Opcode {
     // enigma specific
 
     JumpOnVal = 170,
+    CallBif = 171,
+    CallBifLast = 172,
+    CallBifOnly = 173,
+    ApplyFun = 174,
+    ApplyFunOnly = 175,
+    ApplyFunLast = 176,
+    IApply = 177,
+    IApplyOnly = 178,
+    IApplyLast = 179,
 }
 
 pub static ARITY_MAP: &'static [usize] = &[
@@ -744,6 +753,15 @@ pub static ARITY_MAP: &'static [usize] = &[
     2, // opcode: 169 (swap)
     // enigma-specific
     4, // opcode: 170 (jump_on_val)
+    2, // opcode: 171 (call_bif)
+    3, // opcode: 172 (call_bif_last)
+    2, // opcode: 173 (call_bif_only)
+    0, // opcode: 174 (apply_fun)
+    1, // opcode: 175 (apply_fun_last)
+    0, // opcode: 176 (apply_fun_only)
+    0, // opcode: 177 (i_apply)
+    1, // opcode: 178 (i_apply_last)
+    0, // opcode: 179 (i_apply_only)
 ];
 
 #[inline]
