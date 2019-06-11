@@ -437,6 +437,11 @@ pub static ATOMS: Lazy<AtomTable> = Lazy::new(|| {
 
     atoms.register_atom("protection");
 
+    atoms.register_atom("trim");
+    atoms.register_atom("trim_all");
+    atoms.register_atom("global");
+    atoms.register_atom("scope");
+
     atoms
 });
 
@@ -752,6 +757,11 @@ pub const LITTLE: u32 = 261;
 pub const BIG: u32 = 262;
 
 pub const PROTECTION: u32 = 263;
+
+pub const TRIM: u32 = 264;
+pub const TRIM_ALL: u32 = 265;
+pub const GLOBAL: u32 = 266;
+pub const SCOPE: u32 = 267;
 
 #[inline]
 pub fn cmp(index1: u32, index2: u32) -> std::cmp::Ordering {

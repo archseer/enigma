@@ -190,6 +190,7 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "display_string", 1 => erlang::display_string_1,
             "display_nl", 0 => erlang::display_nl_0,
             "split_binary", 2 => erlang::split_binary_2,
+            "binary_part", 2 => erlang::binary_part_2,
             "binary_part", 3 => erlang::binary_part_3,
 
             // logic
@@ -341,7 +342,10 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "list_to_integer", 1 => erlang::string_list_to_integer_1,
         },
         "binary" => {
+            "part", 2 => erlang::binary_part_2,
             "part", 3 => erlang::binary_part_3,
+            "split", 3 => erlang::binary_split_3,
+            "matches", 3 => erlang::binary_matches_3,
         },
         "unicode" => {
             "characters_to_binary", 2 => erlang::unicode_characters_to_binary_2,

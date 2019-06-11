@@ -21,6 +21,7 @@ pub mod bif {
     }
 
     pub fn run_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+    use std::borrow::Cow;
         let heap = &process.context_mut().heap;
         // println!("run/3: {} {}", args[0], args[1]);
         let string = crate::bif::erlang::list_to_iodata(args[0]).unwrap(); // TODO: error handling
@@ -28,14 +29,14 @@ pub mod bif {
         let regex = match args[1].get_boxed_header() {
             Ok(value::BOXED_REGEX) => {
                 let regex = regex::bytes::Regex::cast_from(&args[1]).unwrap();
-                std::borrow::Cow::Borrowed(regex)
+                Cow::Borrowed(regex)
             }
             _ => {
                 let pattern = crate::bif::erlang::list_to_iodata(args[1]).unwrap(); // TODO: error handling
 
                 // TODO verify args
                 let regex = Regex::new(std::str::from_utf8(&pattern).unwrap()).unwrap();
-                std::borrow::Cow::Owned(regex)
+                Cow::Owned(regex)
             }
         };
 
