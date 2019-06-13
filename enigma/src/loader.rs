@@ -27,6 +27,7 @@ pub struct Line {
 
 pub struct Loader<'a> {
     atoms: Vec<&'a str>,
+    attrs: Term,
     imports: Vec<MFA>,
     exports: Vec<MFA>,
     literals: Vec<Term>,
@@ -176,8 +177,12 @@ impl LValue {
 
     pub fn is_source(&self) -> bool {
         match self {
-            LValue::Constant(..) | LValue::BigInt(..) | LValue::ExtendedLiteral(..) | LValue::X(..) | LValue::Y(..) => true,
-            _ => false
+            LValue::Constant(..)
+            | LValue::BigInt(..)
+            | LValue::ExtendedLiteral(..)
+            | LValue::X(..)
+            | LValue::Y(..) => true,
+            _ => false,
         }
     }
 }
@@ -186,6 +191,7 @@ impl<'a> Loader<'a> {
     pub fn new() -> Loader<'a> {
         Loader {
             atoms: Vec::new(),
+            attrs: Term::nil(),
             imports: Vec::new(),
             exports: Vec::new(),
             literals: Vec::new(),
@@ -243,7 +249,8 @@ impl<'a> Loader<'a> {
         self.prepare();
 
         let mut constants = Vec::new();
-        let instructions = instruction::transform_engine(&self.instructions, &mut constants, &self.literal_heap);
+        let instructions =
+            instruction::transform_engine(&self.instructions, &mut constants, &self.literal_heap);
         // println!("ins {:?}", instructions);
 
         Ok(Module {
@@ -257,6 +264,7 @@ impl<'a> Loader<'a> {
             instructions,
             lines: self.lines,
             name: self.atom_map[&0], // atom 0 is module name
+            attrs: self.attrs,
             on_load: self.on_load,
         })
     }
@@ -284,7 +292,7 @@ impl<'a> Loader<'a> {
     fn load_attributes(&mut self, chunk: Chunk) {
         // Contains two parts: a proplist of module attributes, encoded as External Term Format,
         // and a compiler info (options and version) encoded similarly.
-        let _val = etf::decode(chunk, &self.literal_heap);
+        self.attrs = etf::decode(chunk, &self.literal_heap);
     }
 
     fn load_local_fun_table(&mut self, chunk: Chunk) {
@@ -463,10 +471,8 @@ impl<'a> Loader<'a> {
                 }
                 Opcode::IntCodeEnd => {
                     // push a pointer to the end of instructions
-                    self.funs.insert(
-                        (LINE_INVALID_LOCATION as u32, 0),
-                        instructions.len() as u32,
-                    );
+                    self.funs
+                        .insert((LINE_INVALID_LOCATION as u32, 0), instructions.len() as u32);
                     break;
                 }
                 Opcode::OnLoad => unimplemented!("on_load instruction"),
@@ -656,17 +662,15 @@ impl<'a> Loader<'a> {
                 (O::SelectVal, &[arg, fail, V::ExtendedList(list)]) if use_jump_table(&*list) => {
                     let l = fail.to_label();
                     let (table, min) = gen_jump_table(&*list, l);
-                    self.instructions.push(
-                        Instruction {
-                            op: O::JumpOnVal,
-                            args: vec![
-                                arg.clone(),
-                                fail.clone(),
-                                LValue::JumpTable(table),
-                                LValue::Constant(Term::int(min))
-                            ],
-                        }
-                    )
+                    self.instructions.push(Instruction {
+                        op: O::JumpOnVal,
+                        args: vec![
+                            arg.clone(),
+                            fail.clone(),
+                            LValue::JumpTable(table),
+                            LValue::Constant(Term::int(min)),
+                        ],
+                    })
                 }
 
                 (O::CallExt, &[arity, V::Literal(i)]) => {
@@ -674,13 +678,22 @@ impl<'a> Loader<'a> {
                     match crate::bif::BIFS.get(mfa) {
                         // apply/2 is an instruction, not a BIF.
                         // call_ext u==2 u$func:erlang:apply/2 => i_apply_fun
-                        Some(&APPLY_2) => self.instructions.push(Instruction { op: O::ApplyFun, args: vec![] }),
+                        Some(&APPLY_2) => self.instructions.push(Instruction {
+                            op: O::ApplyFun,
+                            args: vec![],
+                        }),
                         // The apply/3 BIF is an instruction.
                         // call_ext u==3 u$bif:erlang:apply/3 => i_apply
-                        Some(&APPLY_3) => self.instructions.push(Instruction { op: O::IApply, args: vec![] }),
+                        Some(&APPLY_3) => self.instructions.push(Instruction {
+                            op: O::IApply,
+                            args: vec![],
+                        }),
                         // call_ext u Bif=u$is_bif => call_bif Bif
-                        Some(bif) => self.instructions.push(Instruction { op: O::CallBif, args: vec![arity.clone(), V::Bif(*bif)] }),
-                        None => self.instructions.push(ins)
+                        Some(bif) => self.instructions.push(Instruction {
+                            op: O::CallBif,
+                            args: vec![arity.clone(), V::Bif(*bif)],
+                        }),
+                        None => self.instructions.push(ins),
                     }
                 }
 
@@ -688,14 +701,23 @@ impl<'a> Loader<'a> {
                     let mfa = &imports[*i as usize];
                     match crate::bif::BIFS.get(mfa) {
                         // call_ext_last u==2 u$func:erlang:apply/2 D => i_apply_fun_last D
-                        Some(&APPLY_2) => self.instructions.push(Instruction { op: O::ApplyFunLast, args: vec![d.clone()] }),
+                        Some(&APPLY_2) => self.instructions.push(Instruction {
+                            op: O::ApplyFunLast,
+                            args: vec![d.clone()],
+                        }),
                         // call_ext_last u==3 u$bif:erlang:apply/3 D => i_apply_last D
-                        Some(&APPLY_3) => self.instructions.push(Instruction { op: O::IApplyLast, args: vec![d.clone()] }),
+                        Some(&APPLY_3) => self.instructions.push(Instruction {
+                            op: O::IApplyLast,
+                            args: vec![d.clone()],
+                        }),
                         // call_ext_last u Bif=u$is_bif D => deallocate D | call_bif_only Bif
                         Some(bif) => {
-                            self.instructions.push(Instruction { op: O::CallBifLast, args: vec![arity.clone(), V::Bif(*bif), d.clone()] });
+                            self.instructions.push(Instruction {
+                                op: O::CallBifLast,
+                                args: vec![arity.clone(), V::Bif(*bif), d.clone()],
+                            });
                         }
-                        None => self.instructions.push(ins)
+                        None => self.instructions.push(ins),
                     }
                 }
 
@@ -703,12 +725,21 @@ impl<'a> Loader<'a> {
                     let mfa = &imports[*i as usize];
                     match crate::bif::BIFS.get(mfa) {
                         // call_ext_only u==2 u$func:erlang:apply/2 => i_apply_fun_only
-                        Some(&APPLY_2) => self.instructions.push(Instruction { op: O::ApplyFunOnly, args: vec![] }),
+                        Some(&APPLY_2) => self.instructions.push(Instruction {
+                            op: O::ApplyFunOnly,
+                            args: vec![],
+                        }),
                         // call_ext_only u==3 u$bif:erlang:apply/3 => i_apply_only
-                        Some(&APPLY_3) => self.instructions.push(Instruction { op: O::IApplyOnly, args: vec![] }),
+                        Some(&APPLY_3) => self.instructions.push(Instruction {
+                            op: O::IApplyOnly,
+                            args: vec![],
+                        }),
                         // call_ext_only Ar=u Bif=u$is_bif => call_bif_only Bif
-                        Some(bif) => self.instructions.push(Instruction { op: O::CallBifOnly, args: vec![arity.clone(), V::Bif(*bif)] }),
-                        None => self.instructions.push(ins)
+                        Some(bif) => self.instructions.push(Instruction {
+                            op: O::CallBifOnly,
+                            args: vec![arity.clone(), V::Bif(*bif)],
+                        }),
+                        None => self.instructions.push(ins),
                     }
                 }
                 (O::CallExt, _) => unreachable!(),
@@ -735,33 +766,36 @@ fn use_jump_table(list: &ExtList) -> bool {
     // check types
     match (&list[0], &list[1]) {
         (LValue::Constant(i), LValue::Label(_)) => {
-            if i.is_smallint() { } else { return false }
-        },
+            if i.is_smallint() {
+            } else {
+                return false;
+            }
+        }
         _ => return false,
     }
 
-
-    let i = if let LValue::Constant(i) = list[0] { i.to_int().unwrap() } else { unreachable!() };
+    let i = if let LValue::Constant(i) = list[0] {
+        i.to_int().unwrap()
+    } else {
+        unreachable!()
+    };
     let mut min = i;
     let mut max = i;
 
     let mut iter = list.chunks_exact(2);
     while let Some(chunk) = iter.next() {
         match chunk {
-            &[LValue::Constant(i), LValue::Label(_)] => {
-                match i.to_int() {
-                    Some(i) => {
-                        if i < min {
-                            min = i;
-                        }
-                        if i > max {
-                            max = i;
-                        }
+            &[LValue::Constant(i), LValue::Label(_)] => match i.to_int() {
+                Some(i) => {
+                    if i < min {
+                        min = i;
                     }
-                    None => return false,
+                    if i > max {
+                        max = i;
+                    }
                 }
-
-            }
+                None => return false,
+            },
             _ => return false,
         }
     }
@@ -772,7 +806,11 @@ fn use_jump_table(list: &ExtList) -> bool {
 
 use crate::instruction;
 fn gen_jump_table(list: &ExtList, fail: instruction::Label) -> (instruction::JumpTable, i32) {
-    let i = if let LValue::Constant(i) = list[0] { i.to_int().unwrap() } else { unreachable!() };
+    let i = if let LValue::Constant(i) = list[0] {
+        i.to_int().unwrap()
+    } else {
+        unreachable!()
+    };
     let mut min = i;
     let mut max = i;
 
@@ -803,7 +841,6 @@ fn gen_jump_table(list: &ExtList, fail: instruction::Label) -> (instruction::Jum
                 let i = i.to_int().unwrap();
                 let index = i - min;
                 table[index as usize] = l;
-
             }
             _ => unreachable!(),
         }

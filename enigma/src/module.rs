@@ -66,6 +66,8 @@ pub struct Module {
     pub lines: Vec<Line>,
     /// Atom name of the module.
     pub name: u32,
+    // Module attributes (version, compiler settings, etc) -- stored on the literal_heap.
+    pub attrs: Term,
     pub on_load: Option<u32>,
 }
 

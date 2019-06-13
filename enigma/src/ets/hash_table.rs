@@ -1,6 +1,6 @@
 use super::*;
 use crate::immix::Heap;
-use crate::value::{Cons, Term, CastFrom, CastInto, CastIntoMut, Tuple, Variant};
+use crate::value::{CastFrom, CastInto, CastIntoMut, Cons, Term, Tuple, Variant};
 use error::*;
 use hashbrown::HashMap;
 use parking_lot::RwLock;
@@ -168,17 +168,18 @@ impl Table for HashTable {
         _reverse: bool,
     ) -> Result<Term> {
         let heap = &process.context_mut().heap;
-        let res = self
+        let values: Vec<_> = self
             .hashmap
             .read()
             .iter()
-            .fold(Term::nil(), |acc, (_key, val)| {
-                // println!("running select for {}", val);
-                match pam::r#match::run(vm, process, pattern, *val, flags) {
-                    Some(val) => cons!(heap, val, acc),
-                    None => acc,
-                }
-            });
+            .filter_map(|(_key, val)| pam::r#match::run(vm, process, pattern, *val, flags))
+            .collect();
+
+        // TODO: need the intermediate because of reverse, in the future don't reverse
+        let res = values
+            .into_iter()
+            .rev()
+            .fold(Term::nil(), |acc, val| cons!(heap, val, acc));
         // println!("PAM res: {}", res);
         Ok(res)
     }

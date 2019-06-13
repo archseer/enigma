@@ -28,6 +28,37 @@
 // cons_b
 // return
 // halt
+//
+// ---
+// tuple(2)
+// pusht(2)
+// pusht(9)
+// pop
+// eq(:appl)
+// skip)                                                                                                                                                                                                       pusht(9)                                                                                                                                                                                                    skip)                                                                                                                                                                                                       skip)
+// skip)                                                                                                                                                                                                       skip)                                                                                                                                                                                                       skip)                                                                                                                                                                                                       skip)
+// pop
+// eq(:appl_data)
+// skip)
+// skip)
+// skip)
+// skip)
+// bind(2)
+// skip)
+// skip)
+// skip)
+// pop
+// eq(:loaded)
+// bind(1)
+// catch
+// push_c([])
+// pushv_result(1)
+// cons_b
+// pushv_result(2)
+// cons_b
+// return
+// halt
+
 use super::*;
 use crate::vm;
 

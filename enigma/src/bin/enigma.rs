@@ -39,7 +39,6 @@ fn run() -> i32 {
             .expect("No home directory")
             .to_str()
             .unwrap(),
-
         //"-init_debug",
         "--",
         "-kernel",

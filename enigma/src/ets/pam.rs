@@ -875,7 +875,7 @@ impl Compiler {
     fn all_bindings(&mut self) -> DMCRet {
         self.text.push(Opcode::PushC(Term::nil()));
         let keys: Vec<_> = self.vars.keys().cloned().collect();
-        keys.into_iter().for_each(|n| {
+        keys.into_iter().rev().for_each(|n| {
             self.add_pushv_variant(n);
             self.text.push(Opcode::ConsB());
         });

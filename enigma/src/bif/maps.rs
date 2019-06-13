@@ -2,7 +2,7 @@ use crate::atom;
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Term, CastFrom, CastInto, HAMT};
+use crate::value::{self, CastFrom, CastInto, Term, HAMT};
 use crate::vm;
 
 // TODO: deprecated past OTP 22

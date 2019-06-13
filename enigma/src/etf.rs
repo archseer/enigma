@@ -326,7 +326,7 @@ pub fn encode(term: Term) -> std::io::Result<Vec<u8>> {
 }
 
 pub fn encode_term(res: &mut Vec<u8>, term: Term) -> std::io::Result<()> {
-    use value::{Cons, CastFrom, Tuple};
+    use value::{CastFrom, Cons, Tuple};
 
     match term.into_variant() {
         Variant::Integer(i) => {

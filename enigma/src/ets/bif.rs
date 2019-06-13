@@ -3,7 +3,7 @@ use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
 use crate::value;
-use crate::value::{Cons, Term, CastFrom, Tuple, Type, Variant};
+use crate::value::{CastFrom, Cons, Term, Tuple, Type, Variant};
 use crate::vm;
 
 use super::bag::Bag;
@@ -660,15 +660,13 @@ pub fn info_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resu
 pub fn info_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let table = get_table(vm, args[0])?;
     match args[1].into_variant() {
-        Variant::Atom(atom::PROTECTION) => {
-            match table_protection!(table.meta().status) {
-                Status::DB_PRIVATE => Ok(atom!(PRIVATE)),
-                Status::DB_PROTECTED => Ok(atom!(PROTECTED)),
-                Status::DB_PUBLIC => Ok(atom!(PUBLIC)),
-                _ => unreachable!()
-            }
+        Variant::Atom(atom::PROTECTION) => match table_protection!(table.meta().status) {
+            Status::DB_PRIVATE => Ok(atom!(PRIVATE)),
+            Status::DB_PROTECTED => Ok(atom!(PROTECTED)),
+            Status::DB_PUBLIC => Ok(atom!(PUBLIC)),
+            _ => unreachable!(),
         },
-        _ => unimplemented!("ets:info/2 {} {}", args[0], args[1])
+        _ => unimplemented!("ets:info/2 {} {}", args[0], args[1]),
     }
 }
 

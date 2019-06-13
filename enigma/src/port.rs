@@ -629,10 +629,11 @@ impl Renderer {
     pub fn delete_chars(&mut self, bytes: &[u8]) {
         use std::convert::TryInto;
         let n = i16::from_be_bytes(bytes[0..2].try_into().unwrap());
+        // info!("delete_chars: n={}", n);
         if n > 0 { // delete forwards
             self.line.delete(n as usize);
         } else { // delete backwards
-            self.line.backspace((-n) as usize);
+            self.line.backspace(n.abs() as usize);
         }
         // TODO: need to redraw more efficiently and with multiline
         write!(self.out, "\r{}", termion::clear::CurrentLine);
@@ -918,7 +919,6 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
                             }
                             // 3 DELC
                             3 => {
-                                // info!("delete_chars: bytes={:?}", &bytes[1..]);
                                 renderer.delete_chars(&bytes[1..]);
                             }
                             // BEEP
@@ -1005,6 +1005,7 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
             res = stdin.read(&mut buf).fuse() => {
                 match res {
                     Ok(bytes) => {
+                        // info!("id: {} , owner {} recv! {:?}", id, owner, &buf[..bytes]);
                         let vm = Machine::current();
                         // need to return a tuple, but want to avoid heap alloc here..
                         let bin = Arc::new(crate::bitstring::Binary::from(&buf[..bytes]));

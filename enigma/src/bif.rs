@@ -8,12 +8,13 @@ use crate::persistent_term;
 use crate::port;
 use crate::process::{self, RcProcess};
 use crate::regex;
-use crate::value::{self, BigInt, Cons, Term, CastFrom, CastInto, Tuple, Variant};
+use crate::value::{self, BigInt, CastFrom, CastInto, Cons, Term, Tuple, Variant};
 use crate::vm;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 
 pub mod arith;
+pub mod binary;
 mod chrono;
 mod dtrace;
 pub mod erlang;
@@ -189,9 +190,9 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "display", 1 => erlang::display_1,
             "display_string", 1 => erlang::display_string_1,
             "display_nl", 0 => erlang::display_nl_0,
-            "split_binary", 2 => erlang::split_binary_2,
-            "binary_part", 2 => erlang::binary_part_2,
-            "binary_part", 3 => erlang::binary_part_3,
+            "split_binary", 2 => binary::split_binary_2,
+            "binary_part", 2 => binary::part_2,
+            "binary_part", 3 => binary::part_3,
 
             // logic
             "and", 2 => erlang::and_2,
@@ -324,6 +325,7 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             // TODO distinguish the two (erlang vs os) later
             "system_time", 0 => chrono::system_time_0,
             "system_time", 1 => chrono::system_time_1,
+            "timestamp", 0 => chrono::timestamp_0,
         },
         "erts_internal" => {
             "group_leader", 2 => info::group_leader_2,
@@ -342,10 +344,14 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "list_to_integer", 1 => erlang::string_list_to_integer_1,
         },
         "binary" => {
-            "part", 2 => erlang::binary_part_2,
-            "part", 3 => erlang::binary_part_3,
-            "split", 3 => erlang::binary_split_3,
-            "matches", 3 => erlang::binary_matches_3,
+            "part", 2 => binary::part_2,
+            "part", 3 => binary::part_3,
+            "list_to_bin", 1 => erlang::list_to_binary_1,
+            "copy", 1 => binary::copy_1,
+            "copy", 2 => binary::copy_2,
+            "split", 3 => binary::split_3,
+            "matches", 3 => binary::matches_3,
+            "longest_common_prefix", 1 => binary::longest_common_prefix_1,
         },
         "unicode" => {
             "characters_to_binary", 2 => erlang::unicode_characters_to_binary_2,
@@ -1409,7 +1415,11 @@ fn erts_internal_time_unit_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Te
     Ok(Term::uint64(heap, unit))
 }
 
-fn erts_internal_request_system_task_3(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> Result {
+fn erts_internal_request_system_task_3(
+    _vm: &vm::Machine,
+    process: &RcProcess,
+    _args: &[Term],
+) -> Result {
     unimplemented!()
 }
 

@@ -1,6 +1,6 @@
 use super::*;
 use crate::immix::Heap;
-use crate::value::{Cons, Term, CastFrom, Tuple};
+use crate::value::{CastFrom, Cons, Term, Tuple};
 use error::*;
 use parking_lot::RwLock;
 use std::collections::HashSet;

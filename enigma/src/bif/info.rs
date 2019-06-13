@@ -2,7 +2,7 @@ use crate::atom;
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, CastFrom, Variant};
+use crate::value::{self, CastFrom, Cons, Term, Variant};
 use crate::vm;
 use crate::Itertools;
 
@@ -134,7 +134,7 @@ pub fn process_info_aux(
         atom::PRIORITY => {
             // TODO: temporary
             atom!(NORMAL)
-        },
+        }
         atom::TRACE => unimplemented!(),
         atom::BINARY => unimplemented!(),
         atom::SEQUENTIAL_TRACE_TOKEN => unimplemented!(),

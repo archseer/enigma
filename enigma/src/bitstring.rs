@@ -1126,21 +1126,26 @@ pub fn append(
          * build size and the size of the old binary. Allow some room
          * for growing.
          */
-        let (bin, bitoffs, bitsize) = match binary.get_boxed_header() {
+        let (bin, offs, bitoffs, size, bitsize) = match binary.get_boxed_header() {
             Ok(value::BOXED_BINARY) => {
                 // TODO use ok_or to cast to some, then use ?
                 let value = &binary.get_boxed_value::<RcBinary>().unwrap();
-                (*value, 0, 0)
+                (*value, 0, 0, value.data.len(), 0)
             }
             Ok(value::BOXED_SUBBINARY) => {
                 // TODO use ok_or to cast to some, then use ?
                 let value = &binary.get_boxed_value::<SubBinary>().unwrap();
-                (&value.original, value.bit_offset, value.bitsize)
+                (
+                    &value.original,
+                    value.offset,
+                    value.bit_offset,
+                    value.size,
+                    value.bitsize,
+                )
             }
             _ => unreachable!(),
         };
-        // TODO: do in one step
-        let bin_size = 8 * binary_size!(binary) + bitsize;
+        let bin_size = 8 * size + bitsize;
         if unit > 1 {
             if (unit == 8 && (bin_size & 7) != 0) || (bin_size % unit) != 0 {
                 return None; // TODO: BADARG
@@ -1181,7 +1186,7 @@ pub fn append(
         copy_binary!(
             new_binary.get_mut().as_mut_ptr(),
             0,
-            bin.data.as_ptr(),
+            bin.data.as_ptr().add(offs),
             bitoffs as usize,
             bin_size
         );
@@ -1575,16 +1580,19 @@ impl Builder {
         if let value::Variant::Integer(value) = int.into_variant() {
             match size {
                 0 => (), // skip
-                8 => self.data().push(value as u8),
+                // calc offset
                 _ => {
-                    // let rbits = 8 - bit_offset;
+                    let rbits = 8 - bit_offset;
                     if bit_offset + size <= 8 {
+                        let buf = self.data();
                         // All bits are in the same byte
-                        // iptr = erts_current_bin + byte_offset!(self.offset);
-                        // b = *iptr & (0xff << rbits);
-                        // b |= (signed_val(arg) & ((1 << num_bits)-1)) << (8-bit_offset-num_bits);
-                        // *iptr = b;
-                        unimplemented!()
+                        let i = byte_offset!(self.offset);
+                        let (mask, _) = 0xFF_u8.overflowing_shl(rbits as u32);
+                        let mut b = buf[i] & mask;
+                        let (mask, _) = ((1 << size as u32) - 1 as u32)
+                            .overflowing_shl((8 - bit_offset - size) as u32);
+                        b |= (value as u8) & (mask as u8);
+                        buf[i] = b;
                     } else if bit_offset == 0 {
                         // More than one bit, starting at a byte boundary
                         // let bits = bit_offset!(size);
@@ -1748,8 +1756,33 @@ mod tests {
                     0,
                     subbinary.original.data.as_ptr(),
                     subbinary.bit_offset as usize,
-                    subbinary.bitsize + subbinary.size
+                    subbinary.bitsize + (subbinary.size * 8)
                 ) == std::cmp::Ordering::Equal
+            )
+        }
+
+        let sub1 = SubBinary::new(
+            Arc::new(Binary::from(vec![114, 101, 118, 101, 0, 0, 0, 0])),
+            4 * 8,
+            0,
+            false,
+        );
+        let sub2 = SubBinary::new(
+            Arc::new(Binary::from(vec![114, 101, 112, 108, 97, 99, 101, 0])),
+            4 * 8,
+            0,
+            false,
+        );
+
+        unsafe {
+            assert!(
+                cmp_bits(
+                    sub1.original.data.as_ptr(),
+                    sub1.bit_offset as usize,
+                    sub2.original.data.as_ptr(),
+                    sub2.bit_offset as usize,
+                    sub2.bitsize + (sub2.size * 8)
+                ) != std::cmp::Ordering::Equal
             )
         }
     }

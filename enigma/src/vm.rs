@@ -221,7 +221,7 @@ macro_rules! op_call_ext {
         // TODO: precompute these
         let mfa = unsafe { &(*$context.ip.module).imports[$dest as usize] };
 
-        // if $process.pid == 39 {
+        // if $process.pid >= 95 {
         // info!("pid={} action=call_ext mfa={}", $process.pid, mfa);
         // }
 

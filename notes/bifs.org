@@ -428,7 +428,7 @@
 ** New Bifs in R13B04 [0/1]
 - [ ] bif erlang:binary_to_term/2
 
-** The binary match bifs (New in R14A - EEP9) [7/24]
+** The binary match bifs (New in R14A - EEP9) [11/24]
 The searching/splitting/substituting thingies
 - [X] ubif erlang:binary_part/2
 - [X] ubif erlang:binary_part/3
@@ -437,16 +437,16 @@ The searching/splitting/substituting thingies
 - [ ] bif binary:match/3
 - [ ] bif binary:matches/2
 - [X] bif binary:matches/3
-- [ ] bif binary:longest_common_prefix/1
+- [X] bif binary:longest_common_prefix/1
 - [ ] bif binary:longest_common_suffix/1
 - [ ] bif binary:first/1
 - [ ] bif binary:last/1
 - [ ] bif binary:at/2
 - [X] bif binary:part/2 binary_binary_part_2
 - [X] bif binary:part/3 binary_binary_part_3
-- [ ] bif binary:list_to_bin/1
-- [ ] bif binary:copy/1
-- [ ] bif binary:copy/2
+- [X] bif binary:list_to_bin/1
+- [X] bif binary:copy/1
+- [X] bif binary:copy/2
 - [ ] bif binary:referenced_byte_size/1
 - [ ] bif binary:encode_unsigned/1
 - [ ] bif binary:encode_unsigned/2

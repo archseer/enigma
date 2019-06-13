@@ -113,7 +113,7 @@ impl ExecutionContext {
     pub fn fetch_register(&mut self, register: instruction::Register) -> Term {
         use instruction::Register;
         match register {
-            Register::X(reg) => unsafe {*self.x.get_unchecked(reg.0 as usize)},
+            Register::X(reg) => unsafe { *self.x.get_unchecked(reg.0 as usize) },
             Register::Y(reg) => self.stack[self.stack.len() - (reg.0 + 1) as usize],
         }
     }
@@ -124,7 +124,7 @@ impl ExecutionContext {
         match register {
             Register::X(reg) => unsafe {
                 *self.x.get_unchecked_mut(reg.0 as usize) = value;
-            }
+            },
             Register::Y(reg) => {
                 let len = self.stack.len();
                 self.stack[(len - (reg.0 + 1) as usize)] = value;
@@ -376,6 +376,7 @@ impl Process {
                     self.local_data_mut().mailbox.send(value);
                 }
                 Signal::PortMessage { from, value, .. } => {
+                    // info!("pid={} processing port-message from={} {:?}", self.pid, from, value);
                     // we only get the binary, so construct message on heap
                     let heap = &self.context_mut().heap;
                     let binary = Term::from(heap.alloc(value::Boxed {

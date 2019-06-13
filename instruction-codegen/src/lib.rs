@@ -1,15 +1,15 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
-use proc_macro2::{Span, TokenTree, Punct, Group};
-use proc_quote::{quote, quote_spanned,TokenStreamExt};
+use proc_macro2::{Group, Punct, Span, TokenTree};
+use proc_quote::{quote, quote_spanned, TokenStreamExt};
 
-use syn::parse::{Parse, ParseStream};
-use syn::punctuated::{Punctuated};
 use syn::ext::IdentExt;
+use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
 use syn::{braced, parenthesized, parse_macro_input, Ident, Result, Token};
 
-use permutate::{Permutator};
+use permutate::Permutator;
 
 // TODO: skip underscores
 
@@ -90,9 +90,7 @@ struct Instructions {
 impl Parse for Instructions {
     fn parse(input: ParseStream) -> Result<Self> {
         let ins = input.parse_terminated(Instruction::parse)?;
-        Ok(Self {
-            ins
-        })
+        Ok(Self { ins })
     }
 }
 
@@ -118,38 +116,50 @@ fn build_variants(ins: &Instruction) -> Vec<Opcode> {
         }]
     } else {
         // TODO: skip types starting with _
-	let types: Vec<Vec<String>> = ins.args.iter().map(|arg| arg.types.to_string().chars().map(|c| c.to_string()).collect()).collect();
+        let types: Vec<Vec<String>> = ins
+            .args
+            .iter()
+            .map(|arg| {
+                arg.types
+                    .to_string()
+                    .chars()
+                    .map(|c| c.to_string())
+                    .collect()
+            })
+            .collect();
 
         // *sigh*
 
         // Convert the `Vec<Vec<String>>` into a `Vec<Vec<&str>>`
-        let tmp: Vec<Vec<&str>> = types.iter()
-            .map(|list| list.iter()
-                 .map(AsRef::as_ref)
-                 .collect::<Vec<&str>>()
-            )
+        let tmp: Vec<Vec<&str>> = types
+            .iter()
+            .map(|list| list.iter().map(AsRef::as_ref).collect::<Vec<&str>>())
             .collect();
 
         // Convert the `Vec<Vec<&str>>` into a `Vec<&[&str]>`
-        let vector_of_slices: Vec<&[&str]> = tmp.iter()
-            .map(AsRef::as_ref).collect();
+        let vector_of_slices: Vec<&[&str]> = tmp.iter().map(AsRef::as_ref).collect();
 
         let permutator = Permutator::new(&vector_of_slices);
 
         let names = ins.args.iter().map(|arg| arg.name.clone());
 
-        permutator.map(|types| {
-            let suffix = types.join("");
-            // suffix.make_ascii_uppercase();
-            let name = Ident::new(&format!("{}_{}", name, suffix), Span::call_site());
+        permutator
+            .map(|types| {
+                let suffix = types.join("");
+                // suffix.make_ascii_uppercase();
+                let name = Ident::new(&format!("{}_{}", name, suffix), Span::call_site());
 
-            Opcode {
-                name,
-                genop: genop.clone(),
-                args: names.clone().zip(types.iter().map(|t| t.to_string())).collect(),
-                body: ins.body.clone()
-            }
-        }).collect()
+                Opcode {
+                    name,
+                    genop: genop.clone(),
+                    args: names
+                        .clone()
+                        .zip(types.iter().map(|t| t.to_string()))
+                        .collect(),
+                    body: ins.body.clone(),
+                }
+            })
+            .collect()
     }
 }
 
@@ -158,37 +168,41 @@ fn expand_enum_variants(op: &Opcode) -> proc_macro2::TokenStream {
     if op.args.is_empty() {
         quote! { #name }
     } else {
-        let args: Vec<proc_macro2::TokenStream> = op.args.iter().filter_map(|(arg, t)| {
-            if !arg.to_string().starts_with('_') {
-                let t = match t.as_str() {
-                    "c" => Ident::new("u32", Span::call_site()),
-                    "r" => Ident::new("Regs", Span::call_site()),
-                    "x" => Ident::new("RegisterX", Span::call_site()),
-                    "y" => Ident::new("RegisterY", Span::call_site()),
-                    "i" => Ident::new("i32", Span::call_site()),
-                    "q" => Ident::new("u32", Span::call_site()),
-                    "l" => Ident::new("Label", Span::call_site()),
-                    "s" => Ident::new("Source", Span::call_site()),
-                    "t" => Ident::new("u8", Span::call_site()),
-                    "u" => Ident::new("u32", Span::call_site()),
-                    "d" => Ident::new("Register", Span::call_site()),
-                    "b" => Ident::new("Bif", Span::call_site()),
-                    "m" => Ident::new("ExtendedList", Span::call_site()),
-                    "v" => Ident::new("Bytes", Span::call_site()),
-                    "F" => Ident::new("BitFlag", Span::call_site()),
-                    "S" => Ident::new("Size", Span::call_site()),
-                    "L" => Ident::new("FloatRegs", Span::call_site()),
-                    "R" => Ident::new("FRegister", Span::call_site()),
-                    "T" => Ident::new("JumpTable", Span::call_site()),
-                    //_ => syn::Error::new(arg.span(), format!("unexpected type `{}`", t)).to_compile_error(),
-                    _ => panic!("unexpected type {}", t),
-                };
+        let args: Vec<proc_macro2::TokenStream> = op
+            .args
+            .iter()
+            .filter_map(|(arg, t)| {
+                if !arg.to_string().starts_with('_') {
+                    let t = match t.as_str() {
+                        "c" => Ident::new("u32", Span::call_site()),
+                        "r" => Ident::new("Regs", Span::call_site()),
+                        "x" => Ident::new("RegisterX", Span::call_site()),
+                        "y" => Ident::new("RegisterY", Span::call_site()),
+                        "i" => Ident::new("i32", Span::call_site()),
+                        "q" => Ident::new("u32", Span::call_site()),
+                        "l" => Ident::new("Label", Span::call_site()),
+                        "s" => Ident::new("Source", Span::call_site()),
+                        "t" => Ident::new("u8", Span::call_site()),
+                        "u" => Ident::new("u32", Span::call_site()),
+                        "d" => Ident::new("Register", Span::call_site()),
+                        "b" => Ident::new("Bif", Span::call_site()),
+                        "m" => Ident::new("ExtendedList", Span::call_site()),
+                        "v" => Ident::new("Bytes", Span::call_site()),
+                        "F" => Ident::new("BitFlag", Span::call_site()),
+                        "S" => Ident::new("Size", Span::call_site()),
+                        "L" => Ident::new("FloatRegs", Span::call_site()),
+                        "R" => Ident::new("FRegister", Span::call_site()),
+                        "T" => Ident::new("JumpTable", Span::call_site()),
+                        //_ => syn::Error::new(arg.span(), format!("unexpected type `{}`", t)).to_compile_error(),
+                        _ => panic!("unexpected type {}", t),
+                    };
 
-                Some(quote!{ #arg: #t })
-            } else {
-                None
-            }
-        }).collect();
+                    Some(quote! { #arg: #t })
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         quote! {
             #name { #(#args),* }
@@ -198,23 +212,27 @@ fn expand_enum_variants(op: &Opcode) -> proc_macro2::TokenStream {
 
 fn expand_impls(op: &Opcode) -> proc_macro2::TokenStream {
     let variant = &op.name;
-    let args: Vec<_> = op.args.iter().filter_map(|(n, t)|
-        if !n.to_string().starts_with('_') {
-            let var = match t.as_str() {
-                "m" => quote!{ ref #n },
-                "v" => quote!{ ref #n },
-                "T" => quote!{ ref #n },
-                _ => quote! { #n }
-            };
-            Some(var)
-        } else {
-            // skip types starting with _
-            None
-        }
-    ).collect();
+    let args: Vec<_> = op
+        .args
+        .iter()
+        .filter_map(|(n, t)| {
+            if !n.to_string().starts_with('_') {
+                let var = match t.as_str() {
+                    "m" => quote! { ref #n },
+                    "v" => quote! { ref #n },
+                    "T" => quote! { ref #n },
+                    _ => quote! { #n },
+                };
+                Some(var)
+            } else {
+                // skip types starting with _
+                None
+            }
+        })
+        .collect();
 
     let mut input = op.body.clone().into_iter().peekable();
-    let body =  interpolate_opcode_impls(op, &mut input).unwrap();
+    let body = interpolate_opcode_impls(op, &mut input).unwrap();
 
     quote! {
         Instruction::#variant { #(#args),* } => {
@@ -226,51 +244,61 @@ fn expand_impls(op: &Opcode) -> proc_macro2::TokenStream {
 fn expand_loads(op: &Opcode) -> proc_macro2::TokenStream {
     let variant = &op.name;
     let genop = &op.genop;
-    let matches: Vec<_> = op.args.iter().map(|(n, t)| {
-        if n.to_string().starts_with('_') {
-            // blank match on ignored args
-            quote! { _ }
-        } else {
-            match t.as_str() {
-                "c" => quote!{ #n }, // could be BigInt, hence why we don't match
-                "x" => quote!{ V::X(#n) },
-                "y" => quote!{ V::Y(#n) },
-                "i" => quote!{ V::Constant(#n) }, // a bit annoying, was cast to constant before
-                "q" => quote!{ V::ExtendedLiteral(#n) },
-                "b" => quote!{ V::Bif(#n) },
-                "l" => quote!{ V::Label(#n) },
-                "L" => quote!{ V::FloatReg(#n) },
-                "T" => quote!{ V::JumpTable(#n) },
-                "u" => quote!{ #n },
-                "t" => quote!{ #n },
-                "r" => quote!{ #n },
-                _ => quote! { #n }
+    let matches: Vec<_> = op
+        .args
+        .iter()
+        .map(|(n, t)| {
+            if n.to_string().starts_with('_') {
+                // blank match on ignored args
+                quote! { _ }
+            } else {
+                match t.as_str() {
+                    "c" => quote! { #n }, // could be BigInt, hence why we don't match
+                    "x" => quote! { V::X(#n) },
+                    "y" => quote! { V::Y(#n) },
+                    "i" => quote! { V::Constant(#n) }, // a bit annoying, was cast to constant before
+                    "q" => quote! { V::ExtendedLiteral(#n) },
+                    "b" => quote! { V::Bif(#n) },
+                    "l" => quote! { V::Label(#n) },
+                    "L" => quote! { V::FloatReg(#n) },
+                    "T" => quote! { V::JumpTable(#n) },
+                    "u" => quote! { #n },
+                    "t" => quote! { #n },
+                    "r" => quote! { #n },
+                    _ => quote! { #n },
+                }
             }
-        }
-    }).collect();
-    let args: Vec<_> = op.args.iter().filter_map(|(n, t)| {
-        if !n.to_string().starts_with('_') {
-            let arg = match t.as_str() {
-                "c" => quote_spanned!{n.span() => #n: to_const(#n, constants, literal_heap) },
-                "x" => quote_spanned!{n.span() => #n: RegisterX((*#n).try_into().unwrap()) },
-                "y" => quote_spanned!{n.span() => #n: RegisterY((*#n).try_into().unwrap()) },
-                "i" => quote_spanned!{n.span() => #n: #n.to_int().unwrap() },
-                "q" => quote_spanned!{n.span() => #n: *#n },
-                "b" => quote_spanned!{n.span() => #n: Bif(*#n) },
-                "l" => quote_spanned!{n.span() => #n: *#n },
-                "L" => quote_spanned!{n.span() => #n: (*#n).try_into().unwrap() },
-                "T" => quote_spanned!{n.span() => #n: #n.clone() },
-                "u" => quote_spanned!{n.span() => #n: #n.to_u32().try_into().unwrap() },
-                "t" => quote_spanned!{n.span() => #n: #n.to_u32().try_into().unwrap() },
-                "r" => quote_spanned!{n.span() => #n: #n.to_u32().try_into().unwrap() },
-                _ => quote_spanned! {n.span() => #n: #n.into_with_heap(constants, literal_heap) }
-            };
-            Some(arg)
-        } else {
-            // skip types starting with _
-            None
-        }
-    }).collect();
+        })
+        .collect();
+    let args: Vec<_> = op
+        .args
+        .iter()
+        .filter_map(|(n, t)| {
+            if !n.to_string().starts_with('_') {
+                let arg = match t.as_str() {
+                    "c" => quote_spanned! {n.span() => #n: to_const(#n, constants, literal_heap) },
+                    "x" => quote_spanned! {n.span() => #n: RegisterX((*#n).try_into().unwrap()) },
+                    "y" => quote_spanned! {n.span() => #n: RegisterY((*#n).try_into().unwrap()) },
+                    "i" => quote_spanned! {n.span() => #n: #n.to_int().unwrap() },
+                    "q" => quote_spanned! {n.span() => #n: *#n },
+                    "b" => quote_spanned! {n.span() => #n: Bif(*#n) },
+                    "l" => quote_spanned! {n.span() => #n: *#n },
+                    "L" => quote_spanned! {n.span() => #n: (*#n).try_into().unwrap() },
+                    "T" => quote_spanned! {n.span() => #n: #n.clone() },
+                    "u" => quote_spanned! {n.span() => #n: #n.to_u32().try_into().unwrap() },
+                    "t" => quote_spanned! {n.span() => #n: #n.to_u32().try_into().unwrap() },
+                    "r" => quote_spanned! {n.span() => #n: #n.to_u32().try_into().unwrap() },
+                    _ => {
+                        quote_spanned! {n.span() => #n: #n.into_with_heap(constants, literal_heap) }
+                    }
+                };
+                Some(arg)
+            } else {
+                // skip types starting with _
+                None
+            }
+        })
+        .collect();
 
     // let cond = quote!{ if use_jump_table(&*list) };
 
@@ -330,17 +358,19 @@ pub fn instruction(tokens: TokenStream) -> TokenStream {
                 ins = unsafe { (*context.ip.module).instructions.get_unchecked(context.ip.ptr as usize) };
                 context.ip.ptr += 1;
 
-              // info!(
+                // if process.pid >= 95 {
+                // info!(
                 // "proc pid={:?} reds={:?} mod={:?} offs={:?} ins={:?}",
                 // process.pid,
                 // context.reds,
                 // atom::to_str(unsafe { (*context.ip.module).name}).unwrap(),
                 // context.ip.ptr,
                 // ins,
-              // );
+                // );
+              // }
                 match *ins {
                     #(#impls),*
-                } 
+                }
             }
             }
         }
@@ -381,10 +411,7 @@ type InputIter = std::iter::Peekable<proc_macro2::token_stream::IntoIter>;
 /// `punct` and the rest of the `input`.
 ///
 /// Input that is part of the pattern is automatically consumed.
-fn interpolation_pattern_type(
-    punct: &Punct,
-    input: &mut InputIter,
-) -> Option<Ident> {
+fn interpolation_pattern_type(punct: &Punct, input: &mut InputIter) -> Option<Ident> {
     match (punct.as_char(), input.peek()) {
         // #ident
         ('#', Some(TokenTree::Ident(_))) => {
@@ -403,7 +430,11 @@ fn interpolation_pattern_type(
 /// Transforms a `Group` into code that appends the given `Group` into `__stream`.
 ///
 /// Inside iterator patterns, use `parse_group_in_iterator_pattern`.
-fn interpolate_group(stream: &mut proc_macro2::TokenStream, opcode: &Opcode, group: &Group) -> Result<()> {
+fn interpolate_group(
+    stream: &mut proc_macro2::TokenStream,
+    opcode: &Opcode,
+    group: &Group,
+) -> Result<()> {
     let mut inner = group.stream().into_iter().peekable();
     let inner = interpolate_opcode_impls(opcode, &mut inner)?;
 
@@ -413,26 +444,34 @@ fn interpolate_group(stream: &mut proc_macro2::TokenStream, opcode: &Opcode, gro
     Ok(())
 }
 
-
 /// Interpolates the given variable, which should implement `ToTokens`.
-fn interpolate_to_tokens_ident(stream: &mut proc_macro2::TokenStream, opcode: &Opcode, ident: &Ident, next: Option<&proc_macro2::TokenTree>) {
+fn interpolate_to_tokens_ident(
+    stream: &mut proc_macro2::TokenStream,
+    opcode: &Opcode,
+    ident: &Ident,
+    next: Option<&proc_macro2::TokenTree>,
+) {
     let typ = match opcode.args.iter().find(|(name, _)| name == ident) {
         Some(t) => &t.1,
         None => {
-            stream.append_all(syn::Error::new_spanned(ident, "argument undefined").to_compile_error());
+            stream.append_all(
+                syn::Error::new_spanned(ident, "argument undefined").to_compile_error(),
+            );
             return;
         }
     };
 
     let code = match next.and_then(|token| match token {
         TokenTree::Punct(punct) => Some(punct.as_char()),
-        _ => None
+        _ => None,
     }) {
         // if it's an assignment, treat it specially
         Some('=') => match typ.as_str() {
             "c" => syn::Error::new_spanned(ident, "cannot assign to constant").to_compile_error(),
             "q" => syn::Error::new_spanned(ident, "cannot assign to literal").to_compile_error(),
-            "x" => quote_spanned!(ident.span() => *unsafe { context.x.get_unchecked_mut(#ident.0 as usize) }),
+            "x" => {
+                quote_spanned!(ident.span() => *unsafe { context.x.get_unchecked_mut(#ident.0 as usize) })
+            }
             "y" => quote_spanned!(ident.span() => *unsafe {
                 let len = context.stack.len();
                 context.stack.get_unchecked_mut(len - (#ident.0 + 1) as usize)
@@ -454,14 +493,23 @@ fn interpolate_to_tokens_ident(stream: &mut proc_macro2::TokenStream, opcode: &O
             "t" => quote_spanned!(ident.span() => #ident),
             "u" => quote_spanned!(ident.span() => #ident),
             "b" => quote_spanned!(ident.span() => #ident),
-            _ => syn::Error::new_spanned(ident, format!("unexpected type `{}`", typ)).to_compile_error()
+            _ => syn::Error::new_spanned(ident, format!("unexpected type `{}`", typ))
+                .to_compile_error(),
         },
         _ => match typ.as_str() {
-            "c" => quote_spanned!(ident.span() => unsafe { (*context.ip.module).constants[#ident as usize] }),
-            "q" => quote_spanned!(ident.span() => unsafe { (*context.ip.module).literals[#ident as usize] }),
+            "c" => {
+                quote_spanned!(ident.span() => unsafe { (*context.ip.module).constants[#ident as usize] })
+            }
+            "q" => {
+                quote_spanned!(ident.span() => unsafe { (*context.ip.module).literals[#ident as usize] })
+            }
             // TODO: assignment
-            "x" => quote_spanned!(ident.span() => unsafe { (*context.x.get_unchecked(#ident.0 as usize)) }),
-            "y" => quote_spanned!(ident.span() => unsafe { (*context.stack.get_unchecked(context.stack.len() - (#ident.0 + 1) as usize)) }),
+            "x" => {
+                quote_spanned!(ident.span() => unsafe { (*context.x.get_unchecked(#ident.0 as usize)) })
+            }
+            "y" => {
+                quote_spanned!(ident.span() => unsafe { (*context.stack.get_unchecked(context.stack.len() - (#ident.0 + 1) as usize)) })
+            }
             "s" => quote_spanned!(ident.span() => context.expand_arg(#ident)),
             // TODO: needs to be assignable
             "d" => quote_spanned!(ident.span() => context.fetch_register(#ident)),
@@ -470,14 +518,18 @@ fn interpolate_to_tokens_ident(stream: &mut proc_macro2::TokenStream, opcode: &O
             "t" => quote_spanned!(ident.span() => #ident),
             "u" => quote_spanned!(ident.span() => #ident),
             "b" => quote_spanned!(ident.span() => #ident),
-            _ => syn::Error::new_spanned(ident, format!("unexpected type `{}`", typ)).to_compile_error()
-        }
+            _ => syn::Error::new_spanned(ident, format!("unexpected type `{}`", typ))
+                .to_compile_error(),
+        },
     };
     stream.append_all(code)
 }
 
 /// Parses the input according to `quote!` rules.
-fn interpolate_opcode_impls(op: &Opcode, input: &mut InputIter) -> Result<proc_macro2::TokenStream> {
+fn interpolate_opcode_impls(
+    op: &Opcode,
+    input: &mut InputIter,
+) -> Result<proc_macro2::TokenStream> {
     let mut output = proc_macro2::TokenStream::new();
 
     while let Some(token) = input.next() {

@@ -2,7 +2,7 @@ use crate::atom;
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Term, CastFrom, Tuple, Variant};
+use crate::value::{self, CastFrom, Term, Tuple, Variant};
 use crate::vm;
 use chrono::prelude::*;
 use num_bigint::ToBigInt;
@@ -116,6 +116,32 @@ pub fn system_time_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
 // Secs = ErlangSystemTime div 1000000 - MegaSecs*1000000,
 // MicroSecs = ErlangSystemTime rem 1000000,
 // {MegaSecs, Secs, MicroSecs}.
+
+pub fn timestamp_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
+    let heap = &process.context_mut().heap;
+
+    let time = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap();
+
+    let megasecs = Term::int(0);
+    let secs = Term::bigint(heap, time.as_secs().to_bigint().unwrap());
+    let microsecs = Term::int(0);
+
+    // TODO:
+    Ok(tup3!(heap, megasecs, secs, microsecs))
+
+    // ErtsSystemTime stime = erts_os_system_time();
+    // ErtsSystemTime ms, s, us;
+
+    // us = ERTS_MONOTONIC_TO_USEC(stime);
+    // s = us / (1000*1000);
+    // ms = s / (1000*1000);
+
+    // *megasec = (Uint) ms;
+    // *sec = (Uint) (s - ms*(1000*1000));
+    // *microsec = (Uint) (us - s*(1000*1000));
+}
 
 pub fn universaltime_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;

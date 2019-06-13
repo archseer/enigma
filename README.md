@@ -42,7 +42,7 @@ make local_setup
 We hope to simplify this step in the future (once enigma can run the compiler).
 
 Run `cargo run` to install dependencies, build and run the VM. By default, it
-will boot up the erlang shell ([which works, but has some rendering bugs](https://asciinema.org/a/yVKI5dAdDXGq11azUSjbQV42y)).
+will boot up the erlang shell ([iex also works, but has some rendering bugs](https://asciinema.org/a/zIjbf5AJx9YxEycyl9ij5ISVM)).
 
 Expect crashes, but a lot of the functionality is already available.
 
@@ -58,8 +58,8 @@ a detailed progress breakdown on [opcodes](/notes/opcodes.org) or [BIFs](/notes/
 - [x] Get the full OTP kernel/stdlib to boot (`init:start`).
 - [x] Get the Eshell to run.
 - [x] Get OTP tests to run (works with a custom runner currently).
-- [ ] Get the erlang compiler to work.
-- [ ] Get IEx to run.
+- [x] Get the erlang compiler to work.
+- [x] Get IEx to run.
 - [ ] Get OTP tests to pass.
 
 #### Features
@@ -73,17 +73,9 @@ a detailed progress breakdown on [opcodes](/notes/opcodes.org) or [BIFs](/notes/
 - [x] Links & monitors
 - [ ] Timers
 - [x] Maps
-- [ ] Binaries
-  - [x] Basic type implementation
-  - [ ] Binary building
-  - [x] Binary matching
-  - [x] Bitstring (bit-level) matching
-  - [ ] Binary searching
-    - multi pattern via [aho-corasick](https://github.com/BurntSushi/aho-corasick)
-    - single pattern via [boyer-moore](https://github.com/killerswan/boyer-moore-search) | [needle booyer-moore](https://docs.rs/needle/0.1.1/needle/) | [regex - booyer-moore](https://github.com/ethanpailes/regex/commit/d2e28f959ac384db62f7cbeba1576cf39a75b294)
+- [x] Binaries
 - [ ] File IO
-    - [x] open/read/close/read_file
-    - [ ] write
+    - [x] open/read/close/read_file/write
     - [ ] Filesystem interaction
 - [ ] [External NIFs](http://erlang.org/doc/man/erl_nif.html)
 - [ ] Ports (might never be fully supported, we provide a few boot-critical ones as builtins: tty, fd)
@@ -98,7 +90,8 @@ a detailed progress breakdown on [opcodes](/notes/opcodes.org) or [BIFs](/notes/
 - [ ] inet via socket nifs
 - [ ] Code reloading
 - [ ] Tracing/debugging support
-- [ ] Load-time instruction transform and specialization engine
+- [ ] Load-time instruction transform
+- [x] Load-time instruction specialization engine
 
 ### Goals, ideas & experiments
 
@@ -119,7 +112,6 @@ Future possibilities:
 - BIF as a generator function (yield to suspend/on reduce)
 - Provide built-in adapter modules for [hyper](https://github.com/hyperium/hyper) as a Plug Adapter / HTTP client.
 - Cross-compile to WebAssembly ([runtime](https://github.com/rustasync/runtime/))
-- Use Commentz-Walter for binary matching. ["Commentz-Walter is an algorithm that combines Aho-Corasick with Boyer-Moore. (Only implementation I know of is in GNU grep.)"](https://github.com/rust-lang/regex/issues/197))
 
 #### Initial non-goals
 

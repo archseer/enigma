@@ -4,7 +4,7 @@ use crate::bif;
 use crate::exception::{Exception, Reason};
 
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, CastFrom};
+use crate::value::{self, CastFrom, Cons, Term};
 use crate::vm;
 use std::env;
 

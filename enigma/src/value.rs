@@ -853,7 +853,7 @@ impl Term {
                 let value = &self.get_boxed_value::<bitstring::SubBinary>().unwrap();
 
                 if value.bit_offset & 7 != 0 {
-                    panic!("to_str can't work with non-zero bit_offset");
+                    panic!("to_str can't work with non-zero bit_offset {:?}", value);
                 }
 
                 let offset = value.offset; // byte_offset!
@@ -994,9 +994,11 @@ impl PartialEq for Variant {
             (Variant::Cons(l1), Variant::Cons(l2)) => unsafe { (**l1).eq(&(**l2)) },
 
             (Variant::Pointer(p1), Variant::Pointer(p2)) => unsafe {
-                let header = **p1;
-                if header == **p2 {
-                    match header {
+                let h1 = **p1;
+                let h2 = **p2;
+
+                if h1 == h2 {
+                    match h1 {
                         BOXED_TUPLE => {
                             let t1 = &*(*p1 as *const Tuple);
                             let t2 = &*(*p2 as *const Tuple);
@@ -1022,6 +1024,23 @@ impl PartialEq for Variant {
                             let b2 = &*(*p2 as *const Boxed<bitstring::RcBinary>);
                             b1.value.data.eq(&b2.value.data)
                         }
+                        BOXED_SUBBINARY => {
+                            let b1 = &(*(*p1 as *const Boxed<bitstring::SubBinary>)).value;
+                            let b2 = &(*(*p2 as *const Boxed<bitstring::SubBinary>)).value;
+
+                            // first compare lengths, then use cmp_bits
+                            if (b1.size * 8 + b1.bitsize) != (b2.size * 8 + b2.bitsize) {
+                                return false;
+                            }
+
+                            bitstring::cmp_bits(
+                                b1.original.data.as_ptr().add(b1.offset),
+                                b1.bit_offset as usize,
+                                b2.original.data.as_ptr().add(b2.offset),
+                                b2.bit_offset as usize,
+                                b2.bitsize + (b2.size * 8),
+                            ) == std::cmp::Ordering::Equal
+                        }
                         BOXED_REF => {
                             let r1 = &*(*p1 as *const Boxed<process::Ref>);
                             let r2 = &*(*p2 as *const Boxed<process::Ref>);
@@ -1035,7 +1054,44 @@ impl PartialEq for Variant {
                         i => unimplemented!("boxed_value eq for {}", i),
                     }
                 } else {
-                    false
+                    // special cases
+                    match (h1, h2) {
+                        (BOXED_BINARY, BOXED_SUBBINARY) => {
+                            let b1 = &(*(*p1 as *const Boxed<bitstring::RcBinary>)).value;
+                            let b2 = &(*(*p2 as *const Boxed<bitstring::SubBinary>)).value;
+
+                            // first compare lengths, then use cmp_bits
+                            if b1.data.len() * 8 != (b2.size * 8 + b2.bitsize) {
+                                return false;
+                            }
+
+                            bitstring::cmp_bits(
+                                b1.data.as_ptr(),
+                                0,
+                                b2.original.data.as_ptr().add(b2.offset),
+                                b2.bit_offset as usize,
+                                b1.data.len() * 8,
+                            ) == std::cmp::Ordering::Equal
+                        }
+                        (BOXED_SUBBINARY, BOXED_BINARY) => {
+                            let b1 = &(*(*p1 as *const Boxed<bitstring::SubBinary>)).value;
+                            let b2 = &(*(*p2 as *const Boxed<bitstring::RcBinary>)).value;
+
+                            // first compare lengths, then use cmp_bits
+                            if b2.data.len() * 8 != (b1.size * 8 + b1.bitsize) {
+                                return false;
+                            }
+
+                            bitstring::cmp_bits(
+                                b1.original.data.as_ptr().add(b1.offset),
+                                b1.bit_offset as usize,
+                                b2.data.as_ptr(),
+                                0,
+                                b2.data.len() * 8,
+                            ) == std::cmp::Ordering::Equal
+                        }
+                        _ => false,
+                    }
                 }
             },
             _ => false,
@@ -1098,9 +1154,11 @@ impl Ord for Variant {
             (Variant::Cons(l1), Variant::Cons(l2)) => unsafe { (**l1).cmp(&(**l2)) },
 
             (Variant::Pointer(p1), Variant::Pointer(p2)) => unsafe {
-                let header = **p1;
-                if header == **p2 {
-                    match header {
+                let h1 = **p1;
+                let h2 = **p2;
+
+                if h1 == h2 {
+                    match h1 {
                         BOXED_TUPLE => {
                             let t1 = &*(*p1 as *const Tuple);
                             let t2 = &*(*p2 as *const Tuple);
@@ -1131,10 +1189,33 @@ impl Ord for Variant {
                             let b2 = &*(*p2 as *const Boxed<bitstring::RcBinary>);
                             b1.value.data.cmp(&b2.value.data)
                         }
-                        _ => unimplemented!("cmp for {}", header),
+                        BOXED_SUBBINARY => {
+                            let b1 = &(*(*p1 as *const Boxed<bitstring::SubBinary>)).value;
+                            let b2 = &(*(*p2 as *const Boxed<bitstring::SubBinary>)).value;
+
+                            // first compare lengths, then use cmp_bits
+                            let cmp = (b1.size * 8 + b1.bitsize).cmp(&(b2.size * 8 + b2.bitsize));
+
+                            if cmp == std::cmp::Ordering::Equal {
+                                bitstring::cmp_bits(
+                                    b1.original.data.as_ptr(),
+                                    (b1.offset * 8) + b1.bit_offset as usize,
+                                    b2.original.data.as_ptr(),
+                                    (b2.offset * 8) + b2.bit_offset as usize,
+                                    b2.bitsize + (b2.size * 8),
+                                )
+                            } else {
+                                cmp
+                            }
+                        }
+                        _ => unimplemented!("cmp for {}", h1),
                     }
                 } else {
-                    unimplemented!()
+                    match (h1, h2) {
+                        (BOXED_BINARY, BOXED_SUBBINARY) => unimplemented!(),
+                        (BOXED_SUBBINARY, BOXED_BINARY) => unimplemented!(),
+                        _ => unimplemented!(),
+                    }
                 }
             },
             (Variant::Integer(i1), Variant::Pointer(p2)) => unsafe {

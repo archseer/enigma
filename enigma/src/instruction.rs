@@ -1,23 +1,23 @@
 use instruction_codegen::instruction;
 
 // mandatory for loop
-use crate::vm::{Machine, op_deallocate};
-use crate::{atom, port, bif, bitstring, module};
 use crate::bitstring::Flag as BitFlag;
 use crate::exception::{self, Exception, Reason};
-use crate::exports_table::{Export};
+use crate::exports_table::Export;
 use crate::instr_ptr::InstrPtr;
-use crate::instruction::{self};
+use crate::instruction;
 use crate::process::{self, RcProcess};
-use crate::value::{self, Cons, Term, CastFrom, CastInto, CastIntoMut, Tuple, Variant};
+use crate::value::{self, CastFrom, CastInto, CastIntoMut, Cons, Term, Tuple, Variant};
+use crate::vm::{op_deallocate, Machine};
+use crate::{atom, bif, bitstring, module, port};
 use std::time;
 
 use futures::{
-  compat::*,
-  future::{FutureExt, TryFutureExt},
-  // io::AsyncWriteExt,
-  stream::StreamExt,
-  // sink::SinkExt,
+    compat::*,
+    future::{FutureExt, TryFutureExt},
+    // io::AsyncWriteExt,
+    stream::StreamExt,
+    // sink::SinkExt,
 };
 // use futures::prelude::*;
 // end mandatory for loop
@@ -25,8 +25,8 @@ use futures::{
 use std::convert::TryInto;
 
 // for the load transform
-use crate::loader::LValue;
 use crate::immix::Heap;
+use crate::loader::LValue;
 // end for the load transform
 
 use crate::bif::Fn as BifFn;
@@ -39,13 +39,14 @@ pub trait FromWithHeap<T>: Sized {
     /// Performs the conversion.
     fn from_with_heap(_: &T, constants: &mut Vec<Term>, heap: &Heap) -> Self;
 }
-impl<T, U> IntoWithHeap<U> for T where U: FromWithHeap<T>
+impl<T, U> IntoWithHeap<U> for T
+where
+    U: FromWithHeap<T>,
 {
     fn into_with_heap(&self, constants: &mut Vec<Term>, heap: &Heap) -> U {
         U::from_with_heap(self, constants, heap)
     }
 }
-
 
 pub type Bytes = Vec<u8>;
 
@@ -328,7 +329,6 @@ pub fn to_const(value: &LValue, constants: &mut Vec<Term>, heap: &Heap) -> u32 {
 // Constant fit into the instruction and not require a separate table would be good.
 // represent Vec<u8> string buffers as pointers into the string table (a slice would work?).
 
-
 // need three things:
 // generic op definitions
 // op definitions with type permutations
@@ -493,7 +493,7 @@ instruction!(
         context.cp = Some(context.ip);
         op_jump!(context, label);
 
-        // if process.pid > 70 {
+        // if process.pid >= 95 {
         //     let (mfa, _) = context.ip.lookup_func_info().unwrap();
         //     info!("pid={} action=call mfa={}", process.pid, mfa);
         // }
@@ -502,10 +502,9 @@ instruction!(
     fn call_last(arity: t, label: l, words: r) {
         // store arity as live
         op_deallocate(context, words);
-
         op_jump!(context, label);
 
-        // if process.pid > 70 {
+        // if process.pid >= 95 {
         // let (mfa, _) = context.ip.lookup_func_info().unwrap();
         // info!("pid={} action=call_last mfa={}", process.pid, mfa);
         // }
@@ -515,7 +514,7 @@ instruction!(
         // store arity as live
         op_jump!(context, label);
 
-        // if process.pid > 70 {
+        // if process.pid >= 95 {
         // let (mfa, _) = context.ip.lookup_func_info().unwrap();
         // info!("pid={} action=call_only mfa={}", process.pid, mfa);
         // }
@@ -1526,19 +1525,34 @@ instruction!(
         unimplemented!()
     },
     fn bs_utf8_size(fail: l, source: s, destination: d) {
-        unimplemented!()
+        let c = std::char::from_u32(#source.to_uint().unwrap()).unwrap();
+        let value = Term::int(c.len_utf8().try_into().unwrap());
+
+        context.set_register(destination, value);
     },
     fn bs_utf16_size(fail: l, source: s, destination: d) {
-        unimplemented!()
+        let c = std::char::from_u32(#source.to_uint().unwrap()).unwrap();
+        let value = Term::int(c.len_utf16().try_into().unwrap());
+
+        context.set_register(destination, value);
     },
     fn bs_put_utf8(fail: l, flags: F, source: s) {
-        unimplemented!()
+        let c = std::char::from_u32(#source.to_uint().unwrap()).unwrap();
+        let mut buf = [0; 4];
+        let result = c.encode_utf8(&mut buf);
+        context.bs.put_bytes(result.as_bytes());
     },
     fn bs_put_utf16(fail: l, flags: F, source: s) {
-        unimplemented!()
+        let c = std::char::from_u32(#source.to_uint().unwrap()).unwrap();
+        let mut buf = [0; 2];
+        let result = c.encode_utf16(&mut buf);
+        let result = unsafe {
+            std::slice::from_raw_parts(result.as_ptr() as *const u8, result.len() * 2)
+        };
+        context.bs.put_bytes(result);
     },
     fn bs_put_utf32(fail: l, flags: F, source: s) {
-        unimplemented!()
+        unimplemented!("bs_put_utf32: flags {:?}, source {}", flags, #source);
     },
     fn fclearerror() {
         // TODO: BEAM checks for unhandled errors

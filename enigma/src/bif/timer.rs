@@ -1,7 +1,7 @@
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::{self, RcProcess};
-use crate::value::{self, Term, CastFrom, Tuple, Variant};
+use crate::value::{self, CastFrom, Term, Tuple, Variant};
 use crate::vm;
 
 use std::time::{Duration, Instant};

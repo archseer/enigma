@@ -2,7 +2,7 @@ use crate::atom;
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, CastFrom, CastInto, Tuple};
+use crate::value::{self, CastFrom, CastInto, Cons, Term, Tuple};
 use crate::vm;
 
 pub fn member_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
@@ -45,51 +45,6 @@ pub fn member_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::
     Ok(atom!(FALSE)) // , reds_left - max_iter/16
 }
 
-// fn lists_reverse_alloc(process: &RcProcess, mut list: Term, mut tail: Term) -> bif::Result {
-//     const CELLS_PER_RED: usize = 40;
-
-//     let max_cells = CELLS_PER_RED * process.context().reds;
-//     let mut cells_left = max_cells;
-//     let mut lookahead = list;
-
-//     while cells_left != 0 && lookahead.is_list() {
-//         lookahead = CDR(list_val(lookahead));
-//         cells_left -= 1;
-//     }
-
-//     BUMP_REDS(c_p, (max_cells - cells_left) / CELLS_PER_RED);
-
-//     if !lookahead.is_list() && !lookahead.is_nil() {
-//         return Err(Exception::new(Reason::EXC_BADARG));
-//     }
-
-//     // alloc_top = HAlloc(c_p, 2 * (max_cells - cells_left));
-//     // alloc_end = alloc_top + 2 * (max_cells - cells_left);
-
-//     let heap = &process.context_mut().heap;
-
-//     let list = list.iter().take(max_cells).fold(tail, |acc, val| cons!(heap, val, acc));
-
-//     while alloc_top < alloc_end {
-//         Term *pair = list_val(list);
-
-//         tail = CONS(alloc_top, CAR(pair), tail);
-//         list = CDR(pair);
-
-//         debug_assert!(list.is_list() || list.is_nil());
-
-//         alloc_top += 2;
-//     }
-
-//     if list.is_nil() {
-//         return Ok(tail);
-//     }
-
-//     debug_assert!(tail.is_list() && cells_left == 0);
-//     BIF_TRAP2(bif_export[reverse_2], process, list, tail);
-//     unimplemented!()
-// }
-
 pub fn reverse_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // Handle legal and illegal non-lists quickly.
     if args[0].is_nil() {
@@ -101,15 +56,6 @@ pub fn reverse_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::
     let heap = &process.context_mut().heap;
     // TODO: finish up the reduction counting implementation
     Ok(cons.iter().fold(args[1], |acc, val| cons!(heap, *val, acc)))
-
-    /* We build the reversal on the unused part of the heap if possible to save
-     * us the trouble of having to figure out the list size. We fall back to
-     * lists_reverse_alloc when we run out of space. */
-    // if (HeapWordsLeft(BIF_P) > 8) {
-    //     return lists_reverse_onheap(BIF_P, BIF_ARG_1, BIF_ARG_2);
-    // }
-
-    // return lists_reverse_alloc(BIF_P, BIF_ARG_1, BIF_ARG_2);
 }
 
 pub fn keymember_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {

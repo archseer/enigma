@@ -4,7 +4,7 @@ use crate::exception::{Exception, Reason};
 use crate::loader::Loader;
 use crate::module::{self, Module};
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, CastFrom, CastInto, Variant};
+use crate::value::{self, CastFrom, CastInto, Cons, Term, Variant};
 use crate::vm;
 
 pub fn pre_loaded_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif::Result {
@@ -98,9 +98,9 @@ pub fn get_module_info_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
     let heap = &process.context_mut().heap;
     let keys = vec![
         //atom!(MD5),
-        //atom!(NATIVE),
+        atom!(NATIVE),
         //atom!(COMPILE),
-        //atom!(ATTRIBUTES),
+        atom!(ATTRIBUTES),
         atom!(EXPORTS),
         atom!(MODULE),
     ];
@@ -146,7 +146,7 @@ fn get_module_info(heap: &crate::immix::Heap, module: &Module, what: Term) -> bi
             }))
         }
         Variant::Atom(atom::NIFS) => unimplemented!(),
-        Variant::Atom(atom::ATTRIBUTES) => unimplemented!(),
+        Variant::Atom(atom::ATTRIBUTES) => Ok(module.attrs),
         Variant::Atom(atom::COMPILE) => unimplemented!(),
         Variant::Atom(atom::NATIVE_ADDRESSES) => unimplemented!(),
         Variant::Atom(atom::NATIVE) => Ok(atom!(FALSE)), // TODO
@@ -154,11 +154,14 @@ fn get_module_info(heap: &crate::immix::Heap, module: &Module, what: Term) -> bi
     }
 }
 
-pub fn erts_internal_purge_module_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn erts_internal_purge_module_2(
+    vm: &vm::Machine,
+    process: &RcProcess,
+    args: &[Term],
+) -> bif::Result {
     // prepare / prepare_on_load
     // abort
     // complete
     // unimplemented!("purge_module: {} {}", args[0], args[1]);
     Ok(atom!(TRUE))
 }
-

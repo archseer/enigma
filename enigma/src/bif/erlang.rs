@@ -3,7 +3,7 @@ use crate::bif;
 use crate::bitstring;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
-use crate::value::{self, Cons, Term, CastFrom, CastInto, Tuple, Variant};
+use crate::value::{self, CastFrom, CastInto, Cons, Term, Tuple, Variant};
 use crate::vm;
 use lexical;
 
@@ -143,7 +143,6 @@ pub fn binary_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
         size,
         bitoffs,
     );
-    //println!("{}", res);
     Ok(res)
 }
 
@@ -240,6 +239,7 @@ pub fn list_to_iodata(list: Term) -> Result<Vec<u8>, Exception> {
                                 stack.push(cons.tail);
                                 continue; // head loop
                             }
+                            Variant::Nil(value::Special::Nil) => break, // TODO is correct?
                             _ => return Err(Exception::new(Reason::EXC_BADARG)),
                         }
                         break;
@@ -681,7 +681,9 @@ pub fn integer_to_list_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
             let string = i.to_bytes_radix(radix);
             let heap = &process.context_mut().heap;
 
-            Ok(string.into_iter().rev().fold(Term::nil(), |acc, val| cons!(heap, Term::int(i32::from(val)), acc)))
+            Ok(string.into_iter().rev().fold(Term::nil(), |acc, val| {
+                cons!(heap, Term::int(i32::from(val)), acc)
+            }))
         }
         Ok(value::Num::Bignum(i)) => {
             unimplemented!("integer_to_binary_2 with radix");
@@ -696,7 +698,6 @@ pub fn integer_to_list_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     }
 }
 
-
 pub fn integer_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     use lexical::ToBytes;
     match args[0].into_number() {
@@ -704,10 +705,7 @@ pub fn integer_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]
             let string = i.to_bytes();
             let heap = &process.context_mut().heap;
 
-            Ok(Term::binary(
-                heap,
-                bitstring::Binary::from(string),
-            ))
+            Ok(Term::binary(heap, bitstring::Binary::from(string)))
         }
         Ok(value::Num::Bignum(i)) => {
             unimplemented!("integer_to_binary_1 with bignum");
@@ -739,10 +737,7 @@ pub fn integer_to_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]
             let string = i.to_bytes_radix(radix);
             let heap = &process.context_mut().heap;
 
-            Ok(Term::binary(
-                heap,
-                bitstring::Binary::from(string),
-            ))
+            Ok(Term::binary(heap, bitstring::Binary::from(string)))
         }
         Ok(value::Num::Bignum(i)) => {
             unimplemented!("integer_to_binary_2 with bignum");
@@ -805,7 +800,11 @@ pub fn list_to_integer_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term])
     }
 }
 
-pub fn string_list_to_integer_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+pub fn string_list_to_integer_1(
+    _vm: &vm::Machine,
+    process: &RcProcess,
+    args: &[Term],
+) -> bif::Result {
     // list to string
     let heap = &process.context_mut().heap;
 
@@ -814,22 +813,31 @@ pub fn string_list_to_integer_1(_vm: &vm::Machine, process: &RcProcess, args: &[
         args[0].to_bytes().unwrap().to_owned()
     } else {
         let cons = Cons::cast_from(&args[0])?;
-        value::cons::unicode_list_to_buf(cons, 2048)?.as_bytes().to_owned()
+        value::cons::unicode_list_to_buf(cons, 2048)?
+            .as_bytes()
+            .to_owned()
     };
 
-    match lexical::try_parse::<i32, _>(string.clone()) { // the api is not great here, need to clone
+    match lexical::try_parse::<i32, _>(string.clone()) {
+        // the api is not great here, need to clone
         Ok(i) => Ok(tup2!(heap, Term::int(i), Term::nil())),
         Err(err) => {
             match err.kind() {
-                lexical::ErrorKind::InvalidDigit(0) => Ok(tup2!(heap, atom!(ERROR), atom!(NO_INTEGER))),
+                lexical::ErrorKind::InvalidDigit(0) => {
+                    Ok(tup2!(heap, atom!(ERROR), atom!(NO_INTEGER)))
+                }
                 lexical::ErrorKind::InvalidDigit(n) => {
                     // TODO: tests
                     Ok(tup2!(
+                        heap,
+                        Term::int(lexical::parse::<i32, _>(&string[..*n])),
+                        string[*n..].iter().rev().fold(Term::nil(), |acc, b| cons!(
                             heap,
-                            Term::int(lexical::parse::<i32, _>(&string[..*n])),
-                            string[*n..].iter().rev().fold(Term::nil(), |acc, b| cons!(heap, Term::int(i32::from(*b)), acc))
+                            Term::int(i32::from(*b)),
+                            acc
+                        ))
                     ))
-                },
+                }
                 err => panic!("errored with {:?}", err), //TODO
             }
         }
@@ -1005,7 +1013,10 @@ pub fn processes_0(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> bif
         process_table.all()
     };
 
-    let res = pids.into_iter().rev().fold(Term::nil(), |acc, pid| cons!(heap, Term::pid(pid), acc));
+    let res = pids
+        .into_iter()
+        .rev()
+        .fold(Term::nil(), |acc, pid| cons!(heap, Term::pid(pid), acc));
     Ok(res)
 }
 
@@ -1190,364 +1201,6 @@ pub fn make_fun_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
         }
         _ => Err(Exception::new(Reason::EXC_BADARG)),
     }
-}
-
-pub fn split_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    // bin, pos
-    let heap = &process.context_mut().heap;
-
-    let pos = match args[1].into_variant() {
-        Variant::Integer(i) if i >= 0 => i as usize,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
-    };
-
-    if !args[0].is_binary() {
-        return Err(Exception::new(Reason::EXC_BADARG));
-    }
-
-    // TODO: this was a get_real_binary macro before
-    let (bin, offset, bit_offset, size, bitsize) = match args[0].get_boxed_header() {
-        Ok(value::BOXED_BINARY) => {
-            // TODO use ok_or to cast to some, then use ?
-            let value = &args[0].get_boxed_value::<bitstring::RcBinary>().unwrap();
-            (*value, 0, 0, value.data.len(), 0)
-        }
-        Ok(value::BOXED_SUBBINARY) => {
-            // TODO use ok_or to cast to some, then use ?
-            let value = &args[0].get_boxed_value::<bitstring::SubBinary>().unwrap();
-            (
-                &value.original,
-                value.offset,
-                value.bit_offset,
-                value.size,
-                value.bitsize,
-            )
-        }
-        _ => unreachable!(),
-    };
-
-    if size < pos {
-        return Err(Exception::new(Reason::EXC_BADARG));
-    }
-
-    let sb1 = bitstring::SubBinary {
-        original: bin.clone(),
-        size: pos,
-        offset: offset + pos,
-        bit_offset,
-        bitsize: 0,
-        is_writable: false,
-    };
-
-    let sb2 = bitstring::SubBinary {
-        original: bin.clone(),
-        size: size - pos,
-        offset: offset + pos,
-        bit_offset,
-        bitsize, // The extra bits go into the second binary.
-        is_writable: false,
-    };
-
-    Ok(tup2!(
-        heap,
-        Term::subbinary(heap, sb1),
-        Term::subbinary(heap, sb2)
-    ))
-}
-
-pub fn binary_part_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    // PosLen = {Start :: integer() >= 0, Length :: integer()}
-    unimplemented!()
-}
-
-pub fn binary_part_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    let (bin, offs, bitoffs, size, bitsize) = match args[0].get_boxed_header() {
-        Ok(value::BOXED_BINARY) => {
-            // TODO use ok_or to cast to some, then use ?
-            let value = &args[0].get_boxed_value::<bitstring::RcBinary>().unwrap();
-            (*value, 0, 0, value.data.len(), 0)
-        }
-        Ok(value::BOXED_SUBBINARY) => {
-            // TODO use ok_or to cast to some, then use ?
-            let value = &args[0].get_boxed_value::<bitstring::SubBinary>().unwrap();
-            (
-                &value.original,
-                value.offset,
-                value.bit_offset,
-                value.size,
-                value.bitsize,
-                )
-        }
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
-    };
-
-    let mut pos = match args[1].into_variant() {
-        Variant::Integer(i) if i >= 0 => i as usize,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
-    };
-
-    let len = match args[2].into_variant() {
-        Variant::Integer(i) => {
-            if i < 0 {
-                let len = (-i) as usize;
-                if len > pos {
-                    return Err(Exception::new(Reason::EXC_BADARG));
-                }
-                pos -= len;
-                len
-            } else {
-                i as usize
-            }
-        },
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
-    };
-
-    /* overflow */
-    // if ((pos + len) < pos || (len > 0 && (pos + len) == pos) {
-	// goto badarg;
-    // }
-    if size < pos || size < (pos + len) {
-        return Err(Exception::new(Reason::EXC_BADARG));
-    }
-
-    // TODO: make a constructor that doesn't need bits.
-    let offset = (offs >> 8 + bitoffs) + pos;
-    let size = len >> 8;
-
-    // TODO: tests
-    let heap = &process.context_mut().heap;
-    Ok(Term::subbinary(heap, bitstring::SubBinary::new(bin.clone(), size, offset, false)))
-}
-
-pub fn binary_split_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    use std::borrow::Cow;
-    use regex::bytes::Regex;
-    use bitstring::{RcBinary, SubBinary};
-    let heap = &process.context_mut().heap;
-    // <subject> <pattern> <options>
-    // split or replace via regex crate and regex::escape the contents. It'll pick the most
-    // efficient one.
-
-    // subject = binary
-    let (bin, offs, bitoffs, size, bitsize) = match args[0].get_boxed_header() {
-        Ok(value::BOXED_BINARY) => {
-            // TODO use ok_or to cast to some, then use ?
-            let value = &args[0].get_boxed_value::<RcBinary>().unwrap();
-            (*value, 0, 0, value.data.len(), 0)
-        }
-        Ok(value::BOXED_SUBBINARY) => {
-            // TODO use ok_or to cast to some, then use ?
-            let value = &args[0].get_boxed_value::<SubBinary>().unwrap();
-            (
-                &value.original,
-                value.offset,
-                value.bit_offset,
-                value.size,
-                value.bitsize,
-                )
-        }
-        _ => unreachable!(),
-    };
-    if bitoffs > 0 {
-        unimplemented!("Unaligned bitoffs not implemented");
-    }
-    let subject = &bin.data[offs..offs+size];
-
-    // pattern = binary | [binary] | compiled
-    let regex = if let Ok(regex) = Regex::cast_from(&args[1]) {
-        Cow::Borrowed(regex)
-    } else if let Some(bytes) = args[1].to_bytes() {
-        let pattern = regex::escape(std::str::from_utf8(bytes).unwrap());
-        let regex = Regex::new(&pattern).unwrap();
-        Cow::Owned(regex)
-    } else if args[1].is_list() {
-        let mut iter = args[1];
-        let mut acc = Vec::new();
-        while let Ok(Cons { head, tail }) = Cons::cast_from(&iter) {
-            // TODO: error handling
-            let bytes = head.to_bytes().unwrap();
-            let pattern = regex::escape(std::str::from_utf8(bytes).unwrap());
-            acc.push(pattern);
-            iter = *tail;
-        }
-
-        if !iter.is_nil() {
-            return Err(Exception::new(Reason::EXC_BADARG));
-        }
-
-        let pattern = acc.join("|");
-        let regex = Regex::new(&pattern).unwrap();
-        Cow::Owned(regex)
-    } else {
-        return Err(Exception::new(Reason::EXC_BADARG));
-    };
-
-    let mut global = false;
-
-    // parse options
-    if let Ok(cons) = Cons::cast_from(&args[2]) {
-        for val in cons.iter() {
-            match val.into_variant() {
-                Variant::Atom(atom::TRIM) => {
-                    // remove empty trailing parts
-                    unimplemented!()
-                }
-                Variant::Atom(atom::TRIM_ALL) => {
-                    // remove all empty parts
-                    unimplemented!()
-                }
-                Variant::Atom(atom::GLOBAL) => {
-                    // repeat globally
-                    global = true;
-                }
-                Variant::Pointer(..) => {
-                    if let Ok(tup) = Tuple::cast_from(&args[2]) {
-                        if tup.len != 2 {
-                            return Err(Exception::new(Reason::EXC_BADARG));
-                        }
-
-                        match tup[0].into_variant() {
-                            Variant::Atom(atom::SCOPE) => {
-                                unimplemented!()
-                            }
-                            _ => return Err(Exception::new(Reason::EXC_BADARG)),
-                        }
-
-                    } else {
-                        return Err(Exception::new(Reason::EXC_BADARG));
-                    }
-                }
-                _ => return Err(Exception::new(Reason::EXC_BADARG)),
-            }
-        }
-    } else if args[2].is_nil() {
-        // skip
-    } else {
-        return Err(Exception::new(Reason::EXC_BADARG));
-    }
-
-    if global {
-        let mut finder = regex.find_iter(subject);
-        let mut last = 0;
-        let mut acc = Vec::new();
-
-        loop {
-            // based on regex split code, but we needed offsets instead of slices
-            match finder.next() {
-                None => {
-                    if last >= subject.len() {
-                        break;
-                    } else {
-                        acc.push(SubBinary::new(
-                                bin.clone(),
-                                (offs + last) >> 8,
-                                (subject.len() - offs) >> 8,
-                                false
-                        ));
-
-                        last = subject.len();
-                    }
-                }
-                Some(m) => {
-                    acc.push(SubBinary::new(
-                            bin.clone(),
-                            (offs + last) >> 8,
-                            (m.start() - offs) >> 8,
-                            false
-                    ));
-                    last = m.end();
-                }
-            }
-        }
-
-        let res = acc.into_iter().rev().fold(Term::nil(), |acc, val| cons!(heap, Term::subbinary(heap, val), acc));
-        println!("split: {} {} {}\r", args[0], args[1], res);
-        Ok(res)
-    } else {
-        unimplemented!()
-    }
-}
-
-// very similar to split: extract helpers
-pub fn binary_matches_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    use std::borrow::Cow;
-    use regex::bytes::Regex;
-    use bitstring::{RcBinary, SubBinary};
-    let heap = &process.context_mut().heap;
-    // <subject> <pattern> <options>
-    println!("matches/3 start: {} {} {}", args[0], args[1], args[2]);
-
-    // subject = binary
-    let subject = match args[0].to_bytes() {
-        Some(bytes) => bytes,
-        None => return Err(Exception::new(Reason::EXC_BADARG)),
-    };
-
-    // pattern = binary | [binary] | compiled
-    let regex = if let Ok(regex) = Regex::cast_from(&args[1]) {
-        Cow::Borrowed(regex)
-    } else if let Some(bytes) = args[1].to_bytes() {
-        let pattern = regex::escape(std::str::from_utf8(bytes).unwrap());
-        let regex = Regex::new(&pattern).unwrap();
-        Cow::Owned(regex)
-    } else if args[1].is_list() {
-        let mut iter = args[1];
-        let mut acc = Vec::new();
-        while let Ok(Cons { head, tail }) = Cons::cast_from(&iter) {
-            // TODO: error handling
-            let bytes = head.to_bytes().unwrap();
-            let pattern = regex::escape(std::str::from_utf8(bytes).unwrap());
-            acc.push(pattern);
-            iter = *tail;
-        }
-
-        if !iter.is_nil() {
-            return Err(Exception::new(Reason::EXC_BADARG));
-        }
-
-        let pattern = acc.join("|");
-        let regex = Regex::new(&pattern).unwrap();
-        Cow::Owned(regex)
-    } else {
-        return Err(Exception::new(Reason::EXC_BADARG));
-    };
-
-    // parse options
-    if let Ok(cons) = Cons::cast_from(&args[2]) {
-        for val in cons.iter() {
-            match val.into_variant() {
-                Variant::Pointer(..) => {
-                    if let Ok(tup) = Tuple::cast_from(&args[2]) {
-                        if tup.len != 2 {
-                            return Err(Exception::new(Reason::EXC_BADARG));
-                        }
-
-                        match tup[0].into_variant() {
-                            Variant::Atom(atom::SCOPE) => {
-                                unimplemented!()
-                            }
-                            _ => return Err(Exception::new(Reason::EXC_BADARG)),
-                        }
-
-                    } else {
-                        return Err(Exception::new(Reason::EXC_BADARG));
-                    }
-                }
-                _ => return Err(Exception::new(Reason::EXC_BADARG)),
-            }
-        }
-    } else if args[2].is_nil() {
-        // skip
-    } else {
-        return Err(Exception::new(Reason::EXC_BADARG));
-    }
-
-    let values: Vec<_> = regex.find_iter(subject).map(|m| {
-        tup2!(heap, Term::uint64(heap, m.start() as u64), Term::uint64(heap, (m.end() - m.start()) as u64))
-    }).collect();
-    let res = values.into_iter().rev().fold(Term::nil(), |acc, val| cons!(heap, val, acc));
-    println!("matches: {} {} {}\r", args[0], args[1], res);
-    Ok(res)
 }
 
 #[cfg(test)]
