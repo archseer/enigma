@@ -398,14 +398,14 @@ macro_rules! op_apply {
                 // I'm cheating here, *shrug*
                 op_apply_fun!($vm, $context, $process)
             }
-            Some(Export::Bif(_)) => unreachable!("op_apply: bif called without call_bif: {}", mfa),
-            // Some(Export::Bif(bif)) => {
-            //     // TODO: this would still need to return on a bif if it's i_apply_only/_last
+            // Some(Export::Bif(_)) => unreachable!("op_apply: bif called without call_bif: {}", mfa),
+            Some(Export::Bif(bif)) => {
+                // TODO: this would still need to return on a bif if it's i_apply_only/_last
 
-            //     // TODO: apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
-            //     // ^ only happens in apply/fixed_apply
-            //     op_call_bif!($vm, $context, $process, bif, arity)
-            // }
+                // TODO: apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
+                // ^ only happens in apply/fixed_apply
+                op_call_bif!($vm, $context, $process, bif, arity)
+            }
             None => {
                 // println!("apply setup_error_handler pid={}", $process.pid);
                 call_error_handler!($vm, $process, &mfa);

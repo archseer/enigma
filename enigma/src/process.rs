@@ -24,19 +24,13 @@ use std::pin::Pin;
 use tokio::prelude::*;
 
 pub mod registry;
-
 pub mod table;
-
-/// Heavily inspired by inko
 
 pub type RcProcess = Pin<Arc<Process>>;
 
 pub type Ref = usize;
 
-// TODO: max registers should be a MAX_REG constant for (x and freg), OTP uses 1024
-// regs should be growable and shrink on live
-// also, only store "live" regs in the execution context and swap them into VM/scheduler
-// ---> sched should have it's own ExecutionContext
+// TODO: Only store "live" regs in the execution context and swap them into VM/scheduler
 // also this way, regs could be a &mut [] slice with no clone?
 
 pub const MAX_REG: usize = 1024;
@@ -47,6 +41,11 @@ bitflags! {
         const INITIAL = 0;
         const TRAP_EXIT = (1 << 0);
     }
+}
+
+pub enum State {
+    Done,
+    Yield,
 }
 
 // #[derive(Debug)]
@@ -88,8 +87,8 @@ impl ExecutionContext {
         match arg {
             Source::X(i) => unsafe { *self.x.get_unchecked(i.0 as usize) },
             Source::Y(i) => self.stack[self.stack.len() - (i.0 + 1) as usize],
+            // TODO: optimize away into embedded reference if possible
             Source::Constant(i) => unsafe { (*self.ip.module).constants[i as usize] },
-            // TODO: optimize away into a reference somehow at load time
             Source::ExtendedLiteral(i) => unsafe { (*self.ip.module).literals[i as usize] },
             // Source::Constant(i) => self.i,
             // value => unreachable!("expand unimplemented for {:?}", value),
@@ -151,8 +150,6 @@ impl ExecutionContext {
             current: MFA(0, 0, 0),
 
             // register: Register::new(block.code.registers as usize),
-            // binding: Binding::with_rc(block.locals(), block.receiver),
-            // line: block.code.line,
 
             // TODO: not great
             bs: unsafe { std::mem::uninitialized() },
@@ -376,7 +373,10 @@ impl Process {
                     self.local_data_mut().mailbox.send(value);
                 }
                 Signal::PortMessage { from, value, .. } => {
-                    // info!("pid={} processing port-message from={} {:?}", self.pid, from, value);
+                    // info!(
+                    //     "pid={} processing port-message from={} {:?}",
+                    //     self.pid, from, value
+                    // );
                     // we only get the binary, so construct message on heap
                     let heap = &self.context_mut().heap;
                     let binary = Term::from(heap.alloc(value::Boxed {
@@ -697,7 +697,6 @@ pub fn send_message(vm: &Machine, sender: PID, pid: Term, msg: Term) -> Result<T
     } else {
         println!("NOTFOUND");
     }
-    // TODO: if err, we return err that's then put in x0?
 
     Ok(msg)
 }
@@ -707,11 +706,5 @@ pub fn send_signal(vm: &Machine, pid: PID, signal: Signal) -> bool {
         receiver.send_signal(signal);
         return true;
     }
-    // TODO: if err, we return err ?
     false
-}
-
-pub enum State {
-    Done,
-    Yield,
 }

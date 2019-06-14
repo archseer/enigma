@@ -25,7 +25,7 @@ pub fn get_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resu
     let pdict = &process.local_data_mut().dictionary;
     Ok(pdict
         .get(&(args[0]))
-        .cloned() // TODO: try to avoid the clone if possible
+        .copied()
         .unwrap_or_else(|| atom!(UNDEFINED)))
 }
 
@@ -115,7 +115,6 @@ mod tests {
         let res = get_1(&vm, &process, &args);
         assert_eq!(res, Ok(Term::int(1)));
 
-        // TODO: add a assert helper for lists
         let args = vec![];
         let _res = get_0(&vm, &process, &args);
         // assert_eq!(res, Ok(Term::int(1)));

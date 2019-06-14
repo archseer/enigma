@@ -565,8 +565,7 @@ fn save_stacktrace(
         value: StackTrace {
             reason: exc.reason,
             trace: Vec::new(),
-            // TODO: bad
-            current: unsafe { std::mem::uninitialized() },
+            current: context.current,
             pc: None,
             complete: false,
         },
@@ -612,12 +611,11 @@ fn save_stacktrace(
     //     } else {
 
     //     non_bif_stacktrace:
+    /*
+     * For a function_clause error, the arguments are in the beam
+     * registers, c_p->cp is valid, and c_p->current is set.
+     */
 
-    s.current = context.current; // current MFA, is set on BIF calls? also call_fun/apply_fun or any sort of call/dispatch -> jump
-                                 /*
-                                  * For a function_clause error, the arguments are in the beam
-                                  * registers, c_p->cp is valid, and c_p->current is set.
-                                  */
     if s.reason.contains(Reason::EXC_FUNCTION_CLAUSE) {
         // ASSERT(s->current);
         let a = s.current.2;

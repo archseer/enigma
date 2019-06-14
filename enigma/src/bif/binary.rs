@@ -22,12 +22,10 @@ pub fn split_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     // TODO: this was a get_real_binary macro before
     let (bin, offset, bit_offset, size, bitsize) = match args[0].get_boxed_header() {
         Ok(value::BOXED_BINARY) => {
-            // TODO use ok_or to cast to some, then use ?
             let value = &args[0].get_boxed_value::<bitstring::RcBinary>().unwrap();
             (*value, 0, 0, value.data.len(), 0)
         }
         Ok(value::BOXED_SUBBINARY) => {
-            // TODO use ok_or to cast to some, then use ?
             let value = &args[0].get_boxed_value::<bitstring::SubBinary>().unwrap();
             (
                 &value.original,
@@ -72,12 +70,10 @@ pub fn split_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
 fn part(source: Term, mut pos: usize, len: isize) -> Result<SubBinary, Exception> {
     let (bin, offs, bitoffs, size, bitsize) = match source.get_boxed_header() {
         Ok(value::BOXED_BINARY) => {
-            // TODO use ok_or to cast to some, then use ?
             let value = &source.get_boxed_value::<RcBinary>().unwrap();
             (*value, 0, 0, value.data.len(), 0)
         }
         Ok(value::BOXED_SUBBINARY) => {
-            // TODO use ok_or to cast to some, then use ?
             let value = &source.get_boxed_value::<SubBinary>().unwrap();
             (
                 &value.original,
@@ -173,12 +169,10 @@ pub fn split_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
     // subject = binary
     let (bin, offs, bitoffs, size, bitsize) = match args[0].get_boxed_header() {
         Ok(value::BOXED_BINARY) => {
-            // TODO use ok_or to cast to some, then use ?
             let value = &args[0].get_boxed_value::<RcBinary>().unwrap();
             (*value, 0, 0, value.data.len(), 0)
         }
         Ok(value::BOXED_SUBBINARY) => {
-            // TODO use ok_or to cast to some, then use ?
             let value = &args[0].get_boxed_value::<SubBinary>().unwrap();
             (
                 &value.original,

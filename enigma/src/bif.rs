@@ -493,7 +493,6 @@ pub fn apply(vm: &vm::Machine, process: &RcProcess, mfa: &module::MFA, args: &[T
 
 /// Bif implementations
 fn bif_erlang_spawn_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-    // parent: TODO: track parent of process
     // arg[0] = atom for module
     // arg[1] = atom for function
     // arg[2] = arguments for func (well-formed list)
@@ -512,12 +511,10 @@ fn bif_erlang_spawn_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> R
 
     let registry = vm.modules.lock();
     let module = registry.lookup(module).unwrap();
-    // TODO: avoid the clone here since we copy later
     process::spawn(vm, process, module, func, arglist, process::SpawnFlag::NONE)
 }
 
 fn bif_erlang_spawn_link_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-    // parent: TODO: track parent of process
     // arg[0] = atom for module
     // arg[1] = atom for function
     // arg[2] = arguments for func (well-formed list)
@@ -536,7 +533,6 @@ fn bif_erlang_spawn_link_3(vm: &vm::Machine, process: &RcProcess, args: &[Term])
 
     let registry = vm.modules.lock();
     let module = registry.lookup(module).unwrap();
-    // TODO: avoid the clone here since we copy later
     process::spawn(vm, process, module, func, arglist, process::SpawnFlag::LINK)
 }
 
@@ -591,7 +587,6 @@ fn bif_erlang_spawn_opt_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
 
     let registry = vm.modules.lock();
     let module = registry.lookup(module).unwrap();
-    // TODO: avoid the clone here since we copy later
     process::spawn(vm, process, module, func, arglist, flag)
 }
 
@@ -882,8 +877,6 @@ pub fn bif_erlang_is_function_2(_vm: &vm::Machine, _process: &RcProcess, args: &
     Ok(atom!(FALSE))
 }
 
-// TODO: is_record
-
 fn bif_erlang_is_boolean_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_boolean()))
 }
@@ -933,7 +926,6 @@ fn bif_erlang_byte_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
             .data
             .len(),
         Ok(value::BOXED_SUBBINARY) => {
-            // TODO use ok_or to cast to some, then use ?
             let sub = args[0].get_boxed_value::<bitstring::SubBinary>().unwrap();
 
             let mut size = sub.size;
@@ -993,7 +985,7 @@ pub fn bif_erlang_size_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
     if args[0].is_nil() {
         return Ok(Term::int(0));
     }
-    // TODO: binary
+
     if let Ok(tup) = Tuple::cast_from(&args[0]) {
         let heap = &process.context_mut().heap;
 
@@ -1084,14 +1076,12 @@ fn bif_erlang_raise_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
         value: StackTrace {
             reason: class, // TODO: use original reason instead
             trace: Vec::new(),
-            // TODO: bad
-            current: unsafe { std::mem::uninitialized() },
+            current: process.context_mut().current,
             pc: None,
             complete: true,
         },
     });
 
-    // println!("raising with {}", args[2]);
     Err(Exception {
         reason: class,
         value: args[1],
@@ -1113,7 +1103,7 @@ fn bif_erlang_whereis_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -
 fn bif_erlang_nif_error_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
     let (mfa, _) = process.context_mut().ip.lookup_func_info().unwrap();
     print!(
-        "Tried running nif {}, on pid={} might be missing!!\r\n",
+        "Tried running unimplemented NIF {} on pid={}!\r\n",
         mfa, process.pid
     );
     Err(Exception::with_value(Reason::EXC_ERROR, args[0]))
@@ -1493,8 +1483,6 @@ mod tests {
             .rev()
             .fold(Term::nil(), |res, val| value::cons(heap, val, res))
     }
-
-    // TODO: test send_2
 
     #[test]
     fn test_bif_erlang_is_atom_1() {

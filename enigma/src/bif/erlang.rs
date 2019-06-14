@@ -120,12 +120,10 @@ pub fn binary_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
     // TODO: extract as macro
     let (bytes, bitoffs, size) = match binary.get_boxed_header() {
         Ok(value::BOXED_BINARY) => {
-            // TODO use ok_or to cast to some, then use ?
             let value = &binary.get_boxed_value::<bitstring::RcBinary>().unwrap();
             (&value.data[..], 0, value.data.len())
         }
         Ok(value::BOXED_SUBBINARY) => {
-            // TODO use ok_or to cast to some, then use ?
             let value = &binary.get_boxed_value::<bitstring::SubBinary>().unwrap();
             (
                 &value.original.data[value.offset..],
@@ -239,7 +237,7 @@ pub fn list_to_iodata(list: Term) -> Result<Vec<u8>, Exception> {
                                 stack.push(cons.tail);
                                 continue; // head loop
                             }
-                            Variant::Nil(value::Special::Nil) => break, // TODO is correct?
+                            Variant::Nil(value::Special::Nil) => break,
                             _ => return Err(Exception::new(Reason::EXC_BADARG)),
                         }
                         break;
@@ -324,9 +322,6 @@ pub fn iolist_to_iovec_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
                 },
                 Variant::Integer(_i) => {
                     // append byte to buf
-                    // TODO: this keeps doing a lookahead
-                    // if (!iol2v_append_byte_seq(state, iterator, &seq_end)) {
-                    // iterator = seq_end;
                     let mut seq_length = 0;
                     let mut lookahead = iterator;
                     while let Ok(Cons { head, tail: _ }) = Cons::cast_from(&lookahead) {
@@ -559,7 +554,6 @@ pub fn binary_to_term_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
 
 pub fn term_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // TODO: needs to yield mid parsing...
-    // TODO: args[1]
     match crate::etf::encode(args[0]) {
         Ok(term) => Ok(Term::binary(
             &process.context_mut().heap,
@@ -920,9 +914,6 @@ pub fn append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
         return Ok(rhs);
     }
 
-    // TODO: use into_variant match?
-
-    // TODO: this same type of logic appears a lot, need to abstract it out, too much unsafe use
     if let Ok(value::Cons { head, tail }) = lhs.cast_into() {
         // keep copying lhs until we reach the tail, point it to rhs
         let mut iter = tail;

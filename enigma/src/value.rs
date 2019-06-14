@@ -844,12 +844,10 @@ impl Term {
     pub fn to_bytes(&self) -> Option<&[u8]> {
         match self.get_boxed_header() {
             Ok(BOXED_BINARY) => {
-                // TODO use ok_or to cast to some, then use ?
                 let value = &self.get_boxed_value::<bitstring::RcBinary>().unwrap();
                 Some(&value.data)
             }
             Ok(BOXED_SUBBINARY) => {
-                // TODO use ok_or to cast to some, then use ?
                 let value = &self.get_boxed_value::<bitstring::SubBinary>().unwrap();
 
                 if value.bit_offset & 7 != 0 {
@@ -867,13 +865,11 @@ impl Term {
     pub fn to_str(&self) -> Option<&str> {
         match self.get_boxed_header() {
             Ok(BOXED_BINARY) => {
-                // TODO use ok_or to cast to some, then use ?
                 let value = &self.get_boxed_value::<bitstring::RcBinary>().unwrap();
                 // TODO: handle err
                 std::str::from_utf8(&value.data).ok()
             }
             Ok(BOXED_SUBBINARY) => {
-                // TODO use ok_or to cast to some, then use ?
                 let value = &self.get_boxed_value::<bitstring::SubBinary>().unwrap();
 
                 if value.bit_offset & 7 != 0 {

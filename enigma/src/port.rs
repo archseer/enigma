@@ -151,7 +151,7 @@ pub fn send_message(
     port: ID,
     msg: Term
     ) -> Result<Term, Exception> {
-    // println!("sending from {} to port {} msg {}", from, port, msg);
+     // info!("sending from {} to port {} msg {}", from, port, msg);
 
     let res = vm.port_table.read().lookup(port).map(|port| port.chan.clone());
     if let Some(mut chan) = res {
@@ -174,7 +174,9 @@ pub fn send_message(
                         //     .compat();
                         // TODO: can probably do without await, if we make sure we don't need 'static
                         let future = async move {chan.send(Signal::Command(bytes)).await; };
-                        vm.runtime.executor().spawn(future.unit_error().boxed().compat());
+                        // TODO: needs to use modern alternatives (await) to .wait()
+                        future.unit_error().boxed().compat().wait().unwrap();
+                        //vm.runtime.block_on(future.unit_error().boxed().compat());
                     }
                     _ => unimplemented!("msg to port {}", msg),
                 }
@@ -398,9 +400,9 @@ impl LineBuffer {
     /// `true` when the character has been appended to the end of the line.
     pub fn insert(&mut self, ch: char, n: usize) -> Option<bool> {
         let shift = ch.len_utf8() * n;
-        if self.buf.len() + shift > self.buf.capacity() {
-            return None;
-        }
+        // if self.buf.len() + shift > self.buf.capacity() {
+        //     return None;
+        // }
         let push = self.pos == self.buf.len();
         if n == 1 {
             self.buf.insert(self.pos, ch);
@@ -598,6 +600,7 @@ impl Renderer {
         for c in chars {
             if *c == b'\n' {
                 self.out.write_all(b"\r\n").unwrap();
+                self.out.flush().unwrap();
                 self.line.clear();
             } else {
                 assert!(self.line.insert(*c as char, 1).is_some());
@@ -883,6 +886,8 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
 
     let mut ios = get_terminal_attr().unwrap();
     ios.c_lflag |= (libc::ISIG); // IEXTEN
+    ios.c_cc[libc::VMIN] = 1;
+    ios.c_cc[libc::VTIME] = 0;
     set_terminal_attr(&ios).unwrap();
 
     // need to disable echo and canon

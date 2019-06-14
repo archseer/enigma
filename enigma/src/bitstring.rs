@@ -331,7 +331,6 @@ macro_rules! binary_size {
         match $str.get_boxed_header() {
             Ok(value::BOXED_BINARY) => $str.get_boxed_value::<RcBinary>().unwrap().data.len(),
             Ok(value::BOXED_SUBBINARY) => {
-                // TODO use ok_or to cast to some, then use ?
                 let sub = $str.get_boxed_value::<SubBinary>().unwrap();
                 let mut size = sub.size;
 
@@ -361,12 +360,10 @@ pub fn start_match_3(heap: &Heap, binary: Term) -> Option<Term> {
     // TODO: this is not nice
     let mb = match binary.get_boxed_header() {
         Ok(value::BOXED_BINARY) => {
-            // TODO use ok_or to cast to some, then use ?
             let value = binary.get_boxed_value::<RcBinary>().unwrap().clone();
             MatchBuffer::from(value)
         }
         Ok(value::BOXED_SUBBINARY) => {
-            // TODO use ok_or to cast to some, then use ?
             let value = binary.get_boxed_value::<SubBinary>().unwrap().clone();
             MatchBuffer::from(value)
         }
@@ -1054,7 +1051,6 @@ pub fn append(
     // TODO: this is not nice
     let writable = match binary.get_boxed_header() {
         Ok(value::BOXED_SUBBINARY) => {
-            // TODO use ok_or to cast to some, then use ?
             let sb = &binary.get_boxed_value::<SubBinary>().unwrap();
 
             sb.is_writable && sb.original.is_writable
@@ -1128,12 +1124,10 @@ pub fn append(
          */
         let (bin, offs, bitoffs, size, bitsize) = match binary.get_boxed_header() {
             Ok(value::BOXED_BINARY) => {
-                // TODO use ok_or to cast to some, then use ?
                 let value = &binary.get_boxed_value::<RcBinary>().unwrap();
                 (*value, 0, 0, value.data.len(), 0)
             }
             Ok(value::BOXED_SUBBINARY) => {
-                // TODO use ok_or to cast to some, then use ?
                 let value = &binary.get_boxed_value::<SubBinary>().unwrap();
                 (
                     &value.original,
@@ -1628,12 +1622,10 @@ impl Builder {
         // convert binary to string
         let (bin, offs, bitoffs, size, bitsize) = match binary.get_boxed_header() {
             Ok(value::BOXED_BINARY) => {
-                // TODO use ok_or to cast to some, then use ?
                 let value = &binary.get_boxed_value::<RcBinary>().unwrap();
                 (*value, 0, 0, value.data.len(), 0)
             }
             Ok(value::BOXED_SUBBINARY) => {
-                // TODO use ok_or to cast to some, then use ?
                 let value = &binary.get_boxed_value::<SubBinary>().unwrap();
                 (
                     &value.original,

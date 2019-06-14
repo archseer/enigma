@@ -11,14 +11,11 @@ use syn::{braced, parenthesized, parse_macro_input, Ident, Result, Token};
 
 use permutate::Permutator;
 
-// TODO: skip underscores
-
 /// Argument typing shorthands:
 /// - x: x register
 /// - y: y register
 /// - r: register size
 /// - d: x or y register destination)
-/// TODO: float register, and fl+r reg
 /// - c: constant
 /// - s: source (register or constant)
 /// - l: label
@@ -503,7 +500,6 @@ fn interpolate_to_tokens_ident(
             "q" => {
                 quote_spanned!(ident.span() => unsafe { (*context.ip.module).literals[#ident as usize] })
             }
-            // TODO: assignment
             "x" => {
                 quote_spanned!(ident.span() => unsafe { (*context.x.get_unchecked(#ident.0 as usize)) })
             }
@@ -511,7 +507,6 @@ fn interpolate_to_tokens_ident(
                 quote_spanned!(ident.span() => unsafe { (*context.stack.get_unchecked(context.stack.len() - (#ident.0 + 1) as usize)) })
             }
             "s" => quote_spanned!(ident.span() => context.expand_arg(#ident)),
-            // TODO: needs to be assignable
             "d" => quote_spanned!(ident.span() => context.fetch_register(#ident)),
             "r" => quote_spanned!(ident.span() => #ident),
             "l" => quote_spanned!(ident.span() => #ident),

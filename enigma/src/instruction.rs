@@ -626,7 +626,7 @@ instruction!(
     },
     fn allocate_heap(stackneed: r, heapneed: r, live: r) {
         // TODO: this also zeroes the values, make it dynamically change the
-        // capacity/len of the Vec to bypass initing these.
+        // capacity/len of the Vec to bypass initing these?
 
         // allocate stackneed space on stack, ensure heapneed on heap, if gc, keep live
         // num of X regs. save cp on stack.
@@ -651,8 +651,8 @@ instruction!(
         // TODO: check heap for heapneed space!
         context.callstack.push((stackneed, context.cp.take()));
     },
-    fn test_heap(_heapneed: r, n: r) { // TODO args
-        // println!("TODO: TestHeap unimplemented!");
+    fn test_heap(_heapneed: r, n: r) {
+        // println!("TestHeap unimplemented!");
     },
     fn init(n: d) {
         context.set_register(n, NIL)
@@ -939,18 +939,17 @@ instruction!(
     },
     fn try_end(register: d) {
         context.catches -= 1;
-        context.set_register(register, NIL) // TODO: make_blank macro
+        context.set_register(register, NIL)
     },
     fn try_case(register: d) {
         // pops a catch context in y  Erases the label saved in the Arg0 slot. Noval in R0 indicate that something is caught. If so, R0 is set to R1, R1 — to R2, R2 — to R3.
 
         // TODO: this initial part is identical to TryEnd
         context.catches -= 1;
-        context.set_register(register, NIL); // TODO: make_blank macro
+        context.set_register(register, NIL);
 
         assert!(context.x[0].is_none());
         // TODO: c_p->fvalue = NIL;
-        // TODO: make more efficient via memmove
         context.x[0] = context.x[1];
         context.x[1] = context.x[2];
         context.x[2] = context.x[3];
@@ -984,8 +983,8 @@ instruction!(
         // catch will keep going upwards.
 
         // TODO: this initial part is identical to TryEnd
-        context.catches -= 1; // TODO: this is overflowing
-        context.set_register(register, NIL); // TODO: make_blank macro
+        context.catches -= 1;
+        context.set_register(register, NIL);
 
         if context.x[0].is_none() {
             // c_p->fvalue = NIL;
@@ -1096,9 +1095,6 @@ instruction!(
         //   allocate binary + procbin
         //   set as non writable initially??
 
-        // TODO: use a current_string ptr to be able to write to the Arc wrapped str
-        // alternatively, loop through the instrs until we hit a non bs_ instr.
-        // that way, no unsafe ptrs!
         let size = size.to_val(context).to_int().unwrap() as usize;
         let mut binary = bitstring::Binary::with_size(size);
         binary.is_writable = false;
@@ -1112,7 +1108,6 @@ instruction!(
         // TODO: fail label
         let size = match #size.into_variant() {
             Variant::Integer(i) => i as usize,
-            // LValue::Literal(i) => i as usize, // TODO: unsure if correct
             Variant::Atom(atom::START) => 0,
             _ => unreachable!("{:?}", size),
         };
@@ -1713,7 +1708,7 @@ instruction!(
                 context.set_register(dest.into_register(), val)
             } else {
                 op_jump!(context, fail);
-                break; // TODO: original impl loops over everything
+                break;
             }
         }
     },

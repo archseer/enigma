@@ -11,9 +11,6 @@ pub const MAX_ATOM_CHARS: usize = 255;
 pub struct Atom {
     /// Length of utf8-encoded atom name.
     pub len: u16,
-    /// First 4 bytes used for comparisons
-    pub ord0: u32, // TODO: use ord for comparison
-    // TODO: Allocate these on atom heap or as a sequence of static blocks
     pub name: String,
 }
 
@@ -21,27 +18,10 @@ impl Atom {
     /// Construct a new atom from a raw string.
     pub fn new(s: &str) -> Atom {
         let b = s.as_bytes();
-        let mut ord0 = 0u32;
-
-        // This might be particularly ugly. Erlang/OTP does this by preallocating
-        // a minimum of 4 bytes and taking from them unconditionally.
-        if !b.is_empty() {
-            ord0 = u32::from(b[0]) << 24;
-            if b.len() > 1 {
-                ord0 |= u32::from(b[1]) << 16;
-                if b.len() > 2 {
-                    ord0 |= u32::from(b[2]) << 8;
-                    if b.len() > 3 {
-                        ord0 |= u32::from(b[3]);
-                    }
-                }
-            }
-        }
 
         assert!(s.len() <= u16::MAX as usize);
         Atom {
             len: s.len() as u16,
-            ord0,
             name: s.to_string(),
         }
     }
@@ -92,7 +72,7 @@ impl AtomTable {
         let val1 = &atoms[index1 as usize];
         let val2 = &atoms[index2 as usize];
 
-        val1.ord0.cmp(&val2.ord0)
+        val1.name.cmp(&val2.name)
     }
 
     /// Allocate new atom in the atom table or find existing.
