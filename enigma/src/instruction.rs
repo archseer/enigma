@@ -69,9 +69,11 @@ pub type FloatRegs = u8;
 pub type Regs = u16;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[repr(transparent)]
 pub struct RegisterX(pub Regs);
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[repr(transparent)]
 pub struct RegisterY(pub Regs);
 
 pub type ExtendedList = Box<Vec<Entry>>;

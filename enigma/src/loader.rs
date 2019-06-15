@@ -1,4 +1,4 @@
-use crate::atom::{self, ATOMS};
+use crate::atom;
 use crate::etf;
 use crate::immix::Heap;
 use crate::module::{Lambda, Module, MFA};
@@ -277,7 +277,6 @@ impl<'a> Loader<'a> {
     fn load_atoms(&mut self, chunk: Chunk<'a>) {
         let (_, atoms) = atom_chunk(chunk).unwrap();
         self.atoms = atoms;
-        ATOMS.reserve(self.atoms.len() as u32);
 
         for (index, a) in self.atoms.iter().enumerate() {
             let g_index = atom::from_str(a);

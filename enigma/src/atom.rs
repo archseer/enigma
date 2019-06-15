@@ -1,428 +1,407 @@
-//use std::ptr;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use std::u16;
 
 /// Maximum character length of an atom.
 pub const MAX_ATOM_CHARS: usize = 255;
 
-#[derive(Debug)]
-pub struct Atom {
-    /// Length of utf8-encoded atom name.
-    pub len: u16,
-    pub name: String,
-}
+#[derive(Debug, Clone, Copy)]
+pub struct Atom(pub u32);
 
 impl Atom {
     /// Construct a new atom from a raw string.
-    pub fn new(s: &str) -> Atom {
-        let b = s.as_bytes();
-
-        assert!(s.len() <= u16::MAX as usize);
-        Atom {
-            len: s.len() as u16,
-            name: s.to_string(),
-        }
+    pub fn new(val: &str) -> Self {
+        assert!(val.len() <= MAX_ATOM_CHARS);
+        Atom(ATOMS.write().from_str(val))
     }
 }
 
-/// Lookup table (generic for other types later)
+// impl From<&str> for Atom {
+//     #[inline]
+//     fn from(value: &str) -> Self {
+//         Atom::new(val)
+//     }
+// }
+
+// impl From<String> for Atom {
+//     #[inline]
+//     fn from(value: String) -> Self {
+//         Atom::new(val)
+//     }
+// }
+
 #[derive(Debug)]
 pub struct AtomTable {
     /// Direct mapping string to atom index
-    index: RwLock<HashMap<String, u32>>,
+    ids: HashMap<&'static str, u32>,
 
     /// Reverse mapping atom index to string (sorted by index)
-    index_r: RwLock<Vec<Atom>>,
+    names: Vec<&'static str>,
 }
 
-/// Stores atom lookup tables.
 impl AtomTable {
     pub fn new() -> AtomTable {
         AtomTable {
-            index: RwLock::new(HashMap::new()),
-            index_r: RwLock::new(Vec::new()),
+            ids: HashMap::new(),
+            names: Vec::new(),
         }
     }
 
-    pub fn reserve(&self, _len: u32) {}
-
-    pub fn register_atom(&self, val: &str) -> u32 {
-        // TODO: probably keep a single lock for both
-        let mut index_r = self.index_r.write();
-        let index = index_r.len() as u32;
-        self.index.write().insert(val.to_string(), index);
-        index_r.push(Atom::new(val));
+    pub fn insert(&mut self, name: &str) -> u32 {
+        // this is to only have it allocated once (instead of twice, once for each index)
+        let name = Box::leak(String::from(name).into_boxed_str());
+        let index = self.names.len() as u32;
+        self.ids.insert(name, index);
+        self.names.push(name);
         index
     }
 
     pub fn lookup(&self, val: &str) -> Option<u32> {
-        let atoms = self.index.read();
-
-        if atoms.contains_key(val) {
-            return Some(atoms[val]);
-        }
-        None
+        self.ids.get(val).copied()
     }
 
     pub fn cmp(&self, index1: u32, index2: u32) -> std::cmp::Ordering {
-        let atoms = self.index_r.read();
-
-        let val1 = &atoms[index1 as usize];
-        let val2 = &atoms[index2 as usize];
-
-        val1.name.cmp(&val2.name)
+        let val1 = &self.names[index1 as usize];
+        let val2 = &self.names[index2 as usize];
+        val1.cmp(&val2)
     }
 
     /// Allocate new atom in the atom table or find existing.
-    pub fn from_str(&self, val: &str) -> u32 {
-        // unfortunately, cache hits need the write lock to avoid race conditions
-        let mut atoms = self.index.write();
-
-        if atoms.contains_key(val) {
-            return atoms[val];
-        }
-
-        let mut index_r = self.index_r.write();
-        let index = index_r.len() as u32;
-        atoms.insert(val.to_string(), index);
-        index_r.push(Atom::new(val));
-        index
+    pub fn from_str(&mut self, val: &str) -> u32 {
+        self.lookup(val).unwrap_or_else(|| self.insert(val))
     }
 
-    pub fn to_str(&self, index: u32) -> Option<*const Atom> {
-        let index_r = self.index_r.read();
-        if index >= index_r.len() as u32 {
+    pub fn to_str(&self, index: u32) -> Option<&'static str> {
+        if index >= self.names.len() as u32 {
             return None;
         }
-        Some(&index_r[index as usize] as *const Atom)
+        self.names.get(index as usize).copied()
     }
 }
 
-pub static ATOMS: Lazy<AtomTable> = Lazy::new(|| {
-    let atoms = AtomTable::new();
-    atoms.register_atom("nil"); // 0
-    atoms.register_atom("true"); // 1
-    atoms.register_atom("false"); // 2
-    atoms.register_atom("undefined"); // 3
-    atoms.register_atom("value"); // 4
-    atoms.register_atom("all"); // 5
+pub static ATOMS: Lazy<RwLock<AtomTable>> = Lazy::new(|| {
+    let mut atoms = AtomTable::new();
+    atoms.insert("nil"); // 0
+    atoms.insert("true"); // 1
+    atoms.insert("false"); // 2
+    atoms.insert("undefined"); // 3
+    atoms.insert("value"); // 4
+    atoms.insert("all"); // 5
 
-    atoms.register_atom("normal");
-    atoms.register_atom("internal_error");
-    atoms.register_atom("badarg");
-    atoms.register_atom("badarith");
-    atoms.register_atom("badmatch");
-    atoms.register_atom("function_clause");
-    atoms.register_atom("case_clause");
-    atoms.register_atom("if_clause");
-    atoms.register_atom("undef");
-    atoms.register_atom("badfun");
-    atoms.register_atom("badarity");
-    atoms.register_atom("timeout_value");
-    atoms.register_atom("no_proc");
-    atoms.register_atom("not_alive");
-    atoms.register_atom("system_limit");
-    atoms.register_atom("try_clause");
-    atoms.register_atom("not_sup");
-    atoms.register_atom("badmap");
-    atoms.register_atom("badkey");
+    atoms.insert("normal");
+    atoms.insert("internal_error");
+    atoms.insert("badarg");
+    atoms.insert("badarith");
+    atoms.insert("badmatch");
+    atoms.insert("function_clause");
+    atoms.insert("case_clause");
+    atoms.insert("if_clause");
+    atoms.insert("undef");
+    atoms.insert("badfun");
+    atoms.insert("badarity");
+    atoms.insert("timeout_value");
+    atoms.insert("no_proc");
+    atoms.insert("not_alive");
+    atoms.insert("system_limit");
+    atoms.insert("try_clause");
+    atoms.insert("not_sup");
+    atoms.insert("badmap");
+    atoms.insert("badkey");
 
-    atoms.register_atom("nocatch");
+    atoms.insert("nocatch");
 
-    atoms.register_atom("exit");
-    atoms.register_atom("error");
-    atoms.register_atom("throw");
+    atoms.insert("exit");
+    atoms.insert("error");
+    atoms.insert("throw");
 
-    atoms.register_atom("file");
-    atoms.register_atom("line");
+    atoms.insert("file");
+    atoms.insert("line");
 
-    atoms.register_atom("ok");
+    atoms.insert("ok");
 
-    atoms.register_atom("erlang");
-    atoms.register_atom("apply");
+    atoms.insert("erlang");
+    atoms.insert("apply");
 
-    atoms.register_atom("trap_exit");
-    atoms.register_atom("start");
-    atoms.register_atom("kill");
-    atoms.register_atom("killed");
+    atoms.insert("trap_exit");
+    atoms.insert("start");
+    atoms.insert("kill");
+    atoms.insert("killed");
 
-    atoms.register_atom("not_loaded");
-    atoms.register_atom("noproc");
-    atoms.register_atom("file_info");
+    atoms.insert("not_loaded");
+    atoms.insert("noproc");
+    atoms.insert("file_info");
 
-    atoms.register_atom("device");
-    atoms.register_atom("directory");
-    atoms.register_atom("regular");
-    atoms.register_atom("symlink");
-    atoms.register_atom("other");
+    atoms.insert("device");
+    atoms.insert("directory");
+    atoms.insert("regular");
+    atoms.insert("symlink");
+    atoms.insert("other");
 
-    atoms.register_atom("read");
-    atoms.register_atom("write");
-    atoms.register_atom("read_write");
-    atoms.register_atom("none");
+    atoms.insert("read");
+    atoms.insert("write");
+    atoms.insert("read_write");
+    atoms.insert("none");
 
-    atoms.register_atom("down");
-    atoms.register_atom("process");
+    atoms.insert("down");
+    atoms.insert("process");
 
-    atoms.register_atom("link");
-    atoms.register_atom("monitor");
+    atoms.insert("link");
+    atoms.insert("monitor");
 
-    atoms.register_atom("current_function");
-    atoms.register_atom("current_location");
-    atoms.register_atom("current_stacktrace");
-    atoms.register_atom("initial_call");
-    atoms.register_atom("status");
-    atoms.register_atom("messages");
-    atoms.register_atom("message_queue_len");
-    atoms.register_atom("message_queue_data");
-    atoms.register_atom("links");
-    atoms.register_atom("monitored_by");
-    atoms.register_atom("dictionary");
-    atoms.register_atom("error_handler");
-    atoms.register_atom("heap_size");
-    atoms.register_atom("stack_size");
-    atoms.register_atom("memory");
-    atoms.register_atom("garbage_collection");
-    atoms.register_atom("garbage_collection_info");
-    atoms.register_atom("group_leader");
-    atoms.register_atom("reductions");
-    atoms.register_atom("priority");
-    atoms.register_atom("trace");
-    atoms.register_atom("binary");
-    atoms.register_atom("sequential_trace_token");
-    atoms.register_atom("catch_level");
-    atoms.register_atom("backtrace");
-    atoms.register_atom("last_calls");
-    atoms.register_atom("total_heap_size");
-    atoms.register_atom("suspending");
-    atoms.register_atom("min_heap_size");
-    atoms.register_atom("min_bin_vheap_size");
-    atoms.register_atom("max_heap_size");
-    atoms.register_atom("magic_ref");
-    atoms.register_atom("fullsweep_after");
-    atoms.register_atom("registered_name");
+    atoms.insert("current_function");
+    atoms.insert("current_location");
+    atoms.insert("current_stacktrace");
+    atoms.insert("initial_call");
+    atoms.insert("status");
+    atoms.insert("messages");
+    atoms.insert("message_queue_len");
+    atoms.insert("message_queue_data");
+    atoms.insert("links");
+    atoms.insert("monitored_by");
+    atoms.insert("dictionary");
+    atoms.insert("error_handler");
+    atoms.insert("heap_size");
+    atoms.insert("stack_size");
+    atoms.insert("memory");
+    atoms.insert("garbage_collection");
+    atoms.insert("garbage_collection_info");
+    atoms.insert("group_leader");
+    atoms.insert("reductions");
+    atoms.insert("priority");
+    atoms.insert("trace");
+    atoms.insert("binary");
+    atoms.insert("sequential_trace_token");
+    atoms.insert("catch_level");
+    atoms.insert("backtrace");
+    atoms.insert("last_calls");
+    atoms.insert("total_heap_size");
+    atoms.insert("suspending");
+    atoms.insert("min_heap_size");
+    atoms.insert("min_bin_vheap_size");
+    atoms.insert("max_heap_size");
+    atoms.insert("magic_ref");
+    atoms.insert("fullsweep_after");
+    atoms.insert("registered_name");
 
-    atoms.register_atom("enoent");
+    atoms.insert("enoent");
 
-    atoms.register_atom("badfile");
+    atoms.insert("badfile");
 
-    atoms.register_atom("max");
-    atoms.register_atom("high");
-    atoms.register_atom("medium");
-    atoms.register_atom("low");
+    atoms.insert("max");
+    atoms.insert("high");
+    atoms.insert("medium");
+    atoms.insert("low");
 
-    atoms.register_atom("nonode@nohost");
+    atoms.insert("nonode@nohost");
 
-    atoms.register_atom("port");
-    atoms.register_atom("time_offset");
+    atoms.insert("port");
+    atoms.insert("time_offset");
 
-    atoms.register_atom("bag");
-    atoms.register_atom("duplicate_bag");
-    atoms.register_atom("set");
-    atoms.register_atom("ordered_set");
-    atoms.register_atom("keypos");
-    atoms.register_atom("write_concurrency");
-    atoms.register_atom("read_concurrency");
-    atoms.register_atom("heir");
-    atoms.register_atom("public");
-    atoms.register_atom("private");
-    atoms.register_atom("protected");
-    atoms.register_atom("named_table");
-    atoms.register_atom("compressed");
+    atoms.insert("bag");
+    atoms.insert("duplicate_bag");
+    atoms.insert("set");
+    atoms.insert("ordered_set");
+    atoms.insert("keypos");
+    atoms.insert("write_concurrency");
+    atoms.insert("read_concurrency");
+    atoms.insert("heir");
+    atoms.insert("public");
+    atoms.insert("private");
+    atoms.insert("protected");
+    atoms.insert("named_table");
+    atoms.insert("compressed");
 
-    atoms.register_atom("undefined_function");
+    atoms.insert("undefined_function");
 
-    atoms.register_atom("os_type");
-    atoms.register_atom("win32");
-    atoms.register_atom("unix");
+    atoms.insert("os_type");
+    atoms.insert("win32");
+    atoms.insert("unix");
 
-    atoms.register_atom("info");
-    atoms.register_atom("flush");
+    atoms.insert("info");
+    atoms.insert("flush");
 
-    atoms.register_atom("erts_internal");
-    atoms.register_atom("flush_monitor_messages");
+    atoms.insert("erts_internal");
+    atoms.insert("flush_monitor_messages");
 
-    atoms.register_atom("$_");
-    atoms.register_atom("$$");
-    atoms.register_atom("_");
+    atoms.insert("$_");
+    atoms.insert("$$");
+    atoms.insert("_");
 
-    atoms.register_atom("const");
-    atoms.register_atom("and");
-    atoms.register_atom("or");
-    atoms.register_atom("andalso");
-    atoms.register_atom("andthen");
-    atoms.register_atom("orelse");
-    atoms.register_atom("self");
-    atoms.register_atom("is_seq_trace");
-    atoms.register_atom("set_seq_token");
-    atoms.register_atom("get_seq_token");
-    atoms.register_atom("return_trace");
-    atoms.register_atom("exception_trace");
-    atoms.register_atom("display");
-    atoms.register_atom("process_dump");
-    atoms.register_atom("enable_trace");
-    atoms.register_atom("disable_trace");
-    atoms.register_atom("caller");
-    atoms.register_atom("silent");
-    atoms.register_atom("set_tcw");
-    atoms.register_atom("set_tcw_fake");
+    atoms.insert("const");
+    atoms.insert("and");
+    atoms.insert("or");
+    atoms.insert("andalso");
+    atoms.insert("andthen");
+    atoms.insert("orelse");
+    atoms.insert("self");
+    atoms.insert("is_seq_trace");
+    atoms.insert("set_seq_token");
+    atoms.insert("get_seq_token");
+    atoms.insert("return_trace");
+    atoms.insert("exception_trace");
+    atoms.insert("display");
+    atoms.insert("process_dump");
+    atoms.insert("enable_trace");
+    atoms.insert("disable_trace");
+    atoms.insert("caller");
+    atoms.insert("silent");
+    atoms.insert("set_tcw");
+    atoms.insert("set_tcw_fake");
 
-    atoms.register_atom("is_atom");
-    atoms.register_atom("is_float");
-    atoms.register_atom("is_integer");
-    atoms.register_atom("is_list");
-    atoms.register_atom("is_number");
-    atoms.register_atom("is_pid");
-    atoms.register_atom("is_port");
-    atoms.register_atom("is_reference");
-    atoms.register_atom("is_tuple");
-    atoms.register_atom("is_map");
-    atoms.register_atom("is_binary");
-    atoms.register_atom("is_function");
-    atoms.register_atom("is_record");
+    atoms.insert("is_atom");
+    atoms.insert("is_float");
+    atoms.insert("is_integer");
+    atoms.insert("is_list");
+    atoms.insert("is_number");
+    atoms.insert("is_pid");
+    atoms.insert("is_port");
+    atoms.insert("is_reference");
+    atoms.insert("is_tuple");
+    atoms.insert("is_map");
+    atoms.insert("is_binary");
+    atoms.insert("is_function");
+    atoms.insert("is_record");
 
-    atoms.register_atom("abs");
-    atoms.register_atom("element");
-    atoms.register_atom("hd");
-    atoms.register_atom("length");
-    atoms.register_atom("node");
-    atoms.register_atom("round");
-    atoms.register_atom("size");
-    atoms.register_atom("map_size");
-    atoms.register_atom("map_get");
-    atoms.register_atom("is_map_key");
-    atoms.register_atom("bit_size");
-    atoms.register_atom("tl");
-    atoms.register_atom("trunc");
-    atoms.register_atom("float");
-    atoms.register_atom("+");
-    atoms.register_atom("-");
-    atoms.register_atom("*");
-    atoms.register_atom("/");
-    atoms.register_atom("div");
-    atoms.register_atom("rem");
-    atoms.register_atom("band");
-    atoms.register_atom("bor");
-    atoms.register_atom("bxor");
-    atoms.register_atom("bnot");
-    atoms.register_atom("bsl");
-    atoms.register_atom("bsr");
-    atoms.register_atom(">");
-    atoms.register_atom(">=");
-    atoms.register_atom("<");
-    atoms.register_atom("=<");
-    atoms.register_atom("=:=");
-    atoms.register_atom("==");
-    atoms.register_atom("=/=");
-    atoms.register_atom("/=");
-    atoms.register_atom("not");
-    atoms.register_atom("xor");
+    atoms.insert("abs");
+    atoms.insert("element");
+    atoms.insert("hd");
+    atoms.insert("length");
+    atoms.insert("node");
+    atoms.insert("round");
+    atoms.insert("size");
+    atoms.insert("map_size");
+    atoms.insert("map_get");
+    atoms.insert("is_map_key");
+    atoms.insert("bit_size");
+    atoms.insert("tl");
+    atoms.insert("trunc");
+    atoms.insert("float");
+    atoms.insert("+");
+    atoms.insert("-");
+    atoms.insert("*");
+    atoms.insert("/");
+    atoms.insert("div");
+    atoms.insert("rem");
+    atoms.insert("band");
+    atoms.insert("bor");
+    atoms.insert("bxor");
+    atoms.insert("bnot");
+    atoms.insert("bsl");
+    atoms.insert("bsr");
+    atoms.insert(">");
+    atoms.insert(">=");
+    atoms.insert("<");
+    atoms.insert("=<");
+    atoms.insert("=:=");
+    atoms.insert("==");
+    atoms.insert("=/=");
+    atoms.insert("/=");
+    atoms.insert("not");
+    atoms.insert("xor");
 
-    atoms.register_atom("native");
-    atoms.register_atom("second");
-    atoms.register_atom("millisecond");
-    atoms.register_atom("microsecond");
-    atoms.register_atom("perf_counter");
+    atoms.insert("native");
+    atoms.insert("second");
+    atoms.insert("millisecond");
+    atoms.insert("microsecond");
+    atoms.insert("perf_counter");
 
-    atoms.register_atom("exiting");
-    atoms.register_atom("garbage_collecting");
-    atoms.register_atom("waiting");
-    atoms.register_atom("running");
-    atoms.register_atom("runnable");
-    atoms.register_atom("suspended");
+    atoms.insert("exiting");
+    atoms.insert("garbage_collecting");
+    atoms.insert("waiting");
+    atoms.insert("running");
+    atoms.insert("runnable");
+    atoms.insert("suspended");
 
-    atoms.register_atom("module");
-    atoms.register_atom("md5");
-    atoms.register_atom("exports");
-    atoms.register_atom("functions");
-    atoms.register_atom("nifs");
-    atoms.register_atom("attributes");
-    atoms.register_atom("compile");
-    atoms.register_atom("native_addresses");
+    atoms.insert("module");
+    atoms.insert("md5");
+    atoms.insert("exports");
+    atoms.insert("functions");
+    atoms.insert("nifs");
+    atoms.insert("attributes");
+    atoms.insert("compile");
+    atoms.insert("native_addresses");
 
-    atoms.register_atom("hipe_architecture");
-    atoms.register_atom("new");
-    atoms.register_atom("infinity");
+    atoms.insert("hipe_architecture");
+    atoms.insert("new");
+    atoms.insert("infinity");
 
-    atoms.register_atom("enotdir");
+    atoms.insert("enotdir");
 
-    atoms.register_atom("spawn");
-    atoms.register_atom("tty_sl -c -e");
-    atoms.register_atom("fd");
-    atoms.register_atom("system_version");
+    atoms.insert("spawn");
+    atoms.insert("tty_sl -c -e");
+    atoms.insert("fd");
+    atoms.insert("system_version");
 
-    atoms.register_atom("unicode");
-    atoms.register_atom("utf8");
-    atoms.register_atom("latin1");
+    atoms.insert("unicode");
+    atoms.insert("utf8");
+    atoms.insert("latin1");
 
-    atoms.register_atom("command");
-    atoms.register_atom("data");
+    atoms.insert("command");
+    atoms.insert("data");
 
-    atoms.register_atom("DOWN");
-    atoms.register_atom("UP");
-    atoms.register_atom("EXIT");
+    atoms.insert("DOWN");
+    atoms.insert("UP");
+    atoms.insert("EXIT");
 
-    atoms.register_atom("on_heap");
-    atoms.register_atom("off_heap");
+    atoms.insert("on_heap");
+    atoms.insert("off_heap");
 
-    atoms.register_atom("system_logger");
+    atoms.insert("system_logger");
 
-    atoms.register_atom("$end_of_table");
-    atoms.register_atom("iterator");
+    atoms.insert("$end_of_table");
+    atoms.insert("iterator");
 
-    atoms.register_atom("match");
-    atoms.register_atom("nomatch");
+    atoms.insert("match");
+    atoms.insert("nomatch");
 
-    atoms.register_atom("exclusive");
-    atoms.register_atom("append");
-    atoms.register_atom("sync");
-    atoms.register_atom("skip_type_check");
+    atoms.insert("exclusive");
+    atoms.insert("append");
+    atoms.insert("sync");
+    atoms.insert("skip_type_check");
 
-    atoms.register_atom("purify");
+    atoms.insert("purify");
 
-    atoms.register_atom("acquired");
-    atoms.register_atom("busy");
-    atoms.register_atom("lock_order_violation");
+    atoms.insert("acquired");
+    atoms.insert("busy");
+    atoms.insert("lock_order_violation");
 
-    atoms.register_atom("eof");
+    atoms.insert("eof");
 
-    atoms.register_atom("beam_lib");
-    atoms.register_atom("version");
+    atoms.insert("beam_lib");
+    atoms.insert("version");
 
-    atoms.register_atom("type");
-    atoms.register_atom("pid");
-    atoms.register_atom("new_index");
-    atoms.register_atom("new_uniq");
-    atoms.register_atom("index");
-    atoms.register_atom("uniq");
-    atoms.register_atom("env");
-    atoms.register_atom("refc");
-    atoms.register_atom("arity");
-    atoms.register_atom("name");
-    atoms.register_atom("local");
-    atoms.register_atom("external");
-    atoms.register_atom("machine");
-    atoms.register_atom("otp_release");
+    atoms.insert("type");
+    atoms.insert("pid");
+    atoms.insert("new_index");
+    atoms.insert("new_uniq");
+    atoms.insert("index");
+    atoms.insert("uniq");
+    atoms.insert("env");
+    atoms.insert("refc");
+    atoms.insert("arity");
+    atoms.insert("name");
+    atoms.insert("local");
+    atoms.insert("external");
+    atoms.insert("machine");
+    atoms.insert("otp_release");
 
-    atoms.register_atom("bof");
-    atoms.register_atom("cur");
+    atoms.insert("bof");
+    atoms.insert("cur");
 
-    atoms.register_atom("no_integer");
+    atoms.insert("no_integer");
 
-    atoms.register_atom("endian");
-    atoms.register_atom("little");
-    atoms.register_atom("big");
+    atoms.insert("endian");
+    atoms.insert("little");
+    atoms.insert("big");
 
-    atoms.register_atom("protection");
+    atoms.insert("protection");
 
-    atoms.register_atom("trim");
-    atoms.register_atom("trim_all");
-    atoms.register_atom("global");
-    atoms.register_atom("scope");
+    atoms.insert("trim");
+    atoms.insert("trim_all");
+    atoms.insert("global");
+    atoms.insert("scope");
 
-    atoms
+    RwLock::new(atoms)
 });
 
 pub const TRUE: u32 = 1;
@@ -745,17 +724,15 @@ pub const SCOPE: u32 = 267;
 
 #[inline]
 pub fn cmp(index1: u32, index2: u32) -> std::cmp::Ordering {
-    ATOMS.cmp(index1, index2)
+    ATOMS.read().cmp(index1, index2)
 }
 #[inline]
 pub fn from_str(val: &str) -> u32 {
-    ATOMS.from_str(val)
+    // unfortunately, cache hits need the write lock to avoid race conditions
+    ATOMS.write().from_str(val)
 }
 
 #[inline]
-pub fn to_str(index: u32) -> Result<String, String> {
-    if let Some(p) = ATOMS.to_str(index) {
-        return Ok(unsafe { (*p).name.clone() });
-    }
-    Err(format!("Atom does not exist: {}", index))
+pub fn to_str(index: u32) -> Option<&'static str> {
+    ATOMS.read().to_str(index)
 }

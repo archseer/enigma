@@ -232,7 +232,7 @@ unsafe impl Send for LocalData {}
 unsafe impl Send for ExecutionContext {}
 unsafe impl Sync for ExecutionContext {}
 unsafe impl Sync for Process {}
-impl RefUnwindSafe for Process {}
+// impl RefUnwindSafe for Process {}
 
 impl Process {
     pub fn with_rc(
@@ -362,8 +362,8 @@ impl Process {
 
         if context.timeout.is_none() {
             let (trigger, cancel) = futures::channel::oneshot::channel::<()>();
-            context.recv_channel = Some(cancel); // TODO: if timer already set, don't set again!!!
-            context.timeout = Some(trigger); // TODO: if timer already set, don't set again!!!
+            context.recv_channel = Some(cancel);
+            context.timeout = Some(trigger);
         }
 
         // get internal, if we ran out, start processing external
