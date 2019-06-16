@@ -294,7 +294,7 @@ impl<'a> Loader<'a> {
         self.attrs = etf::decode(chunk, &self.literal_heap);
     }
 
-    fn load_local_fun_table(&mut self, chunk: Chunk) {
+    fn load_local_fun_table(&mut self, _chunk: Chunk) {
         // let (_, _data) = expt_chunk(chunk, &self.atom_map).unwrap();
     }
 
@@ -596,38 +596,32 @@ impl<'a> Loader<'a> {
 
         let atom_map = &self.atom_map;
         let labels = &self.labels;
-        let postprocess_value = |arg: &LValue| -> LValue {
-            match arg {
-                LValue::Atom(i) => {
-                    if *i == 0 {
-                        return LValue::Constant(Term::nil());
-                    }
-                    LValue::Constant(Term::atom(Atom(atom_map[&(*i - 1)])))
-                }
-                LValue::Integer(i) => LValue::Constant(Term::int(*i)),
-                LValue::Label(l) => {
-                    if *l == 0 {
-                        return LValue::Label(0);
-                    }
-                    LValue::Label(labels[l])
-                }
-                val => val.clone(),
+        let postprocess_value = |arg: &mut LValue| match arg {
+            LValue::Atom(i) => {
+                let t = if *i == 0 {
+                    Term::nil()
+                } else {
+                    Term::atom(Atom(atom_map[&(*i - 1)]))
+                };
+                *arg = LValue::Constant(t);
             }
+            LValue::Integer(i) => {
+                *arg = LValue::Constant(Term::int(*i));
+            }
+            LValue::Label(l) => {
+                let l = if *l == 0 { 0 } else { labels[l] };
+                *arg = LValue::Label(l);
+            }
+            _ => (),
         };
-
         instructions.iter_mut().for_each(|instruction| {
             // patch local atoms into global
-            instruction.args = instruction
-                .args
-                .iter()
-                .map(|arg| match arg {
-                    LValue::ExtendedList(vec) => {
-                        let vec = (*vec).iter().map(|arg| postprocess_value(arg)).collect();
-                        LValue::ExtendedList(Box::new(vec))
-                    }
-                    _ => postprocess_value(arg),
-                })
-                .collect();
+            instruction.args.iter_mut().for_each(|arg| match arg {
+                LValue::ExtendedList(vec) => {
+                    (*vec).iter_mut().for_each(|arg| postprocess_value(arg))
+                }
+                _ => postprocess_value(arg),
+            })
         });
 
         self.instructions = Vec::with_capacity(instructions.len());
