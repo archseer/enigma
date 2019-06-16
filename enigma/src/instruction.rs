@@ -538,7 +538,7 @@ macro_rules! op_apply {
                     $process.pid, module, func
                 );
 
-                return Err(Exception::new(Reason::EXC_BADARG));
+                return Err(badarg!());
             }
 
             if module.to_atom().unwrap() != atom::ERLANG || func.to_atom().unwrap() != atom::APPLY {
@@ -589,7 +589,7 @@ macro_rules! op_apply {
 
         if !args.is_nil() {
             // Must be well-formed list
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
 
         /*
@@ -660,7 +660,7 @@ macro_rules! op_apply_fun {
 
         if !args.is_nil() {
             /* Must be well-formed list */
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
         //context.x[arity] = fun;
 
@@ -708,7 +708,7 @@ macro_rules! op_fixed_apply {
             $context.x[1] = func;
             $context.x[2] = Term::nil();
 
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
 
         let module = module.to_atom().unwrap();

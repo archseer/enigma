@@ -49,17 +49,17 @@ pub fn get_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Res
 pub fn from_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let mut list = &args[0];
     if !list.is_list() {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
     let mut map = HAMT::new();
     while let Ok(value::Cons { head, tail }) = list.cast_into() {
         if let Ok(tuple) = value::Tuple::cast_from(head) {
             if tuple.len != 2 {
-                return Err(Exception::new(Reason::EXC_BADARG));
+                return Err(badarg!());
             }
             map.insert(tuple[0], tuple[1]);
         } else {
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
         list = tail;
     }

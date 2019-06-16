@@ -1,6 +1,5 @@
 use crate::atom::{self, Atom};
 use crate::bif;
-use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
 use crate::value::{self, CastFrom, Cons, Term, Variant};
 use crate::vm;
@@ -39,7 +38,7 @@ pub fn process_info_aux(
 
     let item = match item.into_variant() {
         Variant::Atom(i) => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     let local_data = process.local_data();
@@ -148,7 +147,7 @@ pub fn process_info_aux(
         atom::MAX_HEAP_SIZE => unimplemented!(),
         atom::MAGIC_REF => unimplemented!(),
         atom::FULLSWEEP_AFTER => unimplemented!(),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     Ok(tup2!(heap, Term::atom(item), res))
@@ -158,7 +157,7 @@ pub fn process_info_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
     // args are pid, `[item, .. ]` or just `item`.
     // response is `[tup,..]` or just `tup`
     if !args[0].is_pid() {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
 
     let pid = args[0].to_pid().unwrap();
@@ -223,7 +222,7 @@ pub fn fun_info_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
             _ => unimplemented!(),
         }
     } else {
-        Err(Exception::new(Reason::EXC_BADARG))
+        Err(badarg!())
     }
 }
 
@@ -269,7 +268,7 @@ pub fn system_info_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
         Variant::Pointer(..) => {
             if let Ok(tup) = value::Tuple::cast_from(&args[0]) {
                match tup[0].into_variant() {
-                   Variant::Atom(atom::PURIFY) => return Err(Exception::new(Reason::EXC_BADARG)),
+                   Variant::Atom(atom::PURIFY) => return Err(badarg!()),
                    _ => unimplemented!("system_info for {}", args[0])
                }
             } else {
@@ -286,7 +285,7 @@ pub fn system_flag_2(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> b
         Variant::Atom(atom::SYSTEM_LOGGER) => {
             let pid = match args[1].into_variant() {
                 Variant::Pid(pid) => pid,
-                _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                _ => return Err(badarg!()),
             };
 
             let old_pid = vm.system_logger.swap(pid as usize, Ordering::Relaxed);
@@ -303,12 +302,12 @@ pub fn group_leader_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) ->
 pub fn group_leader_2(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let pid = match args[0].to_pid() {
         Some(pid) => pid,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     let _target = match args[1].to_pid() {
         Some(pid) => pid,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     // TODO optimize for if process.pid == pid
@@ -322,6 +321,6 @@ pub fn group_leader_2(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> 
         proc.local_data_mut().group_leader = pid;
         Ok(atom!(TRUE))
     } else {
-        Err(Exception::new(Reason::EXC_BADARG))
+        Err(badarg!())
     }
 }

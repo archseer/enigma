@@ -18,7 +18,7 @@ pub fn md5_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resu
 pub fn make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let num = match args[0].into_number() {
         Ok(value::Num::Integer(i)) if !i < 0 => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     let heap = &process.context_mut().heap;
     let tuple = value::tuple(heap, num as u32);
@@ -33,7 +33,7 @@ pub fn make_tuple_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
 pub fn make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let num = match args[0].into_number() {
         Ok(value::Num::Integer(i)) if !i < 0 => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     let heap = &process.context_mut().heap;
     let tuple = value::tuple(heap, num as u32);
@@ -47,11 +47,11 @@ pub fn make_tuple_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
     for item in init.iter() {
         let t = Tuple::cast_from(&item)?;
         if t.len != 2 {
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
         let n = match t[0].into_number() {
             Ok(value::Num::Integer(i)) if !i < 1 && i - 1 < num => i - 1,
-            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+            _ => return Err(badarg!()),
         };
         unsafe {
             std::ptr::write(&mut tuple[n as usize], t[1]);
@@ -74,11 +74,11 @@ pub fn append_element_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
 pub fn setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let number = match args[0].into_number() {
         Ok(value::Num::Integer(i)) if !i < 1 => i - 1,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     let t = Tuple::cast_from(&args[1])?;
     if number >= t.len() as i32 {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
     let heap = &process.context_mut().heap;
     let new_tuple = value::tuple(heap, t.len() as u32);
@@ -93,11 +93,11 @@ pub fn setelement_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
 pub fn element_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let number = match args[0].into_number() {
         Ok(value::Num::Integer(i)) if !i < 1 => (i - 1) as usize,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     let t = Tuple::cast_from(&args[1])?;
     if number >= t.len() {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
     Ok(t[number])
 }
@@ -131,7 +131,7 @@ pub fn binary_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
                 value.size,
             )
         }
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     let res = bitstring::bytes_to_list(
@@ -230,7 +230,7 @@ pub fn list_to_iodata(list: Term) -> Result<Vec<u8>, Exception> {
                             }
                             Variant::Pointer(..) => match elem.to_bytes() {
                                 Some(data) => bytes.extend_from_slice(data),
-                                None => return Err(Exception::new(Reason::EXC_BADARG)),
+                                None => return Err(badarg!()),
                             },
                             Variant::Cons(p) => {
                                 ptr = p;
@@ -238,7 +238,7 @@ pub fn list_to_iodata(list: Term) -> Result<Vec<u8>, Exception> {
                                 continue; // head loop
                             }
                             Variant::Nil(value::Special::Nil) => break,
-                            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                            _ => return Err(badarg!()),
                         }
                         break;
                     }
@@ -252,24 +252,24 @@ pub fn list_to_iodata(list: Term) -> Result<Vec<u8>, Exception> {
                         }
                         Variant::Pointer(..) => match elem.to_bytes() {
                             Some(data) => bytes.extend_from_slice(data),
-                            None => return Err(Exception::new(Reason::EXC_BADARG)),
+                            None => return Err(badarg!()),
                         },
                         Variant::Nil(..) => {}
                         Variant::Cons(p) => {
                             ptr = p;
                             continue; // tail loop
                         }
-                        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                        _ => return Err(badarg!()),
                     }
                     break;
                 }
             }
             Variant::Pointer(..) => match elem.to_bytes() {
                 Some(data) => bytes.extend_from_slice(data),
-                None => return Err(Exception::new(Reason::EXC_BADARG)),
+                None => return Err(badarg!()),
             },
             Variant::Nil(..) => {}
-            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+            _ => return Err(badarg!()),
         }
     }
 
@@ -318,7 +318,7 @@ pub fn iolist_to_iovec_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
                         // TODO: in the future reuse writable binaries as buf
                         iterator = *tail;
                     }
-                    _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                    _ => return Err(badarg!()),
                 },
                 Variant::Integer(_i) => {
                     // append byte to buf
@@ -349,7 +349,7 @@ pub fn iolist_to_iovec_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
 
                     iterator = *head;
                 }
-                _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                _ => return Err(badarg!()),
             }
             //     } else if (is_small(head)) {
             //         Eterm seq_end;
@@ -367,7 +367,7 @@ pub fn iolist_to_iovec_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
             // append binary
             res.push(iterator);
         } else if !iterator.is_nil() {
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
 
         if let Some(item) = stack.pop() {
@@ -427,10 +427,10 @@ pub fn unicode_characters_to_binary_2(
                 Variant::Pointer(..) => match elem.to_bytes() {
                     Some(data) => bytes.extend_from_slice(data),
                     _ => unreachable!("got a weird pointy: {}", elem),
-                    // None => return Err(Exception::new(Reason::EXC_BADARG)),
+                    // None => return Err(badarg!()),
                 },
                 _ => unreachable!("got a weird ele: {}", elem),
-                // _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                // _ => return Err(badarg!()),
             }
         } else {
             stack.pop();
@@ -440,7 +440,7 @@ pub fn unicode_characters_to_binary_2(
     // TODO: up to here, equivalent to list_to_binary_1
     String::from_utf8(bytes)
         .map(|string| Term::binary(heap, bitstring::Binary::from(string.into_bytes())))
-        .map_err(|_| Exception::new(Reason::EXC_BADARG))
+        .map_err(|_| badarg!())
 }
 
 pub fn unicode_characters_to_list_2(
@@ -499,14 +499,14 @@ pub fn iolist_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
                             Variant::Integer(_i @ 0..=255) => count += 1,
                             Variant::Pointer(..) => match elem.to_bytes() {
                                 Some(data) => count += data.len(),
-                                None => return Err(Exception::new(Reason::EXC_BADARG)),
+                                None => return Err(badarg!()),
                             },
                             Variant::Cons(p) => {
                                 ptr = p;
                                 stack.push(cons.tail);
                                 continue; // head loop
                             }
-                            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                            _ => return Err(badarg!()),
                         }
                         break;
                     }
@@ -517,24 +517,24 @@ pub fn iolist_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
                         Variant::Integer(_i @ 0..=255) => count += 1,
                         Variant::Pointer(..) => match elem.to_bytes() {
                             Some(data) => count += data.len(),
-                            None => return Err(Exception::new(Reason::EXC_BADARG)),
+                            None => return Err(badarg!()),
                         },
                         Variant::Nil(..) => {}
                         Variant::Cons(p) => {
                             ptr = p;
                             continue; // tail loop
                         }
-                        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                        _ => return Err(badarg!()),
                     }
                     break;
                 }
             }
             Variant::Pointer(..) => match elem.to_bytes() {
                 Some(data) => count += data.len(),
-                None => return Err(Exception::new(Reason::EXC_BADARG)),
+                None => return Err(badarg!()),
             },
             Variant::Nil(..) => {}
-            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+            _ => return Err(badarg!()),
         }
     }
 
@@ -549,7 +549,7 @@ pub fn binary_to_term_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
             Err::<_, std::io::Error>(error) => panic!("binary_to_term error: {:?}", error),
         };
     }
-    Err(Exception::new(Reason::EXC_BADARG))
+    Err(badarg!())
 }
 
 pub fn term_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
@@ -580,7 +580,7 @@ pub fn binary_to_atom_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) 
         Variant::Atom(atom::LATIN1) => (),
         Variant::Atom(atom::UNICODE) => (),
         Variant::Atom(atom::UTF8) => (),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     if let Some(bytes) = args[0].to_bytes() {
@@ -589,10 +589,10 @@ pub fn binary_to_atom_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) 
                 let atom = atom::Atom::from(string);
                 Ok(Term::atom(atom))
             }
-            Err(_) => Err(Exception::new(Reason::EXC_BADARG)),
+            Err(_) => Err(badarg!()),
         };
     }
-    Err(Exception::new(Reason::EXC_BADARG))
+    Err(badarg!())
 }
 
 pub fn atom_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
@@ -603,7 +603,7 @@ pub fn atom_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
 
             Ok(bitstring!(heap, string))
         }
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 
@@ -612,7 +612,7 @@ pub fn atom_to_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
         Variant::Atom(atom::LATIN1) => (),
         Variant::Atom(atom::UNICODE) => (),
         Variant::Atom(atom::UTF8) => (),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     match args[0].into_variant() {
@@ -625,7 +625,7 @@ pub fn atom_to_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
                 bitstring::Binary::from(string.as_bytes().to_vec()),
             ))
         }
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 
@@ -637,7 +637,7 @@ pub fn pid_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
 
             Ok(bitstring!(heap, string))
         }
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 
@@ -657,7 +657,7 @@ pub fn integer_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
         }
         _ => {
             println!("integer_to_list_1 called with {}", args[0]);
-            Err(Exception::new(Reason::EXC_BADARG))
+            Err(badarg!())
         }
     }
 }
@@ -667,7 +667,7 @@ pub fn integer_to_list_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
 
     let radix = match args[1].into_variant() {
         Variant::Integer(i) if i >= 2 && i <= 16 => i as u8,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     match args[0].into_number() {
@@ -687,7 +687,7 @@ pub fn integer_to_list_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
         }
         _ => {
             println!("integer_to_list_2 called with {}", args[0]);
-            Err(Exception::new(Reason::EXC_BADARG))
+            Err(badarg!())
         }
     }
 }
@@ -713,7 +713,7 @@ pub fn integer_to_binary_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]
         }
         _ => {
             println!("integer_to_list_1 called with {}", args[0]);
-            Err(Exception::new(Reason::EXC_BADARG))
+            Err(badarg!())
         }
     }
 }
@@ -723,7 +723,7 @@ pub fn integer_to_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]
 
     let radix = match args[1].into_variant() {
         Variant::Integer(i) if i >= 2 && i <= 16 => i as u8,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     match args[0].into_number() {
@@ -745,14 +745,14 @@ pub fn integer_to_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]
         }
         _ => {
             println!("integer_to_list_2 called with {}", args[0]);
-            Err(Exception::new(Reason::EXC_BADARG))
+            Err(badarg!())
         }
     }
 }
 
 pub fn fun_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     if args[0].get_type() != value::Type::Closure {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
 
     let string = format!("{}", args[0]);
@@ -763,7 +763,7 @@ pub fn fun_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
 
 pub fn ref_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     if args[0].get_type() != value::Type::Ref {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
 
     let string = format!("{}", args[0]);
@@ -776,7 +776,7 @@ pub fn binary_to_integer_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term
     // list to string
     let bytes = match args[0].to_bytes() {
         Some(b) => b,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     match lexical::try_parse::<i32, _>(bytes) {
         Ok(i) => Ok(Term::int(i)),
@@ -862,7 +862,7 @@ pub fn list_to_tuple_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
 
     if !tmp.is_nil() {
         // Must be well-formed list
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
 
     // allocate tuple, traverse the list and assign to tup
@@ -940,7 +940,7 @@ pub fn append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
 
         if !iter.is_nil() {
             // tail was a badly formed list
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
 
         // now link the copy to the rhs
@@ -951,7 +951,7 @@ pub fn append_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
     }
 
     // assert!(!(BIF_P->flags & F_DISABLE_GC));
-    Err(Exception::new(Reason::EXC_BADARG))
+    Err(badarg!())
 }
 
 pub fn subtract_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
@@ -1015,7 +1015,7 @@ pub fn and_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Res
     match (args[0].to_bool(), args[1].to_bool()) {
         (Some(true), Some(true)) => Ok(atom!(TRUE)),
         (Some(_), Some(_)) => Ok(atom!(FALSE)),
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 
@@ -1023,7 +1023,7 @@ pub fn or_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Resu
     match (args[0].to_bool(), args[1].to_bool()) {
         (Some(false), Some(false)) => Ok(atom!(FALSE)),
         (Some(_), Some(_)) => Ok(atom!(TRUE)),
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 
@@ -1032,7 +1032,7 @@ pub fn xor_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Res
         (Some(true), Some(false)) => Ok(atom!(TRUE)),
         (Some(false), Some(true)) => Ok(atom!(TRUE)),
         (Some(_), Some(_)) => Ok(atom!(FALSE)),
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 
@@ -1040,7 +1040,7 @@ pub fn not_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Res
     match args[0].to_bool() {
         Some(true) => Ok(atom!(FALSE)),
         Some(false) => Ok(atom!(TRUE)),
-        None => Err(Exception::new(Reason::EXC_BADARG)),
+        None => Err(badarg!()),
     }
 }
 
@@ -1093,11 +1093,11 @@ pub fn sneqeq_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::
 pub fn bor_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let i1 = match args[0].into_variant() {
         Variant::Integer(i) => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     let i2 = match args[1].into_variant() {
         Variant::Integer(i) => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     Ok(Term::int(i1 | i2))
 }
@@ -1105,11 +1105,11 @@ pub fn bor_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Res
 pub fn band_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let i1 = match args[0].into_variant() {
         Variant::Integer(i) => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     let i2 = match args[1].into_variant() {
         Variant::Integer(i) => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     Ok(Term::int(i1 & i2))
 }
@@ -1117,11 +1117,11 @@ pub fn band_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Re
 pub fn bxor_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let i1 = match args[0].into_variant() {
         Variant::Integer(i) => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     let i2 = match args[1].into_variant() {
         Variant::Integer(i) => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     Ok(Term::int(i1 ^ i2))
 }
@@ -1129,11 +1129,11 @@ pub fn bxor_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Re
 pub fn bsl_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let i1 = match args[0].into_variant() {
         Variant::Integer(i) => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     let i2 = match args[1].into_variant() {
         Variant::Integer(i) => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     // TODO: need to use overflowing_shl
     Ok(Term::int(i1 << i2))
@@ -1142,11 +1142,11 @@ pub fn bsl_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Res
 pub fn bsr_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let i1 = match args[0].into_variant() {
         Variant::Integer(i) => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     let i2 = match args[1].into_variant() {
         Variant::Integer(i) => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     // TODO: need to use overflowing_shr
     Ok(Term::int(i1 >> i2))
@@ -1155,7 +1155,7 @@ pub fn bsr_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Res
 pub fn bnot_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     let i1 = match args[0].into_variant() {
         Variant::Integer(i) => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     Ok(Term::int(!i1))
 }
@@ -1190,7 +1190,7 @@ pub fn make_fun_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
         (Variant::Atom(m), Variant::Atom(f), Variant::Integer(a)) if a > 0 => {
             Ok(Term::export(heap, crate::module::MFA(m, f, a as u32)))
         }
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 

@@ -290,7 +290,7 @@ pub fn read_info_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
 
     let follow_links = match args[1].to_int() {
         Some(i) => i > 0,
-        None => return Err(Exception::new(Reason::EXC_BADARG)),
+        None => return Err(badarg!()),
     };
 
     let cons = Cons::cast_from(&args[0])?;
@@ -398,7 +398,7 @@ pub fn read_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
         Variant::Integer(i) => i as usize,
         // TODO: bigint
         _ => unimplemented!(),
-        // _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        // _ => return Err(badarg!()),
     };
 
     let mut buffer = vec![0; size];
@@ -445,13 +445,13 @@ pub fn seek_nif_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
     let file = File::cast_from_mut(&args[0])?;
     let pos = match args[2].into_variant() {
         Variant::Integer(i) if i >= 0 => i as usize,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     let seek = match args[1].into_variant() {
         Variant::Atom(atom::BOF) => SeekFrom::Start(pos as u64),
         Variant::Atom(atom::CUR) => SeekFrom::Current(pos as i64),
         Variant::Atom(atom::EOF) => SeekFrom::End(pos as i64),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     match file.seek(seek) {
         Ok(new_pos) => Ok(tup2!(heap, atom!(OK), Term::uint64(heap, new_pos))),

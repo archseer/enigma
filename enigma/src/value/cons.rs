@@ -1,5 +1,4 @@
 use super::{CastFrom, CastInto, Term, Variant, WrongBoxError};
-use crate::exception;
 use crate::immix::Heap;
 use core::marker::PhantomData;
 use std::cmp::Ordering;
@@ -137,13 +136,16 @@ impl Cons {
 /// @return 0 ok,
 ///        -1 type error,
 ///        -2 list too long, only \c len characters written
-pub fn unicode_list_to_buf(list: &Cons, _max_len: usize) -> Result<String, exception::Exception> {
+pub fn unicode_list_to_buf(
+    list: &Cons,
+    _max_len: usize,
+) -> Result<String, crate::exception::Exception> {
     // TODO: handle max_len
     list.iter()
         .map(|v| {
             v.to_uint()
                 .and_then(std::char::from_u32)
-                .ok_or_else(|| exception::Exception::new(exception::Reason::EXC_BADARG))
+                .ok_or_else(|| badarg!())
         })
         .collect()
 }

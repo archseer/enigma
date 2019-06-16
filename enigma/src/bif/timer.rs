@@ -1,5 +1,4 @@
 use crate::bif;
-use crate::exception::{Exception, Reason};
 use crate::process::{self, RcProcess};
 use crate::value::{self, CastFrom, Term, Tuple, Variant};
 use crate::vm;
@@ -12,11 +11,11 @@ pub fn send_after_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif
     // time, dest, msg
     let delay = match args[0].to_uint() {
         Some(i) => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     if !args[1].is_pid() {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
 
     let dest = args[1];

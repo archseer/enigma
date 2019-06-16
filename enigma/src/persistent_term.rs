@@ -43,7 +43,6 @@ impl Table {
 
 pub mod bif {
     use crate::bif::Result;
-    use crate::exception::{Exception, Reason};
     use crate::process::RcProcess;
     use crate::value::Term;
     use crate::vm;
@@ -51,7 +50,7 @@ pub mod bif {
     pub fn get_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
         match vm.persistent_terms.get(args[0]) {
             Some(val) => Ok(val),
-            None => Err(Exception::new(Reason::EXC_BADARG)), // default
+            None => Err(badarg!()), // default
         }
     }
 

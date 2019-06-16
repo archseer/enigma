@@ -1039,7 +1039,7 @@ pub fn append(
     let build_size_in_bits = match build_size.into_variant() {
         value::Variant::Integer(i) if i >= 0 => i,
         // TODO: return err reason probs instead of tweaking freason
-        // _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        // _ => return Err(badarg!()),
         _ => return None,
         // p->freason = BADARG;
     };
@@ -1204,7 +1204,7 @@ pub fn private_append(
     let build_size_in_bits = match build_size.into_variant() {
         value::Variant::Integer(i) if !i < 0 => i,
         // TODO: return err reason probs instead of tweaking freason
-        // _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        // _ => return Err(badarg!()),
         _ => return None,
         // p->freason = BADARG;
     };

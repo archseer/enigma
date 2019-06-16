@@ -1,6 +1,5 @@
 use crate::atom;
 use crate::bif;
-use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
 use crate::value::{self, CastFrom, CastInto, Cons, Term, Tuple};
 use crate::vm;
@@ -14,7 +13,7 @@ pub fn member_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::
     if args[1].is_nil() {
         return Ok(atom!(FALSE));
     } else if !args[1].is_list() {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
 
     let term = &args[0];
@@ -40,7 +39,7 @@ pub fn member_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::
 
     if !list.is_list() {
         // BUMP_REDS(BIF_P, reds_left - max_iter/16);
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
     Ok(atom!(FALSE)) // , reds_left - max_iter/16
 }
@@ -92,7 +91,7 @@ fn keyfind(_func: bif::Fn, _process: &RcProcess, args: &[Term]) -> bif::Result {
 
     let pos = match args[1].into_number() {
         Ok(value::Num::Integer(i)) if !i < 1 => i as usize - 1, // it's always 1-indexed
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     // OTP does 3 different loops based on key type (simple, immed, boxed), but luckily in rust we

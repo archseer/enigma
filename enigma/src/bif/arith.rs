@@ -1,5 +1,4 @@
 use crate::bif;
-use crate::exception::{Exception, Reason};
 use crate::numeric::division::{FlooredDiv, OverflowingFlooredDiv};
 use crate::numeric::modulo::{Modulo, OverflowingModulo};
 use crate::process::RcProcess;
@@ -16,7 +15,7 @@ pub fn float_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::R
         Ok(value::Num::Integer(i)) => Ok(Term::from(*i as f64)),
         Ok(value::Num::Float(..)) => Ok(args[0]),
         Ok(value::Num::Bignum(..)) => unimplemented!(),
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 
@@ -26,7 +25,7 @@ pub fn round_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
         Ok(value::Num::Integer(..)) => Ok(args[0]),
         Ok(value::Num::Float(f)) => Ok(Term::int64(heap, f.round() as i64)),
         Ok(value::Num::Bignum(..)) => Ok(args[0]),
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 
@@ -36,7 +35,7 @@ pub fn ceil_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Res
         Ok(value::Num::Integer(..)) => Ok(args[0]),
         Ok(value::Num::Float(f)) => Ok(Term::int64(heap, f.ceil() as i64)),
         Ok(value::Num::Bignum(..)) => Ok(args[0]),
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 
@@ -46,7 +45,7 @@ pub fn floor_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
         Ok(value::Num::Integer(..)) => Ok(args[0]),
         Ok(value::Num::Float(f)) => Ok(Term::int64(heap, f.floor() as i64)),
         Ok(value::Num::Bignum(..)) => Ok(args[0]),
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 
@@ -56,7 +55,7 @@ pub fn abs_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resu
         Ok(value::Num::Integer(i)) => Ok(Term::int(i.abs())),
         Ok(value::Num::Float(f)) => Ok(Term::from(f.abs())),
         Ok(value::Num::Bignum(i)) => Ok(Term::bigint(heap, i.abs())),
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 
@@ -100,7 +99,7 @@ macro_rules! trig_func {
             Ok(value::Num::Integer(i)) => f64::from(i),
             Ok(value::Num::Float(f)) => f,
             Ok(value::Num::Bignum(..)) => unimplemented!(),
-            Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
+            Err(_) => return Err(badarg!()),
         };
         Ok(Term::from(res.$op()))
     }};
@@ -159,7 +158,7 @@ pub fn math_erf_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif
         Ok(value::Num::Integer(i)) => f64::from(i),
         Ok(value::Num::Float(f)) => f,
         Ok(value::Num::Bignum(..)) => unimplemented!(),
-        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
+        Err(_) => return Err(badarg!()),
     };
     Ok(Term::from(statrs::function::erf::erf(res)))
 }
@@ -169,7 +168,7 @@ pub fn math_erfc_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bi
         Ok(value::Num::Integer(i)) => f64::from(i),
         Ok(value::Num::Float(f)) => f,
         Ok(value::Num::Bignum(..)) => unimplemented!(),
-        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
+        Err(_) => return Err(badarg!()),
     };
     Ok(Term::from(1.0_f64 - statrs::function::erf::erf(res)))
 }
@@ -179,7 +178,7 @@ pub fn math_exp_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif
         Ok(value::Num::Integer(i)) => f64::from(i),
         Ok(value::Num::Float(f)) => f,
         Ok(value::Num::Bignum(..)) => unimplemented!(),
-        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
+        Err(_) => return Err(badarg!()),
     };
     Ok(Term::from(res.powf(std::f64::consts::E)))
 }
@@ -205,13 +204,13 @@ pub fn math_atan2_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> b
         Ok(value::Num::Integer(i)) => f64::from(i),
         Ok(value::Num::Float(f)) => f,
         Ok(value::Num::Bignum(..)) => unimplemented!(),
-        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
+        Err(_) => return Err(badarg!()),
     };
     let arg = match args[1].into_number() {
         Ok(value::Num::Integer(i)) => f64::from(i),
         Ok(value::Num::Float(f)) => f,
         Ok(value::Num::Bignum(..)) => unimplemented!(),
-        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
+        Err(_) => return Err(badarg!()),
     };
     Ok(Term::from(res.atan2(arg)))
 }
@@ -221,13 +220,13 @@ pub fn math_pow_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif
         Ok(value::Num::Integer(i)) => f64::from(i),
         Ok(value::Num::Float(f)) => f,
         Ok(value::Num::Bignum(..)) => unimplemented!(),
-        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
+        Err(_) => return Err(badarg!()),
     };
     let index = match args[1].into_number() {
         Ok(value::Num::Integer(i)) => f64::from(i),
         Ok(value::Num::Float(f)) => f,
         Ok(value::Num::Bignum(..)) => unimplemented!(),
-        Err(_) => return Err(Exception::new(Reason::EXC_BADARG)),
+        Err(_) => return Err(badarg!()),
     };
 
     Ok(Term::from(base.powf(index)))

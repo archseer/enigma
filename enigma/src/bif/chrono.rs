@@ -1,6 +1,5 @@
 use crate::atom;
 use crate::bif;
-use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
 use crate::value::{self, CastFrom, Term, Tuple, Variant};
 use crate::vm;
@@ -102,7 +101,7 @@ pub fn system_time_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bi
             .unwrap(),
         Variant::Atom(atom::PERF_COUNTER) => vm.elapsed_time().as_secs().to_bigint().unwrap(),
         Variant::Integer(_) => unimplemented!(),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     Ok(Term::bigint(heap, time))
 }
@@ -171,14 +170,11 @@ pub fn posixtime_to_universaltime_1(
 
     let timestamp: i64 = match args[0].into_number() {
         Ok(value::Num::Integer(i)) => i64::from(i),
-        Ok(value::Num::Bignum(value)) => value
-            .to_i64()
-            .ok_or_else(|| Exception::new(Reason::EXC_BADARG))?,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        Ok(value::Num::Bignum(value)) => value.to_i64().ok_or_else(|| badarg!())?,
+        _ => return Err(badarg!()),
     };
 
-    let dt = NaiveDateTime::from_timestamp_opt(timestamp, 0)
-        .ok_or_else(|| Exception::new(Reason::EXC_BADARG))?;
+    let dt = NaiveDateTime::from_timestamp_opt(timestamp, 0).ok_or_else(|| badarg!())?;
 
     // hp = HAlloc(BIF_P, 4+4+3);
     let date = tup3!(
@@ -244,7 +240,7 @@ pub fn universaltime_to_localtime_1(
     let heap = &process.context_mut().heap;
 
     let ((year, month, day), (hour, minute, second)) =
-        time_to_parts(args[0]).ok_or_else(|| Exception::new(Reason::EXC_BADARG))?;
+        time_to_parts(args[0]).ok_or_else(|| badarg!())?;
 
     let dt = Utc
         .ymd(year, month as u32, day as u32)

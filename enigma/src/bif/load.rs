@@ -1,6 +1,5 @@
 use crate::atom::{self, Atom};
 use crate::bif;
-use crate::exception::{Exception, Reason};
 use crate::loader::Loader;
 use crate::module::{self, Module};
 use crate::process::RcProcess;
@@ -26,7 +25,7 @@ pub fn prepare_loading_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
 
     args[1]
         .to_bytes()
-        .ok_or_else(|| Exception::new(Reason::EXC_BADARG))
+        .ok_or_else(|| badarg!())
         .map(|bytes| maybe_uncompress(bytes))
         .and_then(|bytes| {
             loader
@@ -68,7 +67,7 @@ pub fn has_prepared_code_on_load_1(
             let value: &*mut Module = value;
             unsafe { Ok(Term::boolean((**value).on_load.is_some())) }
         }
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 
@@ -80,7 +79,7 @@ pub fn finish_loading_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -
                 .map(|value: &*mut Module| unsafe { Box::from_raw(*value) })
         })
         .collect::<Result<Vec<Box<Module>>, _>>()
-        .map_err(|_| Exception::new(Reason::EXC_BADARG))
+        .map_err(|_| badarg!())
         .and_then(|mods| {
             module::finish_loading_modules(vm, mods);
             Ok(atom!(OK))
@@ -90,7 +89,7 @@ pub fn finish_loading_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -
 pub fn get_module_info_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let name = match args[0].into_variant() {
         Variant::Atom(i) => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     let registry = vm.modules.lock();
@@ -117,7 +116,7 @@ pub fn get_module_info_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
 pub fn get_module_info_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let name = match args[0].into_variant() {
         Variant::Atom(i) => i,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     let registry = vm.modules.lock();
@@ -150,7 +149,7 @@ fn get_module_info(heap: &crate::immix::Heap, module: &Module, what: Term) -> bi
         Variant::Atom(atom::COMPILE) => unimplemented!(),
         Variant::Atom(atom::NATIVE_ADDRESSES) => unimplemented!(),
         Variant::Atom(atom::NATIVE) => Ok(atom!(FALSE)), // TODO
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 

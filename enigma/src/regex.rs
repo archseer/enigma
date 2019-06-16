@@ -9,19 +9,21 @@ use regex::bytes::Regex;
 pub mod bif {
     use super::*;
     use crate::bif::Result;
-    use crate::exception::{Exception, Reason};
     use crate::process::RcProcess;
-    use crate::value::{Term, CastFrom, self};
+    use crate::value::{self, CastFrom, Term};
     use crate::vm;
 
     pub fn version_0(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
         // TODO: static regex version for now
         let version = "1.1.7";
-        Ok(Term::binary(&process.context_mut().heap, bitstring::Binary::from(version.as_bytes().to_owned())))
+        Ok(Term::binary(
+            &process.context_mut().heap,
+            bitstring::Binary::from(version.as_bytes().to_owned()),
+        ))
     }
 
     pub fn run_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
-    use std::borrow::Cow;
+        use std::borrow::Cow;
         let heap = &process.context_mut().heap;
         // println!("run/3: {} {}", args[0], args[1]);
         let string = crate::bif::erlang::list_to_iodata(args[0]).unwrap(); // TODO: error handling
@@ -75,7 +77,7 @@ pub mod bif {
         }
 
         let pattern = crate::bif::erlang::list_to_iodata(args[0]).unwrap(); // TODO: error handling
-        // this is terrible, but the syntax is incompatible
+                                                                            // this is terrible, but the syntax is incompatible
         let pattern = String::from_utf8(pattern).unwrap().replace("(?<", "(?P<");
         // TODO verify args
         let regex = Regex::new(&pattern).unwrap();

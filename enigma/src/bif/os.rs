@@ -1,8 +1,6 @@
 use crate::atom;
 use crate::bif;
 
-use crate::exception::{Exception, Reason};
-
 use crate::process::RcProcess;
 use crate::value::{self, CastFrom, Cons, Term};
 use crate::vm;
@@ -22,7 +20,7 @@ pub fn get_env_var_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
     match env::var(name) {
         Ok(var) => Ok(bitstring!(heap, var)),
         Err(env::VarError::NotPresent) => Ok(atom!(FALSE)),
-        Err(env::VarError::NotUnicode(..)) => Err(Exception::new(Reason::EXC_BADARG)), // TODO
+        Err(env::VarError::NotUnicode(..)) => Err(badarg!()), // TODO
     }
 }
 

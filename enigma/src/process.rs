@@ -685,11 +685,11 @@ pub fn send_message(vm: &Machine, sender: PID, pid: Term, msg: Term) -> Result<T
                 Some(process.clone())
             } else {
                 println!("registered name {} not found!", pid);
-                return Err(Exception::new(Reason::EXC_BADARG));
+                return Err(badarg!());
             }
         }
         value::Variant::Pid(pid) => vm.process_table.lock().get(pid),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     if let Some(receiver) = receiver {

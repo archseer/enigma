@@ -1,6 +1,6 @@
 use crate::value::{Term, Variant, Tuple, CastFrom};
 use crate::process::{PID, Ref};
-use crate::exception::{Exception, Reason};
+use crate::exception::{Exception};
 use crate::atom;
 use crate::value;
 use crate::vm::Machine;
@@ -158,7 +158,7 @@ pub fn send_message(
         // TODO: error unhandled
         let tup = Tuple::cast_from(&msg)?;
         if !tup.len() == 2 || !tup[0].is_pid() {
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
         match Tuple::cast_from(&tup[1]) {
             Ok(cmd) => {

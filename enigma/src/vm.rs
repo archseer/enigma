@@ -1,18 +1,22 @@
-use crate::atom::{self, Atom};
+use crate::atom::Atom;
 use crate::bitstring;
 use crate::ets::{RcTableRegistry, TableRegistry};
 use crate::exception::{self, Exception, Reason};
-use crate::exports_table::{Export, ExportsTable, RcExportsTable};
+use crate::exports_table::{ExportsTable, RcExportsTable};
 use crate::module; 
 use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
 use crate::instruction;
-use crate::process::registry::Registry as ProcessRegistry;
-use crate::process::table::Table as ProcessTable;
+use crate::process::{
+    self,
+    RcProcess,
+    registry::Registry as ProcessRegistry,
+    table::Table as ProcessTable,
+};
 use crate::port::{Table as PortTable, RcTable as RcPortTable};
-use crate::process::{self, RcProcess};
 use crate::persistent_term::{Table as PersistentTermTable};
 use crate::servo_arc::Arc;
-use crate::value::{self, Cons, Term};
+use crate::value::{Cons, Term};
+
 use std::cell::RefCell;
 // use log::debug;
 use parking_lot::Mutex;
@@ -256,7 +260,7 @@ impl Machine {
         let fun = Atom::from("start");
         let arity = 2;
         context.x[0] = Term::atom(Atom::from("init"));
-        context.x[1] = value::Cons::from_iter(
+        context.x[1] = Cons::from_iter(
             args.into_iter()
                 .map(|arg| Term::binary(&context.heap, bitstring::Binary::from(arg.into_bytes()))),
             &context.heap,

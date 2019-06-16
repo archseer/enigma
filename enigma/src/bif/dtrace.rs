@@ -1,6 +1,5 @@
 use crate::atom;
 use crate::bif;
-// use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
 use crate::value::Term;
 use crate::vm;

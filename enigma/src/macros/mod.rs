@@ -1,6 +1,13 @@
 pub mod arith;
 
 #[macro_export]
+macro_rules! badarg {
+    () => {
+        crate::exception::Exception::new(crate::exception::Reason::EXC_BADARG)
+    };
+}
+
+#[macro_export]
 macro_rules! tup {
     (@single $($x:tt)*) => (());
     (@count $($rest:expr),*) => (<[()]>::len(&[$(tup!(@single $rest)),*]));

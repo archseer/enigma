@@ -1,7 +1,7 @@
 use crate::atom;
 use crate::bif;
 use crate::bitstring::{self, Binary, RcBinary, SubBinary};
-use crate::exception::{Exception, Reason};
+use crate::exception::Exception;
 use crate::process::RcProcess;
 use crate::value::{self, CastFrom, CastInto, Cons, Term, Tuple, Variant};
 use crate::vm;
@@ -12,11 +12,11 @@ pub fn split_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
 
     let pos = match args[1].into_variant() {
         Variant::Integer(i) if i >= 0 => i as usize,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     if !args[0].is_binary() {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
 
     // TODO: this was a get_real_binary macro before
@@ -39,7 +39,7 @@ pub fn split_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     };
 
     if size < pos {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
 
     let sb1 = bitstring::SubBinary {
@@ -83,13 +83,13 @@ fn part(source: Term, mut pos: usize, len: isize) -> Result<SubBinary, Exception
                 value.bitsize,
             )
         }
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     let len = if len < 0 {
         let len = (-len) as usize;
         if len > pos {
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
         pos -= len;
         len
@@ -102,7 +102,7 @@ fn part(source: Term, mut pos: usize, len: isize) -> Result<SubBinary, Exception
     // goto badarg;
     // }
     if size < pos || size < (pos + len) {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
 
     // TODO: make a constructor that doesn't need bits.
@@ -119,17 +119,17 @@ pub fn part_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Res
 
     if let Ok(tup) = Tuple::cast_from(&args[1]) {
         if tup.len != 2 {
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
 
         let pos = match tup[0].into_variant() {
             Variant::Integer(i) if i >= 0 => i as usize,
-            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+            _ => return Err(badarg!()),
         };
 
         let len = match tup[1].into_variant() {
             Variant::Integer(i) => i as isize,
-            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+            _ => return Err(badarg!()),
         };
 
         let heap = &process.context_mut().heap;
@@ -137,7 +137,7 @@ pub fn part_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Res
         return Ok(Term::subbinary(heap, subbin));
     }
 
-    Err(Exception::new(Reason::EXC_BADARG))
+    Err(badarg!())
 }
 
 pub fn part_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
@@ -145,12 +145,12 @@ pub fn part_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Res
 
     let pos = match args[1].into_variant() {
         Variant::Integer(i) if i >= 0 => i as usize,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     let len = match args[2].into_variant() {
         Variant::Integer(i) => i as isize,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     let heap = &process.context_mut().heap;
@@ -208,14 +208,14 @@ pub fn split_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
         }
 
         if !iter.is_nil() {
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
 
         let pattern = acc.join("|");
         let regex = Regex::new(&pattern).unwrap();
         Cow::Owned(regex)
     } else {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     };
 
     let mut global = false;
@@ -239,24 +239,24 @@ pub fn split_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
                 Variant::Pointer(..) => {
                     if let Ok(tup) = Tuple::cast_from(&args[2]) {
                         if tup.len != 2 {
-                            return Err(Exception::new(Reason::EXC_BADARG));
+                            return Err(badarg!());
                         }
 
                         match tup[0].into_variant() {
                             Variant::Atom(atom::SCOPE) => unimplemented!(),
-                            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                            _ => return Err(badarg!()),
                         }
                     } else {
-                        return Err(Exception::new(Reason::EXC_BADARG));
+                        return Err(badarg!());
                     }
                 }
-                _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                _ => return Err(badarg!()),
             }
         }
     } else if args[2].is_nil() {
         // skip
     } else {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
 
     if global {
@@ -313,7 +313,7 @@ pub fn matches_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::
     // subject = binary
     let subject = match args[0].to_bytes() {
         Some(bytes) => bytes,
-        None => return Err(Exception::new(Reason::EXC_BADARG)),
+        None => return Err(badarg!()),
     };
 
     // pattern = binary | [binary] | compiled
@@ -335,14 +335,14 @@ pub fn matches_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::
         }
 
         if !iter.is_nil() {
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
 
         let pattern = acc.join("|");
         let regex = Regex::new(&pattern).unwrap();
         Cow::Owned(regex)
     } else {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     };
 
     // parse options
@@ -352,24 +352,24 @@ pub fn matches_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::
                 Variant::Pointer(..) => {
                     if let Ok(tup) = Tuple::cast_from(&args[2]) {
                         if tup.len != 2 {
-                            return Err(Exception::new(Reason::EXC_BADARG));
+                            return Err(badarg!());
                         }
 
                         match tup[0].into_variant() {
                             Variant::Atom(atom::SCOPE) => unimplemented!(),
-                            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                            _ => return Err(badarg!()),
                         }
                     } else {
-                        return Err(Exception::new(Reason::EXC_BADARG));
+                        return Err(badarg!());
                     }
                 }
-                _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                _ => return Err(badarg!()),
             }
         }
     } else if args[2].is_nil() {
         // skip
     } else {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
 
     let values: Vec<_> = regex
@@ -432,7 +432,7 @@ pub fn longest_common_prefix_1(
     }
 
     if !iter.is_nil() {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
 
     Ok(Term::uint64(heap, longest_common_prefix(&acc) as u64))
@@ -452,7 +452,7 @@ pub fn copy_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Res
     let heap = &process.context_mut().heap;
     let bytes = match args[0].to_bytes() {
         Some(bytes) => bytes,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     let bin = copy(bytes, 1);
@@ -463,12 +463,12 @@ pub fn copy_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Res
     let heap = &process.context_mut().heap;
     let bytes = match args[0].to_bytes() {
         Some(bytes) => bytes,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     let n = match args[1].into_variant() {
         Variant::Integer(i) if i >= 0 => i as usize,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     let bin = copy(bytes, n);

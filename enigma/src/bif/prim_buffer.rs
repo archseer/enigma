@@ -164,10 +164,10 @@ pub mod bif {
         let buf = Buffer::cast_from_mut(&args[0])?;
         let cnt = match args[1].into_variant() {
             Variant::Integer(i) if i >= 0 => i as usize,
-            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+            _ => return Err(badarg!()),
         };
         if buf.size() < cnt {
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
         buf.skip(cnt);
         Ok(atom!(OK))

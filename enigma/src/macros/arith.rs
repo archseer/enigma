@@ -84,7 +84,7 @@ macro_rules! integer_overflow_op {
                 }
             }
             _ => {
-                return Err(Exception::new(Reason::EXC_BADARG));
+                return Err(badarg!());
             }
         }
     }};

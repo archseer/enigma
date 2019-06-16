@@ -38,7 +38,7 @@ enum Tag {
     NewReference = 114,
     SmallAtom = 115, // deprecated latin-1
     Map = 116,
-    Fun = 117,
+    Fun = 117, // deprecated since R8
     AtomU8 = 118,
     SmallAtomU8 = 119,
 }
@@ -108,7 +108,7 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> 
         // NewReference
         // SmallAtom (deprecated?)
         Tag::Map => decode_map(rest, heap),
-        // Fun
+        // Tag::Fun => panic!("etf: Fun tag is deprecated!"),
         // AtomU8
         // SmallAtomU8
         Tag::List => decode_list(rest, heap),

@@ -36,14 +36,14 @@ impl Exception {
 
 impl From<value::WrongBoxError> for Exception {
     fn from(_value: value::WrongBoxError) -> Self {
-        Exception::new(Reason::EXC_BADARG)
+        badarg!()
     }
 }
 
 impl From<crate::ets::error::Error> for Exception {
     fn from(value: crate::ets::error::Error) -> Self {
         match value.kind() {
-            crate::ets::error::ErrorKind::BadItem => Exception::new(Reason::EXC_BADARG),
+            crate::ets::error::ErrorKind::BadItem => badarg!(),
             _ => unimplemented!(),
         }
     }

@@ -1,6 +1,6 @@
 use crate::atom;
 use crate::bif;
-use crate::exception::{Exception, Reason};
+use crate::exception::Exception;
 use crate::process::RcProcess;
 use crate::value;
 use crate::value::{CastFrom, Cons, Term, Tuple, Type, Variant};
@@ -15,11 +15,11 @@ use super::{pam, Status};
 
 pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     if !args[0].is_atom() {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
     // TODO: is_list already checks for nil? needs impl change maybe
     if !(args[1].is_nil() || args[1].is_list()) {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
 
     let heap = &process.context_mut().heap;
@@ -71,19 +71,19 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
                             Variant::Atom(atom::KEYPOS) => {
                                 match tup[1].to_int() {
                                     Some(i) if i > 0 => keypos = (i - 1) as usize,
-                                    _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                                    _ => return Err(badarg!()),
                                 };
                             }
                             Variant::Atom(atom::WRITE_CONCURRENCY) => {
                                 match tup[1].to_bool() {
                                     Some(val) => is_fine_locked = val,
-                                    None => return Err(Exception::new(Reason::EXC_BADARG)),
+                                    None => return Err(badarg!()),
                                 };
                             }
                             Variant::Atom(atom::READ_CONCURRENCY) => {
                                 match tup[1].to_bool() {
                                     Some(val) => frequent_read = val,
-                                    None => return Err(Exception::new(Reason::EXC_BADARG)),
+                                    None => return Err(badarg!()),
                                 };
                             }
                             Variant::Atom(atom::HEIR) => {
@@ -91,10 +91,10 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
                                     heir = atom!(NONE);
                                     heir_data = atom!(UNDEFINED);
                                 } else {
-                                    return Err(Exception::new(Reason::EXC_BADARG));
+                                    return Err(badarg!());
                                 }
                             }
-                            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                            _ => return Err(badarg!()),
                         }
                     } else if tup.len() == 3 {
                         //&& tup[0] == am_heir && is_internal_pid(tp[2]) {
@@ -102,7 +102,7 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
                     //     heir = tp[2];
                     //     heir_data = tp[3];
                     } else {
-                        return Err(Exception::new(Reason::EXC_BADARG));
+                        return Err(badarg!());
                     }
                 }
                 Variant::Atom(atom::PUBLIC) => {
@@ -122,13 +122,13 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
                 }
                 Variant::Atom(atom::SET) | Variant::Atom(atom::PROTECTED) => {}
                 _ => unreachable!(),
-                // _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                // _ => return Err(badarg!()),
             }
         }
     }
 
     // if !list.is_nil() { // bad opt or not a well formed list
-    //     return Err(Exception::new(Reason::EXC_BADARG));
+    //     return Err(badarg!());
     // }
 
     /*if IS_TREE_TABLE(status) && is_fine_locked && !status.contains(Status::DB_PRIVATE) {
@@ -184,7 +184,7 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
             Arc::new(OrderedSet::new(meta, process))
         },
         Status::DB_CA_ORDERED_SET => unimplemented!(),
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     {
@@ -215,7 +215,7 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
         // table_dec_refc(tb, 0);
         // BIF_ERROR(BIF_P, BADARG);
 
-        Err(Exception::new(Reason::EXC_BADARG))
+        Err(badarg!())
     } else {
         Ok(Term::reference(heap, tid))
     }
@@ -232,7 +232,7 @@ pub fn whereis_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
     // atom
     let name = match args[0].into_variant() {
         Variant::Atom(name) => name,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     let tid = vm
@@ -268,7 +268,7 @@ fn get_table(vm: &vm::Machine, term: Term) -> std::result::Result<RcTable, Excep
         }
         _ => None,
     }
-    .ok_or_else(|| Exception::new(Reason::EXC_BADARG))
+    .ok_or_else(|| badarg!())
 }
 
 pub fn insert_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
@@ -293,7 +293,7 @@ pub fn insert_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
         // TODO if bad list
         // if (lst != NIL) { goto badarg; }
         if !valid {
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
 
         cons.iter()
@@ -303,7 +303,7 @@ pub fn insert_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
     } else {
         // single param
         if !validate(&args[1]) {
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
         table.insert(process, args[1], false)
     };
@@ -312,7 +312,7 @@ pub fn insert_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
         Ok(_) => Ok(atom!(TRUE)),
         // TODO use From ets::Error
         // TODO ERROR_SYSRES on SYSTEM_LIMIT
-        Err(_) => Err(Exception::new(Reason::EXC_BADARG)),
+        Err(_) => Err(badarg!()),
     }
 }
 
@@ -337,7 +337,7 @@ pub fn insert_new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif
         // TODO if bad list
         // if (lst != NIL) { goto badarg; }
         if !valid {
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
 
         // check if the key already exists first.
@@ -354,7 +354,7 @@ pub fn insert_new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif
     } else {
         // single param
         if !validate(&args[1]) {
-            return Err(Exception::new(Reason::EXC_BADARG));
+            return Err(badarg!());
         }
         table.insert(process, args[1], false)
     };
@@ -363,7 +363,7 @@ pub fn insert_new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif
         Ok(_) => Ok(atom!(TRUE)),
         // TODO use From ets::Error
         // TODO ERROR_SYSRES on SYSTEM_LIMIT
-        Err(_) => Err(Exception::new(Reason::EXC_BADARG)),
+        Err(_) => Err(badarg!()),
     }
 }
 
@@ -382,7 +382,7 @@ pub fn lookup_element_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
 
     let index = match args[2].into_number() {
         Ok(value::Num::Integer(i)) if i > 0 => (i - 1) as usize,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     // for some reason just returning won't work
@@ -426,7 +426,7 @@ pub fn update_element_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
         .contains(Status::DB_SET | Status::DB_ORDERED_SET | Status::DB_CA_ORDERED_SET)
     {
         // Err(new_error(ErrorKind::BadItem))
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     };
 
     let list = if args[2].is_tuple() {

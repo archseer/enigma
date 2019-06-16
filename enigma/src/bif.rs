@@ -500,12 +500,12 @@ fn bif_erlang_spawn_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> R
 
     let module = match args[0].into_variant() {
         Variant::Atom(module) => module,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     let func = match args[1].into_variant() {
         Variant::Atom(func) => func,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     let arglist = args[2];
 
@@ -522,12 +522,12 @@ fn bif_erlang_spawn_link_3(vm: &vm::Machine, process: &RcProcess, args: &[Term])
 
     let module = match args[0].into_variant() {
         Variant::Atom(module) => module,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     let func = match args[1].into_variant() {
         Variant::Atom(func) => func,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     let arglist = args[2];
 
@@ -543,21 +543,21 @@ fn bif_erlang_spawn_opt_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     let tup: &Tuple = match Tuple::cast_from(&args[0]) {
         Ok(tup) => {
             if tup.len() != 4 {
-                return Err(Exception::new(Reason::EXC_BADARG));
+                return Err(badarg!());
             }
             tup
         }
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     let module = match tup[0].into_variant() {
         Variant::Atom(module) => module,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     let func = match tup[1].into_variant() {
         Variant::Atom(func) => func,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     let arglist = tup[2];
 
@@ -571,7 +571,7 @@ fn bif_erlang_spawn_opt_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
                 if let Ok(tup) = Tuple::cast_from(&val) {
                     if tup.len() != 2 {
                         unimplemented!("error!");
-                        // return Err(Exception::new(Reason::EXC_BADARG));
+                        // return Err(badarg!());
                     }
                     match tup[0].into_variant() {
                         Variant::Atom(atom::MESSAGE_QUEUE_DATA) => acc, // TODO: implement
@@ -579,7 +579,7 @@ fn bif_erlang_spawn_opt_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
                     }
                 } else {
                     unimplemented!("Unimplemented spawn_opt for badarg");
-                    // return Err(Exception::new(Reason::EXC_BADARG));
+                    // return Err(badarg!());
                 }
             }
         }
@@ -634,7 +634,7 @@ fn bif_erlang_link_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Re
             Ok(atom!(TRUE))
         }
         Variant::Port(_) => unimplemented!(),
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 
@@ -651,7 +651,7 @@ fn bif_erlang_unlink_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
             Ok(atom!(TRUE))
         }
         // TODO: port
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 
@@ -676,13 +676,13 @@ fn bif_erlang_monitor_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
                         process.pid
                     } else {
                         println!("registered name {} not found!", args[1]);
-                        return Err(Exception::new(Reason::EXC_BADARG));
+                        return Err(badarg!());
                     }
                 }
                 // TODO: {atom name, node}
                 Variant::Pointer(_) => unimplemented!("monitor for {}", args[1]),
                 Variant::Port(_) => unimplemented!("monitor for {}", args[1]),
-                _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                _ => return Err(badarg!()),
             };
 
             // add the pid to our monitor tree
@@ -715,7 +715,7 @@ fn bif_erlang_monitor_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
         }
         Variant::Atom(atom::PORT) => unimplemented!(),
         Variant::Atom(atom::TIME_OFFSET) => unimplemented!(),
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 
@@ -742,7 +742,7 @@ fn demonitor(
         }
         return Ok(false);
     }
-    Err(Exception::new(Reason::EXC_BADARG))
+    Err(badarg!())
 }
 
 fn bif_erlang_demonitor_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
@@ -763,7 +763,7 @@ fn bif_erlang_demonitor_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
         match val.into_variant() {
             Variant::Atom(atom::INFO) => info = true,
             Variant::Atom(atom::FLUSH) => flush = true,
-            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+            _ => return Err(badarg!()),
         }
     }
 
@@ -861,7 +861,7 @@ pub fn bif_erlang_is_function_1(_vm: &vm::Machine, _process: &RcProcess, args: &
 pub fn bif_erlang_is_function_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     let arity = match args[0].into_variant() {
         Variant::Integer(i) if i >= 0 => i as u32,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
 
     if let Ok(closure) = value::Closure::cast_from(&args[0]) {
@@ -936,7 +936,7 @@ fn bif_erlang_byte_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
             }
             size
         }
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     Ok(Term::uint64(heap, size as u64))
 }
@@ -959,7 +959,7 @@ fn bif_erlang_bit_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
             let sub = args[0].get_boxed_value::<bitstring::SubBinary>().unwrap();
             sub.size * 8 + sub.bitsize
         }
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     Ok(Term::uint64(heap, size as u64))
 }
@@ -996,7 +996,7 @@ pub fn bif_erlang_size_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
         return bif_erlang_byte_size_1(vm, process, args);
     }
 
-    Err(Exception::new(Reason::EXC_BADARG))
+    Err(badarg!())
 }
 
 fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
@@ -1027,7 +1027,7 @@ fn bif_erlang_exit_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Re
             Ok(atom!(TRUE))
         }
         // TODO: port
-        _ => Err(Exception::new(Reason::EXC_BADARG)),
+        _ => Err(badarg!()),
     }
 }
 
@@ -1064,7 +1064,7 @@ fn bif_erlang_raise_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
         Variant::Atom(atom::ERROR) => Reason::EXC_ERROR,
         Variant::Atom(atom::EXIT) => Reason::EXC_EXIT,
         Variant::Atom(atom::THROW) => Reason::EXC_THROWN,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     // trace is already provided for us, so strip the flag so it's not overwritten
     class.remove(Reason::EXF_SAVETRACE);
@@ -1097,7 +1097,7 @@ fn bif_erlang_whereis_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -
         }
         return Ok(atom!(UNDEFINED));
     }
-    Err(Exception::new(Reason::EXC_BADARG))
+    Err(badarg!())
 }
 
 fn bif_erlang_nif_error_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
@@ -1139,7 +1139,7 @@ pub fn bif_erlang_load_nif_2(vm: &vm::Machine, process: &RcProcess, args: &[Term
 
         return Ok(Term::atom(atom::OK));
     }
-    Err(Exception::new(Reason::EXC_BADARG))
+    Err(badarg!())
 }
 
 pub fn bif_erlang_apply_2(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> Result {
@@ -1165,7 +1165,7 @@ pub fn bif_erlang_process_flag_2(_vm: &vm::Machine, process: &RcProcess, args: &
                 // TODO atom to_bool, then pass that in as 2 arg
                 Variant::Atom(atom::TRUE) => local_data.flags.set(process::Flag::TRAP_EXIT, true),
                 Variant::Atom(atom::FALSE) => local_data.flags.set(process::Flag::TRAP_EXIT, false),
-                _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                _ => return Err(badarg!()),
             }
             Ok(Term::boolean(old_value))
         }
@@ -1177,7 +1177,7 @@ pub fn bif_erlang_process_flag_2(_vm: &vm::Machine, process: &RcProcess, args: &
                 Variant::Atom(atom::HIGH) => StateFlag::PRQ_HIGH,
                 Variant::Atom(atom::MEDIUM) => StateFlag::PRQ_MEDIUM,
                 Variant::Atom(atom::LOW) => StateFlag::PRQ_LOW,
-                _ => return Err(Exception::new(Reason::EXC_BADARG)),
+                _ => return Err(badarg!()),
             };
             let local_data = process.local_data_mut();
 
@@ -1207,7 +1207,7 @@ fn bif_erlang_register_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
         let pid = match args[1].into_variant() {
             Variant::Pid(pid) => pid,
             Variant::Port(..) => unimplemented!(),
-            _ => return Err(Exception::new(Reason::EXC_BADARG)),
+            _ => return Err(badarg!()),
         };
         let arc = vm.process_table.lock().get(pid).unwrap();
         vm.process_registry.lock().register(name, arc);
@@ -1215,7 +1215,7 @@ fn bif_erlang_register_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
         process.local_data_mut().name = Some(name);
         return Ok(atom!(TRUE));
     }
-    Err(Exception::new(Reason::EXC_BADARG))
+    Err(badarg!())
 }
 
 /// unregister(atom) unregisters a global process or port (for this node)
@@ -1226,7 +1226,7 @@ fn bif_erlang_unregister_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]
 
         return Ok(Term::boolean(res.is_some()));
     }
-    Err(Exception::new(Reason::EXC_BADARG))
+    Err(badarg!())
 }
 
 fn bif_erlang_is_process_alive_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
@@ -1236,12 +1236,12 @@ fn bif_erlang_is_process_alive_1(vm: &vm::Machine, _process: &RcProcess, args: &
 
         return Ok(Term::boolean(res));
     }
-    Err(Exception::new(Reason::EXC_BADARG))
+    Err(badarg!())
 }
 
 fn bif_erlang_function_exported_3(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     if !args[0].is_atom() || !args[1].is_atom() || !args[2].is_smallint() {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
 
     let arity = args[2].to_uint().unwrap();
@@ -1259,7 +1259,7 @@ fn bif_erlang_function_exported_3(vm: &vm::Machine, _process: &RcProcess, args: 
 
 fn bif_erlang_module_loaded_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
     if !args[0].is_atom() {
-        return Err(Exception::new(Reason::EXC_BADARG));
+        return Err(badarg!());
     }
 
     let module = args[0].to_atom().unwrap();
@@ -1301,7 +1301,7 @@ pub fn bif_erlang_trunc_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
         Ok(value::Num::Integer(i)) => Ok(Term::int(*i)),
         Ok(value::Num::Float(f)) => Ok(Term::int64(heap, f.trunc() as i64)),
         Ok(value::Num::Bignum(v)) => Ok(Term::bigint(heap, v.clone())),
-        Err(_) => Err(Exception::new(Reason::EXC_BADARG)),
+        Err(_) => Err(badarg!()),
     }
 }
 
@@ -1352,11 +1352,11 @@ fn port_control_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Resul
     // );
     let port = match args[0].into_variant() {
         Variant::Port(id) => id,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     let opcode = match args[1].into_variant() {
         Variant::Integer(op) if op > 0 => op as usize,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     let reference = port::control(vm, process.pid, port, opcode, args[2])?;
     Ok(Term::reference(&process.context_mut().heap, reference))
@@ -1365,7 +1365,7 @@ fn port_control_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Resul
 fn erts_internal_port_close_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
     let port = match args[0].into_variant() {
         Variant::Port(id) => id,
-        _ => return Err(Exception::new(Reason::EXC_BADARG)),
+        _ => return Err(badarg!()),
     };
     port::close(vm, process.pid, port)?;
     Ok(atom!(TRUE))
@@ -1428,7 +1428,7 @@ fn phash_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
             Ok(Term::uint64(heap, (hash % i as u64) + 1)) // range needs to be 1..num
         }
         Ok(_) => unimplemented!(),
-        Err(_) => Err(Exception::new(Reason::EXC_BADARG)),
+        Err(_) => Err(badarg!()),
     }
 }
 
@@ -1453,7 +1453,7 @@ fn phash2_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
     match args[1].into_number() {
         Ok(value::Num::Integer(i)) => Ok(Term::uint64(heap, hash % i as u64)),
         Ok(_) => unimplemented!(),
-        Err(_) => Err(Exception::new(Reason::EXC_BADARG)),
+        Err(_) => Err(badarg!()),
     }
 }
 
