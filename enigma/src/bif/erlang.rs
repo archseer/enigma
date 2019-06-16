@@ -622,7 +622,7 @@ pub fn atom_to_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
 
             Ok(Term::binary(
                 heap,
-                bitstring::Binary::from(string.into_bytes()),
+                bitstring::Binary::from(string.as_bytes().to_vec()),
             ))
         }
         _ => Err(Exception::new(Reason::EXC_BADARG)),

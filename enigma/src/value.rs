@@ -1,7 +1,7 @@
 // We cast header -> boxed value a lot in this file.
 #![allow(clippy::cast_ptr_alignment)]
 
-use crate::atom;
+use crate::atom::{self, Atom};
 use crate::bitstring;
 use crate::exception;
 use crate::immix::Heap;
@@ -195,7 +195,7 @@ pub enum Variant {
     Float(self::Float),
     Nil(Special), // TODO: expand nil to be able to hold different types of empty (tuple, list, map)
     Integer(i32),
-    Atom(u32),
+    Atom(atom::Atom),
     Port(u32),
     Pid(process::PID),
     Cons(*const self::Cons),
@@ -401,10 +401,10 @@ impl Term {
     }
 
     #[inline]
-    pub fn atom(value: u32) -> Self {
+    pub fn atom(value: Atom) -> Self {
         unsafe {
             Term {
-                value: NanBox::new(TERM_ATOM, value),
+                value: NanBox::new(TERM_ATOM, value.0),
             }
         }
     }
@@ -791,7 +791,7 @@ impl Term {
     //     self.get_type() == Type::CP
     // }
 
-    pub fn to_atom(self) -> Option<u32> {
+    pub fn to_atom(self) -> Option<Atom> {
         match self.into_variant() {
             Variant::Atom(i) => Some(i),
             _ => None,

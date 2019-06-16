@@ -1,3 +1,4 @@
+use crate::atom::Atom;
 use crate::value::Term;
 use crate::vm;
 //use crate::servo_arc::Arc;
@@ -157,7 +158,7 @@ pub struct Metadata {
     ///
     tid: process::Ref,
     /// atom
-    name: Option<usize>,
+    name: Option<Atom>,
     status: Status,
     kind: Status,
     keypos: usize,
@@ -187,15 +188,16 @@ impl TableRegistry {
         self.tables.get(&reference).cloned()
     }
 
-    pub fn get_named(&self, name: usize) -> Option<RcTable> {
-        self.named_tables.get(&name).cloned()
+    pub fn get_named(&self, name: Atom) -> Option<RcTable> {
+        self.named_tables.get(&(name.0 as usize)).cloned()
     }
 
     pub fn insert(&mut self, reference: process::Ref, table: RcTable) {
         self.tables.insert(reference, table);
     }
 
-    pub fn insert_named(&mut self, name: usize, table: RcTable) -> bool {
+    pub fn insert_named(&mut self, name: Atom, table: RcTable) -> bool {
+        let name = name.0 as usize;
         if !self.named_tables.contains_key(&name) {
             self.named_tables.insert(name, table);
             return true;
@@ -211,13 +213,15 @@ impl TableRegistry {
 
         // if named, remove from named index
         if let Some(name) = meta.name {
-            self.named_tables.remove(&name);
+            self.named_tables.remove(&(name.0 as usize));
         }
 
         true
     }
 
-    pub fn whereis(&self, name: usize) -> Option<process::Ref> {
-        self.named_tables.get(&name).map(|table| table.meta().tid)
+    pub fn whereis(&self, name: Atom) -> Option<process::Ref> {
+        self.named_tables
+            .get(&(name.0 as usize))
+            .map(|table| table.meta().tid)
     }
 }

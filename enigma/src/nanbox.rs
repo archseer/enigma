@@ -159,6 +159,16 @@ impl<'a, T> NanBoxable for Option<&'a T> {
     }
 }
 
+impl NanBoxable for crate::atom::Atom {
+    unsafe fn from_nan_box(n: NanBox) -> Self {
+        Self(n.0 as u32)
+    }
+
+    fn into_nan_box(self) -> NanBox {
+        NanBox(u64::from(self.0))
+    }
+}
+
 macro_rules! impl_array {
     ($($typ: ty)+) => {
         $(

@@ -1,4 +1,4 @@
-use crate::atom;
+use crate::atom::{self, Atom};
 use crate::bif;
 use crate::bitstring;
 use crate::ets;
@@ -397,7 +397,7 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
     ]
 });
 
-type NifTable = HashMap<u32, Vec<(u32, u32, Fn)>>;
+type NifTable = HashMap<Atom, Vec<(Atom, u32, Fn)>>;
 
 macro_rules! nif_map {
     ($($module:expr => {$($fun:expr, $arity:expr => $rust_fn:path,)*},)*) => {

@@ -383,7 +383,7 @@ fn encode_tuple(res: &mut Vec<u8>, tuple: &value::Tuple) -> std::io::Result<()> 
     Ok(())
 }
 
-fn encode_atom(res: &mut Vec<u8>, atom: String) -> std::io::Result<()> {
+fn encode_atom(res: &mut Vec<u8>, atom: &str) -> std::io::Result<()> {
     if atom.len() > 0xFFFF {
         // return Err(EncodeError::TooLongAtomName(atom));
         panic!("Atom name too long!");

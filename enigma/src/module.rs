@@ -1,4 +1,4 @@
-use crate::atom;
+use crate::atom::{self, Atom};
 use crate::bif;
 use crate::exports_table::ExportsTable;
 use crate::immix::Heap;
@@ -10,7 +10,7 @@ use crate::vm::Machine;
 use hashbrown::HashMap;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub struct MFA(pub u32, pub u32, pub u32);
+pub struct MFA(pub Atom, pub Atom, pub u32);
 
 impl std::fmt::Display for MFA {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -43,7 +43,7 @@ impl CastFrom<Term> for MFA {
 
 #[derive(Debug, PartialEq)]
 pub struct Lambda {
-    pub name: u32,
+    pub name: Atom,
     pub arity: u32,
     pub offset: u32,
     pub index: u32,
@@ -54,18 +54,18 @@ pub struct Lambda {
 // TODO: add new, remove pub for all these fields
 #[derive(Debug)]
 pub struct Module {
-    pub imports: Vec<MFA>,    // mod,  func, arity
-    pub exports: Vec<MFA>,    // func, arity, label
-    pub constants: Vec<Term>, // basically same as literals... but immediates
+    pub imports: Vec<MFA>,              // mod,  func, arity
+    pub exports: Vec<(Atom, u32, u32)>, // func, arity, label
+    pub constants: Vec<Term>,           // basically same as literals... but immediates
     pub literals: Vec<Term>,
     pub literal_heap: Heap,
     pub lambdas: Vec<Lambda>,
-    pub funs: HashMap<(u32, u32), u32>, // (fun name as atom, arity) -> offset
+    pub funs: HashMap<(Atom, u32), u32>, // (fun name as atom, arity) -> offset
     pub instructions: Vec<Instruction>,
     // debugging info
     pub lines: Vec<Line>,
     /// Atom name of the module.
-    pub name: u32,
+    pub name: Atom,
     // Module attributes (version, compiler settings, etc) -- stored on the literal_heap.
     pub attrs: Term,
     pub on_load: Option<u32>,
@@ -91,7 +91,7 @@ impl Module {
         });
     }
 
-    pub fn load_nifs(&mut self, vm: &Machine, nifs: &[(u32, u32, bif::Fn)]) {
+    pub fn load_nifs(&mut self, vm: &Machine, nifs: &[(Atom, u32, bif::Fn)]) {
         use std::convert::TryInto;
         let mut exports = vm.exports.write();
 

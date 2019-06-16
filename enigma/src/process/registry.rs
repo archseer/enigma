@@ -1,3 +1,4 @@
+use crate::atom::Atom;
 use hashbrown::HashMap;
 
 // pub type RcRegistry = Arc<Mutex<Registry<RcProcess>>>;
@@ -17,16 +18,16 @@ impl<T: Clone> Registry<T> {
     //     Arc::new(Mutex::new(Self::new()))
     // }
 
-    pub fn register(&mut self, atom: u32, process: T) -> &T {
-        self.processes.entry(atom).or_insert(process)
+    pub fn register(&mut self, atom: Atom, process: T) -> &T {
+        self.processes.entry(atom.0).or_insert(process)
     }
 
-    pub fn unregister(&mut self, atom: u32) -> Option<T> {
-        self.processes.remove(&atom)
+    pub fn unregister(&mut self, atom: Atom) -> Option<T> {
+        self.processes.remove(&atom.0)
     }
 
-    pub fn whereis(&self, atom: u32) -> Option<&T> {
-        self.processes.get(&atom)
+    pub fn whereis(&self, atom: Atom) -> Option<&T> {
+        self.processes.get(&atom.0)
     }
 }
 

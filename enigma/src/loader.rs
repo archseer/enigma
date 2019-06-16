@@ -1,4 +1,4 @@
-use crate::atom;
+use crate::atom::{self, Atom};
 use crate::etf;
 use crate::immix::Heap;
 use crate::module::{Lambda, Module, MFA};
@@ -29,12 +29,12 @@ pub struct Loader<'a> {
     atoms: Vec<&'a str>,
     attrs: Term,
     imports: Vec<MFA>,
-    exports: Vec<MFA>,
+    exports: Vec<(Atom, u32, u32)>,
     literals: Vec<Term>,
     strings: Vec<u8>,
     lambdas: Vec<Lambda>,
     atom_map: HashMap<u32, u32>, // TODO: remove this; local id -> global id
-    funs: HashMap<(u32, u32), u32>, // (fun name as atom, arity) -> offset
+    funs: HashMap<(Atom, u32), u32>, // (fun name as atom, arity) -> offset
     labels: HashMap<u32, u32>,   // label -> offset
     line_items: Vec<FuncInfo>,
     lines: Vec<Line>,
@@ -146,7 +146,7 @@ impl LValue {
         match *self {
             LValue::Constant(t) => t.into_variant(),
             LValue::Integer(i) => crate::value::Variant::Integer(i),
-            LValue::Atom(i) => crate::value::Variant::Atom(i),
+            LValue::Atom(i) => crate::value::Variant::Atom(Atom(i)),
             LValue::Nil => crate::value::Variant::Nil(crate::value::Special::Nil),
             _ => unreachable!("into_value for {:?}", self),
         }
@@ -263,7 +263,7 @@ impl<'a> Loader<'a> {
             funs: self.funs,
             instructions,
             lines: self.lines,
-            name: self.atom_map[&0], // atom 0 is module name
+            name: Atom(self.atom_map[&0]), // atom 0 is module name
             attrs: self.attrs,
             on_load: self.on_load,
         })
@@ -279,7 +279,7 @@ impl<'a> Loader<'a> {
         self.atoms = atoms;
 
         for (index, a) in self.atoms.iter().enumerate() {
-            let g_index = atom::from_str(a);
+            let g_index = atom::from_str(a).0;
             // keep a mapping of these to patch the instrs
             self.atom_map.insert(index as u32, g_index);
         }
@@ -295,35 +295,18 @@ impl<'a> Loader<'a> {
     }
 
     fn load_local_fun_table(&mut self, chunk: Chunk) {
-        let (_, _data) = loct_chunk(chunk).unwrap();
+        // let (_, _data) = expt_chunk(chunk, &self.atom_map).unwrap();
     }
 
     fn load_imports_table(&mut self, chunk: Chunk) {
-        let (_, data) = loct_chunk(chunk).unwrap();
-        self.imports = data
-            .into_iter()
-            .map(|mfa| {
-                MFA(
-                    self.atom_map[&(mfa.0 as u32 - 1)],
-                    self.atom_map[&(mfa.1 as u32 - 1)],
-                    mfa.2,
-                )
-            })
-            .collect();
+        let (_, data) = impt_chunk(chunk, &self.atom_map).unwrap();
+        self.imports = data;
     }
 
     fn load_exports_table(&mut self, chunk: Chunk) {
-        let (_, data) = loct_chunk(chunk).unwrap();
-        self.exports = data
-            .into_iter()
-            .map(|mfa| {
-                MFA(
-                    self.atom_map[&(mfa.0 as u32 - 1)],
-                    mfa.1,
-                    mfa.2, // TODO: translate these offsets instead of using funs[]
-                )
-            })
-            .collect();
+        let (_, data) = expt_chunk(chunk, &self.atom_map).unwrap();
+        // TODO: translate these offsets instead of using funs[]
+        self.exports = data;
     }
 
     fn load_strings_table(&mut self, chunk: Chunk) {
@@ -376,7 +359,7 @@ impl<'a> Loader<'a> {
     }
 
     fn load_lambdas_table(&mut self, chunk: Chunk) {
-        let (_, data) = funt_chunk(chunk).unwrap();
+        let (_, data) = funt_chunk(chunk, &self.atom_map).unwrap();
         // TODO: convert at load time, if nfree == 0, then allocate as a literal --> move instruction,
         // if captures env, then allocate a func --> make_fun2
         //
@@ -460,7 +443,7 @@ impl<'a> Loader<'a> {
                     // don't skip so we can apply tracing during runtime
                     if let [_module, LValue::Atom(f), LValue::Literal(a)] = &instruction.args[..] {
                         last_func_start = pos; // store pos for line number data
-                        let f = self.atom_map[&(*f - 1)]; // necessary because atoms weren't remapped yet
+                        let f = Atom(self.atom_map[&(*f - 1)]); // necessary because atoms weren't remapped yet
                         self.funs
                             .insert((f, *a as u32), (instructions.len() as u32) + 1); // need to point after func_info
                     } else {
@@ -470,8 +453,10 @@ impl<'a> Loader<'a> {
                 }
                 Opcode::IntCodeEnd => {
                     // push a pointer to the end of instructions
-                    self.funs
-                        .insert((LINE_INVALID_LOCATION as u32, 0), instructions.len() as u32);
+                    self.funs.insert(
+                        (Atom(LINE_INVALID_LOCATION as u32), 0),
+                        instructions.len() as u32,
+                    );
                     break;
                 }
                 Opcode::OnLoad => unimplemented!("on_load instruction"),
@@ -617,7 +602,7 @@ impl<'a> Loader<'a> {
                     if *i == 0 {
                         return LValue::Constant(Term::nil());
                     }
-                    LValue::Constant(Term::atom(atom_map[&(*i - 1)]))
+                    LValue::Constant(Term::atom(Atom(atom_map[&(*i - 1)])))
                 }
                 LValue::Integer(i) => LValue::Constant(Term::int(*i)),
                 LValue::Label(l) => {
@@ -1069,51 +1054,76 @@ named!(
     )
 );
 
-named!(
-    fun_entry<&[u8], MFA>,
+fn impt_chunk<'a>(rest: &'a [u8], atom_map: &HashMap<u32, u32>) -> IResult<&'a [u8], Vec<MFA>> {
     do_parse!(
-        function: be_u32 >>
-        arity: be_u32 >>
-        label: be_u32 >>
-        (MFA(function, arity, label))
+        rest,
+        count: be_u32
+            >> entries:
+                count!(
+                    do_parse!(
+                        module: be_u32
+                            >> function: be_u32
+                            >> arity: be_u32
+                            >> (MFA(
+                                Atom(atom_map[&(module - 1)]),
+                                Atom(atom_map[&(function - 1)]),
+                                arity
+                            ))
+                    ),
+                    count as usize
+                )
+            >> (entries)
     )
-);
+}
 
-named!(
-    loct_chunk<&[u8], Vec<MFA>>,
+fn expt_chunk<'a>(
+    rest: &'a [u8],
+    atom_map: &HashMap<u32, u32>,
+) -> IResult<&'a [u8], Vec<(Atom, u32, u32)>> {
     do_parse!(
-        count: be_u32 >>
-        entries: count!(fun_entry, count as usize) >>
-        (entries)
+        rest,
+        count: be_u32
+            >> entries:
+                count!(
+                    do_parse!(
+                        function: be_u32
+                            >> arity: be_u32
+                            >> label: be_u32
+                            >> ((Atom(atom_map[&(function - 1)]), arity, label))
+                    ),
+                    count as usize
+                )
+            >> (entries)
     )
-);
+}
 
-named!(
-    litt_chunk<&[u8], Vec<MFA>>,
+fn funt_chunk<'a>(rest: &'a [u8], atom_map: &HashMap<u32, u32>) -> IResult<&'a [u8], Vec<Lambda>> {
     do_parse!(
-        count: be_u32 >>
-        entries: count!(fun_entry, count as usize) >>
-        (entries)
+        rest,
+        count: be_u32
+            >> entries:
+                count!(
+                    do_parse!(
+                        name: be_u32
+                            >> arity: be_u32
+                            >> offset: be_u32
+                            >> index: be_u32
+                            >> nfree: be_u32
+                            >> ouniq: be_u32
+                            >> (Lambda {
+                                name: Atom(atom_map[&(name - 1)]),
+                                arity,
+                                offset: offset,
+                                index,
+                                nfree,
+                                ouniq
+                            })
+                    ),
+                    count as usize
+                )
+            >> (entries)
     )
-);
-
-named!(
-    funt_chunk<&[u8], Vec<Lambda>>,
-    do_parse!(
-        count: be_u32 >>
-        entries: count!(do_parse!(
-            name: be_u32 >>
-            arity: be_u32 >>
-            offset: be_u32 >>
-            index: be_u32 >>
-            nfree: be_u32 >>
-            ouniq: be_u32 >>
-            (Lambda { name, arity, offset: offset, index, nfree, ouniq })
-            )
-        , count as usize) >>
-        (entries)
-    )
-);
+}
 
 // It can be Literal=0, Integer=1, Atom=2, XRegister=3, YRegister=4, Label=5, Character=6, Extended=7.
 // If the base tag was Extended=7, then bits 4-5-6-7 PLUS 7 will become the extended tag.

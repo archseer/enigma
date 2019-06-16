@@ -181,7 +181,7 @@ pub fn call_error_handler(
     vm: &Machine,
     process: &RcProcess,
     mfa: &module::MFA,
-    func: u32,
+    func: atom::Atom,
 ) -> Result<(), Exception> {
     // debug!("call_error_handler mfa={}, mfa)
     let context = process.context_mut();

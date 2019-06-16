@@ -1,3 +1,4 @@
+use crate::atom::Atom;
 use crate::loader::{FuncInfo, LINE_INVALID_LOCATION};
 use crate::module::{Module, MFA};
 use crate::value::{self, CastFrom, Term};
@@ -37,7 +38,7 @@ impl InstrPtr {
     pub fn lookup_func_info(&self) -> Option<(MFA, Option<FuncInfo>)> {
         let module = unsafe { &(*self.module) };
 
-        let mut vec: Vec<(&(u32, u32), &u32)> = module.funs.iter().collect();
+        let mut vec: Vec<(&(Atom, u32), &u32)> = module.funs.iter().collect();
         vec.sort_by(|(_, v1), (_, v2)| v1.cmp(v2));
 
         let mut low: u32 = 0;

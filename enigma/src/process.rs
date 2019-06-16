@@ -1,5 +1,5 @@
 pub use self::table::PID;
-use crate::atom;
+use crate::atom::{self, Atom};
 use crate::bitstring;
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
@@ -14,7 +14,7 @@ use crate::value::{self, CastInto, Term};
 use crate::vm::Machine;
 use hashbrown::{HashMap, HashSet};
 use std::cell::UnsafeCell;
-use std::panic::RefUnwindSafe;
+// use std::panic::RefUnwindSafe;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -147,7 +147,7 @@ impl ExecutionContext {
 
             exc: None,
 
-            current: MFA(0, 0, 0),
+            current: MFA(Atom(0), Atom(0), 0),
 
             // register: Register::new(block.code.registers as usize),
 
@@ -187,12 +187,12 @@ pub struct LocalData {
     pub group_leader: PID,
 
     // name (atom)
-    pub name: Option<u32>,
+    pub name: Option<Atom>,
 
     pub initial_call: MFA,
 
     /// error handler, defaults to error_handler
-    pub error_handler: u32,
+    pub error_handler: Atom,
 
     // links (tree)
     pub links: HashSet<PID>,
@@ -251,7 +251,7 @@ impl Process {
             parent,
             group_leader,
             name: None,
-            initial_call: MFA(0, 0, 0),
+            initial_call: MFA(Atom(0), Atom(0), 0),
             error_handler: atom::ERROR_HANDLER,
             links: HashSet::new(),
             monitors: HashMap::new(),
@@ -606,7 +606,7 @@ pub fn spawn(
     vm: &Machine,
     parent: &RcProcess,
     module: *const Module,
-    func: u32,
+    func: Atom,
     args: Term,
     flags: SpawnFlag,
 ) -> Result<Term, Exception> {

@@ -1,4 +1,4 @@
-use crate::atom;
+use crate::atom::{self, Atom};
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::process::RcProcess;
@@ -203,7 +203,7 @@ pub fn fun_info_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
                 }
             }
             Variant::Atom(atom::REFC) => unimplemented!(),
-            Variant::Atom(atom::ARITY) => Ok(Term::atom(closure.mfa.2)),
+            Variant::Atom(atom::ARITY) => Ok(Term::uint(heap, closure.mfa.2)),
             Variant::Atom(atom::NAME) => unimplemented!(),
             _ => unimplemented!(),
         }
@@ -228,16 +228,16 @@ pub fn fun_info_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
 }
 
 #[cfg(target_family = "unix")]
-const OS_FAMILY: u32 = atom::UNIX;
+const OS_FAMILY: Atom = atom::UNIX;
 
 #[cfg(target_family = "windows")]
-const OS_FAMILY: u32 = atom::WIN32;
+const OS_FAMILY: Atom = atom::WIN32;
 
 #[cfg(target_endian = "little")]
-const ENDIAN: u32 = atom::LITTLE;
+const ENDIAN: Atom = atom::LITTLE;
 
 #[cfg(target_endian = "big")]
-const ENDIAN: u32 = atom::BIG;
+const ENDIAN: Atom = atom::BIG;
 
 pub fn system_info_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     use std::sync::atomic::Ordering;

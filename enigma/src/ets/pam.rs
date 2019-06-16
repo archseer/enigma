@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 
 use crate::value::{self, Variant, Cons, Tuple, Map, CastFrom, CastInto};
 use crate::immix::Heap;
-use crate::atom;
+use crate::atom::{self, Atom};
 use crate::bif::{self};
 
 pub struct Pattern {
@@ -196,8 +196,8 @@ impl std::fmt::Display for Opcode {
 // The table of callable bif's, i e guard bif's and
 // some special animals that can provide us with trace
 // information. This array is sorted on init.
-pub static GUARD_BIFS: Lazy<HashMap<(u32, usize), (bif::Fn, Flag)>> = Lazy::new(|| {
-    let mut table: HashMap<(u32, usize), (bif::Fn, Flag)> = HashMap::new();
+pub static GUARD_BIFS: Lazy<HashMap<(Atom, usize), (bif::Fn, Flag)>> = Lazy::new(|| {
+    let mut table: HashMap<(Atom, usize), (bif::Fn, Flag)> = HashMap::new();
 
     table.insert((atom::IS_ATOM, 1), (bif::bif_erlang_is_atom_1, Flag::DBIF_ALL));
     table.insert((atom::IS_FLOAT, 1), (bif::bif_erlang_is_float_1, Flag::DBIF_ALL));
@@ -266,8 +266,8 @@ pub fn is_variable(obj: Term) -> Option<usize> {
     // int N;
     match obj.into_variant() {
         // TODO original checked for < 2 as error but we use nil, true, false as 0,1,2
-        Variant::Atom(i) if i > 2 => {
-            crate::atom::to_str(i)
+        Variant::Atom(Atom(i)) if i > 2 => {
+            crate::atom::to_str(Atom(i))
                 .and_then(|name| {
                     let name = name.as_bytes();
                     if name[0] == b'$' {

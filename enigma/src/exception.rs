@@ -1,4 +1,4 @@
-use crate::atom;
+use crate::atom::{self, Atom};
 use crate::immix::Heap;
 use crate::instr_ptr::InstrPtr;
 use crate::loader::FuncInfo;
@@ -92,7 +92,7 @@ bitflags! {
         /// exception in the early stages, before a handler is found, and also
         /// maintains some separation between the class tag and the actions.
 
-        const EXF_OFFSET = Self::EXT_TAGBITS.bits;
+        const EXF_OFFSET = Self::EXT_BITS.bits;
         const EXF_BITS = 7;
 
         /// ignore catches
@@ -222,10 +222,10 @@ macro_rules! exception_code {
 const MAX_BACKTRACE_SIZE: u32 = 64;
 pub const DEFAULT_BACKTRACE_SIZE: u32 = 8;
 
-const EXIT_TAGS: [u32; 3] = [atom::ERROR, atom::EXIT, atom::THROW];
+const EXIT_TAGS: [Atom; 3] = [atom::ERROR, atom::EXIT, atom::THROW];
 
 /// Mapping from error code 'index' to atoms.
-const EXIT_CODES: [u32; 20] = [
+const EXIT_CODES: [Atom; 20] = [
     atom::INTERNAL_ERROR, // 0
     atom::NORMAL,
     atom::INTERNAL_ERROR,
@@ -485,27 +485,29 @@ pub fn add_stacktrace(process: &RcProcess, value: Term, trace: Term) -> Term {
 /// Forming the correct error value from the internal error code.
 /// This does not update c_p->fvalue or c_p->freason.
 fn expand_error_value(process: &RcProcess, reason: Reason, value: Term) -> Term {
-    match exception_code!(reason) {
+    let reason = exception_code!(reason) as usize;
+    match reason {
         // primary
         0 => {
             // Primary exceptions use fvalue as it is
             value
         }
-        atom::BADMATCH
-        | atom::CASE_CLAUSE
-        | atom::TRY_CLAUSE
-        | atom::BADFUN
-        | atom::BADARITY
-        | atom::BADKEY => {
+        5 // badmatch 
+        | 7 // case_clause
+        | 16 // try_clause
+        | 10 // badfun
+        | 11 // badarity
+        | 19 => { // badkey
             let heap = &process.context_mut().heap;
             //Some common exceptions: value -> {atom, value}
             //    ASSERT(is_value(Value)); TODO: check that is not non-value
-            let error_atom = Term::atom(EXIT_CODES[exception_code!(reason) as usize]);
+            let error_atom =
+                Term::atom(EXIT_CODES[reason]);
             tup2!(heap, error_atom, value)
         }
         _ => {
             // Other exceptions just use an atom as descriptor
-            Term::atom(EXIT_CODES[exception_code!(reason) as usize])
+            Term::atom(EXIT_CODES[reason])
         }
     }
 }
@@ -798,7 +800,7 @@ pub fn erts_build_mfa_item(fi: &(MFA, Option<FuncInfo>), heap: &Heap, args: Term
         // } else {
         //     file_term = erts_atom_to_string(&hp, (fi.fname_ptr)[file-1]);
         // };
-        let file_term = Term::atom(2);
+        let file_term = atom!(FALSE);
 
         let mut tuple = tup2!(heap, Term::atom(atom::LINE), Term::uint(heap, line));
         loc = cons!(heap, tuple, loc);

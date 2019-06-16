@@ -154,7 +154,7 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
     // meth: methods
     let meta = Metadata {
         tid,
-        name: Some(args[0].to_atom().unwrap() as usize), // unsound conversion
+        name: Some(args[0].to_atom().unwrap()), // unsound conversion
         status,
         kind: status, // Note, 'kind' is *read only* from now on...
         keypos,
@@ -199,7 +199,7 @@ pub fn new_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Resul
         if vm
             .ets_tables
             .lock()
-            .insert_named(args[0].to_atom().unwrap() as usize, table)
+            .insert_named(args[0].to_atom().unwrap(), table)
         {
             return Ok(args[0]);
         }
@@ -238,7 +238,7 @@ pub fn whereis_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::R
     let tid = vm
         .ets_tables
         .lock()
-        .whereis(name as usize)
+        .whereis(name)
         .map(|tid| Term::reference(&process.context_mut().heap, tid));
 
     match tid {
@@ -259,7 +259,7 @@ fn get_table(vm: &vm::Machine, term: Term) -> std::result::Result<RcTable, Excep
         Type::Atom => {
             let key = term.to_atom().unwrap();
             let lock = vm.ets_tables.lock();
-            lock.get_named(key as usize)
+            lock.get_named(key)
         }
         Type::Ref => {
             let key = term.to_ref().unwrap(); // TODO: HANDLE Atom
