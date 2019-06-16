@@ -8,9 +8,8 @@ use crate::instr_ptr::InstrPtr;
 use crate::instruction;
 use crate::process::{self, RcProcess};
 use crate::value::{self, CastFrom, CastInto, CastIntoMut, Cons, Term, Tuple, Variant};
-use crate::vm::{op_deallocate, Machine};
+use crate::vm::Machine;
 use crate::{atom, bif, bitstring, module, port};
-use std::time;
 
 use futures::{
     compat::*,
@@ -23,6 +22,7 @@ use futures::{
 // end mandatory for loop
 
 use std::convert::TryInto;
+use std::time;
 
 // for the load transform
 use crate::immix::Heap;
@@ -286,12 +286,10 @@ impl FromWithHeap<LValue> for ExtendedList {
             LValue::ExtendedList(l) => Box::new(
                 l.iter()
                     .map(|i| match i {
-                        LValue::Literal(i) => crate::instruction::Entry::Literal(*i),
-                        LValue::ExtendedLiteral(i) => {
-                            crate::instruction::Entry::ExtendedLiteral(*i)
-                        }
-                        LValue::Label(i) => crate::instruction::Entry::Label(*i),
-                        _ => crate::instruction::Entry::Value(i.into_with_heap(constants, heap)),
+                        LValue::Literal(i) => Entry::Literal(*i),
+                        LValue::ExtendedLiteral(i) => Entry::ExtendedLiteral(*i),
+                        LValue::Label(i) => Entry::Label(*i),
+                        _ => Entry::Value(i.into_with_heap(constants, heap)),
                     })
                     .collect(),
             ),
@@ -335,6 +333,459 @@ pub fn to_const(value: &LValue, constants: &mut Vec<Term>, heap: &Heap) -> u32 {
 // generic op definitions
 // op definitions with type permutations
 // transform rules
+
+macro_rules! expand_float {
+    ($context:expr, $value:expr) => {{
+        match &$value {
+            FRegister::ExtendedLiteral(i) => unsafe {
+                if let Variant::Float(value::Float(f)) =
+                    (*$context.ip.module).literals[*i as usize].into_variant()
+                {
+                    f
+                } else {
+                    unreachable!()
+                }
+            },
+            FRegister::X(reg) => {
+                if let Variant::Float(value::Float(f)) = $context.x[reg.0 as usize].into_variant() {
+                    f
+                } else {
+                    unreachable!()
+                }
+            }
+            FRegister::Y(reg) => {
+                let len = $context.stack.len();
+                if let Variant::Float(value::Float(f)) =
+                    $context.stack[len - (reg.0 + 1) as usize].into_variant()
+                {
+                    f
+                } else {
+                    unreachable!()
+                }
+            }
+            FRegister::FloatReg(reg) => $context.f[*reg as usize],
+        }
+    }};
+}
+
+macro_rules! op_jump {
+    ($context:expr, $label:expr) => {
+        $context.ip.ptr = $label
+    };
+}
+
+macro_rules! op_jump_ptr {
+    ($context:expr, $ptr:expr) => {
+        $context.ip = $ptr
+    };
+}
+
+pub fn op_deallocate(context: &mut process::ExecutionContext, nwords: u16) {
+    let (_, cp) = context.callstack.pop().unwrap();
+    context
+        .stack
+        .truncate(context.stack.len() - nwords as usize);
+
+    context.cp = cp;
+}
+
+macro_rules! call_error_handler {
+    ($vm:expr, $process:expr, $mfa:expr) => {
+        call_error_handler($vm, $process, $mfa, atom::UNDEFINED_FUNCTION)?
+    };
+}
+
+// func is atom
+#[inline]
+pub fn call_error_handler(
+    vm: &Machine,
+    process: &RcProcess,
+    mfa: &module::MFA,
+    func: atom::Atom,
+) -> Result<(), Exception> {
+    // debug!("call_error_handler mfa={}, mfa)
+    let context = process.context_mut();
+
+    // Search for the error_handler module.
+    let ptr =
+        match vm
+            .exports
+            .read()
+            .lookup(&module::MFA(process.local_data().error_handler, func, 3))
+        {
+            Some(Export::Fun(ptr)) => ptr,
+            Some(_) => unimplemented!("call_error_handler for non-fun"),
+            None => {
+                println!("function not found {}", mfa);
+                // no error handler
+                // TODO: set current to mfa
+                return Err(Exception::new(Reason::EXC_UNDEF));
+            }
+        };
+
+    // Create a list with all arguments in the x registers.
+    // TODO: I don't like from_iter requiring copied
+    let args = Cons::from_iter(context.x[0..mfa.2 as usize].iter().copied(), &context.heap);
+
+    // Set up registers for call to error_handler:<func>/3.
+    context.x[0] = Term::atom(mfa.0); // module
+    context.x[1] = Term::atom(mfa.1); // func
+    context.x[2] = args;
+    op_jump_ptr!(context, ptr);
+    Ok(())
+}
+
+macro_rules! op_call_ext {
+    ($vm:expr, $context:expr, $process:expr, $arity:expr, $dest: expr) => {{
+        // TODO: precompute these
+        let mfa = unsafe { &(*$context.ip.module).imports[$dest as usize] };
+
+        // if $process.pid >= 95 {
+        // info!("pid={} action=call_ext mfa={}", $process.pid, mfa);
+        // }
+
+        let export = { $vm.exports.read().lookup(mfa) }; // drop the exports lock
+
+        match export {
+            Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
+            Some(Export::Bif(APPLY_2)) => unreachable!("apply/2 called via call_ext"),
+            Some(Export::Bif(APPLY_3)) => unreachable!("apply/3 called via call_ext"),
+            Some(Export::Bif(_)) => unreachable!("bif called without call_bif: {}", mfa),
+            // Some(Export::Bif(bif)) => {
+            //     // precomputed in most cases, but not for nifs
+            //     // TODO: return needs to still be handled here then :/
+            //     op_call_bif!($vm, $context, $process, bif, $arity as usize)
+            // }
+            None => {
+                // call error_handler here
+                call_error_handler!($vm, $process, mfa);
+            }
+        }
+    }};
+}
+
+macro_rules! op_call_bif {
+    ($vm:expr, $context:expr, $process:expr, $bif:expr, $arity:expr) => {{
+        // make a slice out of arity x registers
+        let args = &$context.x[0..$arity];
+        match $bif($vm, $process, args) {
+            Ok(val) => {
+                $context.x[0] = val; // HAXX, return value emulated
+            }
+            Err(exc) => return Err(exc),
+        }
+    }};
+}
+macro_rules! op_call_fun {
+    ($vm:expr, $context:expr, $process:expr, $value:expr, $arity:expr) => {{
+        if let Ok(closure) = value::Closure::cast_from(&$value) {
+            // keep X regs set based on arity
+            // set additional X regs based on lambda.binding
+            // set x from 1 + arity (x0 is func, followed by call params) onwards to binding
+            if let Some(binding) = &closure.binding {
+                let arity = $arity as usize;
+                $context.x[arity..arity + binding.len()].copy_from_slice(&binding[..]);
+            }
+
+            // TODO: closure needs to jump_ptr to the correct module.
+            let ptr = {
+                // temporary HAXX
+                let registry = $vm.modules.lock();
+                // let module = module::load_module(&self.modules, path).unwrap();
+                let module = registry.lookup(closure.mfa.0).unwrap();
+
+                InstrPtr {
+                    module,
+                    ptr: closure.ptr,
+                }
+            };
+
+            op_jump_ptr!($context, ptr);
+        } else if let Ok(mfa) = module::MFA::cast_from(&$value) {
+            // TODO: deduplicate this part
+            let export = { $vm.exports.read().lookup(&mfa) }; // drop the exports lock
+
+            match export {
+                Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
+                Some(Export::Bif(bif)) => {
+                    op_call_bif!($vm, $context, &$process, bif, mfa.2 as usize)
+                }
+                None => {
+                    // println!("apply setup_error_handler");
+                    call_error_handler!($vm, &$process, &mfa);
+                    // apply_setup_error_handler
+                }
+            }
+        } else {
+            unreachable!()
+        }
+    }};
+}
+
+macro_rules! op_apply {
+    ($vm:expr, $context:expr, $process:expr) => {{
+        let mut module = $context.x[0];
+        let mut func = $context.x[1];
+        let mut args = $context.x[2];
+
+        loop {
+            if !func.is_atom() || !module.is_atom() {
+                $context.x[0] = module;
+                $context.x[1] = func;
+                $context.x[2] = Term::nil();
+                println!(
+                    "pid={} tried to apply not a func {}:{}",
+                    $process.pid, module, func
+                );
+
+                return Err(Exception::new(Reason::EXC_BADARG));
+            }
+
+            if module.to_atom().unwrap() != atom::ERLANG || func.to_atom().unwrap() != atom::APPLY {
+                break;
+            }
+
+            // Handle apply of apply/3...
+
+            // continually loop over args to resolve
+            let a = args;
+
+            if let Ok(cons) = Cons::cast_from(&a) {
+                let m = cons.head;
+                let a = cons.tail;
+
+                if let Ok(cons) = Cons::cast_from(&a) {
+                    let f = cons.head;
+                    let a = cons.tail;
+
+                    if let Ok(cons) = Cons::cast_from(&a) {
+                        let a = cons.head;
+                        if cons.tail.is_nil() {
+                            module = m;
+                            func = f;
+                            args = a;
+                            continue;
+                        }
+                    }
+                }
+            }
+            break; // != erlang:apply/3
+        }
+
+        let mut arity = 0;
+
+        // Walk down the 3rd parameter of apply (the argument list) and copy
+        // the parameters to the x registers (reg[]).
+
+        while let Ok(value::Cons { head, tail }) = args.cast_into() {
+            if arity < process::MAX_REG - 1 {
+                $context.x[arity] = *head;
+                arity += 1;
+                args = *tail
+            } else {
+                return Err(Exception::new(Reason::EXC_SYSTEM_LIMIT));
+            }
+        }
+
+        if !args.is_nil() {
+            // Must be well-formed list
+            return Err(Exception::new(Reason::EXC_BADARG));
+        }
+
+        /*
+         * Get the index into the export table, or failing that the export
+         * entry for the error handler module.
+         *
+         * Note: All BIFs have export entries; thus, no special case is needed.
+         */
+
+        let mfa = module::MFA(module.to_atom().unwrap(), func.to_atom().unwrap(), arity as u32);
+
+        // println!("pid={} applying/3... {}", $process.pid, mfa);
+
+        let export = { $vm.exports.read().lookup(&mfa) }; // drop the exports lock
+
+        match export {
+            Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
+            Some(Export::Bif(APPLY_2)) => {
+                // TODO: this clobbers the registers
+
+                // TODO: rewrite these two into Apply instruction calls
+                // I'm cheating here, *shrug*
+                op_apply_fun!($vm, $context, $process)
+            }
+            // Some(Export::Bif(_)) => unreachable!("op_apply: bif called without call_bif: {}", mfa),
+            Some(Export::Bif(bif)) => {
+                // TODO: this would still need to return on a bif if it's i_apply_only/_last
+
+                // TODO: apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
+                // ^ only happens in apply/fixed_apply
+                op_call_bif!($vm, $context, $process, bif, arity)
+            }
+            None => {
+                // println!("apply setup_error_handler pid={}", $process.pid);
+                call_error_handler!($vm, $process, &mfa);
+                // apply_setup_error_handler
+            }
+        }
+        //    if ((ep = erts_active_export_entry(module, function, arity)) == NULL) {
+        //      if ((ep = apply_setup_error_handler(p, module, function, arity, reg)) == NULL)
+        //        goto error;
+        //    }
+        //    TODO: runs on apply and fixed apply
+        //    apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
+
+        // op_jump_ptr!($context, ptr)
+    }};
+}
+
+macro_rules! op_apply_fun {
+    ($vm:expr, $context:expr, $process:expr) => {{
+        // Walk down the 3rd parameter of apply (the argument list) and copy
+        // the parameters to the x registers (reg[]).
+
+        let fun = $context.x[0];
+        let mut args = $context.x[1];
+        let mut arity = 0;
+
+        while let Ok(value::Cons { head, tail }) = args.cast_into() {
+            if arity < process::MAX_REG - 1 {
+                $context.x[arity] = *head;
+                arity += 1;
+                args = *tail
+            } else {
+                return Err(Exception::new(Reason::EXC_SYSTEM_LIMIT));
+            }
+        }
+
+        if !args.is_nil() {
+            /* Must be well-formed list */
+            return Err(Exception::new(Reason::EXC_BADARG));
+        }
+        //context.x[arity] = fun;
+
+        op_call_fun!($vm, $context, $process, fun, arity);
+    }};
+}
+
+macro_rules! op_return {
+    ($process:expr, $context:expr) => {{
+        if let Some(i) = $context.cp.take() {
+            op_jump_ptr!($context, i);
+        } else {
+            // println!("Process pid={} exited with normal, x0: {}", $process.pid, $context.x[0]);
+            return Ok(process::State::Done);
+        }
+    }};
+}
+
+macro_rules! fail {
+    ($context:expr, $label:expr) => {{
+        op_jump!($context, $label);
+        continue;
+    }};
+}
+
+macro_rules! cond_fail {
+    ($context:expr, $fail:expr, $exc: expr) => {{
+        if $fail != 0 {
+            op_jump!($context, $fail);
+            continue;
+        } else {
+            return Err($exc);
+        }
+    }};
+}
+
+macro_rules! op_fixed_apply {
+    ($vm:expr, $context:expr, $process:expr, $arity:expr) => {{
+        let arity = $arity as usize;
+        let module = $context.x[arity];
+        let func = $context.x[arity + 1];
+
+        if !func.is_atom() || !module.is_atom() {
+            $context.x[0] = module;
+            $context.x[1] = func;
+            $context.x[2] = Term::nil();
+
+            return Err(Exception::new(Reason::EXC_BADARG));
+        }
+
+        let module = module.to_atom().unwrap();
+        let func = func.to_atom().unwrap();
+
+        // Handle apply of apply/3...
+        if module == atom::ERLANG && func == atom::APPLY && $arity == 3 {
+            op_apply!($vm, $context, $process);
+            continue;
+        }
+
+        /*
+         * Get the index into the export table, or failing that the export
+         * entry for the error handler module.
+         *
+         * Note: All BIFs have export entries; thus, no special case is needed.
+         */
+
+        // TODO: make arity a U8 on the type
+        let mfa = module::MFA(module, func, $arity as u32);
+
+        let export = { $vm.exports.read().lookup(&mfa) }; // drop the exports lock
+
+        match export {
+            Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
+            Some(Export::Bif(bif)) => {
+                // TODO: apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
+                // ^ only happens in apply/fixed_apply
+
+                op_call_bif!($vm, $context, $process, bif, arity)
+            }
+            None => {
+                // println!("fixed_apply setup_error_handler pid={}", $process.pid);
+                call_error_handler!($vm, $process, &mfa);
+                // apply_setup_error_handler
+            }
+        }
+        //    if ((ep = erts_active_export_entry(module, function, arity)) == NULL) {
+        //      if ((ep = apply_setup_error_handler(p, module, function, arity, reg)) == NULL)
+        //        goto error;
+        //    }
+        //    TODO: runs on apply and fixed apply
+        //    apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
+
+        // op_jump_ptr!($context, ptr)
+    }};
+}
+
+macro_rules! safepoint_and_reduce {
+    ($vm:expr, $process:expr, $reductions:expr) => {{
+        // if $vm.gc_safepoint(&$process) {
+        //     return Ok(());
+        // }
+
+        // Reduce once we've exhausted all the instructions in a context.
+        if $reductions > 0 {
+            $reductions -= 1;
+        } else {
+            // $vm
+            //     .process_pool
+            //     .schedule(Job::normal($process.clone()));
+            return Ok(process::State::Yield);
+        }
+    }};
+}
+
+macro_rules! to_expr {
+    ($e:expr) => {
+        $e
+    };
+}
+
+macro_rules! op_float {
+    ($context:expr, $a:expr, $b:expr, $dest:expr, $op:tt) => {{
+        $context.f[$dest as usize] = to_expr!($context.f[$a as usize] $op $context.f[$b as usize]);
+    }};
+}
 
 const APPLY_2: bif::Fn = bif::bif_erlang_apply_2;
 const APPLY_3: bif::Fn = bif::bif_erlang_apply_3;
@@ -830,7 +1281,7 @@ instruction!(
             let mut jumped = false;
 
             for chunk in arities.chunks_exact(2) {
-                if let instruction::Entry::Literal(n) = chunk[0] {
+                if let Entry::Literal(n) = chunk[0] {
                     if n == len {
                         let label = chunk[1].to_label();
                         op_jump!(context, label);

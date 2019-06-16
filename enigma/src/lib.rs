@@ -1,7 +1,5 @@
-// The nightly features that are commonly needed with async / await
-#![feature(async_await, alloc_layout_extra)]
-#![feature(arbitrary_self_types)]
-#![recursion_limit = "1024"] // yeowch
+#![feature(async_await, alloc_layout_extra, arbitrary_self_types)]
+#![recursion_limit = "1024"]
 
 #[macro_use]
 mod macros;
