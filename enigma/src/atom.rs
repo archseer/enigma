@@ -64,13 +64,13 @@ impl AtomTable {
         }
     }
 
-    pub fn insert(&mut self, name: &str) -> u32 {
-        // this is to only have it allocated once (instead of twice, once for each index)
-        let name = Box::leak(String::from(name).into_boxed_str());
-        let index = self.names.len() as u32;
-        self.ids.insert(name, index);
-        self.names.push(name);
-        index
+    pub fn insert(&mut self, name: &'static str) -> u32 {
+        let names = &mut self.names;
+        *self.ids.entry(name).or_insert_with(|| {
+            let index = names.len() as u32;
+            names.push(name);
+            index
+        })
     }
 
     pub fn lookup(&self, val: &str) -> Option<u32> {
@@ -85,13 +85,12 @@ impl AtomTable {
 
     /// Allocate new atom in the atom table or find existing.
     pub fn from_str(&mut self, val: &str) -> Atom {
-        Atom(self.lookup(val).unwrap_or_else(|| self.insert(val)))
+        // this is to only have it allocated once (instead of twice, once for each index)
+        let name = Box::leak(String::from(val).into_boxed_str());
+        Atom(self.insert(name))
     }
 
     pub fn to_str(&self, index: u32) -> Option<&'static str> {
-        if index >= self.names.len() as u32 {
-            return None;
-        }
         self.names.get(index as usize).copied()
     }
 }
