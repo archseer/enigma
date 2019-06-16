@@ -17,8 +17,8 @@ impl std::fmt::Display for MFA {
         write!(
             f,
             "{}:{}/{}",
-            atom::to_str(self.0).unwrap(),
-            atom::to_str(self.1).unwrap(),
+            self.0.to_str().unwrap(),
+            self.1.to_str().unwrap(),
             self.2
         )
     }

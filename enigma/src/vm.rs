@@ -1,4 +1,4 @@
-use crate::atom;
+use crate::atom::{self, Atom};
 use crate::bitstring;
 use crate::ets::{RcTableRegistry, TableRegistry};
 use crate::exception::{self, Exception, Reason};
@@ -725,13 +725,13 @@ impl Machine {
         let registry = self.modules.lock();
 
         // start the actual book process
-        let module = registry.lookup(atom::from_str("erl_init")).unwrap();
+        let module = registry.lookup(Atom::from("erl_init")).unwrap();
         let process = process::allocate(&self, 0 /* itself */, 0, module).unwrap();
 
         let context = process.context_mut();
-        let fun = atom::from_str("start");
+        let fun = Atom::from("start");
         let arity = 2;
-        context.x[0] = Term::atom(atom::from_str("init"));
+        context.x[0] = Term::atom(Atom::from("init"));
         context.x[1] = value::Cons::from_iter(
             args.into_iter()
                 .map(|arg| Term::binary(&context.heap, bitstring::Binary::from(arg.into_bytes()))),
@@ -747,10 +747,10 @@ impl Machine {
 
         // start system processes
         // TODO: start as a special process and panic if it halts
-        let module = registry.lookup(atom::from_str("erts_code_purger")).unwrap();
+        let module = registry.lookup(Atom::from("erts_code_purger")).unwrap();
         let process = process::allocate(&self, 0 /* itself */, 0, module).unwrap();
         let context = process.context_mut();
-        let fun = atom::from_str("start");
+        let fun = Atom::from("start");
         let arity = 0;
         op_jump!(context, module.funs[&(fun, arity)]);
         let future = run_with_error_handling(process);

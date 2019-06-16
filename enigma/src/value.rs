@@ -1246,7 +1246,7 @@ impl std::fmt::Display for Variant {
             Variant::Nil(..) => write!(f, "[]"),
             Variant::Integer(i) => write!(f, "{}", i),
             Variant::Float(self::Float(i)) => write!(f, "{}", i),
-            Variant::Atom(i) => write!(f, ":{}", atom::to_str(*i).unwrap()),
+            Variant::Atom(i) => write!(f, ":{}", i.to_str().unwrap()),
             Variant::Port(i) => write!(f, "#Port<{}>", i),
             Variant::Pid(i) => write!(f, "#Pid<{}>", i),
             Variant::Cons(c) => unsafe {

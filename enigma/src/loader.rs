@@ -279,7 +279,7 @@ impl<'a> Loader<'a> {
         self.atoms = atoms;
 
         for (index, a) in self.atoms.iter().enumerate() {
-            let g_index = atom::from_str(a).0;
+            let g_index = Atom::from(*a).0;
             // keep a mapping of these to patch the instrs
             self.atom_map.insert(index as u32, g_index);
         }

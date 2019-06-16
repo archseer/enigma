@@ -2,6 +2,11 @@ use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 
+#[inline]
+pub fn cmp(a1: Atom, a2: Atom) -> std::cmp::Ordering {
+    ATOMS.read().cmp(a1.0, a2.0)
+}
+
 /// Maximum character length of an atom.
 pub const MAX_ATOM_CHARS: usize = 255;
 
@@ -10,9 +15,15 @@ pub struct Atom(pub u32);
 
 impl Atom {
     /// Construct a new atom from a raw string.
+    #[inline]
     pub fn new(val: &str) -> Self {
         assert!(val.len() <= MAX_ATOM_CHARS);
         ATOMS.write().from_str(val)
+    }
+
+    #[inline]
+    pub fn to_str(&self) -> Option<&'static str> {
+        ATOMS.read().to_str(self.0)
     }
 }
 
@@ -22,19 +33,19 @@ impl std::fmt::Display for Atom {
     }
 }
 
-// impl From<&str> for Atom {
-//     #[inline]
-//     fn from(value: &str) -> Self {
-//         Atom::new(val)
-//     }
-// }
+impl From<&str> for Atom {
+    #[inline]
+    fn from(value: &str) -> Self {
+        Atom::new(value)
+    }
+}
 
-// impl From<String> for Atom {
-//     #[inline]
-//     fn from(value: String) -> Self {
-//         Atom::new(val)
-//     }
-// }
+impl From<String> for Atom {
+    #[inline]
+    fn from(value: String) -> Self {
+        Atom::new(value.as_str())
+    }
+}
 
 #[derive(Debug)]
 pub struct AtomTable {
@@ -727,18 +738,3 @@ pub const TRIM: Atom = Atom(264);
 pub const TRIM_ALL: Atom = Atom(265);
 pub const GLOBAL: Atom = Atom(266);
 pub const SCOPE: Atom = Atom(267);
-
-#[inline]
-pub fn cmp(a1: Atom, a2: Atom) -> std::cmp::Ordering {
-    ATOMS.read().cmp(a1.0, a2.0)
-}
-#[inline]
-pub fn from_str(val: &str) -> Atom {
-    // unfortunately, cache hits need the write lock to avoid race conditions
-    ATOMS.write().from_str(val)
-}
-
-#[inline]
-pub fn to_str(index: Atom) -> Option<&'static str> {
-    ATOMS.read().to_str(index.0)
-}

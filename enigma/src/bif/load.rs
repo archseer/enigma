@@ -1,4 +1,4 @@
-use crate::atom;
+use crate::atom::{self, Atom};
 use crate::bif;
 use crate::exception::{Exception, Reason};
 use crate::loader::Loader;
@@ -12,7 +12,7 @@ pub fn pre_loaded_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> b
 
     let iter = vm::PRE_LOADED_NAMES
         .iter()
-        .map(|name| Term::atom(atom::from_str(name)));
+        .map(|name| Term::atom(Atom::from(*name))); // TODO: inefficient because of lookups
 
     Ok(Cons::from_iter(iter, heap))
 }

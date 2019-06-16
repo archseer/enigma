@@ -1,4 +1,4 @@
-use crate::atom;
+use crate::atom::{self, Atom};
 use crate::bitstring;
 use crate::immix::Heap;
 use crate::module;
@@ -140,7 +140,7 @@ pub fn decode_atom(rest: &[u8]) -> IResult<&[u8], Term> {
     let (rest, string) = take_str!(rest, len)?;
 
     // TODO: create atom &string
-    Ok((rest, Term::atom(atom::from_str(string))))
+    Ok((rest, Term::atom(Atom::from(string))))
 }
 
 pub fn decode_tuple<'a>(rest: &'a [u8], len: u32, heap: &Heap) -> IResult<&'a [u8], Term> {
@@ -342,7 +342,7 @@ pub fn encode_term(res: &mut Vec<u8>, term: Term) -> std::io::Result<()> {
             res.write_u8(Tag::Nil as u8)?;
         }
         Variant::Atom(i) => {
-            let atom = atom::to_str(i).unwrap();
+            let atom = i.to_str().unwrap();
             encode_atom(res, atom)?;
         }
         Variant::Float(value::Float(f)) => encode_float(res, f)?,

@@ -267,7 +267,8 @@ pub fn is_variable(obj: Term) -> Option<usize> {
     match obj.into_variant() {
         // TODO original checked for < 2 as error but we use nil, true, false as 0,1,2
         Variant::Atom(Atom(i)) if i > 2 => {
-            crate::atom::to_str(Atom(i))
+            Atom(i)
+                .to_str()
                 .and_then(|name| {
                     let name = name.as_bytes();
                     if name[0] == b'$' {

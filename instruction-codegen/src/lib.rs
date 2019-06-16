@@ -360,7 +360,7 @@ pub fn instruction(tokens: TokenStream) -> TokenStream {
                 // "proc pid={:?} reds={:?} mod={:?} offs={:?} ins={:?}",
                 // process.pid,
                 // context.reds,
-                // atom::to_str(unsafe { (*context.ip.module).name}).unwrap(),
+                // unsafe { (*context.ip.module).name}.to_str().unwrap(),
                 // context.ip.ptr,
                 // ins,
                 // );

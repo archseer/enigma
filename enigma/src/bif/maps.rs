@@ -190,7 +190,7 @@ mod tests {
 
     macro_rules! str_to_atom {
         ($str:expr) => {
-            Term::atom(crate::atom::from_str($str))
+            Term::atom(crate::atom::Atom::from($str))
         };
     }
 
@@ -269,7 +269,7 @@ mod tests {
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, 0, module).unwrap();
         let bad_map = Term::int(3);
-        let args = vec![Term::atom(atom::from_str("test")), bad_map];
+        let args = vec![str_to_atom!("test"), bad_map];
 
         if let Err(exception) = get_2(&vm, &process, &args) {
             assert_eq!(exception.reason, Reason::EXC_BADMAP);

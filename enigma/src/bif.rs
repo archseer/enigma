@@ -48,8 +48,8 @@ macro_rules! bif_map {
         {
             let mut table: BifTable = HashMap::new();
             $(
-                let module = atom::from_str($module);
-                $(table.insert(module::MFA(module, atom::from_str($fun), $arity), $rust_fn);)*
+                let module = Atom::from($module);
+                $(table.insert(module::MFA(module, Atom::from($fun), $arity), $rust_fn);)*
             )*
             table
         }
@@ -404,9 +404,9 @@ macro_rules! nif_map {
         {
             let mut table: NifTable = HashMap::new();
             $(
-                let module = atom::from_str($module);
+                let module = Atom::from($module);
                 table.insert(module, vec![
-                    $((atom::from_str($fun), $arity, $rust_fn),)*
+                    $((Atom::from($fun), $arity, $rust_fn),)*
                 ]);
             )*
             table
@@ -1123,11 +1123,11 @@ pub fn bif_erlang_load_nif_2(vm: &vm::Machine, process: &RcProcess, args: &[Term
 
     if let Ok(cons) = args[0].cast_into() {
         let name = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
-        let atom = atom::from_str(&name);
+        let atom = Atom::from(name);
         let nifs = match NIFS.get(&atom) {
             Some(nifs) => nifs,
             None => {
-                println!("NIFS name: {}, atom {} not found", name, atom);
+                println!("NIFS name: {}, atom {} not found", args[0], atom);
                 return Ok(Term::atom(atom::OK));
             }
         };
@@ -1192,10 +1192,9 @@ pub fn bif_erlang_process_flag_2(_vm: &vm::Machine, process: &RcProcess, args: &
             // TODO: unimplemented
             Ok(atom!(ON_HEAP))
         }
-        Variant::Atom(i) => unimplemented!(
-            "erlang:process_flag/2 not implemented for {:?}",
-            atom::to_str(i)
-        ),
+        Variant::Atom(i) => {
+            unimplemented!("erlang:process_flag/2 not implemented for {:?}", i.to_str())
+        }
         _ => unreachable!(),
     }
 }

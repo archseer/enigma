@@ -164,7 +164,7 @@ pub fn list_to_atom_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) ->
     // BIF_RET(res);
     let list = Cons::cast_from(&args[0])?;
     let string = value::cons::unicode_list_to_buf(list, atom::MAX_ATOM_CHARS)?;
-    let atom = atom::from_str(string.as_str());
+    let atom = atom::Atom::from(string);
     Ok(Term::atom(atom))
 }
 
@@ -586,7 +586,7 @@ pub fn binary_to_atom_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) 
     if let Some(bytes) = args[0].to_bytes() {
         return match std::str::from_utf8(bytes) {
             Ok(string) => {
-                let atom = atom::from_str(string);
+                let atom = atom::Atom::from(string);
                 Ok(Term::atom(atom))
             }
             Err(_) => Err(Exception::new(Reason::EXC_BADARG)),
@@ -598,7 +598,7 @@ pub fn binary_to_atom_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) 
 pub fn atom_to_list_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     match args[0].into_variant() {
         Variant::Atom(i) => {
-            let string = atom::to_str(i).unwrap();
+            let string = i.to_str().unwrap();
             let heap = &process.context_mut().heap;
 
             Ok(bitstring!(heap, string))
@@ -617,7 +617,7 @@ pub fn atom_to_binary_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
 
     match args[0].into_variant() {
         Variant::Atom(i) => {
-            let string = atom::to_str(i).unwrap();
+            let string = i.to_str().unwrap();
             let heap = &process.context_mut().heap;
 
             Ok(Term::binary(
@@ -1204,7 +1204,7 @@ mod tests {
 
     macro_rules! str_to_atom {
         ($str:expr) => {
-            Term::atom(crate::atom::from_str($str))
+            Term::atom(crate::atom::Atom::from($str))
         };
     }
 
