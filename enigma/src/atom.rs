@@ -14,13 +14,6 @@ pub const MAX_ATOM_CHARS: usize = 255;
 pub struct Atom(pub u32);
 
 impl Atom {
-    /// Construct a new atom from a raw string.
-    #[inline]
-    pub fn new(val: &str) -> Self {
-        assert!(val.len() <= MAX_ATOM_CHARS);
-        ATOMS.write().from_str(val)
-    }
-
     #[inline]
     pub fn to_str(&self) -> Option<&'static str> {
         ATOMS.read().to_str(self.0)
@@ -34,21 +27,30 @@ impl std::fmt::Display for Atom {
 }
 
 impl From<&str> for Atom {
-    #[inline]
     fn from(value: &str) -> Self {
-        Atom::new(value)
+        assert!(value.len() <= MAX_ATOM_CHARS);
+        if let Some(id) = ATOMS.read().lookup(&value) {
+            return Atom(id);
+        }
+        let name = Box::leak(String::from(value).into_boxed_str());
+        let id = ATOMS.write().insert(name);
+        Atom(id)
     }
 }
 
 impl From<String> for Atom {
-    #[inline]
     fn from(value: String) -> Self {
-        Atom::new(value.as_str())
+        assert!(value.len() <= MAX_ATOM_CHARS);
+        if let Some(id) = ATOMS.read().lookup(&value) {
+            return Atom(id);
+        }
+        let name = Box::leak(value.into_boxed_str());
+        let id = ATOMS.write().insert(name);
+        Atom(id)
     }
 }
 
-#[derive(Debug)]
-pub struct AtomTable {
+pub(self) struct AtomTable {
     /// Direct mapping string to atom index
     ids: HashMap<&'static str, u32>,
 
@@ -57,7 +59,7 @@ pub struct AtomTable {
 }
 
 impl AtomTable {
-    pub fn new() -> AtomTable {
+    pub fn new() -> Self {
         AtomTable {
             ids: HashMap::new(),
             names: Vec::new(),
@@ -83,19 +85,12 @@ impl AtomTable {
         val1.cmp(&val2)
     }
 
-    /// Allocate new atom in the atom table or find existing.
-    pub fn from_str(&mut self, val: &str) -> Atom {
-        // this is to only have it allocated once (instead of twice, once for each index)
-        let name = Box::leak(String::from(val).into_boxed_str());
-        Atom(self.insert(name))
-    }
-
     pub fn to_str(&self, index: u32) -> Option<&'static str> {
         self.names.get(index as usize).copied()
     }
 }
 
-pub static ATOMS: Lazy<RwLock<AtomTable>> = Lazy::new(|| {
+pub(self) static ATOMS: Lazy<RwLock<AtomTable>> = Lazy::new(|| {
     let mut atoms = AtomTable::new();
     atoms.insert("nil"); // 0
     atoms.insert("true"); // 1
