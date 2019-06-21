@@ -4,21 +4,14 @@ use instruction_codegen::instruction;
 use crate::bitstring::Flag as BitFlag;
 use crate::exception::{self, Exception, Reason};
 use crate::exports_table::Export;
-use crate::instr_ptr::InstrPtr;
 use crate::instruction;
 use crate::process::{self, RcProcess};
 use crate::value::{self, CastFrom, CastInto, CastIntoMut, Cons, Term, Tuple, Variant};
 use crate::vm::Machine;
 use crate::{atom, bif, bitstring, module, port};
 
-use futures::{
-    compat::*,
-    future::{FutureExt, TryFutureExt},
-    // io::AsyncWriteExt,
-    stream::StreamExt,
-    // sink::SinkExt,
-};
-// use futures::prelude::*;
+use futures::compat::*;
+use futures::prelude::*;
 // end mandatory for loop
 
 use std::convert::TryInto;
@@ -30,6 +23,9 @@ use crate::loader::LValue;
 // end for the load transform
 
 use crate::bif::Fn as BifFn;
+
+mod ptr;
+pub use ptr::InstrPtr as Ptr;
 
 pub trait IntoWithHeap<T>: Sized {
     /// Performs the conversion.
@@ -470,7 +466,7 @@ macro_rules! op_call_bif {
         let args = &$context.x[0..$arity];
         match $bif($vm, $process, args) {
             Ok(val) => {
-                $context.x[0] = val; // HAXX, return value emulated
+                $context.x[0] = val;
             }
             Err(exc) => return Err(exc),
         }
@@ -487,14 +483,13 @@ macro_rules! op_call_fun {
                 $context.x[arity..arity + binding.len()].copy_from_slice(&binding[..]);
             }
 
-            // TODO: closure needs to jump_ptr to the correct module.
             let ptr = {
                 // temporary HAXX
                 let registry = $vm.modules.lock();
                 // let module = module::load_module(&self.modules, path).unwrap();
                 let module = registry.lookup(closure.mfa.0).unwrap();
 
-                InstrPtr {
+                Ptr {
                     module,
                     ptr: closure.ptr,
                 }
@@ -608,15 +603,13 @@ macro_rules! op_apply {
         match export {
             Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
             Some(Export::Bif(APPLY_2)) => {
-                // TODO: this clobbers the registers
-
                 // TODO: rewrite these two into Apply instruction calls
                 // I'm cheating here, *shrug*
                 op_apply_fun!($vm, $context, $process)
             }
             // Some(Export::Bif(_)) => unreachable!("op_apply: bif called without call_bif: {}", mfa),
             Some(Export::Bif(bif)) => {
-                // TODO: this would still need to return on a bif if it's i_apply_only/_last
+                // TODO: this would still need to return on a bif if it's i_apply_only/_last?
 
                 // TODO: apply_bif_error_adjustment(p, ep, reg, arity, I, stack_offset);
                 // ^ only happens in apply/fixed_apply
@@ -1383,7 +1376,7 @@ instruction!(
             register,
             Term::catch(
                 &context.heap,
-                InstrPtr {
+                Ptr {
                     ptr: fail,
                     module: context.ip.module
                 }
@@ -1419,7 +1412,7 @@ instruction!(
             register,
             Term::catch(
                 &context.heap,
-                InstrPtr {
+                Ptr {
                     ptr: fail,
                     module: context.ip.module
                 }

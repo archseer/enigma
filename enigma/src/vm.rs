@@ -1,39 +1,32 @@
 use crate::atom::Atom;
-use crate::bitstring;
-use crate::ets::{RcTableRegistry, TableRegistry};
+use crate::{bitstring, module, instruction};
 use crate::exception::{self, Exception, Reason};
-use crate::exports_table::{ExportsTable, RcExportsTable};
-use crate::module; 
-use crate::module_registry::{ModuleRegistry, RcModuleRegistry};
-use crate::instruction;
-use crate::process::{
-    self,
-    RcProcess,
-    registry::Registry as ProcessRegistry,
-    table::Table as ProcessTable,
-};
-use crate::port::{Table as PortTable, RcTable as RcPortTable};
-use crate::persistent_term::{Table as PersistentTermTable};
+use crate::process::{self, RcProcess};
 use crate::servo_arc::Arc;
 use crate::value::{Cons, Term};
 
+use crate::ets::{RcTableRegistry, TableRegistry};
+use crate::exports_table::ExportsTable;
+use crate::module_registry::ModuleRegistry;
+use crate::port::{Table as PortTable, RcTable as RcPortTable};
+use crate::persistent_term::{Table as PersistentTermTable};
+use crate::process::{
+    registry::Registry as ProcessRegistry,
+    table::Table as ProcessTable,
+};
+
 use std::cell::RefCell;
 // use log::debug;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use std::panic;
 use std::sync::atomic::AtomicUsize;
 use std::time;
 
 // use tokio::prelude::*;
 use futures::{
-  compat::*,
-  future::{FutureExt, TryFutureExt},
-  // io::AsyncWriteExt,
-  // stream::StreamExt,
-  // sink::SinkExt,
+    // compat::*,
+    prelude::*,
 };
-// use futures::prelude::*;
-
 
 /// A reference counted State.
 pub type RcMachine = Arc<Machine>;
@@ -41,12 +34,14 @@ pub type RcMachine = Arc<Machine>;
 pub struct Machine {
     /// Table containing all processes.
     pub process_table: Mutex<ProcessTable<RcProcess>>,
+
+    /// Table containing named processes.
     pub process_registry: Mutex<ProcessRegistry<RcProcess>>,
 
     pub port_table: RcPortTable,
     /// TODO: Use priorities later on
 
-    /// The start time of the VM (more or less).
+    /// Start time of the VM boot-up
     pub start_time: time::Instant,
 
     pub next_ref: AtomicUsize,
@@ -54,19 +49,19 @@ pub struct Machine {
     /// PID pointing to the process handling system-wide logging.
     pub system_logger: AtomicUsize,
 
+    /// Futures pool for running processes
     pub process_pool: tokio::runtime::Runtime,
+
+    /// Futures pool for running I/O and other utility tasks ("dirty scheduler")
     pub runtime: tokio::runtime::Runtime,
 
     pub exit: Option<futures::channel::oneshot::Sender<()>>,
 
-    // env config, arguments, panic handler
-
-    // atom table is accessible globally as ATOMS
-    /// export table
-    pub exports: RcExportsTable,
+    /// Exports table
+    pub exports: RwLock<ExportsTable>,
 
     /// Module registry
-    pub modules: RcModuleRegistry,
+    pub modules: Mutex<ModuleRegistry>,
 
     pub ets_tables: RcTableRegistry,
 
@@ -132,6 +127,7 @@ pub const PRE_LOADED_NAMES: &[&str] = &[
     "persistent_term",
 ];
 
+/// Embedded bytecode for OTP bootstrap
 pub const PRE_LOADED: &[&[u8]] = &[
     include_bytes!("../../otp/erts/preloaded/ebin/erts_code_purger.beam"),
     include_bytes!("../../otp/erts/preloaded/ebin/erl_init.beam"),
@@ -207,10 +203,12 @@ impl Machine {
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     }
 
+    /// Elapsed time since VM start
     pub fn elapsed_time(&self) -> time::Duration {
         self.start_time.elapsed()
     }
 
+    /// Preload all the bootstrap modules
     pub fn preload_modules(&self) {
         PRE_LOADED.iter().for_each(|bytecode| {
             module::load_bytes(self, bytecode).unwrap();

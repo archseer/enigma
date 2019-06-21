@@ -1,4 +1,4 @@
-use crate::atom::{self, Atom};
+use crate::atom::Atom;
 use crate::etf;
 use crate::immix::Heap;
 use crate::module::{Lambda, Module, MFA};
@@ -25,7 +25,7 @@ pub struct Line {
     pub loc: usize,
 }
 
-pub struct Loader<'a> {
+pub(self) struct Loader<'a> {
     atoms: Vec<&'a str>,
     attrs: Term,
     imports: Vec<MFA>,
@@ -185,6 +185,10 @@ impl LValue {
             _ => false,
         }
     }
+}
+
+pub fn load_file(bytes: &[u8]) -> Result<Module, nom::Err<&[u8]>> {
+    Loader::new().load_file(bytes)
 }
 
 impl<'a> Loader<'a> {
@@ -979,7 +983,7 @@ fn decode_line_items<'a>(rest: &'a [u8], mut count: u32) -> IResult<&'a [u8], Ve
 type Chunk<'a> = &'a [u8];
 
 named!(
-    pub scan_beam<&[u8], Vec<(&str, Chunk)>>,
+    scan_beam<&[u8], Vec<(&str, Chunk)>>,
     do_parse!(
         tag!("FOR1") >>
         _size: le_u32 >>
@@ -1015,7 +1019,7 @@ fn align_bytes(size: u32) -> u32 {
 }
 
 #[derive(Debug)]
-pub struct CodeChunk<'a> {
+struct CodeChunk<'a> {
     pub sub_size: u32,   // prefixed extra field data
     pub version: u32,    // should be 0
     pub opcode_max: u32, // highest opcode used for versioning
@@ -1285,7 +1289,7 @@ pub struct Instruction {
 }
 
 named!(
-    pub scan_instructions<&[u8], Vec<Instruction>>,
+    scan_instructions<&[u8], Vec<Instruction>>,
     many0!(complete!(scan_instruction))
 );
 

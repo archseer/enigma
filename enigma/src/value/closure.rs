@@ -9,7 +9,6 @@ pub struct Closure {
     pub binding: Option<Vec<Term>>,
 }
 
-// TODO: to be CastFrom once rust stabilizes the trait
 impl CastFrom<Term> for Closure {
     type Error = WrongBoxError;
 

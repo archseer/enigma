@@ -11,16 +11,12 @@ use parking_lot::{RwLock, Mutex, MutexGuard};
 
 use tokio::prelude::*;
 
-use futures::channel::mpsc;
-use futures::select;
 use futures::{
-  compat::*,
-  future::{FutureExt, TryFutureExt},
-  io::AsyncWriteExt,
-  stream::StreamExt,
-  sink::SinkExt,
+    select,
+    channel::mpsc,
+    compat::*,
+    prelude::*,
 };
-use futures::io::AsyncReadExt;
 
 /// The type of a PID.
 pub type ID = u32;
@@ -195,7 +191,6 @@ pub fn close(vm: &Machine, from: PID, port: ID) -> Result<(), Exception> {
 
     if let Some(mut chan) = res {
         // TODO: error unhandled
-        use futures::sink::SinkExt as FuturesSinkExt;
 
         let future = async move {chan.send(Signal::Close).await; };
         vm.runtime.executor().spawn(future.unit_error().boxed().compat());
@@ -218,7 +213,6 @@ pub fn control(
         let reference = vm.next_ref();
 
         // TODO: error unhandled
-        use futures::sink::SinkExt as FuturesSinkExt;
         let bytes = crate::bif::erlang::list_to_iodata(msg).unwrap();
         // let fut = chan
         //     .send(port::Signal::Command(bytes))

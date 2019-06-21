@@ -78,14 +78,15 @@ macro_rules! fail {
     }};
 }
 
-/// Execution of the match program, this is Pam.
-/// May return THE_NON_VALUE, which is a bailout.
-/// the parameter 'arity' is only used if 'term' is actually an array,
-/// i.e. 'DCOMP_TRACE' was specified
+// Execution of the match program, this is Pam.
+// the parameter 'arity' is only used if 'term' is actually an array,
+// i.e. 'DCOMP_TRACE' was specified
 // termp seems to be null except on tracing
 // arity seems to be null except on tracing
 // return_flags are a tracing thing
 // process and pself are same except on tracing
+
+/// Execute a PAM program against a value. Returns a new value on match, `None` on fail.
 #[allow(dead_code)]
 pub fn run(
     vm: &vm::Machine,

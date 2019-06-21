@@ -1,16 +1,13 @@
 use crate::bif;
-use crate::instr_ptr::InstrPtr;
+use crate::instruction;
 use crate::module::MFA;
 use hashbrown::HashMap;
 use parking_lot::RwLock;
 use std::fmt;
 
-/// Reference counted ExportsTable.
-pub type RcExportsTable = RwLock<ExportsTable>; // TODO: I don't like this lock at all
-
 #[derive(Copy, Clone)]
 pub enum Export {
-    Fun(InstrPtr),
+    Fun(instruction::Ptr),
     Bif(bif::Fn),
 }
 
@@ -29,7 +26,7 @@ pub struct ExportsTable {
 }
 
 impl ExportsTable {
-    pub fn with_rc() -> RcExportsTable {
+    pub fn with_rc() -> RwLock<ExportsTable> {
         let mut exports = HashMap::new();
 
         // load all the bif exports
@@ -40,7 +37,7 @@ impl ExportsTable {
         RwLock::new(ExportsTable { exports })
     }
 
-    pub fn register(&mut self, mfa: MFA, ptr: InstrPtr) {
+    pub fn register(&mut self, mfa: MFA, ptr: instruction::Ptr) {
         self.exports.insert(mfa, Export::Fun(ptr));
     }
 

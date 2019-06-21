@@ -1,8 +1,6 @@
 use crate::atom::Atom;
 use hashbrown::HashMap;
 
-// pub type RcRegistry = Arc<Mutex<Registry<RcProcess>>>;
-
 /// A registry for handling processes with registered (atom) names.
 #[derive(Default)]
 pub struct Registry<T: Clone> {
@@ -14,9 +12,6 @@ impl<T: Clone> Registry<T> {
             processes: HashMap::new(),
         }
     }
-    // pub fn with_rc() -> RcRegistry {
-    //     Arc::new(Mutex::new(Self::new()))
-    // }
 
     pub fn register(&mut self, atom: Atom, process: T) -> &T {
         self.processes.entry(atom.0).or_insert(process)

@@ -1,17 +1,15 @@
 use crate::atom::Atom;
-use crate::loader::Loader;
+use crate::loader;
 use crate::module::Module;
 use hashbrown::HashMap;
 use parking_lot::Mutex;
-
-pub type RcModuleRegistry = Mutex<ModuleRegistry>;
 
 pub struct ModuleRegistry {
     pub modules: HashMap<Atom, Box<Module>>,
 }
 
 impl ModuleRegistry {
-    pub fn with_rc() -> RcModuleRegistry {
+    pub fn with_rc() -> Mutex<ModuleRegistry> {
         Mutex::new(ModuleRegistry {
             modules: HashMap::new(),
         })
@@ -26,8 +24,7 @@ impl ModuleRegistry {
 
     /// Parses a full file path pointing to a module.
     pub fn parse_module(&mut self, bytes: &[u8]) -> Result<&Module, std::io::Error> {
-        let loader = Loader::new();
-        let module = loader.load_file(bytes).unwrap();
+        let module = loader::load_file(bytes).unwrap();
 
         // TODO: handle uncompress, like the bif does
 

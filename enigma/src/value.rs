@@ -1,16 +1,14 @@
 // We cast header -> boxed value a lot in this file.
 #![allow(clippy::cast_ptr_alignment)]
 
-use crate::atom::{self, Atom};
-use crate::bitstring;
-use crate::exception;
 use crate::immix::Heap;
-use crate::instr_ptr::InstrPtr;
-use crate::module;
+use crate::instruction;
 use crate::nanbox::NanBox;
-use crate::process;
+use crate::{atom, bitstring, exception, module, process};
+
 use allocator_api::Layout;
 pub use num_bigint::BigInt;
+
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
@@ -345,15 +343,17 @@ pub const BOXED_REGEX: u8 = 24;
 
 #[derive(Debug)]
 #[repr(C)]
+/// A boxed value on the heap. Consists of a header followed by the value.
 pub struct Boxed<T> {
     pub header: Header,
     pub value: T,
 }
 
-// term order:
-// number < atom < reference < fun < port < pid < tuple < map < nil < list < bit string
+/// Erlang term order:
+/// number < atom < reference < fun < port < pid < tuple < map < nil < list < bit string
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Type {
+    /// Integer, float or bigint
     Number,
     Atom,
     Ref,
@@ -525,7 +525,7 @@ impl Term {
         }))
     }
 
-    pub fn catch(heap: &Heap, value: InstrPtr) -> Self {
+    pub fn catch(heap: &Heap, value: instruction::Ptr) -> Self {
         Term::from(heap.alloc(Boxed {
             header: BOXED_CATCH,
             value,
@@ -853,24 +853,8 @@ impl Term {
     }
 
     pub fn to_str(&self) -> Option<&str> {
-        match self.get_boxed_header() {
-            Ok(BOXED_BINARY) => {
-                let value = &self.get_boxed_value::<bitstring::RcBinary>().unwrap();
-                // TODO: handle err
-                std::str::from_utf8(&value.data).ok()
-            }
-            Ok(BOXED_SUBBINARY) => {
-                let value = &self.get_boxed_value::<bitstring::SubBinary>().unwrap();
-
-                if value.bit_offset & 7 != 0 {
-                    panic!("to_str can't work with non-zero bit_offset");
-                }
-
-                let offset = value.offset;
-                std::str::from_utf8(&value.original.data[offset..offset + value.size]).ok()
-            }
-            _ => None,
-        }
+        self.to_bytes()
+            .and_then(|bytes| std::str::from_utf8(bytes).ok())
     }
 
     pub fn boolean(value: bool) -> Self {
@@ -880,7 +864,7 @@ impl Term {
         Variant::Atom(atom::FALSE).into()
     }
 
-    /// deeply clone the value, copying heap allocated structures onto the new heap.
+    /// Deep clone the value, copying heap allocated structures onto the new heap.
     /// TODO: implementation without recursion
     pub fn deep_clone(&self, heap: &Heap) -> Self {
         match self.into_variant() {
@@ -1329,7 +1313,7 @@ impl std::fmt::Display for Variant {
                         write!(f, "#Fun<{}>", ptr.value.mfa)
                     }
                     // BOXED_CP => {
-                    //     let ptr = &*(*ptr as *const Boxed<Option<InstrPtr>>);
+                    //     let ptr = &*(*ptr as *const Boxed<Option<instruction::Ptr>>);
                     //     write!(f, "CP<{:?}>", ptr.value)
                     // }
                     BOXED_CATCH => write!(f, "CATCH"),
@@ -1341,7 +1325,7 @@ impl std::fmt::Display for Variant {
                     }
                     BOXED_FILE => write!(f, "#File<REF>"),
                     BOXED_BUFFER => write!(f, "#Buffer<REF>"),
-                    BOXED_REGEX => write!(f, "#Regex<REF>"),
+                    BOXED_REGEX => write!(f, "#Ref<Regex>"),
                     _ => unimplemented!(),
                 }
             },

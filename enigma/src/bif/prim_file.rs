@@ -93,10 +93,7 @@ pub fn set_cwd_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> b
 pub fn read_file_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // arg[0] = filename
     let heap = &process.context_mut().heap;
-
-    // TODO bitstrings or non zero offsets can fail ...
-    let cons = Cons::cast_from(&args[0])?;
-    let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
+    let path = args[0].to_str().unwrap();
 
     let bytes = match std::fs::read(path) {
         Ok(bytes) => bytes,
@@ -125,13 +122,12 @@ pub fn internal_native2name_1(vm: &vm::Machine, process: &RcProcess, args: &[Ter
     // Ok(args[0])
 }
 
-pub fn internal_name2native_1(
-    _vm: &vm::Machine,
-    _process: &RcProcess,
-    args: &[Term],
-) -> bif::Result {
+pub fn internal_name2native_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // we already validated the name into unicode in the previous command
-    Ok(args[0])
+    crate::bif::erlang::unicode_characters_to_binary_2(vm, process, &[args[0], atom!(UTF8)])
+    // TODO: use something like
+    // let cons = Cons::cast_from(&args[0])?;
+    // let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
 }
 
 pub fn native_name_encoding_0(
@@ -292,9 +288,7 @@ pub fn read_info_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
         None => return Err(badarg!()),
     };
 
-    let cons = Cons::cast_from(&args[0])?;
-    // TODO: maybe do these casts in the native2name/name2native
-    let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
+    let path = args[0].to_str().unwrap();
 
     let meta = if follow_links {
         std::fs::metadata(path)
@@ -315,10 +309,7 @@ pub fn list_dir_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     // arg[0] = filename
     let heap = &process.context_mut().heap;
 
-    // TODO: needs to work with binary and list based strings
-    // TODO bitstrings or non zero offsets can fail ...
-    let cons = Cons::cast_from(&args[0])?;
-    let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
+    let path = args[0].to_str().unwrap();
 
     let res = match std::fs::read_dir(path) {
         Ok(entries) => Cons::from_iter(
@@ -369,8 +360,7 @@ pub fn open_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif:
     //      * tested against in file_SUITE. */
     //     modes |= EFILE_MODE_READ;
     // }
-    let cons = Cons::cast_from(&args[0])?;
-    let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
+    let path = args[0].to_str().unwrap();
 
     let file = match opts.open(path) {
         Ok(file) => file,
@@ -494,11 +484,8 @@ pub fn make_soft_link_nif_2(
 
 pub fn rename_nif_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
-    let from = Cons::cast_from(&args[0])?;
-    let from = value::cons::unicode_list_to_buf(from, 2048).unwrap();
-
-    let to = Cons::cast_from(&args[1])?;
-    let to = value::cons::unicode_list_to_buf(to, 2048).unwrap();
+    let from = args[0].to_str().unwrap();
+    let to = args[1].to_str().unwrap();
 
     println!("renaming {} to {}", from, to);
 

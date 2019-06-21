@@ -1,15 +1,16 @@
-use crate::atom::{self, Atom};
-use crate::bif;
+use crate::atom;
 use crate::bitstring;
 use crate::ets;
-use crate::exception::{Exception, Reason, StackTrace};
 use crate::module;
 use crate::persistent_term;
 use crate::port;
-use crate::process::{self, RcProcess};
 use crate::regex;
-use crate::value::{self, BigInt, CastFrom, CastInto, Cons, Term, Tuple, Variant};
-use crate::vm;
+
+use crate::exception::{Exception, Reason, StackTrace};
+use crate::process::{self, RcProcess};
+use crate::value::{self, Atom, BigInt, CastFrom, CastInto, Cons, Term, Tuple, Variant};
+use crate::vm::Machine;
+
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 
@@ -57,7 +58,7 @@ macro_rules! bif_map {
 }
 
 pub type Result = std::result::Result<Term, Exception>;
-pub type Fn = fn(&vm::Machine, &RcProcess, &[Term]) -> Result;
+pub type Fn = fn(&Machine, &RcProcess, &[Term]) -> Result;
 type BifTable = HashMap<module::MFA, Fn>;
 
 pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
@@ -491,7 +492,7 @@ pub fn is_bif(mfa: &module::MFA) -> bool {
 }
 
 #[inline]
-pub fn apply(vm: &vm::Machine, process: &RcProcess, mfa: &module::MFA, args: &[Term]) -> Result {
+pub fn apply(vm: &Machine, process: &RcProcess, mfa: &module::MFA, args: &[Term]) -> Result {
     // println!("bif_apply {}", mfa);
     match BIFS.get(mfa) {
         Some(fun) => fun(vm, process, args),
@@ -500,7 +501,7 @@ pub fn apply(vm: &vm::Machine, process: &RcProcess, mfa: &module::MFA, args: &[T
 }
 
 /// Bif implementations
-fn bif_erlang_spawn_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_spawn_3(vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     // arg[0] = atom for module
     // arg[1] = atom for function
     // arg[2] = arguments for func (well-formed list)
@@ -522,7 +523,7 @@ fn bif_erlang_spawn_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> R
     process::spawn(vm, process, module, func, arglist, process::SpawnFlag::NONE)
 }
 
-fn bif_erlang_spawn_link_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_spawn_link_3(vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     // arg[0] = atom for module
     // arg[1] = atom for function
     // arg[2] = arguments for func (well-formed list)
@@ -544,7 +545,7 @@ fn bif_erlang_spawn_link_3(vm: &vm::Machine, process: &RcProcess, args: &[Term])
     process::spawn(vm, process, module, func, arglist, process::SpawnFlag::LINK)
 }
 
-fn bif_erlang_spawn_opt_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_spawn_opt_1(vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     use process::SpawnFlag;
 
     // arg 0 is a 4 value tuple
@@ -598,7 +599,7 @@ fn bif_erlang_spawn_opt_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     process::spawn(vm, process, module, func, arglist, flag)
 }
 
-fn bif_erlang_link_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_link_1(vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     // arg[0] = pid/port
 
     match args[0].into_variant() {
@@ -646,7 +647,7 @@ fn bif_erlang_link_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Re
     }
 }
 
-fn bif_erlang_unlink_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_unlink_1(vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     // arg[0] = pid/port
 
     match args[0].into_variant() {
@@ -663,7 +664,7 @@ fn bif_erlang_unlink_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     }
 }
 
-fn bif_erlang_monitor_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_monitor_2(vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     // arg[0] = pid/port
     let heap = &process.context_mut().heap;
     let reference = vm.next_ref();
@@ -728,7 +729,7 @@ fn bif_erlang_monitor_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) ->
 }
 
 fn demonitor(
-    vm: &vm::Machine,
+    vm: &Machine,
     process: &RcProcess,
     reference: Term,
 ) -> std::result::Result<bool, Exception> {
@@ -753,13 +754,13 @@ fn demonitor(
     Err(badarg!())
 }
 
-fn bif_erlang_demonitor_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_demonitor_1(vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     // arg[0] = ref
     demonitor(vm, process, args[0])?;
     Ok(atom!(TRUE))
 }
 
-fn bif_erlang_demonitor_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_demonitor_2(vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     if args[1].is_nil() {
         return bif_erlang_demonitor_1(vm, process, args);
     }
@@ -803,11 +804,11 @@ fn bif_erlang_demonitor_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     Ok(res)
 }
 
-fn bif_erlang_self_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> Result {
+fn bif_erlang_self_0(_vm: &Machine, process: &RcProcess, _args: &[Term]) -> Result {
     Ok(Term::pid(process.pid))
 }
 
-fn bif_erlang_send_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_send_2(vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     // args: dest <term (pid/atom)>, msg <term>
     let pid = args[0];
     let msg = args[1];
@@ -818,55 +819,55 @@ fn bif_erlang_send_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Re
     }
 }
 
-pub fn bif_erlang_is_atom_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_atom_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_atom()))
 }
 
-pub fn bif_erlang_is_list_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_list_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_list()))
 }
 
-pub fn bif_erlang_is_tuple_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_tuple_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_tuple()))
 }
 
-pub fn bif_erlang_is_float_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_float_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_float()))
 }
 
-pub fn bif_erlang_is_integer_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_integer_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_integer()))
 }
 
-pub fn bif_erlang_is_number_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_number_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_number()))
 }
 
-pub fn bif_erlang_is_port_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_port_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_port()))
 }
 
-pub fn bif_erlang_is_reference_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_reference_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_ref()))
 }
 
-pub fn bif_erlang_is_pid_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_pid_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_pid()))
 }
 
-pub fn bif_erlang_is_binary_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_binary_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_binary()))
 }
 
-pub fn bif_erlang_is_bitstring_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_bitstring_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_bitstring()))
 }
 
-pub fn bif_erlang_is_function_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_function_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_function()))
 }
 
-pub fn bif_erlang_is_function_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_function_2(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     let arity = match args[0].into_variant() {
         Variant::Integer(i) if i >= 0 => i as u32,
         _ => return Err(badarg!()),
@@ -885,15 +886,15 @@ pub fn bif_erlang_is_function_2(_vm: &vm::Machine, _process: &RcProcess, args: &
     Ok(atom!(FALSE))
 }
 
-fn bif_erlang_is_boolean_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_is_boolean_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_boolean()))
 }
 
-pub fn bif_erlang_is_map_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_map_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::boolean(args[0].is_map()))
 }
 
-pub fn bif_erlang_is_map_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_is_map_key_2(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     let key = &args[0];
     let map = &args[1];
     if let Ok(value::Map(map)) = map.cast_into() {
@@ -902,7 +903,7 @@ pub fn bif_erlang_is_map_key_2(_vm: &vm::Machine, _process: &RcProcess, args: &[
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
-pub fn bif_erlang_map_get_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_map_get_2(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     let key = &args[0];
     let map = &args[1];
     if let Ok(value::Map(map)) = map.cast_into() {
@@ -918,12 +919,13 @@ pub fn bif_erlang_map_get_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Ter
     Err(Exception::with_value(Reason::EXC_BADMAP, *map))
 }
 
-fn bif_erlang_tuple_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_tuple_size_1(_vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
+    let (mfa, _) = process.context().ip.lookup_func_info().unwrap();
     let tuple = Tuple::cast_from(&args[0])?;
     Ok(Term::uint(&process.context_mut().heap, tuple.len))
 }
 
-fn bif_erlang_byte_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_byte_size_1(_vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     let heap = &process.context_mut().heap;
 
     // TODO: extracted from binary_size macro, share impl!
@@ -949,7 +951,7 @@ fn bif_erlang_byte_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
     Ok(Term::uint64(heap, size as u64))
 }
 
-fn bif_erlang_bit_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_bit_size_1(_vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     let heap = &process.context_mut().heap;
 
     // TODO: extracted from binary_size macro, share impl!
@@ -972,14 +974,14 @@ fn bif_erlang_bit_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     Ok(Term::uint64(heap, size as u64))
 }
 
-pub fn bif_erlang_map_size_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_map_size_1(_vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     let val = value::Map::cast_from(&args[0])?;
     let heap = &process.context_mut().heap;
 
     Ok(Term::uint(heap, val.0.len() as u32))
 }
 
-pub fn bif_erlang_length_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_length_1(_vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     if args[0].is_nil() {
         return Ok(Term::int(0));
     }
@@ -989,7 +991,7 @@ pub fn bif_erlang_length_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]
     Ok(Term::uint(heap, cons.iter().count() as u32))
 }
 
-pub fn bif_erlang_size_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_size_1(vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     if args[0].is_nil() {
         return Ok(Term::int(0));
     }
@@ -1007,16 +1009,16 @@ pub fn bif_erlang_size_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
     Err(badarg!())
 }
 
-fn bif_erlang_throw_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_throw_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     Err(Exception::with_value(Reason::EXC_THROWN, args[0]))
 }
 
-fn bif_erlang_exit_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_exit_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     // println!("exiting proc pid={} with {}", process.pid, args[0]);
     Err(Exception::with_value(Reason::EXC_EXIT, args[0]))
 }
 
-fn bif_erlang_exit_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_exit_2(vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     // arg[0] pid/port
     // arg[1] reason
 
@@ -1039,12 +1041,12 @@ fn bif_erlang_exit_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Re
     }
 }
 
-fn bif_erlang_error_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_error_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     // println!("raising val {}", args[0]);
     Err(Exception::with_value(Reason::EXC_ERROR, args[0]))
 }
 
-fn bif_erlang_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_error_2(_vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     let heap = &process.context_mut().heap;
 
     Err(Exception::with_value(
@@ -1053,7 +1055,7 @@ fn bif_erlang_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     ))
 }
 
-fn bif_erlang_halt_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_halt_2(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     // arg[0] exit code
     // arg[1] options
 
@@ -1064,7 +1066,7 @@ fn bif_erlang_halt_2(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> 
     unimplemented!()
 }
 
-fn bif_erlang_raise_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_raise_3(_vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     let heap = &process.context_mut().heap;
 
     // class, reason, stacktrace
@@ -1097,7 +1099,7 @@ fn bif_erlang_raise_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> 
     })
 }
 
-fn bif_erlang_whereis_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_whereis_1(vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     /* (Atom, Pid|Port)   */
     if let Variant::Atom(name) = args[0].into_variant() {
         if let Some(process) = vm.process_registry.lock().whereis(name) {
@@ -1108,7 +1110,7 @@ fn bif_erlang_whereis_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -
     Err(badarg!())
 }
 
-fn bif_erlang_nif_error_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_nif_error_1(_vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     let (mfa, _) = process.context_mut().ip.lookup_func_info().unwrap();
     print!(
         "Tried running unimplemented NIF {} on pid={}!\r\n",
@@ -1117,7 +1119,7 @@ fn bif_erlang_nif_error_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
     Err(Exception::with_value(Reason::EXC_ERROR, args[0]))
 }
 
-fn bif_erlang_nif_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_nif_error_2(_vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     let heap = &process.context_mut().heap;
 
     Err(Exception::with_value(
@@ -1126,7 +1128,7 @@ fn bif_erlang_nif_error_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
     ))
 }
 
-pub fn bif_erlang_load_nif_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_load_nif_2(vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     // println!("Tried loading nif: {} with args {}", args[0], args[1]);
 
     if let Ok(cons) = args[0].cast_into() {
@@ -1150,21 +1152,21 @@ pub fn bif_erlang_load_nif_2(vm: &vm::Machine, process: &RcProcess, args: &[Term
     Err(badarg!())
 }
 
-pub fn bif_erlang_apply_2(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> Result {
+pub fn bif_erlang_apply_2(_vm: &Machine, _process: &RcProcess, _args: &[Term]) -> Result {
     // fun (closure), args
     // maps to i_apply_fun
 
     unreachable!("apply/2 called without macro override")
 }
 
-pub fn bif_erlang_apply_3(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> Result {
+pub fn bif_erlang_apply_3(_vm: &Machine, _process: &RcProcess, _args: &[Term]) -> Result {
     // module, function (atom), args
     unreachable!("apply/3 called without macro override");
     // maps to i_apply
 }
 
 /// this sets some process info- trapping exits or the error handler
-pub fn bif_erlang_process_flag_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_process_flag_2(_vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     match args[0].into_variant() {
         Variant::Atom(atom::TRAP_EXIT) => {
             let local_data = process.local_data_mut();
@@ -1208,7 +1210,7 @@ pub fn bif_erlang_process_flag_2(_vm: &vm::Machine, process: &RcProcess, args: &
 }
 
 /// register(atom, Process|Port) registers a global process or port (for this node)
-fn bif_erlang_register_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_register_2(vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     /* (Atom, Pid|Port)   */
     if let Variant::Atom(name) = args[0].into_variant() {
         // need to lookup first to get a Pin<Arc<>>
@@ -1227,7 +1229,7 @@ fn bif_erlang_register_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -
 }
 
 /// unregister(atom) unregisters a global process or port (for this node)
-fn bif_erlang_unregister_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_unregister_1(vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     /* (Atom, Pid|Port)   */
     if let Variant::Atom(name) = args[0].into_variant() {
         let res = vm.process_registry.lock().unregister(name);
@@ -1237,7 +1239,7 @@ fn bif_erlang_unregister_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]
     Err(badarg!())
 }
 
-fn bif_erlang_is_process_alive_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_is_process_alive_1(vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     /* (Atom, Pid|Port)   */
     if let Variant::Pid(pid) = args[0].into_variant() {
         let res = vm.process_table.lock().contains_key(pid);
@@ -1247,7 +1249,7 @@ fn bif_erlang_is_process_alive_1(vm: &vm::Machine, _process: &RcProcess, args: &
     Err(badarg!())
 }
 
-fn bif_erlang_function_exported_3(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_function_exported_3(vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     if !args[0].is_atom() || !args[1].is_atom() || !args[2].is_smallint() {
         return Err(badarg!());
     }
@@ -1259,13 +1261,13 @@ fn bif_erlang_function_exported_3(vm: &vm::Machine, _process: &RcProcess, args: 
         arity,
     );
 
-    if vm.exports.read().lookup(&mfa).is_some() || bif::is_bif(&mfa) {
+    if vm.exports.read().lookup(&mfa).is_some() || is_bif(&mfa) {
         return Ok(atom!(TRUE));
     }
     Ok(atom!(FALSE))
 }
 
-fn bif_erlang_module_loaded_1(vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+fn bif_erlang_module_loaded_1(vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     if !args[0].is_atom() {
         return Err(badarg!());
     }
@@ -1278,7 +1280,7 @@ fn bif_erlang_module_loaded_1(vm: &vm::Machine, _process: &RcProcess, args: &[Te
     Ok(atom!(FALSE))
 }
 
-fn bif_erlang_loaded_0(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> Result {
+fn bif_erlang_loaded_0(vm: &Machine, process: &RcProcess, _args: &[Term]) -> Result {
     let heap = &process.context_mut().heap;
     Ok(vm
         .modules
@@ -1292,18 +1294,18 @@ fn bif_erlang_loaded_0(vm: &vm::Machine, process: &RcProcess, _args: &[Term]) ->
 // kept the original OTP comment
 /* returns the head of a list - this function is unecessary
 and is only here to keep Robert happy (Even more, since it's OP as well) */
-pub fn bif_erlang_hd_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_hd_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     let cons = Cons::cast_from(&args[0])?;
     Ok(cons.head)
 }
 
 /* returns the tails of a list - same comment as above */
-pub fn bif_erlang_tl_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_tl_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> Result {
     let cons = Cons::cast_from(&args[0])?;
     Ok(cons.tail)
 }
 
-pub fn bif_erlang_trunc_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+pub fn bif_erlang_trunc_1(_vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     let heap = &process.context_mut().heap;
     match &args[0].into_number() {
         Ok(value::Num::Integer(i)) => Ok(Term::int(*i)),
@@ -1313,19 +1315,19 @@ pub fn bif_erlang_trunc_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term])
     }
 }
 
-fn io_printable_range_0(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> Result {
+fn io_printable_range_0(_vm: &Machine, _process: &RcProcess, _args: &[Term]) -> Result {
     Ok(atom!(LATIN1))
 }
 
-fn garbage_collect_1(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> Result {
+fn garbage_collect_1(_vm: &Machine, _process: &RcProcess, _args: &[Term]) -> Result {
     // TODO: GC unimplemented
     Ok(atom!(TRUE))
 }
-fn scheduler_wall_time_1(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> Result {
+fn scheduler_wall_time_1(_vm: &Machine, _process: &RcProcess, _args: &[Term]) -> Result {
     // TODO: stats unimplemented
     Ok(atom!(FALSE))
 }
-fn inet_open_8(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> Result {
+fn inet_open_8(_vm: &Machine, process: &RcProcess, _args: &[Term]) -> Result {
     // TODO: ports unimplemented
     Ok(tup2!(
         &process.context_mut().heap,
@@ -1333,27 +1335,27 @@ fn inet_open_8(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> Result
         atom!(NATIVE)
     ))
 }
-fn socket_on_load_0(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> Result {
+fn socket_on_load_0(_vm: &Machine, _process: &RcProcess, _args: &[Term]) -> Result {
     // stub for now
     Ok(atom!(OK))
 }
-fn monitor_nodes(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> Result {
+fn monitor_nodes(_vm: &Machine, _process: &RcProcess, _args: &[Term]) -> Result {
     Ok(atom!(OK))
 }
-fn is_alive(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> Result {
+fn is_alive(_vm: &Machine, _process: &RcProcess, _args: &[Term]) -> Result {
     Ok(atom!(FALSE))
 }
-fn dflag_unicode_io(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -> Result {
+fn dflag_unicode_io(_vm: &Machine, _process: &RcProcess, _args: &[Term]) -> Result {
     // TODO: stub for now
     Ok(atom!(TRUE))
 }
 
-fn open_port_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn open_port_2(vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     let pid = port::spawn(vm, process.pid, args[0], args[1])?;
     Ok(Term::port(pid))
 }
 
-fn port_control_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn port_control_3(vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     // println!(
     //     "port_control called with {}, {}, {}",
     //     args[0], args[1], args[2]
@@ -1370,7 +1372,7 @@ fn port_control_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Resul
     Ok(Term::reference(&process.context_mut().heap, reference))
 }
 
-fn erts_internal_port_close_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn erts_internal_port_close_1(vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     let port = match args[0].into_variant() {
         Variant::Port(id) => id,
         _ => return Err(badarg!()),
@@ -1379,7 +1381,7 @@ fn erts_internal_port_close_1(vm: &vm::Machine, process: &RcProcess, args: &[Ter
     Ok(atom!(TRUE))
 }
 
-fn erts_internal_map_next_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn erts_internal_map_next_3(_vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     let heap = &process.context_mut().heap;
     // this is totally hacky but we can't just splat an iter into a number like BEAM does.
     // so what we do is we store the current pos, and then we simply take enough values to
@@ -1406,14 +1408,14 @@ fn erts_internal_map_next_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term
     Ok(res)
 }
 
-fn erts_internal_time_unit_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> Result {
+fn erts_internal_time_unit_0(_vm: &Machine, process: &RcProcess, _args: &[Term]) -> Result {
     let heap = &process.context_mut().heap;
     let unit: u64 = 1000 * 1000 * 1000;
     Ok(Term::uint64(heap, unit))
 }
 
 fn erts_internal_request_system_task_3(
-    _vm: &vm::Machine,
+    _vm: &Machine,
     process: &RcProcess,
     _args: &[Term],
 ) -> Result {
@@ -1423,7 +1425,7 @@ fn erts_internal_request_system_task_3(
 // FIXME: phash and phash2 are the same, and they don't match the ERTS ones. And they return 64 bit
 // vals instead of max 32 bit ones. *shrug*
 
-fn phash_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn phash_2(_vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     let heap = &process.context_mut().heap;
@@ -1440,7 +1442,7 @@ fn phash_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
     }
 }
 
-fn phash2_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn phash2_1(_vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     let heap = &process.context_mut().heap;
@@ -1450,7 +1452,7 @@ fn phash2_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
     Ok(Term::uint64(heap, hash))
 }
 
-fn phash2_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+fn phash2_2(_vm: &Machine, process: &RcProcess, args: &[Term]) -> Result {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     let heap = &process.context_mut().heap;
@@ -1493,7 +1495,7 @@ mod tests {
 
     #[test]
     fn test_bif_erlang_is_atom_1() {
-        let vm = vm::Machine::new();
+        let vm = Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::atom(3)];
@@ -1507,7 +1509,7 @@ mod tests {
 
     #[test]
     fn test_bif_erlang_is_tuple_1() {
-        let vm = vm::Machine::new();
+        let vm = Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
@@ -1523,7 +1525,7 @@ mod tests {
 
     #[test]
     fn test_bif_erlang_is_list_1() {
-        let vm = vm::Machine::new();
+        let vm = Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
@@ -1538,7 +1540,7 @@ mod tests {
     }
     #[test]
     fn test_bif_erlang_is_float_1() {
-        let vm = vm::Machine::new();
+        let vm = Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::from(3.00)];
@@ -1552,7 +1554,7 @@ mod tests {
 
     #[test]
     fn test_bif_erlang_is_integer_1() {
-        let vm = vm::Machine::new();
+        let vm = Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::int(3)];
@@ -1566,7 +1568,7 @@ mod tests {
 
     #[test]
     fn test_bif_erlang_is_number_1() {
-        let vm = vm::Machine::new();
+        let vm = Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::int(3)];
@@ -1589,7 +1591,7 @@ mod tests {
 
     #[test]
     fn test_bif_erlang_is_port_1() {
-        let vm = vm::Machine::new();
+        let vm = Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::port(80)];
@@ -1603,7 +1605,7 @@ mod tests {
 
     #[test]
     fn test_bif_erlang_is_reference_1() {
-        let vm = vm::Machine::new();
+        let vm = Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
@@ -1619,7 +1621,7 @@ mod tests {
 
     #[test]
     fn test_bif_erlang_is_binary_1() {
-        let vm = vm::Machine::new();
+        let vm = Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
@@ -1636,7 +1638,7 @@ mod tests {
 
     #[test]
     fn test_bif_erlang_is_bitstring_1() {
-        let vm = vm::Machine::new();
+        let vm = Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
@@ -1653,7 +1655,7 @@ mod tests {
 
     #[test]
     fn test_bif_erlang_is_function_1() {
-        let vm = vm::Machine::new();
+        let vm = Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
@@ -1675,7 +1677,7 @@ mod tests {
     }
     #[test]
     fn test_bif_erlang_is_boolean_1() {
-        let vm = vm::Machine::new();
+        let vm = Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, 0, module).unwrap();
         let args = vec![Term::atom(atom::TRUE)];
@@ -1689,7 +1691,7 @@ mod tests {
 
     #[test]
     fn test_bif_erlang_is_map_1() {
-        let vm = vm::Machine::new();
+        let vm = Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
@@ -1706,7 +1708,7 @@ mod tests {
 
     #[test]
     fn test_bif_tuple_size_1() {
-        let vm = vm::Machine::new();
+        let vm = Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;
@@ -1719,7 +1721,7 @@ mod tests {
 
     #[test]
     fn test_bif_map_size_1() {
-        let vm = vm::Machine::new();
+        let vm = Machine::new();
         let module: *const module::Module = std::ptr::null();
         let process = process::allocate(&vm, 0, 0, module).unwrap();
         let heap = &process.context_mut().heap;

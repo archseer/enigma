@@ -1,6 +1,6 @@
 use crate::atom::{self, Atom};
 use crate::immix::Heap;
-use crate::instr_ptr::InstrPtr;
+use crate::instruction;
 use crate::loader::FuncInfo;
 use crate::module::MFA;
 use crate::process::RcProcess;
@@ -254,12 +254,12 @@ pub struct StackTrace {
     /// original exception reason is saved in the struct
     pub reason: Reason, // bitflags
     ///
-    pub pc: Option<InstrPtr>,
+    pub pc: Option<instruction::Ptr>,
     pub current: MFA,
     // /// number of saved pointers in trace[]
     // int depth;
     // BeamInstr *trace[1];  /* varying size - must be last in struct */
-    pub trace: Vec<InstrPtr>,
+    pub trace: Vec<instruction::Ptr>,
     pub complete: bool,
 } // TODO: make all fields private with a constructor
 
@@ -305,7 +305,7 @@ impl CastFrom<Term> for StackTrace {
 pub fn handle_error(
     process: &RcProcess,
     mut exc: Exception, /*, bif_mfa: &MFA*/
-) -> Option<InstrPtr> {
+) -> Option<instruction::Ptr> {
     // print!(
     //     "handling error... proc pid={} exc={}\r\n",
     //     process.pid, exc.value
@@ -387,7 +387,7 @@ pub fn handle_error(
 
 /// Find the nearest catch handler
 /// TODO: return is instr pointer
-fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
+fn next_catch(process: &RcProcess) -> Option<instruction::Ptr> {
     let context = process.context_mut();
     let mut ptr = context.stack.len();
     let mut prev = ptr;
@@ -417,7 +417,7 @@ fn next_catch(process: &RcProcess) -> Option<InstrPtr> {
                 }
 
                 let ptr = *context.stack[ptr - 1]
-                    .get_boxed_value::<InstrPtr>()
+                    .get_boxed_value::<instruction::Ptr>()
                     .unwrap();
 
                 // Unwind the stack up to the current frame.
@@ -650,7 +650,11 @@ fn save_stacktrace(
     exc.trace = cons!(heap, args, Term::from(boxed));
 }
 
-pub fn erts_save_stacktrace(process: &RcProcess, trace: &mut Vec<InstrPtr>, mut depth: u32) {
+pub fn erts_save_stacktrace(
+    process: &RcProcess,
+    trace: &mut Vec<instruction::Ptr>,
+    mut depth: u32,
+) {
     let context = process.context_mut();
     if depth == 0 {
         return;

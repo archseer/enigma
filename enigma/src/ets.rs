@@ -153,16 +153,20 @@ bitflags! {
     }
 }
 
-// Shared metadata for all table types.
+/// Shared metadata for all table types.
 pub struct Metadata {
-    ///
+    /// Table ID
     tid: process::Ref,
-    /// atom
+    /// Table name, if registered as a named table.
     name: Option<Atom>,
     status: Status,
+    /// Table type
     kind: Status,
+    /// Tuple element index that's used as the key.
     keypos: usize,
+    /// Owning process
     owner: process::PID,
+    /// Is the table compressed?
     compress: bool,
 }
 

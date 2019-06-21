@@ -75,7 +75,7 @@ pub fn decode<'a>(bytes: &'a [u8], heap: &Heap) -> Term {
     }
 }
 
-pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
+fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
     // next be_u8 specifies the type tag
     let (rest, tag) = be_u8(rest)?;
     let tag: Tag = unsafe { ::std::mem::transmute(tag) };
@@ -135,7 +135,7 @@ pub fn decode_value<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> 
     }
 }
 
-pub fn decode_atom(rest: &[u8]) -> IResult<&[u8], Term> {
+fn decode_atom(rest: &[u8]) -> IResult<&[u8], Term> {
     let (rest, len) = be_u16(rest)?;
     let (rest, string) = take_str!(rest, len)?;
 
@@ -143,7 +143,7 @@ pub fn decode_atom(rest: &[u8]) -> IResult<&[u8], Term> {
     Ok((rest, Term::atom(Atom::from(string))))
 }
 
-pub fn decode_tuple<'a>(rest: &'a [u8], len: u32, heap: &Heap) -> IResult<&'a [u8], Term> {
+fn decode_tuple<'a>(rest: &'a [u8], len: u32, heap: &Heap) -> IResult<&'a [u8], Term> {
     // alloc space for elements
     let tuple = value::tuple(heap, len);
 
@@ -160,7 +160,7 @@ pub fn decode_tuple<'a>(rest: &'a [u8], len: u32, heap: &Heap) -> IResult<&'a [u
     Ok((rest, tuple.into()))
 }
 
-pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
+fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
     let (rest, len) = be_u32(rest)?;
 
     unsafe {
@@ -192,7 +192,7 @@ pub fn decode_list<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
     }
 }
 
-pub fn decode_map<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
+fn decode_map<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
     let (mut new_rest, len) = be_u32(rest)?;
     let mut map = HAMT::new();
 
@@ -208,7 +208,7 @@ pub fn decode_map<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
 
 /// A string of bytes encoded as tag 107 (String) with 16-bit length.
 /// This is basically a list, but it's optimized to decode to char.
-pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
+fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
     let (rest, len) = be_u16(rest)?;
     if len == 0 {
         return Ok((rest, Term::nil()));
@@ -244,7 +244,7 @@ pub fn decode_string<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term>
     }
 }
 
-pub fn decode_binary<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
+fn decode_binary<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
     let (rest, len) = be_u32(rest)?;
     if len == 0 {
         return Ok((rest, Term::binary(heap, bitstring::Binary::new())));
@@ -254,7 +254,7 @@ pub fn decode_binary<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term>
     Ok((rest, Term::binary(heap, bitstring::Binary::from(bytes))))
 }
 
-pub fn decode_bitstring<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
+fn decode_bitstring<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
     let (rest, len) = be_u32(rest)?;
     let (rest, bits) = be_u8(rest)?;
     if len == 0 && bits == 0 {
@@ -274,7 +274,7 @@ pub fn decode_bitstring<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Te
     ))
 }
 
-pub fn decode_export<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
+fn decode_export<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term> {
     let (rest, m) = decode_value(rest, heap)?;
     let (rest, f) = decode_value(rest, heap)?;
     let (rest, a) = decode_value(rest, heap)?;
@@ -293,12 +293,12 @@ pub fn decode_export<'a>(rest: &'a [u8], heap: &Heap) -> IResult<&'a [u8], Term>
 }
 
 #[cfg(target_pointer_width = "32")]
-pub const WORD_BITS: usize = 32;
+const WORD_BITS: usize = 32;
 
 #[cfg(target_pointer_width = "64")]
-pub const WORD_BITS: usize = 64;
+const WORD_BITS: usize = 64;
 
-pub fn decode_bignum<'a>(rest: &'a [u8], size: u32, heap: &Heap) -> IResult<&'a [u8], Term> {
+fn decode_bignum<'a>(rest: &'a [u8], size: u32, heap: &Heap) -> IResult<&'a [u8], Term> {
     let (rest, sign) = be_u8(rest)?;
 
     let sign = if sign == 0 { Sign::Plus } else { Sign::Minus };
@@ -325,7 +325,7 @@ pub fn encode(term: Term) -> std::io::Result<Vec<u8>> {
     Ok(res)
 }
 
-pub fn encode_term(res: &mut Vec<u8>, term: Term) -> std::io::Result<()> {
+fn encode_term(res: &mut Vec<u8>, term: Term) -> std::io::Result<()> {
     use value::{CastFrom, Cons, Tuple};
 
     match term.into_variant() {

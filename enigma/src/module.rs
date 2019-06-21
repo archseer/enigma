@@ -2,8 +2,7 @@ use crate::atom::{self, Atom};
 use crate::bif;
 use crate::exports_table::ExportsTable;
 use crate::immix::Heap;
-use crate::instr_ptr::InstrPtr;
-use crate::instruction::Instruction;
+use crate::instruction::{self, Instruction};
 use crate::loader::Line;
 use crate::value::{self, CastFrom, Term, Variant};
 use crate::vm::Machine;
@@ -54,6 +53,8 @@ pub struct Lambda {
 // TODO: add new, remove pub for all these fields
 #[derive(Debug)]
 pub struct Module {
+    /// Atom name of the module.
+    pub name: Atom,
     pub imports: Vec<MFA>,              // mod,  func, arity
     pub exports: Vec<(Atom, u32, u32)>, // func, arity, label
     pub constants: Vec<Term>,           // basically same as literals... but immediates
@@ -64,9 +65,7 @@ pub struct Module {
     pub instructions: Vec<Instruction>,
     // debugging info
     pub lines: Vec<Line>,
-    /// Atom name of the module.
-    pub name: Atom,
-    // Module attributes (version, compiler settings, etc) -- stored on the literal_heap.
+    /// Module attributes (version, compiler settings, etc) -- stored on the literal_heap.
     pub attrs: Term,
     pub on_load: Option<u32>,
 }
@@ -82,7 +81,7 @@ impl Module {
             let mfa = MFA(self.name, export.0, export.1);
             if !bif::is_bif(&mfa) {
                 // only export if there's no bif override
-                let ptr = InstrPtr {
+                let ptr = instruction::Ptr {
                     module,
                     ptr: funs[&(export.0, export.1)],
                 };
@@ -91,9 +90,9 @@ impl Module {
         });
     }
 
-    pub fn load_nifs(&mut self, vm: &Machine, nifs: &[(Atom, u32, bif::Fn)]) {
+    pub fn load_nifs(&mut self, _vm: &Machine, nifs: &[(Atom, u32, bif::Fn)]) {
         use std::convert::TryInto;
-        let mut exports = vm.exports.write();
+        // let mut exports = vm.exports.write();
 
         for (name, arity, fun) in nifs {
             // find func_info

@@ -2,7 +2,7 @@
 #![recursion_limit = "1024"]
 
 #[macro_use]
-mod macros;
+pub mod macros;
 #[macro_use]
 pub mod exception;
 #[macro_use]
@@ -10,19 +10,18 @@ pub mod vm;
 #[macro_use]
 pub mod nanbox;
 pub mod atom;
-mod bif;
+pub mod bif;
 pub mod bitstring;
 pub mod etf;
 pub mod ets;
 pub mod exports_table;
 mod immix;
-mod instr_ptr;
 pub mod instruction;
 pub mod loader;
 pub mod mailbox;
 pub mod module;
 pub mod module_registry;
-mod numeric;
+pub mod numeric;
 pub mod opcodes;
 pub mod persistent_term;
 pub mod port;

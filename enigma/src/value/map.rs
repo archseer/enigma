@@ -1,13 +1,12 @@
 use super::{Boxed, CastFrom, CastFromMut, Term, Variant, WrongBoxError, BOXED_MAP};
-// use hamt_rs::HamtMap;
 use im::hashmap::HashMap;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
-// TODO: evaluate using im-rs or https://github.com/orium/rpds HashTrieMap
 pub type HAMT = HashMap<Term, Term>;
 
 #[derive(Eq, Clone)]
+#[repr(transparent)]
 pub struct Map(pub HAMT);
 
 impl CastFrom<Term> for Map {

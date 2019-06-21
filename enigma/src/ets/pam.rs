@@ -196,7 +196,7 @@ impl std::fmt::Display for Opcode {
 // The table of callable bif's, i e guard bif's and
 // some special animals that can provide us with trace
 // information. This array is sorted on init.
-pub static GUARD_BIFS: Lazy<HashMap<(Atom, usize), (bif::Fn, Flag)>> = Lazy::new(|| {
+static GUARD_BIFS: Lazy<HashMap<(Atom, usize), (bif::Fn, Flag)>> = Lazy::new(|| {
     let mut table: HashMap<(Atom, usize), (bif::Fn, Flag)> = HashMap::new();
 
     table.insert((atom::IS_ATOM, 1), (bif::bif_erlang_is_atom_1, Flag::DBIF_ALL));
@@ -327,6 +327,7 @@ pub fn has_variable(node: Term) -> bool {
 /// bool tells us if is_constant
 type DMCRet = std::result::Result<bool, Error>;
 
+/// Pattern matching compiler.
 pub(crate) struct Compiler {
     matchexpr: Vec<Term>,
     guardexpr: Vec<Term>,

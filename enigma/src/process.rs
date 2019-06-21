@@ -3,7 +3,7 @@ use crate::atom::{self, Atom};
 use crate::bitstring;
 use crate::exception::{Exception, Reason};
 use crate::immix::Heap;
-use crate::instr_ptr::InstrPtr;
+use crate::instruction::Ptr;
 use crate::instruction;
 use crate::mailbox::Mailbox;
 use crate::module::{Module, MFA};
@@ -12,16 +12,17 @@ use crate::signal_queue::SignalQueue;
 pub use crate::signal_queue::{ExitKind, Signal};
 use crate::value::{self, CastInto, Term};
 use crate::vm::Machine;
+
 use hashbrown::{HashMap, HashSet};
 use std::cell::UnsafeCell;
 // use std::panic::RefUnwindSafe;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use futures::compat::*;
-use futures::prelude::*;
-use std::pin::Pin;
 use tokio::prelude::*;
+
+use futures::prelude::*;
 
 pub mod registry;
 pub mod table;
@@ -33,6 +34,7 @@ pub type Ref = usize;
 // TODO: Only store "live" regs in the execution context and swap them into VM/scheduler
 // also this way, regs could be a &mut [] slice with no clone?
 
+/// Maximum amount of X registers.
 pub const MAX_REG: usize = 1024;
 // pub const MAX_REG: usize = 255;
 
@@ -43,12 +45,15 @@ bitflags! {
     }
 }
 
+/// Process state after each execution chunk
 pub enum State {
+    /// Done, process has exited / finished executing.
     Done,
+    /// Yield, re-schedule the process to continue executing.
     Yield,
 }
 
-// #[derive(Debug)]
+/// Represents all state necessary for code execution.
 pub struct ExecutionContext {
     /// X registers.
     pub x: [Term; MAX_REG],
@@ -57,14 +62,15 @@ pub struct ExecutionContext {
     /// Stack (accessible through Y registers).
     pub stack: Vec<Term>,
     /// Stores continuation pointers
-    pub callstack: Vec<(instruction::Regs, Option<InstrPtr>)>,
+    pub callstack: Vec<(instruction::Regs, Option<instruction::Ptr>)>,
+    /// Process heap
     pub heap: Heap,
     /// Number of catches on stack.
     pub catches: usize,
     /// Program pointer, points to the current instruction.
-    pub ip: InstrPtr,
+    pub ip: instruction::Ptr,
     /// Continuation pointer
-    pub cp: Option<InstrPtr>,
+    pub cp: Option<instruction::Ptr>,
     /// Current function
     pub current: MFA,
     pub live: usize,
@@ -141,7 +147,7 @@ impl ExecutionContext {
             callstack: Vec::with_capacity(8),
             heap: Heap::new(),
             catches: 0,
-            ip: InstrPtr { ptr: 0, module },
+            ip: instruction::Ptr { ptr: 0, module },
             cp: None,
             live: 0,
 
@@ -176,34 +182,40 @@ bitflags! {
     }
 }
 
+/// Process-local data. Should only be touched by the owning process.
 pub struct LocalData {
-    // allocator, panic handler
     context: Box<ExecutionContext>,
 
     pub state: StateFlag,
 
+    /// Parent process PID
     parent: PID,
 
+    /// Group leader PID (where to route I/O to)
     pub group_leader: PID,
 
-    // name (atom)
+    /// Name, if the process is registered as a named process.
     pub name: Option<Atom>,
 
+    /// Initial function call that the process was started with.
     pub initial_call: MFA,
 
     /// error handler, defaults to error_handler
     pub error_handler: Atom,
 
-    // links (tree)
+    /// A set of PIDs representing linked processes.
     pub links: HashSet<PID>,
-    // monitors (tree)
+
+    /// A map of monitor references to process PIDs.
     pub monitors: HashMap<Ref, PID>,
-    // lt_monitors (list)
+
+    /// A list of PIDs to processes that monitor this process.
     pub lt_monitors: Vec<(PID, Ref)>,
 
-    // signals are sent on death, and the receiving side cleans up it's link/mon structures
+    /// A three-stage signal queue for messages and process lifecycle signals.
     pub signal_queue: SignalQueue,
 
+    /// A mailbox, storing received messages.
     pub mailbox: Mailbox,
 
     pub flags: Flag,
@@ -512,7 +524,7 @@ impl Process {
         }
     }
 
-    // equivalent of erts_continue_exit_process
+    /// Process exited, execute shutdown routines.
     pub fn exit(&self, vm: &Machine, reason: Exception) {
         let local_data = self.local_data_mut();
 
@@ -566,6 +578,7 @@ impl Process {
     }
 }
 
+/// Create a new process and register it in the process table.
 pub fn allocate(
     vm: &Machine,
     parent: PID,
@@ -602,6 +615,7 @@ bitflags! {
     }
 }
 
+/// Spawn a new process on the virtual machine.
 pub fn spawn(
     vm: &Machine,
     parent: &RcProcess,
@@ -677,6 +691,7 @@ pub fn spawn(
     Ok(ret)
 }
 
+/// Send a message from `sender` to `pid`.
 pub fn send_message(vm: &Machine, sender: PID, pid: Term, msg: Term) -> Result<Term, Exception> {
     // println!("sending from={} to={}, msg={}", sender, pid, msg);
     let receiver = match pid.into_variant() {
@@ -701,6 +716,7 @@ pub fn send_message(vm: &Machine, sender: PID, pid: Term, msg: Term) -> Result<T
     Ok(msg)
 }
 
+/// Send a signal to `pid`.
 pub fn send_signal(vm: &Machine, pid: PID, signal: Signal) -> bool {
     if let Some(receiver) = vm.process_table.lock().get(pid) {
         receiver.send_signal(signal);

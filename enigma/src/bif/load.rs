@@ -1,6 +1,6 @@
 use crate::atom::{self, Atom};
 use crate::bif;
-use crate::loader::Loader;
+use crate::loader;
 use crate::module::{self, Module};
 use crate::process::RcProcess;
 use crate::value::{self, CastFrom, CastInto, Cons, Term, Variant};
@@ -20,16 +20,12 @@ pub fn prepare_loading_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) 
     // arg[0] module name atom, arg[1] raw bytecode bytes
     let heap = &process.context_mut().heap;
 
-    // TODO merge new + load_file?
-    let loader = Loader::new();
-
     args[1]
         .to_bytes()
         .ok_or_else(|| badarg!())
         .map(|bytes| maybe_uncompress(bytes))
         .and_then(|bytes| {
-            loader
-                .load_file(bytes.as_ref())
+            loader::load_file(bytes.as_ref())
                 // we box to allocate a permanent space, then we unbox since we'll carry around
                 // the raw pointer that we will Box::from_raw when finalizing.
                 .map(|module| {

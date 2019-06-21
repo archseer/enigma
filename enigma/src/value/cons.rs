@@ -11,8 +11,6 @@ pub struct Cons {
     pub tail: Term,
 }
 
-unsafe impl Sync for Cons {}
-
 impl PartialEq for Cons {
     fn eq(&self, other: &Self) -> bool {
         self.iter().eq(other.iter())

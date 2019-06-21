@@ -567,7 +567,6 @@ pub enum Opcode {
     Swap = 169,
 
     // enigma specific
-
     JumpOnVal = 170,
     CallBif = 171,
     CallBifLast = 172,
@@ -580,7 +579,7 @@ pub enum Opcode {
     IApplyLast = 179,
 }
 
-pub static ARITY_MAP: &'static [usize] = &[
+static ARITY_MAP: &'static [usize] = &[
     0, // opcode 0 does not exist
     1, // opcode: 1 (label)
     3, // opcode: 2 (func_info)
