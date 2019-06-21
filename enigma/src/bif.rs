@@ -349,9 +349,16 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "list_to_bin", 1 => erlang::list_to_binary_1,
             "copy", 1 => binary::copy_1,
             "copy", 2 => binary::copy_2,
+            "split", 2 => binary::split_2,
             "split", 3 => binary::split_3,
+            "match", 2 => binary::match_2,
+            "match", 3 => binary::match_3,
+            "matches", 2 => binary::matches_2,
             "matches", 3 => binary::matches_3,
+            "compile_pattern", 1 => binary::compile_pattern_1,
             "longest_common_prefix", 1 => binary::longest_common_prefix_1,
+            "first", 1 => binary::first_1,
+            "last", 1 => binary::last_1,
         },
         "unicode" => {
             "characters_to_binary", 2 => erlang::unicode_characters_to_binary_2,
@@ -379,6 +386,7 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
         "re" => {
             "version", 0 => regex::bif::version_0,
             "run", 3 => regex::bif::run_3,
+            "compile", 1 => regex::bif::compile_1,
             "compile", 2 => regex::bif::compile_2,
         },
         "persistent_term" => {

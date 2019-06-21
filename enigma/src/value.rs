@@ -22,6 +22,7 @@ pub use self::closure::Closure;
 pub use self::cons::Cons;
 pub use self::map::{Map, HAMT};
 pub use self::tuple::Tuple;
+pub use crate::atom::Atom;
 
 /// Equivalent to TryFrom, but will cast into a reference on heap.
 pub trait CastFrom<T>: Sized {
@@ -192,14 +193,15 @@ pub enum Special {
 
 #[derive(Debug, Copy, Clone, Eq, Hash)]
 pub enum Variant {
-    Float(self::Float),
+    Float(Float),
     Nil(Special), // TODO: expand nil to be able to hold different types of empty (tuple, list, map)
     Integer(i32),
-    Atom(atom::Atom),
+    Atom(Atom),
     Port(u32),
     Pid(process::PID),
-    Cons(*const self::Cons),
-    Pointer(*const Header), // tuple, map, binary, ref
+    Cons(*const Cons),
+    /// A boxed value on the heap.
+    Pointer(*const Header),
 }
 unsafe impl Send for Variant {}
 // unsafe impl Sync for Variant {}
@@ -698,18 +700,6 @@ impl Term {
             _ => Err(()),
         }
     }
-
-    // // TODO: ExtendedList should instead become a Term vec
-    // pub fn into_lvalue(self) -> Option<loader::LValue> {
-    //     match self.into_variant() {
-    //         // TODO: use get type
-    //         Variant::Integer(i) => Some(loader::LValue::Constant(self)),
-    //         Variant::Atom(i) => Some(loader::LValue::Constant(self)),
-    //         Variant::Nil(..) => Some(loader::LValue::Constant(self)),
-    //         // TODO Variant::Float(self::Float(i)) => Num::Float(i),
-    //         _ => None,
-    //     }
-    // }
 
     // ------
 

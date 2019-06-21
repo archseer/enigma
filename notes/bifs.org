@@ -337,11 +337,11 @@
 - [ ] bif erl_ddll:monitor/2
 - [ ] bif erl_ddll:demonitor/1
 
-** Bifs in the re module  [2/5]
+** Bifs in the re module  [5/5]
 - [X] bif re:version/0
-- [ ] bif re:compile/1
-- [ ] bif re:compile/2
-- [ ] bif re:run/2
+- [X] bif re:compile/1
+- [X] bif re:compile/2
+- [X] bif re:run/2
 - [X] bif re:run/3
 
 ** Bifs in lists module. [5/5]
@@ -428,19 +428,19 @@
 ** New Bifs in R13B04 [0/1]
 - [ ] bif erlang:binary_to_term/2
 
-** The binary match bifs (New in R14A - EEP9) [11/24]
+** The binary match bifs (New in R14A - EEP9) [17/24]
 The searching/splitting/substituting thingies
 - [X] ubif erlang:binary_part/2
 - [X] ubif erlang:binary_part/3
-- [ ] bif binary:compile_pattern/1
-- [ ] bif binary:match/2
-- [ ] bif binary:match/3
-- [ ] bif binary:matches/2
+- [X] bif binary:compile_pattern/1
+- [X] bif binary:match/2
+- [X] bif binary:match/3
+- [X] bif binary:matches/2
 - [X] bif binary:matches/3
 - [X] bif binary:longest_common_prefix/1
 - [ ] bif binary:longest_common_suffix/1
-- [ ] bif binary:first/1
-- [ ] bif binary:last/1
+- [X] bif binary:first/1
+- [X] bif binary:last/1
 - [ ] bif binary:at/2
 - [X] bif binary:part/2 binary_binary_part_2
 - [X] bif binary:part/3 binary_binary_part_3
@@ -520,11 +520,11 @@ They are also internal, for dtrace tags sent to the VM's own drivers (efile)
 - [ ] bif ets:update_counter/4
 - [ ] bif erts_debug:map_info/1
 
-** New in 19.0 [3/9]
+** New in 19.0 [4/9]
 - [ ] bif erts_internal:is_process_executing_dirty/1
 - [ ] bif erts_internal:check_dirty_process_code/2
 - [ ] bif erts_internal:purge_module/2
-- [ ] bif binary:split/2
+- [X] bif binary:split/2
 - [X] bif binary:split/3
 - [ ] bif erts_debug:size_shared/1
 - [ ] bif erts_debug:copy_shared/1

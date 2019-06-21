@@ -158,6 +158,46 @@ pub fn part_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Res
     Ok(Term::subbinary(heap, subbin))
 }
 
+// TODO: share some of the impl with split
+pub fn compile_pattern_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    use regex::bytes::Regex;
+    let heap = &process.context_mut().heap;
+
+    // pattern = binary | [binary] | compiled
+    let regex = if let Some(bytes) = args[0].to_bytes() {
+        let pattern = regex::escape(std::str::from_utf8(bytes).unwrap());
+        let regex = Regex::new(&pattern).unwrap();
+        regex
+    } else if args[0].is_list() {
+        let mut iter = args[0];
+        let mut acc = Vec::new();
+        while let Ok(Cons { head, tail }) = Cons::cast_from(&iter) {
+            // TODO: error handling
+            let bytes = head.to_bytes().unwrap();
+            let pattern = regex::escape(std::str::from_utf8(bytes).unwrap());
+            acc.push(pattern);
+            iter = *tail;
+        }
+
+        if !iter.is_nil() {
+            return Err(badarg!());
+        }
+
+        let pattern = acc.join("|");
+        let regex = Regex::new(&pattern).unwrap();
+        regex
+    } else {
+        return Err(badarg!());
+    };
+
+    Ok(Term::regex(heap, regex))
+}
+
+pub fn split_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    split_3(vm, process, &[args[0], args[1], Term::nil()])
+}
+
+// TODO: split on "" is invalid
 pub fn split_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     use regex::bytes::Regex;
     use std::borrow::Cow;
@@ -273,8 +313,8 @@ pub fn split_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
                     } else {
                         acc.push(SubBinary::new(
                             bin.clone(),
-                            (offs + last) * 8,
                             (subject.len() - last) * 8,
+                            (offs + last) * 8,
                             false,
                         ));
 
@@ -282,11 +322,10 @@ pub fn split_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
                     }
                 }
                 Some(m) => {
-                    let pos = offs + last;
                     acc.push(SubBinary::new(
                         bin.clone(),
+                        (m.start() - last) * 8,
                         (offs + last) * 8,
-                        (m.start() - pos) * 8,
                         false,
                     ));
                     last = m.end();
@@ -299,8 +338,116 @@ pub fn split_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Re
         });
         Ok(res)
     } else {
-        unimplemented!()
+        let res = match regex.find(subject) {
+            None => cons!(heap, args[0], Term::nil()),
+            Some(m) => {
+                let s1 = SubBinary::new(bin.clone(), m.start() * 8, offs * 8, false);
+                let s2 = SubBinary::new(
+                    bin.clone(),
+                    (subject.len() - m.end()) * 8,
+                    (offs + m.end()) * 8,
+                    false,
+                );
+                cons!(
+                    heap,
+                    Term::subbinary(heap, s1),
+                    cons!(heap, Term::subbinary(heap, s2), Term::nil())
+                )
+            }
+        };
+        Ok(res)
     }
+}
+
+pub fn match_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    match_3(vm, process, &[args[0], args[1], Term::nil()])
+}
+
+// mostly identical to matches/3
+pub fn match_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    use regex::bytes::Regex;
+    use std::borrow::Cow;
+    let heap = &process.context_mut().heap;
+    // <subject> <pattern> <options>
+
+    // subject = binary
+    let subject = match args[0].to_bytes() {
+        Some(bytes) => bytes,
+        None => return Err(badarg!()),
+    };
+
+    // pattern = binary | [binary] | compiled
+    let regex = if let Ok(regex) = Regex::cast_from(&args[1]) {
+        Cow::Borrowed(regex)
+    } else if let Some(bytes) = args[1].to_bytes() {
+        let pattern = regex::escape(std::str::from_utf8(bytes).unwrap());
+        let regex = Regex::new(&pattern).unwrap();
+        Cow::Owned(regex)
+    } else if args[1].is_list() {
+        let mut iter = args[1];
+        let mut acc = Vec::new();
+        while let Ok(Cons { head, tail }) = Cons::cast_from(&iter) {
+            // TODO: error handling
+            let bytes = head.to_bytes().unwrap();
+            let pattern = regex::escape(std::str::from_utf8(bytes).unwrap());
+            acc.push(pattern);
+            iter = *tail;
+        }
+
+        if !iter.is_nil() {
+            return Err(badarg!());
+        }
+
+        let pattern = acc.join("|");
+        let regex = Regex::new(&pattern).unwrap();
+        Cow::Owned(regex)
+    } else {
+        return Err(badarg!());
+    };
+
+    // parse options
+    if let Ok(cons) = Cons::cast_from(&args[2]) {
+        for val in cons.iter() {
+            match val.into_variant() {
+                Variant::Pointer(..) => {
+                    if let Ok(tup) = Tuple::cast_from(&args[2]) {
+                        if tup.len != 2 {
+                            return Err(badarg!());
+                        }
+
+                        match tup[0].into_variant() {
+                            Variant::Atom(atom::SCOPE) => unimplemented!(),
+                            _ => return Err(badarg!()),
+                        }
+                    } else {
+                        return Err(badarg!());
+                    }
+                }
+                _ => return Err(badarg!()),
+            }
+        }
+    } else if args[2].is_nil() {
+        // skip
+    } else {
+        return Err(badarg!());
+    }
+
+    let res = regex
+        .find(subject)
+        .map(|m| {
+            tup2!(
+                heap,
+                Term::uint64(heap, m.start() as u64),
+                Term::uint64(heap, (m.end() - m.start()) as u64)
+            )
+        })
+        .unwrap_or_else(|| atom!(NOMATCH));
+
+    Ok(res)
+}
+
+pub fn matches_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    matches_3(vm, process, &[args[0], args[1], Term::nil()])
 }
 
 // very similar to split: extract helpers
@@ -473,4 +620,30 @@ pub fn copy_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Res
 
     let bin = copy(bytes, n);
     Ok(Term::binary(heap, bin))
+}
+
+pub fn first_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let heap = &process.context_mut().heap;
+    let bytes = match args[0].to_bytes() {
+        Some(bytes) => bytes,
+        _ => return Err(badarg!()),
+    };
+
+    match bytes.first() {
+        Some(b) => Ok(Term::uint(heap, u32::from(*b))),
+        None => Err(badarg!()),
+    }
+}
+
+pub fn last_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
+    let heap = &process.context_mut().heap;
+    let bytes = match args[0].to_bytes() {
+        Some(bytes) => bytes,
+        _ => return Err(badarg!()),
+    };
+
+    match bytes.last() {
+        Some(b) => Ok(Term::uint(heap, u32::from(*b))),
+        None => Err(badarg!()),
+    }
 }

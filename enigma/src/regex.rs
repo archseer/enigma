@@ -1,6 +1,7 @@
 //use crate::servo_arc::Arc;
-use crate::bitstring;
-use regex::bytes::Regex;
+use crate::value::{Cons, Variant};
+use crate::{atom, bitstring};
+use regex::bytes::{Regex, RegexBuilder};
 
 // pub mod error;
 // use std::error::Error;
@@ -20,6 +21,10 @@ pub mod bif {
             &process.context_mut().heap,
             bitstring::Binary::from(version.as_bytes().to_owned()),
         ))
+    }
+
+    pub fn run_2(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+        run_3(vm, process, &[args[0], args[1], Term::nil()])
     }
 
     pub fn run_3(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
@@ -70,19 +75,48 @@ pub mod bif {
         }
     }
 
+    pub fn compile_1(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
+        compile_2(vm, process, &[args[0], args[1], Term::nil()])
+    }
+
     pub fn compile_2(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> Result {
         let heap = &process.context_mut().heap;
-        if !args[1].is_nil() {
-            unimplemented!("re:compile/2: {} {}", args[0], args[1]);
-        }
 
         let pattern = crate::bif::erlang::list_to_iodata(args[0]).unwrap(); // TODO: error handling
-                                                                            // this is terrible, but the syntax is incompatible
-        let pattern = String::from_utf8(pattern).unwrap().replace("(?<", "(?P<");
-        // TODO verify args
-        let regex = Regex::new(&pattern).unwrap();
 
-        Ok(tup2!(heap, atom!(OK), Term::regex(heap, regex)))
+        // this is terrible, but the syntax is incompatible
+        let pattern = String::from_utf8(pattern).unwrap().replace("(?<", "(?P<");
+
+        let mut builder = RegexBuilder::new(&pattern);
+        let mut unicode = false;
+
+        if !args[1].is_list() {
+            for value in Cons::cast_from(&args[1])?.iter() {
+                match value.into_variant() {
+                    Variant::Atom(atom::CASELESS) => builder.case_insensitive(true),
+                    Variant::Atom(atom::UNICODE) => {
+                        unicode = true;
+                        builder.unicode(true)
+                    }
+                    Variant::Atom(atom::UNGREEDY) => builder.swap_greed(true),
+                    Variant::Atom(atom::MULTILINE) => builder.multi_line(true),
+                    Variant::Atom(atom::DOTALL) => builder.dot_matches_new_line(true),
+                    _ => unimplemented!("{}", args[1]),
+                };
+            }
+        }
+
+        // TODO verify args
+        let regex = builder.build().unwrap();
+
+        Ok(tup!(
+            heap,
+            atom!(RE_PATTERN),
+            Term::uint64(heap, regex.captures_len() as u64),
+            Term::int(if unicode { 1 } else { 0 }),
+            Term::int(0), // TODO: use_crlf
+            Term::regex(heap, regex)
+        ))
     }
 
 }

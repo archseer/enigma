@@ -412,6 +412,12 @@ pub(self) static ATOMS: Lazy<RwLock<AtomTable>> = Lazy::new(|| {
     atoms.insert("global");
     atoms.insert("scope");
 
+    atoms.insert("caseless");
+    atoms.insert("ungreedy");
+    atoms.insert("multiline");
+    atoms.insert("dotall");
+    atoms.insert("re_pattern");
+
     RwLock::new(atoms)
 });
 
@@ -732,3 +738,9 @@ pub const TRIM: Atom = Atom(264);
 pub const TRIM_ALL: Atom = Atom(265);
 pub const GLOBAL: Atom = Atom(266);
 pub const SCOPE: Atom = Atom(267);
+
+pub const CASELESS: Atom = Atom(268);
+pub const UNGREEDY: Atom = Atom(269);
+pub const MULTILINE: Atom = Atom(270);
+pub const DOTALL: Atom = Atom(271);
+pub const RE_PATTERN: Atom = Atom(272);

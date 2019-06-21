@@ -80,8 +80,7 @@ pub fn get_cwd_nif_0(_vm: &vm::Machine, process: &RcProcess, _args: &[Term]) -> 
 
 pub fn set_cwd_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     let heap = &process.context_mut().heap;
-    let cons = Cons::cast_from(&args[0])?;
-    let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
+    let path = args[0].to_str().unwrap();
 
     match std::env::set_current_dir(path) {
         Ok(()) => Ok(atom!(OK)),
@@ -536,11 +535,7 @@ pub fn make_dir_nif_1(_vm: &vm::Machine, _process: &RcProcess, _args: &[Term]) -
 pub fn del_file_nif_1(_vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // arg[0] = filename
     let heap = &process.context_mut().heap;
-
-    // TODO: needs to work with binary and list based strings
-    // TODO bitstrings or non zero offsets can fail ...
-    let cons = Cons::cast_from(&args[0])?;
-    let path = value::cons::unicode_list_to_buf(cons, 2048).unwrap();
+    let path = args[0].to_str().unwrap();
 
     match fs::remove_file(path) {
         Ok(()) => Ok(atom!(OK)),
