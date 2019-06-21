@@ -41,7 +41,7 @@ bitflags = "1.0.4"
 getopts = "0.2.19"
 log = "0.4.6"
 simplelog = "0.5.3"
-hashbrown = "0.4.0"
+hashbrown = "0.5.0"
 nodrop = "0.1.13"
 statrs = "0.11.0"
 lexical = { version = "2.1.0", features = ["radix"]}

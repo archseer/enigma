@@ -33,8 +33,7 @@ moment, that relies on the BEAM build system:
 ```bash
 git submodule update --init --depth 1
 cd otp
-./otp_build autoconf
-./otp_build configure
+/otp_build setup -a
 make libs
 make local_setup
 ```

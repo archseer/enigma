@@ -659,7 +659,7 @@ pub fn integer_to_list_1(_vm: &Machine, process: &RcProcess, args: &[Term]) -> b
 }
 
 pub fn integer_to_list_2(_vm: &Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    use lexical::ToBytes;
+    use lexical::ToLexical;
 
     let radix = match args[1].into_variant() {
         Variant::Integer(i) if i >= 2 && i <= 16 => i as u8,
@@ -668,7 +668,7 @@ pub fn integer_to_list_2(_vm: &Machine, process: &RcProcess, args: &[Term]) -> b
 
     match args[0].into_number() {
         Ok(value::Num::Integer(i)) => {
-            let string = i.to_bytes_radix(radix);
+            let string = i.to_lexical_radix(radix);
             let heap = &process.context_mut().heap;
 
             Ok(string.into_iter().rev().fold(Term::nil(), |acc, val| {
@@ -689,10 +689,10 @@ pub fn integer_to_list_2(_vm: &Machine, process: &RcProcess, args: &[Term]) -> b
 }
 
 pub fn integer_to_binary_1(_vm: &Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    use lexical::ToBytes;
+    use lexical::ToLexical;
     match args[0].into_number() {
         Ok(value::Num::Integer(i)) => {
-            let string = i.to_bytes();
+            let string = i.to_lexical();
             let heap = &process.context_mut().heap;
 
             Ok(Term::binary(heap, bitstring::Binary::from(string)))
@@ -715,7 +715,7 @@ pub fn integer_to_binary_1(_vm: &Machine, process: &RcProcess, args: &[Term]) ->
 }
 
 pub fn integer_to_binary_2(_vm: &Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    use lexical::ToBytes;
+    use lexical::ToLexical;
 
     let radix = match args[1].into_variant() {
         Variant::Integer(i) if i >= 2 && i <= 16 => i as u8,
@@ -724,7 +724,7 @@ pub fn integer_to_binary_2(_vm: &Machine, process: &RcProcess, args: &[Term]) ->
 
     match args[0].into_number() {
         Ok(value::Num::Integer(i)) => {
-            let string = i.to_bytes_radix(radix);
+            let string = i.to_lexical_radix(radix);
             let heap = &process.context_mut().heap;
 
             Ok(Term::binary(heap, bitstring::Binary::from(string)))
