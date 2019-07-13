@@ -19,12 +19,18 @@ test = false
 
 [dependencies]
 instruction-codegen = { path = "../instruction-codegen" }
-tokio = "0.1.20"
-tokio-threadpool = "0.1.14"
-tokio-executor = "0.1.7"
-tokio-signal = "0.2.7"
-futures-preview = {git = "https://github.com/rust-lang-nursery/futures-rs/", features = ["compat", "io-compat", "async-await", "nightly"]}
-futures01 = { package = "futures", version = "0.1" }
+# tokio = "0.1.20"
+# tokio-threadpool = "0.1.14"
+# tokio-executor = "0.1.7"
+# tokio-signal = "0.2.7"
+tokio = {git = "https://github.com/tokio-rs/tokio" }
+# tokio-threadpool = {git = "https://github.com/tokio-rs/tokio" }
+# tokio-executor = {git = "https://github.com/tokio-rs/tokio" }
+tokio-signal = {git = "https://github.com/tokio-rs/tokio" }
+tokio-fs = {git = "https://github.com/tokio-rs/tokio" } # temporary until re-exported
+futures-preview = { version = "0.3.0-alpha.17", features = ["std", "async-await", "nightly"]} # compat, io-compat
+# tokio-stdin-stdout = "0.1.5"
+# tokio-stdin-stdout = { path = "../../tokio-stdin-stdout" }
 # futures-native-timers = { git = "https://github.com/tinaun/futures-native-timers" }
 
 nom = "4.2.3"
@@ -40,14 +46,13 @@ chrono = "0.4.6"
 bitflags = "1.0.4"
 getopts = "0.2.19"
 log = "0.4.6"
-simplelog = "0.5.3"
+# simplelog = "0.5.3"
 hashbrown = "0.5.0"
 nodrop = "0.1.13"
 statrs = "0.11.0"
 lexical = { version = "2.1.0", features = ["radix"]}
 dirs = "2.0.1"
 termion = "1.5.2"
-tokio-stdin-stdout = "0.1.5"
 regex = "1.1.6"
 im = "13.0.0"
 bytes = "0.4.12"

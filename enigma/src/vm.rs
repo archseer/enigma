@@ -24,7 +24,6 @@ use std::time;
 
 // use tokio::prelude::*;
 use futures::{
-    // compat::*,
     prelude::*,
 };
 
@@ -230,14 +229,11 @@ impl Machine {
 
         self.start_main_process(args);
 
-        // Create an infinite stream of "Ctrl+C" notifications. Each item received
-        // on this stream may represent multiple ctrl-c signals.
-        use futures01::future::Future;
-        use futures01::stream::Stream;
-        let ctrl_c = tokio_signal::ctrl_c().flatten_stream();
-
         // Wait until the runtime becomes idle and shut it down.
-        vm.runtime.block_on(ctrl_c.into_future()).ok().unwrap();
+        vm.runtime.block_on(async {
+            let mut ctrl_c = tokio_signal::CtrlC::new().await.unwrap();
+            ctrl_c.next().await;
+        })
         // TODO: proper shutdown
         // self.process_pool.shutdown_on_idle().wait().unwrap();
         // runtime.shutdown_now().wait(); // TODO: block_on
@@ -267,7 +263,7 @@ impl Machine {
         context.ip.ptr = module.funs[&(fun, arity)];
 
         let future = run_with_error_handling(process);
-        self.process_pool.executor().spawn(future.unit_error().boxed().compat());
+        self.process_pool.executor().spawn(future);
 
         // ------
 
@@ -280,7 +276,7 @@ impl Machine {
         let arity = 0;
         context.ip.ptr = module.funs[&(fun, arity)];
         let future = run_with_error_handling(process);
-        self.process_pool.executor().spawn(future.unit_error().boxed().compat());
+        self.process_pool.executor().spawn(future);
 
 
         // self.process_pool.schedule(process);

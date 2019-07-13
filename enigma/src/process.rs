@@ -686,7 +686,7 @@ pub fn spawn(
     let future = crate::vm::run_with_error_handling(new_proc);
     vm.process_pool
         .executor()
-        .spawn(future.unit_error().boxed().compat());
+        .spawn(future);
 
     Ok(ret)
 }

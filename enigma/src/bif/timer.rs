@@ -23,12 +23,10 @@ pub fn send_after_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif
     let from = process.pid;
 
     let when = Instant::now() + Duration::from_millis(u64::from(delay));
-    let fut = Delay::new(when)
-        .and_then(move |_| {
-            vm::Machine::with_current(|vm| process::send_message(vm, from, dest, msg));
-            Ok(())
-        })
-        .map_err(|e| panic!("delay errored; err={:?}", e));
+    let fut = async move {
+        Delay::new(when).await;
+        vm::Machine::with_current(|vm| process::send_message(vm, from, dest, msg));
+    };
     vm.runtime.executor().spawn(fut);
 
     let heap = &process.context_mut().heap;

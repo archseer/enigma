@@ -10,7 +10,6 @@ use crate::value::{self, CastFrom, CastInto, CastIntoMut, Cons, Term, Tuple, Var
 use crate::vm::Machine;
 use crate::{atom, bif, bitstring, module, port};
 
-use futures::compat::*;
 use futures::prelude::*;
 // end mandatory for loop
 
@@ -885,8 +884,8 @@ instruction!(
                 let when = time::Duration::from_millis(ms as u64);
                 use tokio::prelude::FutureExt;
 
-                match cancel.into_future().boxed().compat().timeout(when).compat().await {
-                    Ok(()) =>  {
+                match cancel.timeout(when).await {
+                    Ok(_) =>  {
                         // jump to success (start of recv loop)
                         op_jump!(context, label);
                         // println!("select! resumption pid={}", process.pid);
