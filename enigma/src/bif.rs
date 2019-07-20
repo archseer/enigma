@@ -18,6 +18,7 @@ pub mod arith;
 pub mod binary;
 mod chrono;
 mod dtrace;
+pub mod erf;
 pub mod erlang;
 mod info;
 mod lists;
@@ -264,8 +265,8 @@ pub static BIFS: Lazy<BifTable> = Lazy::new(|| {
             "asinh", 1 => arith::math_asinh_1,
             "atan", 1 => arith::math_atan_1,
             "atanh", 1 => arith::math_atanh_1,
-            "erf", 1 => arith::math_erf_1,
-            "erfc", 1 => arith::math_erfc_1,
+            "erf", 1 => erf::math_erf_1,
+            "erfc", 1 => erf::math_erfc_1,
             "exp", 1 => arith::math_exp_1,
             "log", 1 => arith::math_log_1,
             "log", 1 => arith::math_log_1,

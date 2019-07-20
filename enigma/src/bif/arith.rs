@@ -7,7 +7,6 @@ use crate::vm;
 use num_bigint::BigInt;
 // use num_bigint::ToBigInt;
 use num_traits::Signed;
-use statrs;
 use std::ops::{Add, Mul, Sub};
 
 pub fn float_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
@@ -151,26 +150,6 @@ pub fn math_atan_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bi
 
 pub fn math_atanh_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
     trig_func!(args[0], atanh)
-}
-
-pub fn math_erf_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
-    let res = match args[0].into_number() {
-        Ok(value::Num::Integer(i)) => f64::from(i),
-        Ok(value::Num::Float(f)) => f,
-        Ok(value::Num::Bignum(..)) => unimplemented!(),
-        Err(_) => return Err(badarg!()),
-    };
-    Ok(Term::from(statrs::function::erf::erf(res)))
-}
-
-pub fn math_erfc_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {
-    let res = match args[0].into_number() {
-        Ok(value::Num::Integer(i)) => f64::from(i),
-        Ok(value::Num::Float(f)) => f,
-        Ok(value::Num::Bignum(..)) => unimplemented!(),
-        Err(_) => return Err(badarg!()),
-    };
-    Ok(Term::from(1.0_f64 - statrs::function::erf::erf(res)))
 }
 
 pub fn math_exp_1(_vm: &vm::Machine, _process: &RcProcess, args: &[Term]) -> bif::Result {

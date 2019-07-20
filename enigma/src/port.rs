@@ -162,8 +162,7 @@ pub fn send_message(
                     Variant::Atom(atom::COMMAND) => {
                         // TODO: validate tuple len 2
                         let bytes = crate::bif::erlang::list_to_iodata(cmd[1]).unwrap();
-                        // TODO: can probably do without await, if we make sure we don't need 'static
-                        vm.runtime.block_on(async move { chan.send(Signal::Command(bytes)).await; });
+                        vm.runtime.block_on(chan.send(Signal::Command(bytes)));
                     }
                     _ => unimplemented!("msg to port {}", msg),
                 }
@@ -292,8 +291,7 @@ fn cvt<T: IsMinusOne>(t: T) -> io::Result<T> {
 async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
     use termion::terminal_size;
     let mut buf: [u8;1024] = [0;1024];
-    // let mut stdin = tokio::io::stdin();
-    let mut stdin = tokio_fs::stdin();
+    let mut stdin = tokio::io::stdin();
     let mut input = input.fuse();
 
     let out = std::io::stdout();
@@ -446,7 +444,7 @@ async fn tty(id: ID, owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
 }
 
 async fn stderr(id: ID, _owner: PID, input: mpsc::UnboundedReceiver<Signal>) {
-    let mut stderr = tokio_fs::stderr();
+    let mut stderr = tokio::io::stderr();
     let mut input = input.fuse();
 
     loop {

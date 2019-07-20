@@ -118,7 +118,7 @@ pub struct WrongBoxError;
 
 /// A term is a nanboxed compact representation of a value in 64 bits. It can either be immediate,
 /// in which case it embeds the data, or a boxed pointer, that points to more data.
-#[derive(Debug, Copy, Clone, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Term {
     value: NanBox,
 }

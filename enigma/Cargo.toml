@@ -27,7 +27,6 @@ tokio = {git = "https://github.com/tokio-rs/tokio" }
 # tokio-threadpool = {git = "https://github.com/tokio-rs/tokio" }
 # tokio-executor = {git = "https://github.com/tokio-rs/tokio" }
 tokio-signal = {git = "https://github.com/tokio-rs/tokio" }
-tokio-fs = {git = "https://github.com/tokio-rs/tokio" } # temporary until re-exported
 futures-preview = { version = "0.3.0-alpha.17", features = ["std", "async-await", "nightly"]} # compat, io-compat
 # tokio-stdin-stdout = "0.1.5"
 # tokio-stdin-stdout = { path = "../../tokio-stdin-stdout" }
@@ -39,7 +38,7 @@ num-traits = "0.2.7"
 num-integer = "0.1.40"
 libflate = "0.1.22"
 once_cell = "0.2.0"
-parking_lot = "0.8.0"
+parking_lot = "0.9.0"
 allocator_api = "0.6.0"
 time = "0.1.42"
 chrono = "0.4.6"
@@ -49,7 +48,6 @@ log = "0.4.6"
 # simplelog = "0.5.3"
 hashbrown = "0.5.0"
 nodrop = "0.1.13"
-statrs = "0.11.0"
 lexical = { version = "2.1.0", features = ["radix"]}
 dirs = "2.0.1"
 termion = "1.5.2"
