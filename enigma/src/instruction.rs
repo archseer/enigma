@@ -882,7 +882,7 @@ instruction!(
             },
             Variant::Integer(ms) => {
                 let when = time::Duration::from_millis(ms as u64);
-                use tokio::prelude::FutureExt;
+                use tokio::future::FutureExt;
 
                 match cancel.timeout(when).await {
                     Ok(_) =>  {

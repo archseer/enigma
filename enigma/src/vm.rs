@@ -231,7 +231,7 @@ impl Machine {
 
         // Wait until the runtime becomes idle and shut it down.
         vm.runtime.block_on(async {
-            let mut ctrl_c = tokio_signal::CtrlC::new().await.unwrap();
+            let mut ctrl_c = tokio_net::signal::CtrlC::new().unwrap();
             ctrl_c.next().await;
         })
         // TODO: proper shutdown

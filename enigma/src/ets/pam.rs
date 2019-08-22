@@ -272,7 +272,7 @@ pub fn is_variable(obj: Term) -> Option<usize> {
                 .and_then(|name| {
                     let name = name.as_bytes();
                     if name[0] == b'$' {
-                        lexical::try_parse::<usize, _>(&name[1..]).ok()
+                        lexical::parse::<usize, _>(&name[1..]).ok()
                     } else { None }
                 })
         }

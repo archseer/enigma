@@ -12,9 +12,9 @@ name = "tests"
 path = "tests/progress.rs"
 
 [dependencies]
-syn = { version = "0.15.34", features = ["parsing", "extra-traits"] }
-proc-macro2 = "0.4.30"
-proc-quote = "0.2.2"
+syn = { version = "1.0.3", features = ["parsing", "extra-traits"] }
+proc-macro2 = "1.0.1"
+proc-quote = "0.3.0"
 permutate = "0.3.2"
 heck = "0.3.1"
 # lalrpop-util = "0.17.0"

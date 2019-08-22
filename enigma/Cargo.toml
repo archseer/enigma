@@ -19,17 +19,9 @@ test = false
 
 [dependencies]
 instruction-codegen = { path = "../instruction-codegen" }
-# tokio = "0.1.20"
-# tokio-threadpool = "0.1.14"
-# tokio-executor = "0.1.7"
-# tokio-signal = "0.2.7"
-tokio = {git = "https://github.com/tokio-rs/tokio" }
-# tokio-threadpool = {git = "https://github.com/tokio-rs/tokio" }
-# tokio-executor = {git = "https://github.com/tokio-rs/tokio" }
-tokio-signal = {git = "https://github.com/tokio-rs/tokio" }
-futures-preview = { version = "0.3.0-alpha.17", features = ["std", "async-await", "nightly"]} # compat, io-compat
-# tokio-stdin-stdout = "0.1.5"
-# tokio-stdin-stdout = { path = "../../tokio-stdin-stdout" }
+tokio = { version = "0.2.0-alpha.2" }
+tokio-net = { version = "0.2.0-alpha.2", features = ["signal"] }
+futures-preview = { version = "0.3.0-alpha.18", features = ["std", "async-await", "nightly"] }
 # futures-native-timers = { git = "https://github.com/tinaun/futures-native-timers" }
 
 nom = "4.2.3"
@@ -46,9 +38,9 @@ bitflags = "1.0.4"
 getopts = "0.2.19"
 log = "0.4.6"
 # simplelog = "0.5.3"
-hashbrown = "0.5.0"
+hashbrown = "0.6.0"
 nodrop = "0.1.13"
-lexical = { version = "2.1.0", features = ["radix"]}
+lexical = { version = "3.0.0", features = ["radix"]}
 dirs = "2.0.1"
 termion = "1.5.2"
 regex = "1.1.6"

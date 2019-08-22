@@ -774,9 +774,9 @@ pub fn binary_to_integer_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -
         Some(b) => b,
         _ => return Err(badarg!()),
     };
-    match lexical::try_parse::<i32, _>(bytes) {
+    match lexical::parse::<i32, _>(bytes) {
         Ok(i) => Ok(Term::int(i)),
-        Err(err) => panic!("errored with {}", err), //TODO bigint
+        Err(err) => panic!("errored with {:?}", err), //TODO bigint
     }
 }
 
@@ -784,9 +784,9 @@ pub fn list_to_integer_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> 
     // list to string
     let cons = Cons::cast_from(&args[0])?;
     let string = value::cons::unicode_list_to_buf(cons, 2048)?;
-    match lexical::try_parse::<i32, _>(string) {
+    match lexical::parse::<i32, _>(string) {
         Ok(i) => Ok(Term::int(i)),
-        Err(err) => panic!("errored with {}", err), //TODO
+        Err(err) => panic!("errored with {:?}", err), //TODO
     }
 }
 
@@ -804,20 +804,24 @@ pub fn string_list_to_integer_1(_vm: &Machine, process: &RcProcess, args: &[Term
             .to_owned()
     };
 
-    match lexical::try_parse::<i32, _>(string.clone()) {
+    match lexical::parse::<i32, _>(string.clone()) {
         // the api is not great here, need to clone
         Ok(i) => Ok(tup2!(heap, Term::int(i), Term::nil())),
         Err(err) => {
-            match err.kind() {
-                lexical::ErrorKind::InvalidDigit(0) => {
-                    Ok(tup2!(heap, atom!(ERROR), atom!(NO_INTEGER)))
-                }
-                lexical::ErrorKind::InvalidDigit(n) => {
+            match err {
+                lexical::Error {
+                    code: lexical::ErrorCode::InvalidDigit,
+                    index: 0,
+                } => Ok(tup2!(heap, atom!(ERROR), atom!(NO_INTEGER))),
+                lexical::Error {
+                    code: lexical::ErrorCode::InvalidDigit,
+                    index: n,
+                } => {
                     // TODO: tests
                     Ok(tup2!(
                         heap,
-                        Term::int(lexical::parse::<i32, _>(&string[..*n])),
-                        string[*n..].iter().rev().fold(Term::nil(), |acc, b| cons!(
+                        Term::int(lexical::parse::<i32, _>(&string[..n]).unwrap()),
+                        string[n..].iter().rev().fold(Term::nil(), |acc, b| cons!(
                             heap,
                             Term::int(i32::from(*b)),
                             acc
@@ -834,9 +838,9 @@ pub fn list_to_float_1(_vm: &Machine, _process: &RcProcess, args: &[Term]) -> bi
     // list to string
     let cons = Cons::cast_from(&args[0])?;
     let string = value::cons::unicode_list_to_buf(cons, 2048)?;
-    match lexical::try_parse::<f64, _>(string) {
+    match lexical::parse::<f64, _>(string) {
         Ok(f) => Ok(Term::from(f)),
-        Err(err) => panic!("errored with {}", err), //TODO
+        Err(err) => panic!("errored with {:?}", err), //TODO
     }
 }
 
