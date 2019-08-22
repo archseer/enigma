@@ -1,4 +1,3 @@
-#![feature(alloc_layout_extra)]
 #![recursion_limit = "1024"]
 
 #[macro_use]

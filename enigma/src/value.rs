@@ -1339,7 +1339,16 @@ pub fn tuple(heap: &Heap, len: u32) -> &mut Tuple {
         header: BOXED_TUPLE,
         len,
     });
-    let layout = Layout::new::<Term>().repeat(len as usize).unwrap().0;
+    //
+    // TODO: Layout::array::<Term>(len as usize).unwrap() once it's stable
+    // https://github.com/rust-lang/rust/issues/55724#issuecomment-515489742
+    let layout = Layout::from_size_align(
+        std::mem::size_of::<Term>()
+            .checked_mul(len as usize)
+            .unwrap(),
+        std::mem::align_of::<Term>(),
+    )
+    .unwrap();
     heap.alloc_layout(layout);
     tuple
 }
