@@ -2,7 +2,9 @@ use crate::atom::Atom;
 use crate::{bitstring, module, instruction};
 use crate::exception::{self, Exception, Reason};
 use crate::process::{self, RcProcess};
-use crate::servo_arc::Arc;
+// needs arbitrary_self_types
+// use crate::servo_arc::Arc;
+use std::sync::Arc;
 use crate::value::{Cons, Term};
 
 use crate::ets::{RcTableRegistry, TableRegistry};
@@ -220,10 +222,10 @@ impl Machine {
     ///
     /// This method returns true if the VM terminated successfully, false
     /// otherwise.
-    pub fn start(self: &Arc<Self>, args: Vec<String>) {
+    pub fn start(self: Arc<Self>, args: Vec<String>) {
         let (tx, rx) = futures::channel::oneshot::channel::<()>();
 
-        let vm = unsafe { &mut *(&**self as *const Machine as *mut Machine) };
+        let vm = unsafe { &mut *(&*self as *const Machine as *mut Machine) };
 
         vm.exit = Some(tx);
 
