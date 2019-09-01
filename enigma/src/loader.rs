@@ -449,7 +449,8 @@ impl<'a> Loader<'a> {
                         last_func_start = pos; // store pos for line number data
                         let f = Atom(self.atom_map[&(*f - 1)]); // necessary because atoms weren't remapped yet
                         self.funs
-                            .insert((f, *a as u32), (instructions.len() as u32) + 1); // need to point after func_info
+                            .insert((f, *a as u32), (instructions.len() as u32) + 1);
+                    // need to point after func_info
                     } else {
                         panic!("Bad argument to {:?}", instruction.op)
                     }

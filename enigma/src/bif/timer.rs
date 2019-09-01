@@ -5,7 +5,6 @@ use crate::vm;
 
 use std::time::{Duration, Instant};
 use tokio::prelude::*;
-use tokio::timer::Delay;
 
 pub fn send_after_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
     // time, dest, msg
@@ -24,7 +23,7 @@ pub fn send_after_3(vm: &vm::Machine, process: &RcProcess, args: &[Term]) -> bif
 
     let when = Instant::now() + Duration::from_millis(u64::from(delay));
     let fut = async move {
-        Delay::new(when).await;
+        tokio::timer::delay(when).await;
         vm::Machine::with_current(|vm| process::send_message(vm, from, dest, msg));
     };
     vm.runtime.executor().spawn(fut);

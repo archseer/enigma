@@ -25,9 +25,7 @@ use std::sync::atomic::AtomicUsize;
 use std::time;
 
 // use tokio::prelude::*;
-use futures::{
-    prelude::*,
-};
+use futures::prelude::*;
 
 /// A reference counted State.
 pub type RcMachine = Arc<Machine>;
@@ -233,7 +231,7 @@ impl Machine {
 
         // Wait until the runtime becomes idle and shut it down.
         vm.runtime.block_on(async {
-            let mut ctrl_c = tokio_net::signal::CtrlC::new().unwrap();
+            let mut ctrl_c = tokio_net::signal::ctrl_c().unwrap();
             ctrl_c.next().await;
         })
         // TODO: proper shutdown
