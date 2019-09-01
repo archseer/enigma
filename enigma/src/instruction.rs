@@ -443,8 +443,8 @@ macro_rules! op_call_ext {
 
         match export {
             Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
-            Some(Export::Bif(APPLY_2)) => unreachable!("apply/2 called via call_ext"),
-            Some(Export::Bif(APPLY_3)) => unreachable!("apply/3 called via call_ext"),
+            // Some(Export::Bif(APPLY_2)) => unreachable!("apply/2 called via call_ext"),
+            // Some(Export::Bif(APPLY_3)) => unreachable!("apply/3 called via call_ext"),
             Some(Export::Bif(_)) => unreachable!("bif called without call_bif: {}", mfa),
             // Some(Export::Bif(bif)) => {
             //     // precomputed in most cases, but not for nifs
@@ -601,7 +601,8 @@ macro_rules! op_apply {
 
         match export {
             Some(Export::Fun(ptr)) => op_jump_ptr!($context, ptr),
-            Some(Export::Bif(APPLY_2)) => {
+            // Workaround for https://github.com/rust-lang/rust/issues/63479
+            Some(Export::Bif(bif)) if (bif as usize) == (APPLY_2 as usize) => {
                 // TODO: rewrite these two into Apply instruction calls
                 // I'm cheating here, *shrug*
                 op_apply_fun!($vm, $context, $process)

@@ -661,16 +661,22 @@ impl<'a> Loader<'a> {
                     match crate::bif::BIFS.get(mfa) {
                         // apply/2 is an instruction, not a BIF.
                         // call_ext u==2 u$func:erlang:apply/2 => i_apply_fun
-                        Some(&APPLY_2) => self.instructions.push(Instruction {
-                            op: O::ApplyFun,
-                            args: vec![],
-                        }),
+                        // Workaround for https://github.com/rust-lang/rust/issues/63479
+                        Some(bif) if (*bif as usize) == (APPLY_2 as usize) => {
+                            self.instructions.push(Instruction {
+                                op: O::ApplyFun,
+                                args: vec![],
+                            })
+                        }
                         // The apply/3 BIF is an instruction.
                         // call_ext u==3 u$bif:erlang:apply/3 => i_apply
-                        Some(&APPLY_3) => self.instructions.push(Instruction {
-                            op: O::IApply,
-                            args: vec![],
-                        }),
+                        // Workaround for https://github.com/rust-lang/rust/issues/63479
+                        Some(bif) if (*bif as usize) == (APPLY_3 as usize) => {
+                            self.instructions.push(Instruction {
+                                op: O::IApply,
+                                args: vec![],
+                            })
+                        }
                         // call_ext u Bif=u$is_bif => call_bif Bif
                         Some(bif) => self.instructions.push(Instruction {
                             op: O::CallBif,
@@ -684,15 +690,19 @@ impl<'a> Loader<'a> {
                     let mfa = &imports[*i as usize];
                     match crate::bif::BIFS.get(mfa) {
                         // call_ext_last u==2 u$func:erlang:apply/2 D => i_apply_fun_last D
-                        Some(&APPLY_2) => self.instructions.push(Instruction {
-                            op: O::ApplyFunLast,
-                            args: vec![d.clone()],
-                        }),
+                        Some(bif) if (*bif as usize) == (APPLY_2 as usize) => {
+                            self.instructions.push(Instruction {
+                                op: O::ApplyFunLast,
+                                args: vec![d.clone()],
+                            })
+                        }
                         // call_ext_last u==3 u$bif:erlang:apply/3 D => i_apply_last D
-                        Some(&APPLY_3) => self.instructions.push(Instruction {
-                            op: O::IApplyLast,
-                            args: vec![d.clone()],
-                        }),
+                        Some(bif) if (*bif as usize) == (APPLY_3 as usize) => {
+                            self.instructions.push(Instruction {
+                                op: O::IApplyLast,
+                                args: vec![d.clone()],
+                            })
+                        }
                         // call_ext_last u Bif=u$is_bif D => deallocate D | call_bif_only Bif
                         Some(bif) => {
                             self.instructions.push(Instruction {
@@ -708,15 +718,19 @@ impl<'a> Loader<'a> {
                     let mfa = &imports[*i as usize];
                     match crate::bif::BIFS.get(mfa) {
                         // call_ext_only u==2 u$func:erlang:apply/2 => i_apply_fun_only
-                        Some(&APPLY_2) => self.instructions.push(Instruction {
-                            op: O::ApplyFunOnly,
-                            args: vec![],
-                        }),
+                        Some(bif) if (*bif as usize) == (APPLY_2 as usize) => {
+                            self.instructions.push(Instruction {
+                                op: O::ApplyFunOnly,
+                                args: vec![],
+                            })
+                        }
                         // call_ext_only u==3 u$bif:erlang:apply/3 => i_apply_only
-                        Some(&APPLY_3) => self.instructions.push(Instruction {
-                            op: O::IApplyOnly,
-                            args: vec![],
-                        }),
+                        Some(bif) if (*bif as usize) == (APPLY_3 as usize) => {
+                            self.instructions.push(Instruction {
+                                op: O::IApplyOnly,
+                                args: vec![],
+                            })
+                        }
                         // call_ext_only Ar=u Bif=u$is_bif => call_bif_only Bif
                         Some(bif) => self.instructions.push(Instruction {
                             op: O::CallBifOnly,
