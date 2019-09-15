@@ -659,8 +659,6 @@ pub fn integer_to_list_1(_vm: &Machine, process: &RcProcess, args: &[Term]) -> b
 }
 
 pub fn integer_to_list_2(_vm: &Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    use lexical::ToLexical;
-
     let radix = match args[1].into_variant() {
         Variant::Integer(i) if i >= 2 && i <= 16 => i as u8,
         _ => return Err(badarg!()),
@@ -668,12 +666,16 @@ pub fn integer_to_list_2(_vm: &Machine, process: &RcProcess, args: &[Term]) -> b
 
     match args[0].into_number() {
         Ok(value::Num::Integer(i)) => {
-            let string = i.to_lexical_radix(radix);
+            let string = lexical::to_string_radix(i, radix);
             let heap = &process.context_mut().heap;
 
-            Ok(string.into_iter().rev().fold(Term::nil(), |acc, val| {
-                cons!(heap, Term::int(i32::from(val)), acc)
-            }))
+            Ok(string
+                .into_bytes()
+                .into_iter()
+                .rev()
+                .fold(Term::nil(), |acc, val| {
+                    cons!(heap, Term::int(i32::from(val)), acc)
+                }))
         }
         Ok(value::Num::Bignum(i)) => {
             unimplemented!("integer_to_binary_2 with radix");
@@ -689,10 +691,9 @@ pub fn integer_to_list_2(_vm: &Machine, process: &RcProcess, args: &[Term]) -> b
 }
 
 pub fn integer_to_binary_1(_vm: &Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    use lexical::ToLexical;
     match args[0].into_number() {
         Ok(value::Num::Integer(i)) => {
-            let string = i.to_lexical();
+            let string = lexical::to_string(i).into_bytes();
             let heap = &process.context_mut().heap;
 
             Ok(Term::binary(heap, bitstring::Binary::from(string)))
@@ -715,8 +716,6 @@ pub fn integer_to_binary_1(_vm: &Machine, process: &RcProcess, args: &[Term]) ->
 }
 
 pub fn integer_to_binary_2(_vm: &Machine, process: &RcProcess, args: &[Term]) -> bif::Result {
-    use lexical::ToLexical;
-
     let radix = match args[1].into_variant() {
         Variant::Integer(i) if i >= 2 && i <= 16 => i as u8,
         _ => return Err(badarg!()),
@@ -724,7 +723,7 @@ pub fn integer_to_binary_2(_vm: &Machine, process: &RcProcess, args: &[Term]) ->
 
     match args[0].into_number() {
         Ok(value::Num::Integer(i)) => {
-            let string = i.to_lexical_radix(radix);
+            let string = lexical::to_string_radix(i, radix).into_bytes();
             let heap = &process.context_mut().heap;
 
             Ok(Term::binary(heap, bitstring::Binary::from(string)))
