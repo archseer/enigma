@@ -698,15 +698,11 @@ pub fn integer_to_binary_1(_vm: &Machine, process: &RcProcess, args: &[Term]) ->
 
             Ok(Term::binary(heap, bitstring::Binary::from(string)))
         }
-        Ok(value::Num::Bignum(i)) => {
-            unimplemented!("integer_to_binary_1 with bignum");
-            // let string = i.to_bytes();
-            // let heap = &process.context_mut().heap;
+        Ok(value::Num::Bignum(bigint)) => {
+            let string = bigint.to_str_radix(10).into_bytes();
+            let heap = &process.context_mut().heap;
 
-            // Ok(Term::binary(
-            //     heap,
-            //     bitstring::Binary::from(string),
-            // ))
+            Ok(Term::binary(heap, bitstring::Binary::from(string)))
         }
         _ => {
             println!("integer_to_list_1 called with {}", args[0]);
@@ -728,15 +724,11 @@ pub fn integer_to_binary_2(_vm: &Machine, process: &RcProcess, args: &[Term]) ->
 
             Ok(Term::binary(heap, bitstring::Binary::from(string)))
         }
-        Ok(value::Num::Bignum(i)) => {
-            unimplemented!("integer_to_binary_2 with bignum");
-            // let string = i.to_bytes_radix(radix);
-            // let heap = &process.context_mut().heap;
+        Ok(value::Num::Bignum(bigint)) => {
+            let string = bigint.to_str_radix(radix as u32).into_bytes();
+            let heap = &process.context_mut().heap;
 
-            // Ok(Term::binary(
-            //     heap,
-            //     bitstring::Binary::from(string),
-            // ))
+            Ok(Term::binary(heap, bitstring::Binary::from(string)))
         }
         _ => {
             println!("integer_to_list_2 called with {}", args[0]);
